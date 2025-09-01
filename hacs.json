@@ -1,5 +1,5 @@
 {
   "name": "Drag & Drop Card",
   "render_readme": true,
-  "filename": "drag-and-drop-card.js"
+  "filename": "dist/drag-and-drop-card.js"
 }
