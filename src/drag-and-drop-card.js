@@ -2892,3 +2892,18 @@ _syncEmptyStateUI() {
 if (!customElements.get('drag-and-drop-card')) {
   customElements.define('drag-and-drop-card', DragAndDropCard);
 }
+
+/* Register in HA's card picker */
+(() => {
+  try {
+    const list = (window.customCards = window.customCards || []);
+    if (!list.some(c => c.type === 'drag-and-drop-card')) {
+      list.push({
+        type: 'drag-and-drop-card',   // no "custom:" here
+        name: 'Drag & Drop Card',
+        description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
+        preview: true
+      });
+    }
+  } catch (e) { /* no-op */ }
+})();
