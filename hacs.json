@@ -1,5 +1,6 @@
 {
   "name": "Drag & Drop Card",
   "render_readme": true,
-  "filename": "dist/drag-and-drop-card.js"
+  "filename": "drag-and-drop-card.js",
+  "homeassistant": "2025.8.0"
 }
