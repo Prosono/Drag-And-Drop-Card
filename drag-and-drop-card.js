@@ -1,0 +1,2886 @@
+// drag-and-drop-card.js
+/* eslint-disable no-console */
+const LOG = (m, ...a) => console.debug(`[drag-and-drop-card] ${m}`, ...a);
+console.info('%c drag-and-drop-card loaded', 'color:#03a9f4;font-weight:700;');
+
+const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
+const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
+
+class DragAndDropCard extends HTMLElement {
+  /* ------------------------- Mini config editor (HA) ------------------------- */
+  static getConfigElement() {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <style>
+        .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
+        input[type="text"],input[type="number"],select{
+          padding:6px;border-radius:8px;border:1px solid var(--divider-color);
+          background:var(--primary-background-color);color:var(--primary-text-color)
+        }
+        label{font-weight:600;min-width:130px}
+        .inline{display:inline-flex;gap:8px;align-items:center}
+        .hint{opacity:.65;font-size:.85rem}
+      </style>
+  
+      <div class="cfg-row">
+        <label>Storage key</label>
+        <input type="text" id="storage_key" placeholder="e.g. livingroom_layout">
+      </div>
+  
+      <div class="cfg-row">
+        <label>Grid (px)</label>
+        <input type="number" id="grid" min="5" step="1" value="10">
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="liveSnap"> Snap while dragging (live)</label>
+      </div>
+  
+      <div class="cfg-row">
+        <label>Auto-save</label>
+        <input type="checkbox" id="autoSave" checked>
+        <span style="margin-left:auto">Debounce (ms)</span>
+        <input type="number" id="autoSaveDebounce" min="0" step="50" value="800" style="width:90px">
+      </div>
+  
+      <div class="cfg-row">
+        <label>Container BG</label>
+        <input type="text" id="containerBg" placeholder="transparent">
+      </div>
+  
+      <div class="cfg-row">
+        <label>Card BG</label>
+        <input type="text" id="cardBg" placeholder="var(--ha-card-background, var(--card-background-color))">
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="debug"> Debug logs</label>
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="noOverlap"> Disable overlapping</label>
+      </div>
+  
+      <!-- NEW: container sizing -->
+      <div class="cfg-row">
+        <label>Container size</label>
+        <select id="sizeMode">
+          <option value="dynamic">Dynamic (auto)</option>
+          <option value="fixed_custom">User preference (px)</option>
+          <option value="preset">Preset</option>
+        </select>
+  
+        <span id="sizeCustom" class="inline" style="display:none">
+          W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
+          H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
+        </span>
+  
+        <span id="sizePresetWrap" class="inline" style="display:none">
+          <select id="sizePreset" style="min-width:240px"></select>
+          <select id="sizeOrientation">
+            <option value="auto">Auto</option>
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+          </select>
+        </span>
+        <span class="hint">In fixed mode, cards cannot leave the box.</span>
+      </div>
+    `;
+  
+    // ----- helpers to populate presets -----
+    const PRESETS = DragAndDropCard._sizePresets(); // static helper below
+    const presetSel = el.querySelector('#sizePreset');
+    const addGroup = (label, items) => {
+      const og = document.createElement('optgroup'); og.label = label;
+      items.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.key;
+        o.textContent = `${p.label} (${p.w}×${p.h})`;
+        presetSel.appendChild(o);
+      });
+      presetSel.appendChild(og);
+    };
+    // build grouped list
+    [
+      ['Phones',   PRESETS.filter(p => p.group==='phone')],
+      ['Tablets',  PRESETS.filter(p => p.group==='tablet')],
+      ['Desktop',  PRESETS.filter(p => p.group==='desktop')],
+    ].forEach(([g,items])=>{
+      if (!items.length) return;
+      const og = document.createElement('optgroup'); og.label = g;
+      items.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
+        og.appendChild(o);
+      });
+      presetSel.appendChild(og);
+    });
+  
+    const toggleSizeControls = () => {
+      const mode = el.querySelector('#sizeMode').value;
+      el.querySelector('#sizeCustom').style.display = mode==='fixed_custom' ? 'inline-flex' : 'none';
+      el.querySelector('#sizePresetWrap').style.display = mode==='preset' ? 'inline-flex' : 'none';
+    };
+  
+    // set incoming values (keep type + unknown keys)
+    el.setConfig = (config = {}) => {
+      el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
+      el.querySelector('#storage_key').value = config.storage_key || '';
+      el.querySelector('#grid').value = config.grid ?? 10;
+      el.querySelector('#liveSnap').checked = !!config.drag_live_snap;
+      el.querySelector('#autoSave').checked = config.auto_save !== false;
+      el.querySelector('#autoSaveDebounce').value = config.auto_save_debounce ?? 800;
+      el.querySelector('#containerBg').value = config.container_background ?? 'transparent';
+      el.querySelector('#cardBg').value = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+      el.querySelector('#debug').checked = !!config.debug;
+      el.querySelector('#noOverlap').checked = !!config.disable_overlap;
+  
+      // NEW
+      el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
+      el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
+      el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
+      el.querySelector('#sizePreset').value = config.container_preset || 'fullhd';
+      el.querySelector('#sizeOrientation').value = config.container_preset_orientation || 'auto';
+      toggleSizeControls();
+    };
+  
+    // read current values (merge back into previous config, keep type)
+    el.getConfig = () => {
+      const base = { ...(el._config || { type: 'custom:drag-and-drop-card' }) };
+      base.type = base.type || 'custom:drag-and-drop-card';
+      base.storage_key = el.querySelector('#storage_key').value || undefined;
+      base.grid = Number(el.querySelector('#grid').value || 10);
+      base.drag_live_snap = !!el.querySelector('#liveSnap').checked;
+      base.auto_save = !!el.querySelector('#autoSave').checked;
+      base.auto_save_debounce = Number(el.querySelector('#autoSaveDebounce').value || 800);
+      base.container_background = el.querySelector('#containerBg').value || 'transparent';
+      base.card_background = el.querySelector('#cardBg').value || 'var(--ha-card-background, var(--card-background-color))';
+      base.debug = !!el.querySelector('#debug').checked;
+      base.disable_overlap = !!el.querySelector('#noOverlap').checked;
+  
+      // NEW
+      base.container_size_mode = el.querySelector('#sizeMode').value;
+      base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
+      base.container_fixed_height = Number(el.querySelector('#sizeH').value || 0) || undefined;
+      base.container_preset = el.querySelector('#sizePreset').value || undefined;
+      base.container_preset_orientation = el.querySelector('#sizeOrientation').value || 'auto';
+      return base;
+    };
+  
+    // notify HA when anything changes
+    const fire = () => {
+      el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
+    };
+    const on = (sel, ev = 'input') => el.querySelector(sel)?.addEventListener(ev, () => { if (sel==='#sizeMode') toggleSizeControls(); fire(); });
+  
+    on('#storage_key'); on('#grid');
+    on('#liveSnap','change'); on('#autoSave','change'); on('#autoSaveDebounce');
+    on('#containerBg'); on('#cardBg');
+    on('#debug','change'); on('#noOverlap','change');
+  
+    // NEW listeners
+    on('#sizeMode','change'); on('#sizeW'); on('#sizeH');
+    on('#sizePreset','change'); on('#sizeOrientation','change');
+  
+    return el;
+  }
+  
+    /* ---------------------------- Size helpers ---------------------------- */
+  // ---- size presets (CSS pixels) ----
+static _sizePresets() {
+  return [
+    // Phones
+    { key:'iphone-14-pro',      label:'iPhone 14 Pro',        w:393,  h:852,  group:'phone' },
+    { key:'iphone-14-pro-max',  label:'iPhone 14 Pro Max',    w:430,  h:932,  group:'phone' },
+    { key:'iphone-se-2',        label:'iPhone SE (2/3rd gen)',w:375,  h:667,  group:'phone' },
+    { key:'pixel-7',            label:'Pixel 7',              w:412,  h:915,  group:'phone' },
+    { key:'galaxy-s8',          label:'Galaxy S8',            w:360,  h:740,  group:'phone' },
+    { key:'galaxy-s20-ultra',   label:'Galaxy S20 Ultra',     w:412,  h:915,  group:'phone' },
+
+    // Tablets
+    { key:'ipad-9-7',           label:'iPad 9.7"',            w:768,  h:1024, group:'tablet' },
+    { key:'ipad-11-pro',        label:'iPad Pro 11"',         w:834,  h:1194, group:'tablet' },
+    { key:'ipad-12-9-pro',      label:'iPad Pro 12.9"',       w:1024, h:1366, group:'tablet' },
+    { key:'surface-go-3',       label:'Surface Go 3',         w:800,  h:1280, group:'tablet' },
+
+    // Desktop / Displays
+    { key:'hd',                 label:'HD',                   w:1366, h:768,  group:'desktop' },
+    { key:'wxga-plus',          label:'WXGA+',                w:1440, h:900,  group:'desktop' },
+    { key:'fhd',                label:'Full HD',              w:1920, h:1080, group:'desktop' },
+    { key:'qhd',                label:'2K / QHD',             w:2560, h:1440, group:'desktop' },
+    { key:'uhd-4k',             label:'4K UHD',               w:3840, h:2160, group:'desktop' },
+  ];
+}
+
+_isContainerFixed() { return this.containerSizeMode !== 'dynamic'; }
+
+_resolveFixedSize() {
+  if (this.containerSizeMode === 'fixed_custom') {
+    const w = Math.max(100, Number(this.containerFixedWidth || 0));
+    const h = Math.max(100, Number(this.containerFixedHeight || 0));
+    return { w, h };
+  }
+  if (this.containerSizeMode === 'preset') {
+    const p = DragAndDropCard._sizePresets().find(x => x.key === this.containerPreset) ||
+              DragAndDropCard._sizePresets().find(x => x.key === 'fhd');
+    if (!p) return { w: 1920, h: 1080 };
+    let w = p.w, h = p.h;
+    if (this.containerPresetOrient === 'portrait' && w > h) [w,h] = [h,w];
+    if (this.containerPresetOrient === 'landscape' && h > w) [w,h] = [h,w];
+    return { w, h };
+  }
+  return null;
+}
+
+_applyContainerSizingFromConfig(initial=false) {
+  // set container size according to mode
+  const c = this.cardContainer; if (!c) return;
+
+  if (this._isContainerFixed()) {
+    const { w, h } = this._resolveFixedSize();
+    c.style.width  = `${w}px`;
+    c.style.height = `${h}px`;
+    // ensure overflow hidden (hard lock)
+    c.style.overflow = 'hidden';
+    if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
+    // pull any existing cards back inside
+    this._clampAllCardsInside();
+  } else {
+    // dynamic — let _resizeContainer compute; clear inline to allow growth/shrink
+    c.style.overflow = 'hidden';
+    // keep width/height managed by _resizeContainer
+    if (!initial) this._dbgPush?.('size', 'Applied dynamic size');
+    this._resizeContainer();
+  }
+}
+
+_getContainerSize() {
+  const c = this.cardContainer; if (!c) return { w:0, h:0 };
+  const w = parseFloat(getComputedStyle(c).width) || c.getBoundingClientRect().width;
+  const h = parseFloat(getComputedStyle(c).height) || c.getBoundingClientRect().height;
+  return { w, h };
+}
+
+_clampAllCardsInside() {
+  if (!this._isContainerFixed()) return;
+  const { w: cw, h: ch } = this._getContainerSize();
+  const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
+  wraps.forEach(w => {
+    const x = parseFloat(w.getAttribute('data-x')) || 0;
+    const y = parseFloat(w.getAttribute('data-y')) || 0;
+    const ww = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+    const hh = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+
+    const nx = Math.max(0, Math.min(x, Math.max(0, cw - ww)));
+    const ny = Math.max(0, Math.min(y, Math.max(0, ch - hh)));
+    let nw = Math.min(ww, cw);
+    let nh = Math.min(hh, ch);
+
+    // if width/height exceed box, shrink then re-clamp pos
+    if (nw !== ww || nh !== hh) {
+      w.style.width  = `${nw}px`;
+      w.style.height = `${nh}px`;
+    }
+    const nx2 = Math.max(0, Math.min(nx, Math.max(0, cw - nw)));
+    const ny2 = Math.max(0, Math.min(ny, Math.max(0, ch - nh)));
+    this._setCardPosition(w, nx2, ny2);
+  });
+}
+
+_applyGridVars() {
+  const sz = `${this.gridSize || 10}px`;
+  // host (inherits down)
+  this.style.setProperty('--ddc-grid-size', sz);
+  // container (extra robust)
+  this.cardContainer?.style.setProperty('--ddc-grid-size', sz);
+}
+
+  /* ---------------------------- debug helpers ---------------------------- */
+  _dbgInit() {
+    if (this.__dbgReady) return;
+    this.__dbgReady = true;
+    this._dbgBuffer = [];
+    this._dbgMax = 400;
+    try { window.DDC = this; } catch {}
+  }
+  _dbgPush(kind, msg, extra = null) {
+    const line = { t: new Date().toISOString(), kind, msg, extra };
+    this._dbgBuffer.push(line);
+    if (this._dbgBuffer.length > this._dbgMax) this._dbgBuffer.shift();
+    if (this.debug) console.debug(`%c[ddc:${kind}]%c ${msg}`, 'color:#03a9f4', 'color:unset', extra ?? '');
+  }
+  _dbgDump() { return [...this._dbgBuffer]; }
+  _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  /* --------------------------- Card lifecycle --------------------------- */
+  setConfig(config = {}) {
+    this._config                  = config;
+    this.storageKey               = config.storage_key || undefined;
+    this.gridSize                 = Number(config.grid ?? 10);
+    this.dragLiveSnap             = !!config.drag_live_snap;
+    this.autoSave                 = config.auto_save !== false;
+    this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
+    this.containerBackground      = config.container_background ?? 'transparent';
+    this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    this.debug                    = !!config.debug;
+    this.editMode                 = false;
+    this._backendOK               = false;
+    this.disableOverlap           = !!config.disable_overlap;
+    this.containerSizeMode        = config.container_size_mode || 'dynamic';
+    this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
+    this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
+    this.containerPreset          = config.container_preset || 'fullhd';
+    this.containerPresetOrient    = config.container_preset_orientation || 'auto';
+
+    if (this.cardContainer) this._applyContainerSizingFromConfig(false);
+
+    // Grid-related
+    this._applyGridVars();
+
+    // Overlya fix for UI based cards
+    this._ensureOverlayZFix();
+
+    // selection state
+    this._selection = new Set();
+    this.__groupDrag = null;
+
+    // caches for speed
+    this.__editorCache = new Map(); // type -> element
+    this.__stubCache = new Map();
+
+    this._dbgInit();
+    this._dbgPush('init', 'Card configured', {
+      storageKey_raw: config.storage_key,
+      storageKey_slug: this.storageKey,
+      autoSave: this.autoSave,
+      grid: this.gridSize
+    });
+
+    this.style.setProperty('--ddc-bg', this.containerBackground);
+    this.style.setProperty('--ddc-card-bg', this.cardBackground);
+
+    // preload libs
+    if (!window.jsyaml) {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js';
+      document.head.appendChild(s);
+    }
+    if (!window.interact) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js';
+      s.onload = () => this._initInteract();
+      document.head.appendChild(s);
+    }
+    // preload helpers early to avoid lag on first pick
+    this._helpersPromise = (typeof window.loadCardHelpers === 'function')
+      ? window.loadCardHelpers().catch(()=>null)
+      : Promise.resolve(null);
+
+    if (!this._built) {
+      this._built = true;
+      this.innerHTML = `
+        <style>
+          .ddc-root{
+            position:relative;
+            /* JS will keep this in sync with your “Grid (px)” */
+            --ddc-grid-size: 10px;
+            /* Good contrast on light/dark themes */
+            --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
+          }
+          .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
+          .btn{
+            background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
+            cursor:pointer;font:inherit;box-shadow:0 2px 6px rgba(0,0,0,.12)
+          }
+          .btn.secondary{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}
+          .btn.ghost{background:transparent;color:var(--primary-text-color);border:1px dashed var(--divider-color)}
+          .store-badge{
+            margin-left:auto;border:1px solid var(--divider-color);border-radius:999px;padding:4px 10px;font-size:.85rem;
+            background:rgba(255,193,7,.15);
+          }
+          .card-container{
+            position: relative;
+            padding: 10px;
+            border: 1px solid var(--divider-color);
+            background: var(--ddc-bg, transparent);s
+            width: auto; height: auto; border-radius: 12px; overflow: hidden;
+            isolation: isolate; z-index: 0; -webkit-touch-callout: none;
+            user-select: none;
+          }
+          /* make the grid only on the background, aligned to the same origin as cards */
+          .card-container::before{
+            content:'';
+            position:absolute; inset:0;                 /* same origin as absolutely positioned children */
+            background-image:
+              linear-gradient(var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
+              linear-gradient(90deg, var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px);
+            background-size: var(--ddc-grid-size) var(--ddc-grid-size);
+            background-origin: content-box;              /* align pattern to the content/padding edge */
+            background-clip: content-box;
+            pointer-events:none;
+            opacity:0;
+            transition: opacity .15s;
+            z-index:0;
+          }
+          .card-container.grid-on::before{
+            opacity:.28;
+          }
+
+          .card-wrapper{
+            position:absolute;
+            left: 0;                     /* <<< important: unify origin with the grid */
+            top:  0;                     /* <<< important: unify origin with the grid */
+            box-sizing: border-box;      /* include the 2px border in the set width/height */
+            border:2px solid transparent;
+            background:var(--ddc-card-bg, var(--card-background-color));
+            cursor:grab; overflow:hidden; border-radius:14px;
+            box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
+            will-change:transform,width,height,box-shadow; touch-action:auto;
+            z-index:1;
+          }
+          .card-wrapper.dragging{
+            cursor:grabbing;
+            touch-action: none;
+            }
+          .card-wrapper.editing.selected{
+            border-color:var(--primary-color,#03a9f4);
+            box-shadow:0 0 0 2px var(--primary-color,#03a9f4)!important;
+          }
+
+          /* ---- empty-state of the card---- */
+          .btn.cta-empty{
+            position:relative;
+            padding:12px 16px;
+            font-weight:600;
+            border-radius:14px;
+            display:inline-flex !important;
+            align-items:center;
+            gap:8px;
+            box-shadow:0 6px 18px rgba(3,169,244,.25);
+          }
+          .btn.cta-empty::after{
+            content:"";
+            position:absolute; inset:-4px;
+            border-radius:16px;
+            border:2px solid rgba(3,169,244,.35);
+            animation: ddc-cta-pulse 1.8s ease-out infinite;
+            pointer-events:none;
+          }
+          @keyframes ddc-cta-pulse{
+            0%   { opacity:.85; transform:scale(.98); }
+            70%  { opacity:0;   transform:scale(1.12); }
+            100% { opacity:0;   transform:scale(1.18); }
+          }    
+            
+          /* pleasant buttons: info (light blue) & warning (orange) */
+          .btn.info{
+            background: var(--ddc-info,#4db6ff);
+            color:#0b2537;
+            border:1px solid color-mix(in srgb, var(--ddc-info,#4db6ff) 55%, #000 15%);
+          }
+          .btn.info:hover{ filter: brightness(1.06); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
+          .btn.info:active{ transform: translateY(0) }
+
+          .btn.warning{
+            background: var(--ddc-warning,#ff9800);
+            color:#210b00;
+            border:1px solid color-mix(in srgb, var(--ddc-warning,#ff9800) 55%, #000 15%);
+          }
+          .btn.warning:hover{ filter: brightness(1.07); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
+          .btn.warning:active{ transform: translateY(0) }
+
+          /* small quality-of-life for all .btn */
+          .btn{
+            display:inline-flex; align-items:center; gap:8px;
+            border-radius:12px; transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
+          }
+          .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px }
+
+          /* ---- chip ---- */
+          .chip{
+            position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .15s;
+            z-index:30;
+            pointer-events: none;
+          }
+          .card-wrapper.editing .chip{
+            opacity:1;
+            pointer-events: auto;
+          }
+          .chip .mini{
+            display:inline-flex;align-items:center;gap:6px;
+            background:rgba(28,28,30,.78);color:#fff;border:1px solid rgba(255,255,255,.18);
+            border-radius:999px;padding:6px 10px;font-size:.76rem;cursor:pointer;letter-spacing:.2px;
+            box-shadow:0 2px 6px rgba(0,0,0,.25); transition:transform .08s, background .12s, box-shadow .12s
+          }
+          .chip .mini:hover{transform:translateY(-1px); background:rgba(28,28,30,.95); box-shadow:0 3px 10px rgba(0,0,0,.35)}
+          .chip .mini ha-icon{--mdc-icon-size:18px;width:18px;height:18px}
+          .chip .mini.danger{background:rgba(220, 38, 38, .9);border-color:rgba(255,255,255,.22)}
+          .chip .mini.danger:hover{background:rgba(220, 38, 38, 1)}
+          .chip .mini.pill{padding:6px}
+
+          /* Edit highlight */
+          .card-wrapper.editing{ 
+            border-color:var(--primary-color,#03a9f4);
+            touch-action: none;
+          }
+          .card-wrapper.editing::after{
+            content:"";position:absolute;inset:0;border:1px dashed var(--primary-color,#03a9f4);
+            border-radius:12px;pointer-events:none;opacity:.35;z-index:5;box-sizing:border-box
+          }
+
+          .shield{position:absolute;inset:0;z-index:10;background:transparent;pointer-events:none}
+          .card-wrapper.editing .shield,
+          .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
+
+          .resize-handle{
+            display:none; position:absolute;bottom:6px;right:6px;width:30px;height:30px;border-radius:50%;
+            background:var(--primary-color);color:#fff;border:1px solid rgba(255,255,255,.25);
+            cursor:se-resize;z-index:22;box-shadow:0 3px 8px rgba(0,0,0,.28);
+            align-items:center;justify-content:center;transition:transform .1s, box-shadow .1s, background .12s;
+          }
+          .resize-handle:hover{transform:scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.35)}
+          .card-wrapper.editing .resize-handle{display:flex}
+          .resize-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px;pointer-events:none}
+
+          /* modal */
+          .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
+          .dialog{
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column;
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
+          }
+          .dlg-head{
+            display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
+            background:
+              radial-gradient(1200px 120px at 20% -40px, rgba(3,169,244,.21), transparent 60%),
+              radial-gradient(900px 110px at 80% -40px, rgba(0,150,136,.18), transparent 60%);
+          }
+          .dlg-head h3{margin:0;font-size:1.1rem;letter-spacing:.2px}
+          .dlg-foot{display:flex;gap:10px;justify-content:flex-end;padding:12px;border-top:1px solid var(--divider-color);background:var(--primary-background-color)}
+          .btn:disabled{opacity:.6;cursor:not-allowed}
+
+          /* picker layout */
+          .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color)}
+          #rightPane{overflow:hidden;background:var(--primary-background-color)}
+          .rightGrid{
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
+          }
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative}
+          .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
+          .sec .bd{padding:12px;overflow:visible}       
+          .tabs{display:flex;gap:6px;margin-left:auto}
+          .tab{
+            font-size:.85rem;padding:6px 10px;border-radius:10px;border:1px solid var(--divider-color);
+            background:var(--primary-background-color);color:var(--primary-text-color);cursor:pointer
+          }
+          .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
+
+
+          /* CodeMirror */
+          .CodeMirror{
+            height:260px;border:1px solid var(--divider-color);border-radius:12px;
+            background:var(--primary-background-color);color:var(--primary-text-color);
+            z-index:6;
+          }
+
+          /* YAML editor safety / visibility */
+          #yamlSec{ z-index:5; }
+          #yamlHost, #yamlHost * { touch-action: auto; }
+          ha-code-editor, ha-code-editor * { touch-action: auto; }
+          ha-code-editor{ display:block; height:260px; z-index:6; }
+
+          /* loading spinners */
+          .spin-center{
+            position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events: none; /* let clicks pass through to tabs and controls */
+          }
+
+
+          /* marquee selection rectangle */
+          .marquee{
+            position:absolute; border:1px dashed var(--primary-color);
+            background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+            pointer-events:none; z-index:50;
+          }
+
+          /* placeholder tile */
+          .ddc-placeholder-inner{
+            display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+            background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
+          }
+
+          /* --- hold-to-edit ring (cursor progress) --- */
+          .ddc-press-ring{
+            position:fixed; z-index:100000; width:44px; height:44px; pointer-events:none;
+            margin-left:-22px; margin-top:-22px;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+          }
+          .ddc-press-ring svg{width:44px;height:44px}
+          .ddc-press-ring .pr-bg{stroke: rgba(255,255,255,.45); stroke-width:4; fill:none}
+          .ddc-press-ring .pr-fg{stroke: var(--primary-color); stroke-width:4; fill:none; stroke-linecap:round}
+          .ddc-press-ring .pr-dot{fill: var(--primary-color); opacity:.95}
+
+          /* --- edit-mode ripple transition --- */
+          .ddc-ripple-veil{
+            position:absolute; inset:0; pointer-events:none; z-index:80; overflow:hidden;
+            mix-blend-mode: screen;
+          }
+          .ddc-ripple-veil::before{
+            content:""; position:absolute; left: var(--rip-x, 50%); top: var(--rip-y, 50%);
+            width:0px; height:0px; transform: translate(-50%,-50%);
+            border-radius:50%;
+            background:
+              radial-gradient(closest-side, rgba(3,169,244,.55), rgba(3,169,244,.25) 45%, rgba(0,0,0,0) 65%),
+              radial-gradient(closest-side, rgba(0,150,136,.35), rgba(0,150,136,.15) 50%, rgba(0,0,0,0) 70%);
+            filter: blur(12px);
+            animation: ddc-ripple-grow 900ms ease-out forwards;
+          }
+          .ddc-ripple-veil::after{
+            content:""; position:absolute; inset:-20%;
+            background:
+              repeating-linear-gradient(115deg, rgba(3,169,244,.09) 0 12px, rgba(0,0,0,0) 12px 24px);
+            opacity:0;
+            animation: ddc-ripple-scan 900ms ease-out forwards;
+          }
+          @keyframes ddc-ripple-grow{
+            0%   { width:0; height:0; opacity:.9 }
+            60%  { width:150vmax; height:150vmax; opacity:.9 }
+            100% { width:170vmax; height:170vmax; opacity:0 }
+          }
+          @keyframes ddc-ripple-scan{
+            0%   { transform:scale(.96) rotate(0deg); opacity:0 }
+            40%  { opacity:.7 }
+            100% { transform:scale(1.06) rotate(2deg); opacity:0 }
+          }
+        </style>
+        <div class="ddc-root">
+          <div class="toolbar">
+            <button class="btn" id="addCardBtn" style="display:none">
+              <ha-icon icon="mdi:plus"></ha-icon>
+              <span style="margin-left:6px">Add Card</span>
+            </button>
+            <button class="btn secondary" id="reloadBtn" style="display:none">
+              <ha-icon icon="mdi:refresh"></ha-icon>
+              <span style="margin-left:6px">Reload</span>
+            </button>
+            <button class="btn secondary" id="diagBtn" style="display:none">
+              <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+              <span style="margin-left:6px">Diagnostics</span>
+            </button>
+            <button class="btn secondary" id="exportBtn" style="display:none">
+              <ha-icon icon="mdi:download"></ha-icon>
+              <span style="margin-left:6px">Export Design</span>
+            </button>
+            <button class="btn secondary" id="importBtn" style="display:none">
+              <ha-icon icon="mdi:upload"></ha-icon>
+              <span style="margin-left:6px">Import Design</span>
+            </button>
+            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
+              <ha-icon icon="mdi:storefront-outline"></ha-icon>
+              <span>Open HADS</span>
+            </button>
+            <button class="btn warning" id="exitEditBtn" style="display:none">
+              <ha-icon icon="mdi:exit-run"></ha-icon>
+              <span>Exit edit mode</span>
+            </button>
+            <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
+          </div>
+          <div class="card-container" id="cardContainer"></div>
+        </div>
+      `;
+      this.cardContainer = this.querySelector('#cardContainer');
+      this.addButton     = this.querySelector('#addCardBtn');
+      this.reloadBtn     = this.querySelector('#reloadBtn');
+      this.diagBtn       = this.querySelector('#diagBtn');
+      this.exitEditBtn   = this.querySelector('#exitEditBtn');
+      this.storeBadge    = this.querySelector('#storeBadge');
+      this.exportBtn     = this.querySelector('#exportBtn');
+      this.importBtn     = this.querySelector('#importBtn');
+      this.exploreBtn    = this.querySelector('#exploreBtn');      
+
+      this._applyGridVars();
+      
+      this.addButton.addEventListener('click', () => {
+        if (!this.editMode) this._toggleEditMode(true);
+        this._openCardManager();
+      });      
+      this.reloadBtn.addEventListener('click', () => this._initialLoad(true));
+      this.diagBtn.addEventListener('click', () => this._openDiagnostics());
+      this.exitEditBtn.addEventListener('click', () => this._toggleEditMode(false));
+      this.exportBtn.addEventListener('click', () => this._exportDesign());
+      this.importBtn.addEventListener('click', () => this._importDesign());
+      this.exploreBtn.addEventListener('click', () =>
+        window.open('https://cardstore.smarti.dev/', '_blank', 'noopener,noreferrer')
+      );
+
+      // apply container sizing early
+      this._applyContainerSizingFromConfig(true);
+      // Long-press on blank space (4s) to enter edit; Esc exits
+      this._installLongPressToEnterEdit();
+      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false); });
+
+      // selection interactions in container
+      this._installSelectionMarquee();
+      this.cardContainer.addEventListener('mousedown', (e) => {
+        if (!this.editMode) return;
+        if (e.target.closest('.card-wrapper')) return; // handled per-card
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) this._clearSelection();
+      });
+    }
+
+    this._updateStoreBadge();
+    if (this.cardContainer) this._toggleEditMode(false);
+    this._initialLoad();
+  }
+
+  connectedCallback() {
+    if (!this.__boundExitEdit) {
+      this.__boundExitEdit = () => this._toggleEditMode(false);
+    }
+    window.addEventListener('pagehide', this.__boundExitEdit);
+    window.addEventListener('beforeunload', this.__boundExitEdit);
+  
+    this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); };
+    document.addEventListener('visibilitychange', this.__onVis);
+  
+    // NEW: ensure we never boot in edit mode
+    this._toggleEditMode(false);
+  }
+  
+  disconnectedCallback() {
+    window.removeEventListener('pagehide', this.__boundExitEdit);
+    window.removeEventListener('beforeunload', this.__boundExitEdit);
+    document.removeEventListener('visibilitychange', this.__onVis);
+  
+    // NEW: remove long-press listeners if installed
+    if (this.__lpInstalled && this.__lpHandlers) {
+      const cont = this.cardContainer;
+      cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
+      window.removeEventListener('mousemove', this.__lpHandlers.mouseMove);
+      window.removeEventListener('mouseup', this.__lpHandlers.mouseUp);
+      window.removeEventListener('contextmenu', this.__lpHandlers.contextMenu);
+      cont?.removeEventListener('touchstart', this.__lpHandlers.touchStart);
+      window.removeEventListener('touchmove', this.__lpHandlers.touchMove);
+      window.removeEventListener('touchend', this.__lpHandlers.touchEnd);
+      window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
+      this.__lpInstalled = false;
+      this.__lpHandlers = null;
+    }
+  }
+  
+
+  set hass(hass) {
+    this._hass = hass;
+    LOG('set hass');
+    if (!this.__probed && hass) {
+      this.__probed = true;
+      this._probeBackend().then(() => this._initialLoad(true));
+    }
+    const wraps = this.cardContainer?.children || [];
+    for (const wrap of wraps) {
+      const c = wrap.firstElementChild;
+      if (c && c.hass !== hass) c.hass = hass;
+    }
+  }
+  get hass() { return this._hass; }
+
+  /* ------------------------ Initial load / rebuild ------------------------ */
+  async _initialLoad(force=false) {
+    if (force && this.cardContainer) this.cardContainer.innerHTML = '';
+    this._dbgPush('boot', 'Initial load start', { force });
+
+    let saved = null;
+
+    if (this._backendOK && this.storageKey) {
+      saved = await this._loadLayoutFromBackend(this.storageKey);
+    }
+
+    if (!saved && this.storageKey) {
+      let local = null;
+      try { local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'); } catch {}
+      if (local) this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+
+      if (local && this._backendOK) {
+        try {
+          await this._saveLayoutToBackend(this.storageKey, local);
+          this._dbgPush('boot', 'Migrated local -> backend');
+          saved = local;
+        } catch (e) {
+          this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
+          saved = local;
+        }
+      } else if (local) {
+        saved = local;
+      }
+    }
+
+    if (!saved && this._config?.cards?.length) {
+    this._dbgPush('boot', 'Using embedded config');
+    saved = { cards: this._config.cards };
+      }
+    // If persisted options exist, apply them up front
+    if (saved?.options) this._applyImportedOptions(saved.options, true);
+    // v1 fallback: if file had top-level grid, apply it too
+    else if (typeof saved?.grid === 'number') this._applyImportedOptions({ grid: saved.grid }, true);
+
+    let builtAny = false;
+    if (saved?.cards?.length) {
+      for (const conf of saved.cards) {
+        if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+          const wrap = this._makePlaceholderAt(
+            conf.position?.x || 0,
+            conf.position?.y || 0,
+            conf.size?.width || 100,
+            conf.size?.height || 100
+          );
+          this.cardContainer.appendChild(wrap);
+          builtAny = true;
+          continue;
+        }
+        const cardEl = await this._createCard(conf.card);
+        const wrap = this._makeWrapper(cardEl);
+        if (this.editMode) wrap.classList.add('editing');
+        this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
+        wrap.style.width  = `${conf.size?.width  || 14*this.gridSize}px`;
+        wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
+        if (conf.z != null) wrap.style.zIndex = String(conf.z);
+        this.cardContainer.appendChild(wrap);
+        this._initCardInteract(wrap);
+        builtAny = true;
+      }
+      this._resizeContainer();
+      this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
+    }
+
+    
+
+    if (!builtAny) {
+      this._showEmptyPlaceholder();
+      this._dbgPush('boot', 'No saved layout found; showing placeholder');
+    }
+    this._updateStoreBadge();
+    this._syncEmptyStateUI();
+  }
+
+  /* ------------------------------ Edit mode ------------------------------ */
+  _toggleEditMode(force=null) {
+    // NEW: kill any in-flight “enter edit” timer 
+    try { this.__clearPressTimer?.(); } catch {}
+    const entering = (force === null) ? !this.editMode : !!force;
+    const wasOff = !this.editMode && entering;
+  
+    this.editMode = entering;
+
+    this.editMode = entering;
+    this.addButton.style.display   = this.editMode ? 'inline-block' : 'none';
+    this.reloadBtn.style.display   = this.editMode ? 'inline-block' : 'none';
+    this.diagBtn.style.display     = this.editMode ? 'inline-block' : 'none';
+    this.exitEditBtn.style.display = this.editMode ? 'inline-block' : 'none';
+    this.exportBtn.style.display   = this.editMode ? 'inline-block' : 'none';
+    this.importBtn.style.display   = this.editMode ? 'inline-block' : 'none';
+    this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
+    this._syncEmptyStateUI();
+    
+    this.cardContainer.classList.toggle('grid-on', this.editMode);
+
+    const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
+    wraps.forEach((w) => {
+      w.classList.toggle('editing', this.editMode);
+      const handle = w.querySelector('.resize-handle');
+      if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
+      if (!w.dataset.placeholder && window.interact) {
+        window.interact(w).draggable(this.editMode).resizable(this.editMode);
+      }
+      w.style.touchAction = this.editMode ? 'none' : 'auto';
+    });
+    if (!this.editMode) this._clearSelection();
+
+    if (!this.editMode) {
+      // clear any stale dragging classes
+      this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
+        .forEach(w => w.classList.remove('dragging'));
+    }
+
+    // Play ripple when switching ON
+    if (wasOff) {
+      // center by default, unless last hold coords known
+      const ox = this.__lastHoldX ?? null;
+      const oy = this.__lastHoldY ?? null;
+      this._playEditRipple(ox, oy);
+    }
+  }
+
+  _isInHaEditorPreview() {
+    // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
+    let n = this;
+    while (n) {
+      const tag = (n.nodeType === 1 && n.localName) ? n.localName.toLowerCase() : '';
+      if (tag === 'hui-card-editor' || tag === 'hui-dialog-edit-card' || tag === 'hui-card-preview') return true;
+      if (tag === 'ha-dialog' || tag === 'mwc-dialog') return true; // general HA dialogs (edit card, more-info, etc.)
+      const root = n.getRootNode && n.getRootNode();
+      n = n.parentElement || (root && root.host) || null;
+    }
+    return false;
+  }
+
+  // Replace your _installLongPressToEnterEdit with this version:
+  /* 2) Install long-press ONCE, keep handles so we can remove them later */
+  // Replace your existing _installLongPressToEnterEdit() with this:
+// Robust, pointer-events-based long-press to enter edit mode
+_installLongPressToEnterEdit() {
+  if (this.__lpInstalled) return;
+  this.__lpInstalled = true;
+
+  const cont = this.cardContainer;
+  if (!cont) return;
+
+  // Tunables
+  const HOLD_MS  = 800;  // how long to hold
+  const DRIFT_PX = 18;   // cancel if the pointer drifts more than this
+
+  // ---- helpers ------------------------------------------------------------
+  const isElem = (n) => !!n && typeof n === 'object' && n.nodeType === 1; // Element node
+  const containsSafe = (root, node) => {
+    try { return !!(root && node && typeof root.contains === 'function' && isElem(node) && root.contains(node)); }
+    catch { return false; }
+  };
+  const within = (el) => containsSafe(this.cardContainer, el);
+
+  const isOverCard = (ev) => {
+    // 1) Fast path via target.closest
+    const hit = ev.target?.closest?.('.card-wrapper');
+    if (isElem(hit) && within(hit) && !hit.classList.contains('ddc-placeholder')) return true;
+
+    // 2) Robust path via composedPath() (skip non-Elements like window/document)
+    const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+    for (const n of path) {
+      if (!isElem(n)) continue;
+      if (!within(n)) continue;
+      if (n.classList?.contains('card-wrapper') && !n.classList.contains('ddc-placeholder')) return true;
+    }
+    return false;
+  };  
+
+  const makeRing = (x, y) => {
+    const el = document.createElement('div');
+    el.className = 'ddc-press-ring';
+    document.body.appendChild(el); // ensure always visible
+    Object.assign(el.style, {
+      position: 'fixed', left: `${x}px`, top: `${y}px`,
+      zIndex: '100000', width: '44px', height: '44px',
+      pointerEvents: 'none', marginLeft: '-22px', marginTop: '-22px',
+      filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.35))'
+    });
+    el.innerHTML = `
+      <svg viewBox="0 0 44 44" aria-hidden="true" style="width:44px;height:44px">
+        <circle cx="22" cy="22" r="18" style="stroke:rgba(255,255,255,.45);stroke-width:4;fill:none"></circle>
+        <circle class="pr-fg" cx="22" cy="22" r="18" style="stroke:var(--primary-color);stroke-width:4;fill:none;stroke-linecap:round"></circle>
+        <circle cx="22" cy="22" r="2" style="fill:var(--primary-color);opacity:.95"></circle>
+      </svg>`;
+    const fg = el.querySelector('.pr-fg');
+    const r = 18, circ = 2 * Math.PI * r;
+    fg.style.strokeDasharray = `${circ}`;
+    fg.style.strokeDashoffset = `${circ}`;
+    requestAnimationFrame(() => {
+      fg.style.transition = `stroke-dashoffset ${HOLD_MS}ms linear`;
+      fg.style.strokeDashoffset = '0';
+    });
+    return {
+      el,
+      move(nx, ny) { el.style.left = `${nx}px`; el.style.top = `${ny}px`; },
+      remove() { try { el.remove(); } catch {} }
+    };
+  };  
+
+  // ---- state --------------------------------------------------------------
+  let timer = null;
+  let ring  = null;
+  let startX = 0, startY = 0;
+  let activePointerId = null;
+
+  const clearTimer = () => { if (timer) clearTimeout(timer); timer = null; ring?.remove(); ring = null; };
+  this.__clearPressTimer = clearTimer; // allow external cancel on mode changes
+
+
+  
+  // ---- handlers -----------------------------------------------------------
+  const onPointerDown = (e) => {
+    // Left mouse / primary touch only
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (this._isInHaEditorPreview()) return;
+
+    // Only trigger on empty space *within this container*
+    if (!within(e.target) || isOverCard(e)) return;
+
+    activePointerId = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    this.__lastHoldX = startX; this.__lastHoldY = startY;
+
+    // visual progress ring
+    ring = makeRing(startX, startY);
+
+    timer = setTimeout(() => {
+      clearTimer();
+      const toState = !this.editMode;
+      this._toggleEditMode(toState);
+      this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
+    }, HOLD_MS);
+  };
+
+  const onPointerMove = (e) => {
+    if (timer == null || e.pointerId !== activePointerId) return;
+    ring?.move(e.clientX, e.clientY);
+    if (Math.abs(e.clientX - startX) > DRIFT_PX || Math.abs(e.clientY - startY) > DRIFT_PX) {
+      clearTimer();
+    }
+  };
+
+  const onPointerUpOrCancel = (e) => {
+    if (e.pointerId !== activePointerId) return;
+    clearTimer();
+    activePointerId = null;
+  };
+
+  const onContextMenu = (e) => {
+    // prevent the OS context menu *only while* long-press is pending
+    if (timer) { e.preventDefault(); e.stopPropagation(); return false; }
+  };
+
+  const onDblClick = (e) => {
+    if (this._isInHaEditorPreview()) return;
+    if (!within(e.target) || isOverCard(e)) return;
+    const toState = !this.editMode;
+    this._toggleEditMode(toState);
+    this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
+  };
+
+  // ---- wire up ------------------------------------------------------------
+  cont.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', onPointerUpOrCancel, { passive: true });
+  window.addEventListener('pointercancel', onPointerUpOrCancel, { passive: true });
+  window.addEventListener('contextmenu', onContextMenu);
+
+  cont.addEventListener('dblclick', onDblClick);
+
+  // keep references for clean-up in disconnectedCallback
+  this.__lpHandlers = { onPointerDown, onPointerMove, onPointerUpOrCancel, onContextMenu, onDblClick };
+}
+
+
+_isLayoutEmpty() {
+  const c = this.cardContainer;
+  if (!c) return true;
+  return c.querySelectorAll('.card-wrapper:not(.ddc-placeholder)').length === 0;
+}
+
+_syncEmptyStateUI() {
+  // Show Add button even outside edit mode when empty; style it as a CTA.
+  const empty = this._isLayoutEmpty();
+  if (this.addButton) {
+    const show = this.editMode || empty;
+    this.addButton.style.display = show ? 'inline-block' : 'none';
+    this.addButton.classList.toggle('cta-empty', !this.editMode && empty);
+  }
+
+  // Keep other toolbar buttons hidden unless we’re in edit mode
+  const toggle = (el) => el && (el.style.display = this.editMode ? 'inline-block' : 'none');
+  toggle(this.reloadBtn);
+  toggle(this.diagBtn);
+  toggle(this.exitEditBtn);
+  toggle(this.exportBtn);
+  toggle(this.importBtn);
+  toggle(this.exploreBtn);
+}
+  
+
+  _playEditRipple(clientX=null, clientY=null) {
+    const cont = this.cardContainer;
+    if (!cont) return;
+    const r = cont.getBoundingClientRect();
+    const x = clientX == null ? (r.left + r.width/2) : clientX;
+    const y = clientY == null ? (r.top  + r.height/2) : clientY;
+    const localX = x - r.left;
+    const localY = y - r.top;
+
+    const veil = document.createElement('div');
+    veil.className = 'ddc-ripple-veil';
+    veil.style.setProperty('--rip-x', `${localX}px`);
+    veil.style.setProperty('--rip-y', `${localY}px`);
+    cont.appendChild(veil);
+    setTimeout(()=> veil.remove(), 450);
+  }
+
+  /* ------------------------- Drag/Resize via Interact ------------------------- */
+  _initInteract() {
+    const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
+    wraps.forEach((w) => this._initCardInteract(w));
+  }
+  _initCardInteract(wrap) {
+    if (!window.interact || wrap.dataset.placeholder) return;
+    const gs = this.gridSize, live = !!this.dragLiveSnap;
+
+    // DRAG (supports multi-select move)
+    window.interact(wrap)
+      .draggable({
+        enabled: this.editMode,
+        inertia:false,
+        modifiers:[ window.interact.modifiers.restrictRect({ restriction:'parent', endOnly:true }) ],
+        listeners:{
+          start: (ev) => {
+            if (!this._selection.has(wrap)) {
+              if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
+              this._toggleSelection(wrap, true);
+            }
+            const group = Array.from(this._selection);
+            this.__groupDrag = {
+              leader: wrap,
+              members: group,
+              startRaw: new Map(group.map(w => [w, {
+                x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
+                y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
+                w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
+                h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
+              }]))
+            };
+            group.forEach(w => {
+              w.classList.add('dragging');
+              if (w.getAttribute('data-x-raw') === null) w.setAttribute('data-x-raw', w.getAttribute('data-x') || '0');
+              if (w.getAttribute('data-y-raw') === null) w.setAttribute('data-y-raw', w.getAttribute('data-y') || '0');
+            });
+          },
+          move: (ev) => {
+            if (!this.__groupDrag) return;
+            const gs   = this.gridSize;
+            const live = !!this.dragLiveSnap;
+            const lead = this.__groupDrag.leader;
+            const srL  = this.__groupDrag.startRaw.get(lead);
+
+            // compute tentative leader raw position (don’t write yet)
+            const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
+            const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
+            let dxLead   = curLeadX - srL.x;
+            let dyLead   = curLeadY - srL.y;
+            
+            // build proposed rects for group
+            const proposed = this.__groupDrag.members.map(m => {
+              const sr = this.__groupDrag.startRaw.get(m);
+              const rx = sr.x + dxLead;
+              const ry = sr.y + dyLead;
+              const px = live ? Math.round(rx/gs)*gs : rx;
+              const py = live ? Math.round(ry/gs)*gs : ry;
+              return this._rectFor(m, px, py, sr.w, sr.h);
+            });
+
+            // if overlap protection on and collision → abort this move frame
+            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
+              return;
+            }
+
+            // commit move
+            lead.setAttribute('data-x-raw', String(curLeadX));
+            lead.setAttribute('data-y-raw', String(curLeadY));
+            for (let i = 0; i < this.__groupDrag.members.length; i++) {
+              const m  = this.__groupDrag.members[i];
+              const pr = proposed[i];
+              m.setAttribute('data-x-raw', String(pr.x));
+              m.setAttribute('data-y-raw', String(pr.y));
+              this._setCardPosition(m, pr.x, pr.y);
+            }
+            this._resizeContainer();
+          },
+          end: () => {
+            if (!this.__groupDrag) return;
+            const gs = this.gridSize;
+            // snap + final collision guard
+            const proposed = this.__groupDrag.members.map(m => {
+              const rx = Math.round((parseFloat(m.getAttribute('data-x-raw')) || 0)/gs)*gs;
+              const ry = Math.round((parseFloat(m.getAttribute('data-y-raw')) || 0)/gs)*gs;
+              const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
+              const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
+              return this._rectFor(m, rx, ry, w, h);
+            });
+            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
+              // don’t move; revert to start positions
+              for (const m of this.__groupDrag.members) {
+                const sr = this.__groupDrag.startRaw.get(m);
+                this._setCardPosition(m, sr.x, sr.y);
+                m.setAttribute('data-x-raw', String(sr.x));
+                m.setAttribute('data-y-raw', String(sr.y));
+              }
+            } else {
+              for (const pr of proposed) {
+                this._setCardPosition(pr.el, pr.x, pr.y);
+                pr.el.setAttribute('data-x-raw', String(pr.x));
+                pr.el.setAttribute('data-y-raw', String(pr.y));
+              }
+            }
+            for (const m of this.__groupDrag.members) m.classList.remove('dragging');
+            this._resizeContainer();
+            if (this._isContainerFixed()) this._clampAllCardsInside();
+            this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
+            this.__groupDrag = null;
+          },
+        },
+      });
+
+
+    // RESIZE — bottom-right handle only (single card)
+    window.interact(wrap).resizable({
+      enabled: this.editMode,
+      edges: { right: '.resize-handle', bottom: '.resize-handle' },
+      inertia:false,
+      listeners:{
+        move:(ev)=>{
+          const gs   = this.gridSize;
+          const live = !!this.dragLiveSnap;
+          const curW = parseFloat(wrap.style.width)  || wrap.getBoundingClientRect().width;
+          const curH = parseFloat(wrap.style.height) || wrap.getBoundingClientRect().height;
+    
+          let {width, height} = ev.rect;
+          const wTry = live ? Math.max(gs, Math.round(width/gs)*gs) : width;
+          const hTry = live ? Math.max(gs, Math.round(height/gs)*gs) : height;
+        
+          const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+          const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+        
+          // ⬇️ clamp size if container is fixed
+          let nextW = wTry;
+          let nextH = hTry;
+          if (this._isContainerFixed()) {
+            const { w: cw, h: ch } = this._getContainerSize();
+            nextW = Math.min(wTry, Math.max(this.gridSize, cw - x));
+            nextH = Math.min(hTry, Math.max(this.gridSize, ch - y));
+          }
+        
+          const proposed = [ this._rectFor(wrap, x, y, nextW, nextH) ];
+        
+          if (this.disableOverlap && this._anyCollisionFor(proposed, new Set([wrap]))) {
+            return;
+          }
+          wrap.style.width  = `${nextW}px`;
+          wrap.style.height = `${nextH}px`;
+          this._resizeContainer();
+        },
+        end:()=>{
+          const gs = this.gridSize;
+          const prevW = parseFloat(wrap.style.width)  || wrap.getBoundingClientRect().width;
+          const prevH = parseFloat(wrap.style.height) || wrap.getBoundingClientRect().height;
+        
+          let wSnap = Math.max(gs, Math.round(prevW/gs)*gs);
+          let hSnap = Math.max(gs, Math.round(prevH/gs)*gs);
+        
+          const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+          const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+        
+          // ⬇️ clamp snapped size if container is fixed
+          if (this._isContainerFixed()) {
+            const { w: cw, h: ch } = this._getContainerSize();
+            wSnap = Math.min(wSnap, Math.max(gs, cw - x));
+            hSnap = Math.min(hSnap, Math.max(gs, ch - y));
+          }
+        
+          const proposed = [ this._rectFor(wrap, x, y, wSnap, hSnap) ];
+        
+          if (this.disableOverlap && this._anyCollisionFor(proposed, new Set([wrap]))) {
+            // keep pre-snap size (already applied)
+          } else {
+            wrap.style.width  = `${wSnap}px`;
+            wrap.style.height = `${hSnap}px`;
+          }
+        
+          this._resizeContainer();
+          if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
+          this._queueSave('resize-end');
+        }
+      }
+    });
+
+    // selection with clicks
+    wrap.addEventListener('mousedown', (e) => {
+      if (!this.editMode) return;
+      if (e.target.closest('.resize-handle') || e.target.closest('.chip')) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        e.stopPropagation();
+        this._toggleSelection(wrap); // toggle in multi
+      } else {
+        if (!this._selection.has(wrap)) {
+          this._clearSelection();
+          this._toggleSelection(wrap, true);
+        }
+      }
+    });
+  }
+
+  /* ------------------------ Card creation & wrapper ------------------------ */
+  async _createCard(cfg) {
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+    const el = helpers.createCardElement(cfg);
+    el.hass = this.hass;
+    return el;
+  }
+
+  _makeWrapper(cardEl) {
+    const wrap = document.createElement('div');
+    wrap.classList.add('card-wrapper');
+    if (this.editMode) wrap.classList.add('editing');
+    if (!wrap.style.zIndex) wrap.style.zIndex = String(this._highestZ() + 1);
+
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `
+      <button class="mini" data-act="edit" title="Edit" aria-label="Edit">
+        <ha-icon icon="mdi:pencil"></ha-icon><span>Edit</span>
+      </button>
+      <button class="mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
+        <ha-icon icon="mdi:content-copy"></ha-icon><span>Duplicate</span>
+      </button>
+      <button class="mini pill" data-act="front" title="Bring forward" aria-label="Bring forward">
+        <ha-icon icon="mdi:arrange-bring-forward"></ha-icon>
+      </button>
+      <button class="mini pill" data-act="back" title="Send backward" aria-label="Send backward">
+        <ha-icon icon="mdi:arrange-send-backward"></ha-icon>
+      </button>
+      <button class="mini danger pill" data-act="delete" title="Delete card" aria-label="Delete card">
+        <ha-icon icon="mdi:close-thick"></ha-icon>
+      </button>
+    `;
+    chip.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const act = e.target?.closest('button')?.dataset?.act; if (!act) return;
+
+      if (act === 'delete') {
+        if (this._selection.size > 1 && this._selection.has(wrap)) {
+          const toDel = Array.from(this._selection);
+          toDel.forEach(w => w.remove());
+          this._clearSelection();
+          this._resizeContainer(); this._queueSave('delete-multi'); this._ensurePlaceholderIfEmpty();
+        } else {
+          wrap.remove(); this._resizeContainer(); this._queueSave('delete'); this._ensurePlaceholderIfEmpty();
+        }
+      } else if (act === 'duplicate' || act === 'copy') {
+        const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
+        for (const t of targets) {
+          const cfg = this._extractCardConfig(t.firstElementChild) || {};
+          const dup = await this._createCard(cfg);
+          const w2 = this._makeWrapper(dup);
+          w2.style.width  = t.style.width;
+          w2.style.height = t.style.height;
+          const x = (parseFloat(t.getAttribute('data-x')) || 0) + this.gridSize;
+          const y = (parseFloat(t.getAttribute('data-y')) || 0) + this.gridSize;
+          this._setCardPosition(w2, x, y);
+          w2.style.zIndex = String(this._highestZ() + 1);
+          this.cardContainer.appendChild(w2);
+          this._initCardInteract(w2);
+        }
+        this._resizeContainer();
+        this._queueSave('duplicate');
+      } else if (act === 'front') {
+        this._adjustZ(wrap, +1);
+      } else if (act === 'back')  {
+        this._adjustZ(wrap, -1);
+      } else if (act === 'edit') {
+        const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+        await this._openSmartPicker('edit', cfg, async (newCfg) => {
+          const newEl = await this._createCard(newCfg);
+          newEl.hass = this.hass;
+          wrap.replaceChild(newEl, wrap.firstElementChild);
+          this._queueSave('edit');
+        });
+      }
+    });
+
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+
+    const handle = document.createElement('div');
+    handle.classList.add('resize-handle');
+    handle.title = 'Resize';
+    handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
+
+    wrap.append(cardEl, shield, chip, handle);
+    return wrap;
+  }
+
+  _makePlaceholderAt(x=0,y=0,w=100,h=100) {
+    const wrap = document.createElement('div');
+    wrap.classList.add('card-wrapper','ddc-placeholder');
+    wrap.dataset.placeholder = '1';
+    if (this.editMode) wrap.classList.add('editing');
+    this._setCardPosition(wrap, x, y);
+    wrap.style.width = `${w}px`;
+    wrap.style.height = `${h}px`;
+    wrap.style.zIndex = String(this._highestZ() + 1);
+  
+    const inner = document.createElement('div');
+    inner.className = 'ddc-placeholder-inner';
+    // purely decorative; nothing clickable
+    inner.setAttribute('aria-hidden','true');
+  
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+  
+    wrap.append(inner, shield);
+    return wrap;
+  }
+
+  _showEmptyPlaceholder() {
+    if (this.cardContainer.querySelector('.ddc-placeholder')) return;
+    const p = this._makePlaceholderAt(0,0,100,100);
+    this.cardContainer.appendChild(p);
+    this._resizeContainer();
+    this._syncEmptyStateUI();
+
+  }
+  _hideEmptyPlaceholder() { this.cardContainer.querySelectorAll('.ddc-placeholder').forEach(n => n.remove()); }
+  _ensurePlaceholderIfEmpty() {
+    const realCards = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
+    if (realCards.length === 0) this._showEmptyPlaceholder();
+    this._syncEmptyStateUI();
+  }
+
+  _adjustZ(wrap, delta) {
+    const cur = parseInt(wrap.style.zIndex || '1', 10);
+    let next = cur + delta;
+    next = Math.max(1, Math.min(9999, next));
+    wrap.style.zIndex = String(next);
+    this._queueSave('z-change');
+  }
+
+  _highestZ() {
+    let max = 0;
+    this.cardContainer.querySelectorAll('.card-wrapper').forEach(w => {
+      const z = parseInt(w.style.zIndex || '0', 10);
+      if (z > max) max = z;
+    });
+    return max;
+  }
+
+  _setCardPosition(el, x, y) {
+    // ensure integer CSS pixels and use 3D translate to avoid compositor fuzz
+    const nx = Math.round(x);
+    const ny = Math.round(y);
+    el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+    el.setAttribute('data-x', String(nx));
+    el.setAttribute('data-y', String(ny));
+    el.setAttribute('data-x-raw', String(nx));
+    el.setAttribute('data-y-raw', String(ny));
+  }
+  
+
+  _resizeContainer() {
+    const c = this.cardContainer; if (!c) return;
+  
+    // In fixed modes, do NOT auto-grow/shrink — the box is hard-locked.
+    if (this._isContainerFixed()) return;
+  
+    // Dynamic mode: compute based on content
+    const cards = Array.from(c.querySelectorAll('.card-wrapper'));
+    let maxX = 0, maxY = 0;
+    cards.forEach((card) => {
+      const r  = card.getBoundingClientRect();
+      const cr = c.getBoundingClientRect();
+      const right  = r.left - cr.left + r.width;
+      const bottom = r.top  - cr.top  + r.height;
+      maxX = Math.max(maxX, right);
+      maxY = Math.max(maxY, bottom);
+    });
+    c.style.width  = `${Math.ceil(maxX/this.gridSize)*this.gridSize || 100}px`;
+    c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
+  }
+  
+  
+
+  _rectFor(el, x = null, y = null, wpx = null, hpx = null) {
+    const x0 = x ?? (parseFloat(el.getAttribute('data-x')) || 0);
+    const y0 = y ?? (parseFloat(el.getAttribute('data-y')) || 0);
+    const w  = wpx ?? (parseFloat(el.style.width)  || el.getBoundingClientRect().width  || 0);
+    const h  = hpx ?? (parseFloat(el.style.height) || el.getBoundingClientRect().height || 0);
+    return { x: x0, y: y0, w, h, el };
+  }
+  _rectsOverlap(a, b, eps = 0.5) {
+    return !(a.x + a.w <= b.x + eps || b.x + b.w <= a.x + eps ||
+             a.y + a.h <= b.y + eps || b.y + b.h <= a.y + eps);
+  }
+  _anyCollisionFor(proposedRects, ignoreSet) {
+    const others = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
+      .filter(w => !ignoreSet.has(w) && !w.dataset.placeholder);
+    if (!others.length) return false;
+    const otherRects = others.map(w => this._rectFor(w));
+    for (const pr of proposedRects) for (const or of otherRects) {
+      if (this._rectsOverlap(pr, or)) return true;
+    }
+    return false;
+  }
+  _extractCardConfig(cardEl){ return cardEl?._config || cardEl?.config || {}; }
+
+  /* ------------------------------- Picker UI ------------------------------- */
+  async _openCardManager() { await this._openSmartPicker('add'); }
+
+  _catalog() {
+    return [
+      { id:'favorites', name:'Favorites', items:[] },
+      { id:'recent',    name:'Recent',    items:[] },
+      { id:'basics',    name:'Basics', items:[
+        {type:'entities',          name:'Entities',          icon:'mdi:format-list-bulleted'},
+        {type:'entity',            name:'Entity',            icon:'mdi:checkbox-blank-circle-outline'},
+        {type:'tile',              name:'Tile',              icon:'mdi:view-grid-outline'},
+        {type:'button',            name:'Button',            icon:'mdi:gesture-tap-button'},
+        {type:'glance',            name:'Glance',            icon:'mdi:eye-outline'},
+        {type:'markdown',          name:'Markdown',          icon:'mdi:language-markdown'},
+      ]},
+      { id:'sensors',   name:'Sensors', items:[
+        {type:'sensor',            name:'Sensor',            icon:'mdi:antenna'},
+        {type:'gauge',             name:'Gauge',             icon:'mdi:gauge'},
+        {type:'history-graph',     name:'History graph',     icon:'mdi:chart-line'},
+        {type:'statistics-graph',  name:'Statistics graph',  icon:'mdi:chart-bar'},
+      ]},
+      { id:'visual', name:'Visual', items:[
+        {type:'picture-entity',    name:'Picture entity',    icon:'mdi:image-outline'},
+        {type:'picture-glance',    name:'Picture glance',    icon:'mdi:image-multiple-outline'},
+        {type:'weather-forecast',  name:'Weather',           icon:'mdi:weather-partly-cloudy'},
+        {type:'map',               name:'Map',               icon:'mdi:map'},
+        {type:'iframe',            name:'iFrame',            icon:'mdi:application'},
+      ]},
+      { id:'controls', name:'Controls', items:[
+        {type:'light',             name:'Light',             icon:'mdi:lightbulb-outline'},
+        {type:'thermostat',        name:'Thermostat',        icon:'mdi:thermostat'},
+        {type:'media-control',     name:'Media control',     icon:'mdi:play-circle-outline'},
+        {type:'alarm-panel',       name:'Alarm panel',       icon:'mdi:shield-home-outline'},
+        {type:'area',              name:'Area',              icon:'mdi:map-marker'},
+      ]},
+    ];
+  }
+
+  /* ---- Find/create a config editor element for a given card type ---- */
+  async _getEditorElementForType(type, cfg) {
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+  
+    // Ensure the module/class is loaded
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+  
+    // 1) Instance-provided editor
+    try {
+      const inst = helpers.createCardElement({ type, ...cfg });
+      inst.hass = this.hass;
+      if (typeof inst.getConfigElement === 'function') {
+        const el = await inst.getConfigElement();
+        if (el) return el;
+      }
+    } catch {}
+  
+    // 2) Static class-provided editor
+    try {
+      if (CardClass && typeof CardClass.getConfigElement === 'function') {
+        const el = await CardClass.getConfigElement();
+        if (el) return el;
+      }
+    } catch {}
+  
+    // 3) Known/custom-tag editors (registry hint + common conventions) with retries
+    const base = String(type).replace(/^custom:/, '');
+    const reg = Array.isArray(window.customCards) ? window.customCards : [];
+    const entry = reg.find(c =>
+      c?.type === base || c?.type === type || c?.type === `custom:${base}`
+    );
+  
+    const candidates = [];
+    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
+    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+  
+    for (const tag of candidates) {
+      if (!tag || typeof tag !== 'string') continue;
+      // Try a few times: 0ms, 100ms, 300ms, 700ms
+      for (const delay of [0, 100, 300, 700]) {
+        try {
+          if (!customElements.get(tag)) {
+            await Promise.race([
+              customElements.whenDefined(tag),
+              new Promise(r => setTimeout(r, delay))
+            ]);
+          }
+          if (customElements.get(tag)) {
+            return document.createElement(tag);
+          }
+        } catch {}
+      }
+    }
+  
+    // No UI editor available
+    return null;
+  }
+  
+  _ensureOverlayZFix() {
+    if (document.querySelector('style[data-ddc-overlay-fix]')) return;
+    const s = document.createElement('style');
+    s.setAttribute('data-ddc-overlay-fix', '');
+    s.textContent = `
+      /* Make common HA overlays float above our modal */
+      vaadin-combo-box-overlay,
+      vaadin-overlay-backdrop,
+      mwc-menu-surface,
+      .mdc-menu-surface--open {
+        z-index: 1000000 !important;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+  
+
+  _customCardsFromRegistry() {
+    const reg = Array.isArray(window.customCards) ? window.customCards : [];
+    return reg
+      .map((cc) => ({
+        type: cc?.type?.startsWith('custom:') ? cc.type : `custom:${cc?.type}`,
+        name: cc?.name || cc?.type || 'Custom card',
+        icon: 'mdi:puzzle-outline',
+        description: cc?.description || '',
+        editorTag: cc?.editor || null,  // <- keep if provided
+      }))
+      .filter((it) => typeof it.type === 'string' && it.type.startsWith('custom:'));
+  }
+
+  _schemaForType(type) {
+    const S = (o) => o; const any = [];
+    return ({
+      'entities': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:any, label:'Entities'} ]}),
+      'entity':   S({ fields:[ {key:'entity', type:'entity', multi:false, domains:any, label:'Entity'} ]}),
+      'sensor':   S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['sensor'], label:'Sensor'}, {key:'name', type:'text', label:'Name (optional)'} ]}),
+      'gauge':    S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['sensor','number','input_number'], label:'Numeric entity'}, {key:'min', type:'number', label:'Min', step:'any'}, {key:'max', type:'number', label:'Max', step:'any'} ]}),
+      'history-graph': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:any, label:'Entities (multiselect)'}, {key:'hours_to_show', type:'number', label:'Hours to show', default:24} ]}),
+      'statistics-graph': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:['sensor','number','input_number'], label:'Entities (multiselect)'}, {key:'chart_type', type:'select', options:['line','bar'], label:'Chart type', default:'line'}, {key:'statistic', type:'select', options:['mean','min','max','sum'], label:'Statistic', default:'mean'} ]}),
+      'glance':   S({ fields:[ {key:'entities', type:'entities', multi:true, domains:any, label:'Entities (multiselect)'} ]}),
+      'picture-glance': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:any, label:'Entities (multiselect)'}, {key:'image', type:'text', label:'Image URL (optional)'} ]}),
+      'picture-entity': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:any, label:'Entity'}, {key:'image', type:'text', label:'Image URL (optional)'} ]}),
+      'weather-forecast': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['weather'], label:'Weather entity'} ]}),
+      'map': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:['device_tracker','person'], label:'Trackers / people (multiselect)'}, {key:'default_zoom', type:'number', label:'Default zoom', default:14} ]}),
+      'media-control': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['media_player'], label:'Media player'} ]}),
+      'light': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['light'], label:'Light'} ]}),
+      'thermostat': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['climate'], label:'Climate'} ]}),
+      'alarm-panel': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['alarm_control_panel'], label:'Alarm'} ]}),
+      'markdown': S({ fields:[ {key:'content', type:'textarea', label:'Markdown'} ]}),
+      'tile': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:any, label:'Entity'} ]}),
+      'button': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:any, label:'Entity (optional)'} ]}),
+      'iframe': S({ fields:[ {key:'url', type:'text', label:'URL'} ]}),
+      'area': S({ fields:[ {key:'area', type:'text', label:'Area ID'} ]}),
+    })[type] || { fields: [] };
+  }
+
+  _shapeBySchema(type, cfg = {}) {
+    const sc = this._schemaForType(type) || { fields: [] };
+    const out = { ...cfg, type };
+
+    for (const f of sc.fields) {
+      let v = out[f.key];
+
+      if (f.type === 'entities') {
+        const arr = Array.isArray(v) ? v : (v != null && v !== '' ? [v] : []);
+        const clean = arr.filter(Boolean);
+        if (clean.length) out[f.key] = clean;
+        else delete out[f.key];
+      }
+      else if (f.type === 'entity') {
+        if (Array.isArray(v)) v = v[0];
+        if (v == null || v === '') delete out[f.key];
+        else out[f.key] = String(v);
+      }
+      else if (f.type === 'number') {
+        if (v == null || v === '') { delete out[f.key]; }
+        else {
+          const n = Number(v);
+          if (Number.isFinite(n)) out[f.key] = n;
+          else delete out[f.key];
+        }
+      }
+      else if (f.type === 'select' || f.type === 'text' || f.type === 'textarea') {
+        if (v == null || v === '') delete out[f.key];
+        else out[f.key] = v;
+      }
+    }
+    return out;
+  }
+
+    /* ---- discover custom cards registered by community convention ---- */
+ /* _customCardsFromRegistry() {
+    const reg = Array.isArray(window.customCards) ? window.customCards : [];
+    // Normalize to picker item shape
+    return reg
+      .map((cc) => ({
+        // window.customCards usually has `type: "my-card"` (without "custom:")
+        type: cc?.type?.startsWith('custom:') ? cc.type : `custom:${cc?.type}`,
+        name: cc?.name || cc?.type || 'Custom card',
+        icon: 'mdi:puzzle-outline',
+        description: cc?.description || '',
+      }))
+      .filter((it) => typeof it.type === 'string' && it.type.startsWith('custom:'));
+  }
+*/
+  _statesList(domains) {
+    const all = Object.keys(this.hass?.states || {});
+    if (!domains || !domains.length) return all;
+    return all.filter(eid => domains.includes(eid.split('.')[0]));
+  }
+  _isNumericEntity(eid) {
+    const st = this.hass?.states?.[eid]; if (!st) return false;
+    const v = Number(st.state); return Number.isFinite(v);
+  }
+
+  _getFaves(){ try { return new Set(JSON.parse(localStorage.getItem('ddc_faves')||'[]')); } catch { return new Set(); } }
+  _setFaves(set){ try { localStorage.setItem('ddc_faves', JSON.stringify(Array.from(set))); } catch {} }
+  _getRecent(){ try { return JSON.parse(localStorage.getItem('ddc_recent_types')||'[]'); } catch { return []; } }
+  _pushRecent(type){ try { const r = this._getRecent().filter(t=>t!==type); r.unshift(type); if (r.length>10) r.length=10; localStorage.setItem('ddc_recent_types', JSON.stringify(r)); } catch{} }
+
+  /* ----------------------------- YAML editor helpers ----------------------------- */
+  async _ensureCodeMirror() {
+    if (this.__cmReady) return;
+    if (!document.querySelector('link[data-cm-core]')) {
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css';
+      l.setAttribute('data-cm-core','');
+      document.head.appendChild(l);
+    }
+    await new Promise((resolve) => {
+      if (window.CodeMirror) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+    await new Promise((resolve) => {
+      if (window.CodeMirror?.mimeModes?.yaml) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+    this.__cmReady = true;
+  }
+
+  async _mountYamlEditor(hostEl, initialCfg, onValidChange, onInvalidChange) {
+    const dump = (o) => (window.jsyaml ? window.jsyaml.dump(o) : JSON.stringify(o, null, 2));
+    const parse = (t) => (window.jsyaml ? window.jsyaml.load(t) : JSON.parse(t));
+    hostEl.innerHTML = '';
+    const initialText = dump(initialCfg);
+
+    if (customElements.get('ha-code-editor')) {
+      const ed = document.createElement('ha-code-editor');
+      ed.mode = 'yaml';
+      ed.hass = this.hass;
+      ed.value = initialText;
+      ed.style.display = 'block';
+      ed.style.height = '260px';
+      hostEl.appendChild(ed);
+
+      let programmatic = false;
+      ed.addEventListener('value-changed', (e) => {
+        if (programmatic) return;
+        const txt = e.detail?.value ?? ed.value ?? '';
+        try { onValidChange(parse(txt)); }
+        catch (err) { onInvalidChange?.(err); }
+      });
+      return {
+        setValue: (cfg) => {
+          const txt = dump(cfg);
+          if ((ed.value ?? '') !== txt) { programmatic = true; ed.value = txt; programmatic = false; }
+        }
+      };
+    }
+
+    try {
+      await this._ensureCodeMirror();
+      const cm = window.CodeMirror(hostEl, {
+        value: initialText,
+        mode: 'yaml',
+        lineNumbers: true,
+        lineWrapping: true,
+        indentUnit: 2,
+        tabSize: 2
+      });
+      let programmatic = false;
+      cm.on('change', () => {
+        if (programmatic) return;
+        const text = cm.getValue();
+        try { onValidChange(parse(text)); }
+        catch (e) { onInvalidChange?.(e); }
+      });
+      return {
+        setValue: (cfg) => {
+          const txt = dump(cfg);
+          if (cm.getValue() !== txt) { programmatic = true; cm.setValue(txt); programmatic = false; }
+        }
+      };
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.style.width = '100%';
+      ta.style.height = '260px';
+      ta.value = initialText;
+      ta.addEventListener('input', () => {
+        try { onValidChange(parse(ta.value)); }
+        catch (e) { onInvalidChange?.(e); }
+      });
+      hostEl.appendChild(ta);
+      return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
+    }
+  }
+
+  /* ----------------------- Picker (fast, cached) ----------------------- */
+  async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
+    const close = () => modal.remove();
+    const modal = document.createElement('div'); modal.className='modal';
+    modal.innerHTML = `
+      <div class="dialog" role="dialog" aria-modal="true">
+        <div class="dlg-head">
+          <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
+          <div style="display:flex;gap:10px;flex:1">
+            <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
+            <input id="customType" placeholder="custom:my-card (optional)" style="max-width:260px;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)" aria-label="custom type">
+          </div>
+          <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
+          <button class="btn" id="addBtn" disabled>${mode==='edit'
+            ? '<ha-icon icon="mdi:content-save"></ha-icon><span style="margin-left:6px">Update</span>'
+            : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
+          </button>
+        </div>
+        <div id="layoutGrid" class="layout">
+          <div class="pane" id="leftPane"></div>
+          <div class="pane" id="rightPane">
+            <div class="rightGrid">
+              <div class="sec" style="grid-column:1;grid-row:1">
+                <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
+                <div class="bd" id="quickFill"></div>
+              </div>
+
+              <div class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative">
+                <div class="hd">Preview</div>
+                <div class="spin-center" id="previewSpin" hidden>
+                  <ha-circular-progress indeterminate></ha-circular-progress>
+                </div>
+                <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
+              </div>
+
+              <div class="sec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
+                <div class="hd">
+                  <span>Card options (official editor)</span>
+                  <div id="optTabs" class="tabs">
+                    <button id="tabVisual" class="tab active" aria-selected="true">Visual</button>
+                    <button id="tabYaml" class="tab">YAML</button>
+                  </div>
+                </div>
+                <div class="spin-center" id="editorSpin" hidden>
+                  <ha-circular-progress indeterminate></ha-circular-progress>
+                </div>
+                <div class="bd" style="min-height:0">
+                  <div id="editorHost"></div>
+                  <div id="err" class="err" hidden style="color:var(--error-color);font-size:.9rem"></div>
+                </div>
+              </div>
+
+              <div class="sec" id="yamlSec" style="grid-column:1;grid-row:3;min-height:0">
+                <div class="hd">YAML editor</div>
+                <div class="bd" style="min-height:0">
+                  <div id="yamlHost"></div>
+                  <div id="yamlErr" class="err" hidden style="color:var(--error-color);font-size:.9rem;margin-top:8px"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dlg-foot">
+          <span style="flex:1;opacity:.75;font-size:.85rem">Tip: use <ha-icon icon="mdi:star-outline"></ha-icon> to favorite cards you use often</span>
+          <button class="btn secondary" id="footCancel"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
+          <button class="btn" id="footAdd" disabled>${mode==='edit'
+            ? '<ha-icon icon="mdi:content-save"></ha-icon><span style="margin-left:6px">Update</span>'
+            : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
+          </button>
+        </div>
+      </div>`;
+    this.appendChild(modal);
+
+    const left = modal.querySelector('#leftPane');
+    const addTop = modal.querySelector('#addBtn');
+    const addBottom = modal.querySelector('#footAdd');
+    const cancelTop = modal.querySelector('#cancelBtn');
+    const cancelBot = modal.querySelector('#footCancel');
+    const search = modal.querySelector('#search');
+    const customType = modal.querySelector('#customType');
+    const cardHost = modal.querySelector('#cardHost');
+    const editorHost = modal.querySelector('#editorHost');
+    const editorSpin = modal.querySelector('#editorSpin');
+    const quickFill = modal.querySelector('#quickFill');
+    const yamlHost = modal.querySelector('#yamlHost');
+    const yamlErr = modal.querySelector('#yamlErr');
+    const yamlSec = modal.querySelector('#yamlSec');
+    const tabVisual = modal.querySelector('#tabVisual');
+    const tabYaml = modal.querySelector('#tabYaml');
+    const err = modal.querySelector('#err');
+    const previewSpin = modal.querySelector('#previewSpin');
+    const enableCommit = (on) => { addTop.disabled = addBottom.disabled = !on; };
+    const setError = (msg) => { if (!msg){ err.hidden=true; err.textContent=''; } else { err.hidden=false; err.textContent=msg; } };
+
+    const faves = this._getFaves();
+    const recent = this._getRecent();
+    const catalog = this._catalog();
+    const favSection = catalog.find(c=>c.id==='favorites');
+    const recSection = catalog.find(c=>c.id==='recent');
+    const allItems = catalog.flatMap(c => c.items || []);
+    favSection.items = allItems.filter(i => faves.has(i.type));
+    recSection.items = recent.map(t => allItems.find(i => i.type===t)).filter(Boolean);
+
+    const customItems = this._customCardsFromRegistry();
+    if (customItems.length) {
+      catalog.push({
+        id: 'custom',
+        name: 'Custom (installed)',
+        items: customItems,
+      });
+    }
+
+    let __activeTab = 'visual';
+
+    const showTab = (name) => {
+      const wantYaml = name === 'yaml';
+      tabVisual.classList.toggle('active', !wantYaml);
+      tabVisual.setAttribute('aria-selected', String(!wantYaml));
+      tabYaml.classList.toggle('active', wantYaml);
+      tabYaml.setAttribute('aria-selected', String(wantYaml));
+    
+      // Show/hide the two editors
+      editorHost.parentElement.style.display = wantYaml ? 'none' : '';
+      yamlSec.style.display = wantYaml ? '' : 'none';
+    
+      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
+      __activeTab = wantYaml ? 'yaml' : 'visual';
+    };
+    
+    tabVisual.addEventListener('click', () => showTab('visual'));
+    tabYaml.addEventListener('click', () => showTab('yaml'));
+    
+    // default: Visual
+    showTab('visual');
+
+    const filteredCatalog = () => {
+      const q = search.value.trim().toLowerCase();
+      const custom = customType.value.trim();
+      if (custom) {
+        return [{ id:'custom', name:'Custom', items:[{type:custom, name:'Custom card', icon:'mdi:puzzle-outline'}]}];
+      }
+      return catalog.map(section => ({
+        ...section,
+        items: (section.items||[]).filter(it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q))
+      })).filter(sec => sec.items && sec.items.length || sec.id==='favorites' || sec.id==='recent');
+    };
+
+    const renderLeft = () => {
+      const view = filteredCatalog();
+      left.innerHTML = '';
+      view.forEach(cat => {
+        const div = document.createElement('div');
+        div.style.padding = '12px';
+        div.style.borderBottom = '1px solid var(--divider-color)';
+        const h = document.createElement('h4'); h.textContent = cat.name; h.style.margin='0 0 10px 0'; h.style.fontSize='.92rem'; h.style.opacity='.85';
+        div.appendChild(h);
+
+        if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent')) {
+          const p = document.createElement('div'); p.style.opacity='.6'; p.style.fontSize='.85rem'; p.textContent = cat.id==='favorites' ? 'No favorites yet.' : 'No recent items yet.'; div.appendChild(p);
+        } else {
+          cat.items.forEach(item => {
+            const b = document.createElement('button');
+            b.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px">
+              <ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span>
+            </span>`;
+            Object.assign(b.style,{display:'block',width:'100%',textAlign:'left',border:'none',background:'transparent',padding:'8px',borderRadius:'10px',cursor:'pointer'});
+            b.addEventListener('click', async () => { highlight(b); await selectType(item.type); });
+            div.appendChild(b);
+          });
+        }
+        left.appendChild(div);
+      });
+    };
+
+    const highlight = (btn) => {
+      left.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn?.classList.add('active');
+      if (btn) btn.style.background='rgba(0,0,0,.06)';
+    };
+
+    let currentConfig = null;
+    let currentType = null;
+    let yamlEditorApi = null;
+    let visualEditor = null;
+    let pickSeq = 0; // stale-select guard
+
+    const buildQuickFill = (type, cfg) => {
+      const sc = this._schemaForType(type);
+      quickFill.innerHTML = '';
+      if (!sc.fields.length) {
+        quickFill.innerHTML = `<div style="opacity:.7;font-size:.9rem">No quick fill for this card — use the editors below.</div>`;
+        return;
+      }
+      const all = Object.keys(this.hass?.states || {});
+      const fieldWrap = document.createElement('div');
+
+      const addEntityItem = (eid, arr, container, keyForMulti) => {
+        const div = document.createElement('div');
+        Object.assign(div.style,{padding:'8px 10px',border:'1px solid var(--divider-color)',borderRadius:'10px',cursor:'pointer',userSelect:'none',display:'flex',alignItems:'center',gap:'8px'});
+        div.innerHTML = `<ha-icon icon="mdi:checkbox-blank-outline"></ha-icon><span>${eid}</span>`;
+        if (arr.includes(eid)) {
+          div.style.background='rgba(3,169,244,.12)'; div.style.borderColor='var(--primary-color)';
+          div.querySelector('ha-icon').setAttribute('icon','mdi:checkbox-marked');
+        }
+        div.addEventListener('click', async () => {
+          const idx = arr.indexOf(eid);
+          if (idx>=0) arr.splice(idx,1); else arr.push(eid);
+          const on = arr.includes(eid);
+          div.style.background = on ? 'rgba(3,169,244,.12)' : '';
+          div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
+          div.querySelector('ha-icon').setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
+          currentConfig = this._shapeBySchema(type, {...currentConfig, [keyForMulti]: [...arr]});
+          await mountPreview(currentConfig);
+          yamlEditorApi?.setValue(currentConfig);
+        });
+        container.appendChild(div);
+      };
+
+      sc.fields.forEach(f => {
+        const row = document.createElement('div'); Object.assign(row.style,{display:'flex',gap:'8px',alignItems:'center',marginBottom:'8px'});
+        const label = document.createElement('label'); label.textContent = f.label || f.key; label.style.minWidth='130px';
+
+        if (f.type === 'entities') {
+          const wrap = document.createElement('div'); wrap.style.flex='1';
+          const filter = document.createElement('input'); Object.assign(filter,{placeholder:'Filter entities…'}); Object.assign(filter.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)',background:'var(--card-background-color)',color:'var(--primary-text-color)'});
+          const list = document.createElement('div'); Object.assign(list.style,{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'8px',maxHeight:'220px',overflow:'auto',marginTop:'8px'});
+          const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : all;
+          const selected = Array.isArray(cfg[f.key]) ? [...cfg[f.key]] : (cfg[f.key] ? [cfg[f.key]] : []);
+          const renderList = () => {
+            const q = filter.value.trim().toLowerCase();
+            list.innerHTML = '';
+            pool.filter(eid => !q || eid.toLowerCase().includes(q)).forEach(eid => addEntityItem(eid, selected, list, f.key));
+          };
+          filter.addEventListener('input', renderList);
+          renderList();
+          wrap.append(filter, list);
+          row.append(label, wrap);
+          currentConfig = this._shapeBySchema(type, {...cfg, [f.key]: selected});
+        }
+
+        if (f.type === 'entity') {
+          const dsWrap = document.createElement('div'); dsWrap.style.flex='1'; dsWrap.style.position='relative';
+          const ds = document.createElement('input'); ds.setAttribute('list', 'ddc_entlist_'+f.key);
+          Object.assign(ds.style,{width:'100%',padding:'8px 10px 8px 36px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+          ds.placeholder = `Select ${f.label?.toLowerCase() || 'entity'}…`;
+          const iconLead = document.createElement('ha-icon'); iconLead.setAttribute('icon','mdi:magnify');
+          Object.assign(iconLead.style,{position:'absolute',left:'10px',top:'8px',width:'18px',height:'18px','--mdc-icon-size':'18px',opacity:'.7'});
+          const dl = document.createElement('datalist'); dl.id = 'ddc_entlist_'+f.key;
+          const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : Object.keys(this.hass?.states || {});
+          dl.innerHTML = pool.map(e => `<option value="${e}">`).join('');
+          ds.value = Array.isArray(cfg[f.key]) ? (cfg[f.key][0] || '') : (cfg[f.key] || '');
+          ds.addEventListener('change', async () => {
+            currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ds.value || undefined});
+            await mountPreview(currentConfig);
+            yamlEditorApi?.setValue(currentConfig);
+          });
+          dsWrap.append(iconLead, ds, dl);
+          row.append(label, dsWrap);
+        }
+
+        if (f.type === 'number') {
+          const inpWrap = document.createElement('div'); inpWrap.style.flex='1'; inpWrap.style.position='relative';
+          const inp = document.createElement('input'); inp.type='number'; if (f.step) inp.step=f.step;
+          Object.assign(inp.style,{width:'100%',padding:'8px 10px 8px 36px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+          const numIcon = document.createElement('ha-icon'); numIcon.setAttribute('icon','mdi:counter'); Object.assign(numIcon.style,{position:'absolute',left:'10px',top:'8px','--mdc-icon-size':'18px',width:'18px',height:'18px',opacity:'.7'});
+          inp.value = cfg[f.key] ?? f.default ?? '';
+          inp.addEventListener('input', async () => {
+            const v = inp.value==='' ? undefined : Number(inp.value);
+            currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: isNaN(v)? undefined : v});
+            await mountPreview(currentConfig);
+            yamlEditorApi?.setValue(currentConfig);
+          });
+          inpWrap.append(numIcon, inp);
+          row.append(label, inpWrap);
+        }
+
+        if (f.type === 'select') {
+          const selWrap = document.createElement('div'); selWrap.style.flex='1'; selWrap.style.position='relative';
+          const sel = document.createElement('select'); Object.assign(sel.style,{width:'100%',padding:'8px 10px 8px 36px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+          const selIcon = document.createElement('ha-icon'); selIcon.setAttribute('icon','mdi:format-list-bulleted'); Object.assign(selIcon.style,{position:'absolute',left:'10px',top:'8px','--mdc-icon-size':'18px',width:'18px',height:'18px',opacity:'.7'});
+          (f.options||[]).forEach(o => { const opt = document.createElement('option'); opt.value = o; sel.appendChild(opt); });
+          sel.value = cfg[f.key] ?? f.default ?? (f.options?.[0] || '');
+          sel.addEventListener('change', async () => {
+            currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: sel.value});
+            await mountPreview(currentConfig);
+            yamlEditorApi?.setValue(currentConfig);
+          });
+          selWrap.append(selIcon, sel);
+          row.append(label, selWrap);
+        }
+
+        if (f.type === 'text') {
+          const inpWrap = document.createElement('div'); inpWrap.style.flex='1'; inpWrap.style.position='relative';
+          const inp = document.createElement('input'); inp.type='text';
+          Object.assign(inp.style,{width:'100%',padding:'8px 10px 8px 36px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+          const tIcon = document.createElement('ha-icon'); tIcon.setAttribute('icon','mdi:text'); Object.assign(tIcon.style,{position:'absolute',left:'10px',top:'8px','--mdc-icon-size':'18px',width:'18px',height:'18px',opacity:'.7'});
+          inp.value = cfg[f.key] ?? '';
+          inp.addEventListener('input', async () => {
+            currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: inp.value || undefined});
+            await mountPreview(currentConfig);
+            yamlEditorApi?.setValue(currentConfig);
+          });
+          inpWrap.append(tIcon, inp);
+          row.append(label, inpWrap);
+        }
+
+        if (f.type === 'textarea') {
+          const ta = document.createElement('textarea');
+          Object.assign(ta.style,{flex:'1',minHeight:'120px',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+          ta.value = cfg[f.key] ?? '';
+          ta.addEventListener('input', async () => {
+            currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ta.value || ''});
+            await mountPreview(currentConfig);
+            yamlEditorApi?.setValue(currentConfig);
+          });
+          row.append(label, ta);
+        }
+
+        fieldWrap.appendChild(row);
+      });
+
+      quickFill.innerHTML = '';
+      quickFill.appendChild(fieldWrap);
+    };
+
+    const mountPreview = async (cfg) => {
+      const seq = ++pickSeq;
+      previewSpin.hidden = false;
+      cardHost.innerHTML = '';
+      await raf();
+      try {
+        const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+        if (seq !== pickSeq) return;
+        const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+        if (seq !== pickSeq) return;
+        cardHost.appendChild(temp);
+      } catch {}
+      finally { if (seq === pickSeq) previewSpin.hidden = true; }
+    };
+
+    const mountVisualEditor = async (cfg) => {
+      const seq = ++pickSeq;
+      editorSpin.hidden = false;
+      editorHost.innerHTML = '';
+      await idle();
+      if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
+    
+      // Try to get a UI editor for *any* card type (core or custom)
+      let editor = await this._getEditorElementForType(cfg.type || currentType, cfg);
+    
+      if (!editor) {
+        // No UI editor → show YAML (unless user explicitly selected Visual)
+        const p = document.createElement('div');
+        p.style.opacity = '.7'; p.style.fontSize = '.9rem';
+        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
+        if (seq === pickSeq) {
+          editorHost.appendChild(p);
+          editorSpin.hidden = true;
+        }
+        visualEditor = null;
+        enableCommit(true);
+        if (__activeTab !== 'visual') showTab('yaml');
+        return false;
+      }
+    
+      try {
+        editor.hass = this.hass;
+        if (!editor.isConnected) editorHost.appendChild(editor);
+    
+        // small yield before setConfig to help late-attaching internals
+        await Promise.resolve();
+        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
+    
+        // Remove old listeners if any
+        if (visualEditor && this.__onEditorChange) {
+          visualEditor.removeEventListener('config-changed', this.__onEditorChange);
+          visualEditor.removeEventListener('value-changed', this.__onEditorChange);
+        }
+    
+        const onChange = async (e) => {
+          const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
+          if (!next) return;
+          const nextType = next.type || currentType;
+          currentType = nextType;
+          currentConfig = this._shapeBySchema(nextType, next);
+    
+          setError('');
+          enableCommit(true);
+          buildQuickFill(currentType, currentConfig);
+          await mountPreview(currentConfig);
+          yamlEditorApi?.setValue(currentConfig);
+        };
+    
+        this.__onEditorChange = onChange;
+        editor.addEventListener('config-changed', onChange);
+        editor.addEventListener('value-changed', onChange);
+    
+        visualEditor = editor;
+    
+        // If a UI exists and the user hasn’t explicitly chosen YAML → show Visual
+        if (__activeTab !== 'yaml') showTab('visual');
+    
+        enableCommit(true);
+        return true;
+      } finally {
+        if (seq === pickSeq) editorSpin.hidden = true;
+      }
+    };
+    
+
+    const mountYaml = async (cfg) => {
+      yamlEditorApi = await this._mountYamlEditor(
+        yamlHost,
+        cfg,
+        async (parsed) => {
+          try {
+            const nextType = parsed?.type || currentType;
+            const shaped = this._shapeBySchema(nextType, parsed || {});
+            const typeChanged = nextType !== currentType;
+    
+            currentType = nextType;
+            currentConfig = shaped;
+    
+            yamlErr.hidden = true; yamlErr.textContent = '';
+            enableCommit(true);
+    
+            if (typeChanged) {
+              buildQuickFill(currentType, currentConfig);
+              const hasUI = await mountVisualEditor(currentConfig);
+              if (hasUI && __activeTab !== 'yaml') showTab('visual');
+            } else {
+              try { visualEditor?.setConfig?.(currentConfig); } catch {}
+              await mountPreview(currentConfig);
+            }
+          } catch (e) {
+            yamlErr.hidden = false;
+            yamlErr.textContent = `Invalid config: ${String(e?.message || e)}`;
+            enableCommit(false);
+          }
+        },
+        (e) => {
+          yamlErr.hidden = false;
+          yamlErr.textContent = `Invalid YAML: ${String(e?.message || e)}`;
+          enableCommit(false);
+        }
+      );
+    };
+    
+
+    const getStub = async (type) => {
+      if (this.__stubCache.has(type)) return { ...this.__stubCache.get(type) };
+      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      let CardClass = null;
+      try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+      let cfg;
+      const all = Object.keys(this.hass?.states || {});
+      const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+      if (CardClass?.getStubConfig) {
+        try { cfg = await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
+      }
+      if (!cfg) cfg = await this._getStubConfigForType(type);
+      this.__stubCache.set(type, { ...cfg });
+      return { ...cfg };
+    };
+
+    const selectType = async (type) => {
+      yamlErr.hidden = true; yamlErr.textContent = '';
+      setError('');
+      currentType = type;
+    
+      const cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
+        ? { ...initialCfg }
+        : await getStub(type);
+    
+      currentConfig = this._shapeBySchema(type, cfg);
+      buildQuickFill(type, currentConfig);
+      await mountYaml(currentConfig);
+      await raf();
+      await mountPreview(currentConfig);
+      const hasUI = await mountVisualEditor(currentConfig);
+      showTab(hasUI ? 'visual' : 'yaml');
+      enableCommit(true);
+    };
+    const commit = async () => {
+      if (!currentConfig) return;
+      const finalCfg = this._shapeBySchema(currentType, currentConfig);
+      if (mode === 'edit' && typeof onCommit === 'function') {
+        await onCommit(finalCfg);
+      } else {
+        await this._addPickedCardToLayout(finalCfg);
+        this._pushRecent((finalCfg||{}).type);
+      }
+      close();
+    };
+
+    cancelTop.addEventListener('click', close);
+    cancelBot.addEventListener('click', close);
+    addTop.addEventListener('click', commit);
+    addBottom.addEventListener('click', commit);
+    modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
+
+    search.addEventListener('input', renderLeft);
+    customType.addEventListener('input', renderLeft);
+
+    renderLeft();
+
+    // default selection
+    if (mode === 'edit' && initialCfg) {
+      await selectType(initialCfg.type || 'entities');
+      enableCommit(true);
+    }
+  }
+
+  /* ------------------------- Stubs / helpers (cards) ------------------------- */
+  async _getStubConfigForType(type) {
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+    const all = Object.keys(this.hass?.states || {});
+    const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+    if (CardClass?.getStubConfig) {
+      try { return await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
+    }
+    const base = { type };
+    const first = all[0];
+    const firstSensor = byDomain('sensor')[0] || first;
+
+    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast'].includes(type)) {
+      base.entity = ({
+        'sensor': firstSensor,
+        'gauge':  (byDomain('sensor').find(this._isNumericEntity.bind(this)) || firstSensor),
+        'media-control': byDomain('media_player')[0] || first,
+        'light': byDomain('light')[0] || first,
+        'thermostat': byDomain('climate')[0] || first,
+        'alarm-panel': byDomain('alarm_control_panel')[0] || first,
+        'weather-forecast': byDomain('weather')[0] || first,
+      })[type] || firstSensor || first;
+    }
+    if (['entities','glance','picture-glance','history-graph','statistics-graph','map'].includes(type)) {
+      const pick = (domains) => (domains?.length ? all.filter(e => domains.includes(e.split('.')[0])) : all).slice(0,3);
+      if (type === 'map')        base.entities = pick(['device_tracker','person']);
+      else if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
+      else base.entities = pick();
+    }
+    if (type === 'iframe') base.url = 'https://www.home-assistant.io';
+    if (type === 'markdown') base.content = '## New card';
+    return base;
+  }
+
+  _getNextAvailablePosition() {
+    const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
+    const occupied = new Set();
+    const gs = this.gridSize;
+    wraps.forEach((w) => {
+      const x = (parseFloat(w.getAttribute('data-x')) || 0);
+      const y = (parseFloat(w.getAttribute('data-y')) || 0);
+      const width  = parseFloat(getComputedStyle(w).width)  || 100;
+      const height = parseFloat(getComputedStyle(w).height) || 100;
+      const xStart = Math.floor(x/gs), yStart = Math.floor(y/gs);
+      const xEnd   = Math.floor((x+width)/gs), yEnd = Math.floor((y+height)/gs);
+      for (let xi=xStart; xi<xEnd; xi++) for (let yi=yStart; yi<yEnd; yi++) occupied.add(`${xi}-${yi}`);
+    });
+    let xi=0, yi=0;
+    while (occupied.has(`${xi}-${yi}`)) { xi+=6; if (xi>60) { xi=0; yi+=6; } }
+    return { x: xi*gs, y: yi*gs };
+  }
+
+  async _addPickedCardToLayout(cardConfig) {
+    this._hideEmptyPlaceholder();
+    const cardEl = await this._createCard(cardConfig);
+    const wrap = this._makeWrapper(cardEl);
+    const next = this._getNextAvailablePosition();
+    this._setCardPosition(wrap, next.x, next.y);
+    wrap.style.width  = `${14*this.gridSize}px`;
+    wrap.style.height = `${10*this.gridSize}px`;
+    wrap.style.zIndex = String(this._highestZ() + 1);
+    this.cardContainer.appendChild(wrap);
+    this._initCardInteract(wrap);
+    this._resizeContainer();
+    this._queueSave('add');
+    this._toast('Card added to layout.');
+    this._syncEmptyStateUI();
+  }
+
+  /* ------------------------------ Selection utils ------------------------------ */
+  _toggleSelection(wrap, force=null) {
+    const on = force==null ? !this._selection.has(wrap) : !!force;
+    if (on) this._selection.add(wrap); else this._selection.delete(wrap);
+    wrap.classList.toggle('selected', on);
+  }
+  _clearSelection() {
+    for (const w of this._selection) w.classList.remove('selected');
+    this._selection.clear();
+  }
+
+  _installSelectionMarquee() {
+    const cont = this.cardContainer;
+    let startX=0, startY=0, marquee=null, active=false;
+
+    const toLocal = (ev) => {
+      const r = cont.getBoundingClientRect();
+      const x = ('touches' in ev && ev.touches[0]) ? ev.touches[0].clientX : ev.clientX;
+      const y = ('touches' in ev && ev.touches[0]) ? ev.touches[0].clientY : ev.clientY;
+      return { x: x - r.left, y: y - r.top };
+    };
+
+    const updateSel = (x,y) => {
+      const minX = Math.min(x, startX), maxX = Math.max(x, startX);
+      const minY = Math.min(y, startY), maxY = Math.max(y, startY);
+      marquee.style.left = `${minX}px`;
+      marquee.style.top = `${minY}px`;
+      marquee.style.width = `${maxX-minX}px`;
+      marquee.style.height= `${maxY-minY}px`;
+
+      const rRect = marquee.getBoundingClientRect();
+      const wraps = cont.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
+      this._clearSelection();
+      wraps.forEach(w => {
+        const wr = w.getBoundingClientRect();
+        const overlap = !(wr.right < rRect.left || wr.left > rRect.right || wr.bottom < rRect.top || wr.top > rRect.bottom);
+        if (overlap) this._toggleSelection(w, true);
+      });
+    };
+
+    const down = (e) => {
+      if (!this.editMode) return;
+      if (e.target.closest('.card-wrapper')) return;
+      active = true;
+      const p = toLocal(e);
+      startX = p.x; startY = p.y;
+      marquee = document.createElement('div');
+      marquee.className = 'marquee';
+      marquee.style.left = `${startX}px`;
+      marquee.style.top  = `${startY}px`;
+      cont.appendChild(marquee);
+      e.preventDefault();
+    };
+    const move = (e) => { if (!active || !marquee) return; updateSel(toLocal(e).x, toLocal(e).y); };
+    const up = () => { if (!active) return; active = false; if (marquee) marquee.remove(); marquee = null; };
+
+    cont.addEventListener('mousedown', down);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    cont.addEventListener('touchstart', (e)=>{ if (!this.editMode) return; if (e.target.closest('.card-wrapper')) return; down(e); }, {passive:false});
+    window.addEventListener('touchmove', (e)=>{ move(e); }, {passive:false});
+    window.addEventListener('touchend', up);
+    window.addEventListener('touchcancel', up);
+  }
+
+  /* ------------------------------ Diagnostics ------------------------------ */
+  async _openDiagnostics() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    const sk = this.storageKey || '(none)';
+    const usingHost = this._backendOK && !!this.storageKey;
+
+    const logsToHtml = (rows) => rows.slice(-200).map(r =>
+      `<div style="font-family:monospace;font-size:.85rem;line-height:1.3">
+        <span style="opacity:.6">${r.t}</span>
+        <b style="margin-left:6px;color:#03a9f4">[${r.kind}]</b>
+        <span style="margin-left:6px">${this._safe(r.msg)}</span>
+        ${r.extra ? `<pre style="margin:4px 0 0 0;white-space:pre-wrap;background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:8px;padding:6px;max-height:160px;overflow:auto">${this._safe(JSON.stringify(r.extra, null, 2))}</pre>` : ''}
+      </div>`
+    ).join('');
+
+    modal.innerHTML = `
+      <div class="dialog" style="max-width:1100px;width:min(1100px,95vw);height:min(90vh,860px)">
+        <div class="dlg-head">
+          <h3>Drag & Drop — Diagnostics</h3>
+          <button class="btn secondary" id="closeDiag"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Close</span></button>
+        </div>
+        <div style="display:block;overflow:auto;padding:12px">
+          <div class="section" style="border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);margin-bottom:10px">
+            <div class="hd" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600">Status</div>
+            <div class="bd" style="padding:12px">
+              <div style="display:grid;grid-template-columns:220px 1fr;gap:6px;align-items:center">
+                <div>Storage key (raw → slug)</div><div><code>${this._safe(this._config?.storage_key || '')}</code> → <code>${this._safe(sk)}</code></div>
+                <div>Backend reachable</div><div><b>${this._backendOK ? 'YES' : 'NO'}</b></div>
+                <div>Persist target</div><div><b>${usingHost ? 'Host (backend)' : 'Browser (localStorage)'}</b></div>
+                <div>Auto-save</div><div>${this.autoSave ? `ON (${this.autoSaveDebounce} ms)` : 'OFF'}</div>
+                <div>Cards mounted</div><div>${this.cardContainer?.querySelectorAll('.card-wrapper:not(.ddc-placeholder)').length || 0}</div>
+              </div>
+              <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn" id="testRoundtrip"><ha-icon icon="mdi:sync"></ha-icon><span style="margin-left:6px">Test backend round-trip</span></button>
+                <button class="btn secondary" id="exportJson"><ha-icon icon="mdi:download"></ha-icon><span style="margin-left:6px">Export JSON</span></button>
+                <button class="btn secondary" id="importJson"><ha-icon icon="mdi:upload"></ha-icon><span style="margin-left:6px">Import JSON</span></button>
+                <button class="btn" id="forceSave"><ha-icon icon="mdi:content-save"></ha-icon><span style="margin-left:6px">Force save now</span></button>
+                <button class="btn secondary" id="refreshKeys"><ha-icon icon="mdi:refresh"></ha-icon><span style="margin-left:6px">Refresh backend keys</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="section" style="border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color)">
+            <div class="hd" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600">Logs (latest)</div>
+            <div class="bd" id="logArea" style="padding:12px;max-height:420px;overflow:auto">${logsToHtml(this._dbgDump())}</div>
+          </div>
+        </div>
+      </div>`;
+
+    const close = () => modal.remove();
+    modal.querySelector('#closeDiag').addEventListener('click', close);
+    this.appendChild(modal);
+
+    const refreshLogs = () => {
+      const logArea = modal.querySelector('#logArea');
+      const logsToHtmlLocal = (rows) => rows.slice(-200).map(r =>
+        `<div style="font-family:monospace;font-size:.85rem;line-height:1.3">
+          <span style="opacity:.6">${r.t}</span>
+          <b style="margin-left:6px;color:#03a9f4">[${r.kind}]</b>
+          <span style="margin-left:6px">${this._safe(r.msg)}</span>
+          ${r.extra ? `<pre style="margin:4px 0 0 0;white-space:pre-wrap;background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:8px;padding:6px;max-height:160px;overflow:auto">${this._safe(JSON.stringify(r.extra, null, 2))}</pre>` : ''}
+        </div>`
+      ).join('');
+      logArea.innerHTML = logsToHtmlLocal(this._dbgDump());
+      logArea.scrollTop = logArea.scrollHeight;
+    };
+
+    modal.querySelector('#refreshKeys').addEventListener('click', async () => {
+      try { this._dbgPush('probe', 'Manual refresh'); await this._probeBackend(); }
+      finally { refreshLogs(); }
+    });
+
+    modal.querySelector('#forceSave').addEventListener('click', async () => {
+      await this._saveLayout(false);
+      refreshLogs();
+    });
+
+    modal.querySelector('#exportJson').addEventListener('click', () => {
+      const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
+      const saved = wraps.map((w)=>{
+        const x = parseFloat(w.getAttribute('data-x')) || 0;
+        const y = parseFloat(w.getAttribute('data-y')) || 0;
+        const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+        const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+        const z = parseInt(w.style.zIndex || '1', 10);
+        const cardCfg = this._extractCardConfig(w.firstElementChild);
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+      });
+        const payload = {
+            version: 2,
+            options: this._exportableOptions(),
+            cards: saved
+        };
+      const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ddc_${this.storageKey || 'layout'}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    modal.querySelector('#importJson').addEventListener('click', async () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json';
+      inp.onchange = async () => {
+        const file = inp.files?.[0]; if (!file) return;
+        const txt = await file.text();
+        try {
+          const json = JSON.parse(txt);
+          this._dbgPush('import', 'Loaded file', { bytes: txt.length });
+          this.cardContainer.innerHTML = '';
+          if (json.cards?.length) {
+            for (const conf of json.cards) {
+              if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                this.cardContainer.appendChild(p);
+              } else {
+                const el = await this._createCard(conf.card);
+                const wrap = this._makeWrapper(el);
+                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+                wrap.style.width = `${conf.size?.width||140}px`;
+                wrap.style.height= `${conf.size?.height||100}px`;
+                this.cardContainer.appendChild(wrap);
+                this._initCardInteract(wrap);
+              }
+            }
+          } else {
+            this._showEmptyPlaceholder();
+          }
+          this._resizeContainer();
+          await this._saveLayout(false);
+        } catch (e) {
+          this._dbgPush('import', 'Parse failed', { error: String(e) });
+        }
+        const ev = new Event('ddc-logrefresh'); window.dispatchEvent(ev);
+      };
+      inp.click();
+    });
+
+    modal.querySelector('#testRoundtrip').addEventListener('click', async () => {
+      if (!this._backendOK) {
+        this._dbgPush('test', 'Backend not reachable, aborting');
+        return refreshLogs();
+      }
+      const key = (this.storageKey || 'ddc_test') + '_selftest';
+      const payload = { t: Date.now(), msg: 'roundtrip' };
+      try {
+        await this._saveLayoutToBackend(key, payload);
+        const back = await this._loadLayoutFromBackend(key);
+        this._dbgPush('test', 'Round-trip result', { wrote: payload, read: back });
+      } catch (e) {
+        this._dbgPush('test', 'Round-trip failed', { error: String(e) });
+      }
+      refreshLogs();
+    });
+
+    refreshLogs();
+  }
+
+  
+  /* ----------------------------- Export / Import Design ----------------------------- */
+
+
+  // Put these inside the class
+
+  /** Only the exportable knobs the user set in the UI */
+  _exportableOptions() {
+    const opt = {
+      storage_key: this.storageKey || undefined,
+      grid: this.gridSize,
+      container_background: this.containerBackground,
+      card_background: this.cardBackground,
+      disable_overlap: !!this.disableOverlap,
+      drag_live_snap: !!this.dragLiveSnap,
+      auto_save: !!this.autoSave,
+      auto_save_debounce: this.autoSaveDebounce,
+      debug: !!this.debug,
+      container_size_mode: this.containerSizeMode,
+      container_preset_orientation: this.containerPresetOrient,
+      container_fixed_width: this.containerFixedWidth ?? undefined,
+      container_fixed_height: this.containerFixedHeight ?? undefined,
+      container_preset: this.containerPreset,
+    };
+    // strip undefined to keep files tidy
+    Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
+    return opt;
+  }
+
+  /** Apply options WITHOUT triggering a full rebuild */
+  _applyImportedOptions(opts = {}, recalc = true) {
+    // keep the original config around, but merge options into live props
+    this._config = { ...(this._config || {}), ...opts };
+
+    if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
+    if ('grid' in opts)               this.gridSize = Number(opts.grid) || 10;
+    if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
+    if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
+    if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
+    if ('container_background' in opts) this.containerBackground = opts.container_background ?? 'transparent';
+    if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    if ('debug' in opts)              this.debug = !!opts.debug;
+    if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
+
+    if ('container_size_mode' in opts)        this.containerSizeMode = opts.container_size_mode || 'dynamic';
+    if ('container_fixed_width' in opts)      this.containerFixedWidth  = Number(opts.container_fixed_width)  || null;
+    if ('container_fixed_height' in opts)     this.containerFixedHeight = Number(opts.container_fixed_height) || null;
+    if ('container_preset' in opts)           this.containerPreset = opts.container_preset || 'fhd';
+    if ('container_preset_orientation' in opts) this.containerPresetOrient = opts.container_preset_orientation || 'auto';
+
+    // reflect to CSS
+    this.style.setProperty('--ddc-bg', this.containerBackground);
+    this.style.setProperty('--ddc-card-bg', this.cardBackground);
+    this._applyGridVars();
+
+    if (recalc) {
+      this._applyContainerSizingFromConfig(true);
+      this._resizeContainer();
+      this._updateStoreBadge?.();
+    }
+  }
+
+
+  _exportDesign() {
+    const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
+    const saved = wraps.map((w)=>{
+      const x = parseFloat(w.getAttribute('data-x')) || 0;
+      const y = parseFloat(w.getAttribute('data-y')) || 0;
+      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+      const z = parseInt(w.style.zIndex || '1', 10);
+      const cardCfg = this._extractCardConfig(w.firstElementChild);
+      return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+    });
+    const payload = {
+        version: 2,
+        options: this._exportableOptions(),
+        cards: saved
+      };
+    const name = `ddc_design_${this.storageKey || 'layout'}.json`;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this._toast('Design exported.');
+  }
+  
+  _importDesign() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json';
+    inp.onchange = async () => {
+      const file = inp.files?.[0]; if (!file) return;
+        const txt = await file.text();
+      try {
+        const json = JSON.parse(txt);
+        // Apply options (if present) before building cards
+        if (json.options) this._applyImportedOptions(json.options, true);
+        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
+        this.cardContainer.innerHTML = '';
+        if (json.cards?.length) {
+          for (const conf of json.cards) {
+            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+              this.cardContainer.appendChild(p);
+            } else {
+              const el = await this._createCard(conf.card);
+              const wrap = this._makeWrapper(el);
+              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+              wrap.style.width  = `${conf.size?.width||140}px`;
+              wrap.style.height = `${conf.size?.height||100}px`;
+              if (conf.z != null) wrap.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(wrap);
+              this._initCardInteract(wrap);
+            }
+          }
+        } else {
+          this._showEmptyPlaceholder();
+        }
+        this._resizeContainer();
+        await this._saveLayout(false);
+        this._toast('Design imported.');
+      } catch (e) {
+        console.error('Import failed', e);
+        this._toast('Import failed — invalid file.');
+      }
+    };
+    inp.click();
+  }
+  
+
+  /* ----------------------------- Save / load ----------------------------- */
+  _queueSave(reason='auto') {
+    if (!this.autoSave) return;
+    this._dbgPush('autosave', 'Queued', { reason, debounce: this.autoSaveDebounce });
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce);
+  }
+
+  async _saveLayout(silent = true) {
+    const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
+    const saved = wraps.map((w)=>{
+      const x = parseFloat(w.getAttribute('data-x')) || 0;
+      const y = parseFloat(w.getAttribute('data-y')) || 0;
+      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+      const z = parseInt(w.style.zIndex || '1', 10);
+      const cardCfg = this._extractCardConfig(w.firstElementChild);
+      return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+    });
+    const payload = {
+       version: 2,
+       options: this._exportableOptions(),
+       cards: saved
+     };
+
+    try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
+
+    if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).'); return; }
+
+    try {
+      await this._saveLayoutToBackend(this.storageKey, payload);
+      if (!silent) this._toast('Layout saved.');
+    } catch (e) {
+      console.error('Backend save failed', e);
+      this._dbgPush('save', 'Backend save failed', { error: String(e) });
+      if (!silent) this._toast('Backend save failed — kept local copy.');
+    }
+  }
+
+  async _probeBackend() {
+    this._backendOK = false;
+    const t0 = performance.now();
+    try {
+      this._dbgPush('probe', 'GET /api/dragdrop_storage (list keys)');
+      const r = await this.hass.callApi('get', 'dragdrop_storage');
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('probe', `OK (${ms} ms)`, r);
+      this._backendOK = !!r;
+    } catch (e) {
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('probe', `FAILED (${ms} ms)`, { error: String(e) });
+      this._backendOK = false;
+    }
+    this._updateStoreBadge();
+  }
+
+  async _loadLayoutFromBackend(key) {
+    const url = `dragdrop_storage/${encodeURIComponent(key)}`;
+    const t0 = performance.now();
+    try {
+      this._dbgPush('load', `GET /api/${url}`);
+      const data = await this.hass.callApi('get', url);
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('load', `OK (${ms} ms)`, { bytes: JSON.stringify(data||'').length });
+      return data;
+    } catch (e) {
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('load', `FAILED (${ms} ms)`, { error: String(e) });
+      return null;
+    }
+  }
+
+  async _saveLayoutToBackend(key, data) {
+    const url = `dragdrop_storage/${encodeURIComponent(key)}`;
+    const size = JSON.stringify(data).length;
+    const t0 = performance.now();
+    try {
+      this._dbgPush('save', `POST /api/${url}`, { bytes: size });
+      const res = await this.hass.callApi('post', url, data);
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('save', `OK (${ms} ms)`, res);
+      return res;
+    } catch (e) {
+      const ms = Math.round(performance.now() - t0);
+      this._dbgPush('save', `FAILED (${ms} ms)`, { error: String(e), bytes: size });
+      throw e;
+    }
+  }
+
+  _updateStoreBadge() {
+    const el = this.storeBadge; if (!el) return;
+    const usingHost = this._backendOK && !!this.storageKey;
+    el.textContent = usingHost ? 'storage: backend' : 'storage: local';
+    el.style.background = usingHost ? 'rgba(76,175,80,.15)' : 'rgba(255,193,7,.15)';
+    el.style.borderColor = usingHost ? 'rgba(76,175,80,.45)' : 'rgba(255,193,7,.45)';
+  }
+
+  /* ----------------------------- Utilities ----------------------------- */
+  _toast(message) {
+    const ev = new Event('hass-notification');
+    ev.detail = { message };
+    window.dispatchEvent(ev);
+  }
+  _huiRoot() {
+    try {
+      const ha   = document.querySelector('home-assistant');
+      const main = ha?.shadowRoot?.querySelector('home-assistant-main');
+      const drawer = main?.shadowRoot?.querySelector('ha-drawer') || main;
+      const ppr = drawer?.shadowRoot?.querySelector('partial-panel-resolver') || drawer;
+      const panel = ppr?.shadowRoot?.querySelector('ha-panel-lovelace') || drawer?.shadowRoot?.querySelector('ha-panel-lovelace');
+      return panel?.shadowRoot?.querySelector('hui-root') || null;
+    } catch { return null; }
+  }
+  getCardSize(){ return 3; }
+}
+
+if (!customElements.get('drag-and-drop-card')) {
+  customElements.define('drag-and-drop-card', DragAndDropCard);
+}
