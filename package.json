@@ -6,18 +6,29 @@
   "license": "UNLICENSED",
   "private": false,
   "scripts": {
-    "build": "rollup -c",
-    "prepublishOnly": "npm run build"
+    "build": "esbuild src/drag-and-drop-card.js --bundle --minify --sourcemap --outfile=dist/drag-and-drop-card.js",
+    "watch": "npm run build -- --watch"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-replace": "^5.0.7",
-    "rollup": "^4.19.0",
-    "rollup-plugin-terser": "^7.0.2"
+    "esbuild": "^0.25.9"
   },
   "dependencies": {
     "interactjs": "^1.10.27",
     "js-yaml": "^4.1.0"
-  }
+  },
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Prosono/Drag-And-Drop-Card.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/Prosono/Drag-And-Drop-Card/issues"
+  },
+  "homepage": "https://github.com/Prosono/Drag-And-Drop-Card#readme"
+  
 }
