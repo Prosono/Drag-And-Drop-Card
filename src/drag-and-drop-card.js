@@ -1,3 +1,26 @@
+/*!
+ * Drag & Drop Card (Proprietary)
+ * Copyright (c) 2025 <SMARTI AS>
+ * Use is governed by EULA.md. Third-party notices: THIRD_PARTY_NOTICES.md
+ */
+
+
+// — bundle-time imports so we don't rely on CDNs in HACS installs —
+import interact from 'interactjs';
+import jsyaml from 'js-yaml';
+
+// expose for your existing code that checks window.interact/jsyaml
+if (!window.interact) window.interact = interact;
+if (!window.jsyaml) window.jsyaml = jsyaml;
+
+// pretty console banner + version
+const VERSION = __VERSION__;
+console.info(
+  `%c drag-and-drop-card %c v${VERSION} `,
+  'color:#fff;background:#03a9f4;font-weight:700;padding:2px 6px;border-radius:3px 0 0 3px',
+  'color:#03303a;background:#bdeaff;padding:2px 6px;border-radius:0 3px 3px 0'
+);
+
 // drag-and-drop-card.js
 /* eslint-disable no-console */
 const LOG = (m, ...a) => console.debug(`[drag-and-drop-card] ${m}`, ...a);
@@ -1700,21 +1723,6 @@ _syncEmptyStateUI() {
     return out;
   }
 
-    /* ---- discover custom cards registered by community convention ---- */
- /* _customCardsFromRegistry() {
-    const reg = Array.isArray(window.customCards) ? window.customCards : [];
-    // Normalize to picker item shape
-    return reg
-      .map((cc) => ({
-        // window.customCards usually has `type: "my-card"` (without "custom:")
-        type: cc?.type?.startsWith('custom:') ? cc.type : `custom:${cc?.type}`,
-        name: cc?.name || cc?.type || 'Custom card',
-        icon: 'mdi:puzzle-outline',
-        description: cc?.description || '',
-      }))
-      .filter((it) => typeof it.type === 'string' && it.type.startsWith('custom:'));
-  }
-*/
   _statesList(domains) {
     const all = Object.keys(this.hass?.states || {});
     if (!domains || !domains.length) return all;
