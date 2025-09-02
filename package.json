@@ -6,8 +6,8 @@
   "license": "UNLICENSED",
   "private": false,
   "scripts": {
-    "build": "esbuild src/drag-and-drop-card.js --bundle --minify --sourcemap --outfile=dist/drag-and-drop-card.js",
-    "watch": "npm run build -- --watch"
+  "build": "esbuild src/drag-and-drop-card.js --bundle --minify --sourcemap --format=esm --target=es2019 --outfile=dist/drag-and-drop-card.js --define:__VERSION__=\\\"$npm_package_version\\\"",
+  "watch": "npm run build -- --watch"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
