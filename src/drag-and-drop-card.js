@@ -589,12 +589,12 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
-          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color)}
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -1765,7 +1765,18 @@ _syncEmptyStateUI() {
   _statesList(domains) {
     const all = Object.keys(this.hass?.states || {});
     if (!domains || !domains.length) return all;
-    return all.filter(eid => domains.includes(eid.split('.')[0]));
+
+    if (!this.__domainIndex || this.__domainIndex._gen !== all.length) {
+      const map = {};
+      for (const id of all) {
+        const d = id.split('.')[0];
+        (map[d] ||= []).push(id);
+      }
+      this.__domainIndex = { _gen: all.length, map };
+    }
+    const out = [];
+    for (const d of domains) if (this.__domainIndex.map[d]) out.push(...this.__domainIndex.map[d]);
+    return out;
   }
   _isNumericEntity(eid) {
     const st = this.hass?.states?.[eid]; if (!st) return false;
@@ -1872,7 +1883,59 @@ _syncEmptyStateUI() {
   }
 
   /* ----------------------- Picker (fast, cached) ----------------------- */
+  
+    _createVirtualList({ container, items, rowHeight = 36, renderRow }) {
+    container.style.position = 'relative';
+    container.style.overflow = 'auto';
+    const spacer = document.createElement('div');
+    spacer.style.height = `${items.length * rowHeight}px`;
+    container.innerHTML = '';
+    container.appendChild(spacer);
+
+    const mount = new Map(); // index -> element
+    const render = () => {
+      const scrollTop = container.scrollTop;
+      const h = container.clientHeight;
+      const first = Math.max(0, Math.floor(scrollTop / rowHeight) - 6);
+      const last  = Math.min(items.length - 1, Math.ceil((scrollTop + h) / rowHeight) + 6);
+
+      // remove out-of-window rows
+      for (const [i, el] of mount) {
+        if (i < first || i > last) { el.remove(); mount.delete(i); }
+      }
+      // add visible rows
+      for (let i = first; i <= last; i++) {
+        if (mount.has(i)) continue;
+        const el = renderRow(items[i], i);
+        el.style.position = 'absolute';
+        el.style.left = '0';
+        el.style.right = '0';
+        el.style.top = `${i * rowHeight}px`;
+        mount.set(i, el);
+        container.appendChild(el);
+      }
+    };
+
+    container.addEventListener('scroll', render, { passive: true });
+    new ResizeObserver(render).observe(container);
+    render();
+
+    return {
+      refresh(newItems) {
+        if (newItems) {
+          items = newItems;
+          spacer.style.height = `${items.length * rowHeight}px`;
+          for (const [, el] of mount) el.remove();
+          mount.clear();
+        }
+        render();
+      }
+    };
+  }
+  
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
+
+    
     const close = () => modal.remove();
     const modal = document.createElement('div'); modal.className='modal';
     modal.innerHTML = `
@@ -1999,11 +2062,19 @@ _syncEmptyStateUI() {
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
     
-    tabVisual.addEventListener('click', () => showTab('visual'));
+    tabVisual.addEventListener('click', async () => {
+      showTab('visual');
+      // Mount once, then just update via setConfig
+      if (!visualEditor) {
+        await mountVisualEditor(currentConfig);
+      } else {
+        try { visualEditor.setConfig?.(currentConfig); } catch {}
+      }
+    });
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
-    showTab('visual');
+    showTab('yaml');
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
@@ -2055,6 +2126,8 @@ _syncEmptyStateUI() {
     let yamlEditorApi = null;
     let visualEditor = null;
     let pickSeq = 0; // stale-select guard
+    let __previewTimer = null;
+    let __lastPreviewCfgJSON = '';
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -2082,7 +2155,7 @@ _syncEmptyStateUI() {
           div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
           div.querySelector('ha-icon').setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
           currentConfig = this._shapeBySchema(type, {...currentConfig, [keyForMulti]: [...arr]});
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         });
         container.appendChild(div);
@@ -2094,17 +2167,68 @@ _syncEmptyStateUI() {
 
         if (f.type === 'entities') {
           const wrap = document.createElement('div'); wrap.style.flex='1';
-          const filter = document.createElement('input'); Object.assign(filter,{placeholder:'Filter entities…'}); Object.assign(filter.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)',background:'var(--card-background-color)',color:'var(--primary-text-color)'});
-          const list = document.createElement('div'); Object.assign(list.style,{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'8px',maxHeight:'220px',overflow:'auto',marginTop:'8px'});
+          const filter = document.createElement('input');
+          Object.assign(filter, { placeholder:'Filter entities…' });
+          Object.assign(filter.style, {
+            width:'100%', padding:'8px 10px', borderRadius:'10px',
+            border:'1px solid var(--divider-color)',
+            background:'var(--card-background-color)', color:'var(--primary-text-color)'
+          });
+          const list = document.createElement('div');
+          Object.assign(list.style, {
+            maxHeight:'220px', overflow:'auto', marginTop:'8px',
+            border:'1px solid var(--divider-color)', borderRadius:'10px', padding:'6px'
+          });
           const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : all;
           const selected = Array.isArray(cfg[f.key]) ? [...cfg[f.key]] : (cfg[f.key] ? [cfg[f.key]] : []);
-          const renderList = () => {
-            const q = filter.value.trim().toLowerCase();
-            list.innerHTML = '';
-            pool.filter(eid => !q || eid.toLowerCase().includes(q)).forEach(eid => addEntityItem(eid, selected, list, f.key));
+
+          // virtualized row renderer
+          const renderRow = (eid) => {
+            const div = document.createElement('div');
+            Object.assign(div.style, {
+              padding:'6px 10px', margin:'4px 0',
+              border:'1px solid var(--divider-color)', borderRadius:'10px',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', background:''
+            });
+            const icon = document.createElement('ha-icon');
+            icon.setAttribute('icon','mdi:checkbox-blank-outline');
+            icon.style.setProperty('--mdc-icon-size','18px');
+            const text = document.createElement('span');
+            text.textContent = eid;
+            text.style.whiteSpace = 'nowrap';
+            text.style.overflow = 'hidden';
+            text.style.textOverflow = 'ellipsis';
+            div.append(icon, text);
+
+            const paint = () => {
+              const on = selected.includes(eid);
+              div.style.background = on ? 'rgba(3,169,244,.12)' : '';
+              div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
+              icon.setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
+            };
+            paint();
+
+            div.addEventListener('click', () => {
+              const idx = selected.indexOf(eid);
+              if (idx >= 0) selected.splice(idx, 1); else selected.push(eid);
+              currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: [...selected]});
+              mountPreview(currentConfig);
+              yamlEditorApi?.setValue(currentConfig);
+              paint();
+            });
+
+            return div;
           };
-          filter.addEventListener('input', renderList);
-          renderList();
+
+          let filtered = pool;
+          this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+
+          filter.addEventListener('input', () => {
+            const q = filter.value.trim().toLowerCase();
+            filtered = pool.filter(eid => !q || eid.toLowerCase().includes(q));
+            this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+          });
+
           wrap.append(filter, list);
           row.append(label, wrap);
           currentConfig = this._shapeBySchema(type, {...cfg, [f.key]: selected});
@@ -2123,7 +2247,7 @@ _syncEmptyStateUI() {
           ds.value = Array.isArray(cfg[f.key]) ? (cfg[f.key][0] || '') : (cfg[f.key] || '');
           ds.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ds.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           dsWrap.append(iconLead, ds, dl);
@@ -2139,7 +2263,7 @@ _syncEmptyStateUI() {
           inp.addEventListener('input', async () => {
             const v = inp.value==='' ? undefined : Number(inp.value);
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: isNaN(v)? undefined : v});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(numIcon, inp);
@@ -2154,7 +2278,7 @@ _syncEmptyStateUI() {
           sel.value = cfg[f.key] ?? f.default ?? (f.options?.[0] || '');
           sel.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: sel.value});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           selWrap.append(selIcon, sel);
@@ -2169,7 +2293,7 @@ _syncEmptyStateUI() {
           inp.value = cfg[f.key] ?? '';
           inp.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: inp.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(tIcon, inp);
@@ -2182,7 +2306,7 @@ _syncEmptyStateUI() {
           ta.value = cfg[f.key] ?? '';
           ta.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ta.value || ''});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           row.append(label, ta);
@@ -2195,19 +2319,25 @@ _syncEmptyStateUI() {
       quickFill.appendChild(fieldWrap);
     };
 
-    const mountPreview = async (cfg) => {
-      const seq = ++pickSeq;
-      previewSpin.hidden = false;
-      cardHost.innerHTML = '';
-      await raf();
-      try {
-        const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-        if (seq !== pickSeq) return;
-        const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
-        if (seq !== pickSeq) return;
-        cardHost.appendChild(temp);
-      } catch {}
-      finally { if (seq === pickSeq) previewSpin.hidden = true; }
+    const mountPreview = (cfg) => {
+      const cfgJSON = JSON.stringify(cfg || {});
+      if (cfgJSON === __lastPreviewCfgJSON) return; // same config, skip
+      __lastPreviewCfgJSON = cfgJSON;
+      if (__previewTimer) clearTimeout(__previewTimer);
+      __previewTimer = setTimeout(async () => {
+        const seq = ++pickSeq;
+        previewSpin.hidden = false;
+        cardHost.innerHTML = '';
+        await raf();
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          if (seq !== pickSeq) return;
+          const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+          if (seq !== pickSeq) return;
+          cardHost.appendChild(temp);
+        } catch {}
+        finally { if (seq === pickSeq) previewSpin.hidden = true; }
+      }, 150); // 150–250ms is a sweet spot
     };
 
     const mountVisualEditor = async (cfg) => {
@@ -2238,7 +2368,19 @@ _syncEmptyStateUI() {
       try {
         editor.hass = this.hass;
         if (!editor.isConnected) editorHost.appendChild(editor);
-    
+
+        // Try official getStubConfig once (may load modules) to improve defaults
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
+          if (CardClass?.getStubConfig) {
+            const all = Object.keys(this.hass?.states || {});
+            const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+            const better = await CardClass.getStubConfig(this.hass, all, byDomain);
+            if (better) cfg = this._shapeBySchema(cfg.type || currentType, { ...better });
+          }
+        } catch {}
+
         // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
         try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
@@ -2259,7 +2401,7 @@ _syncEmptyStateUI() {
           setError('');
           enableCommit(true);
           buildQuickFill(currentType, currentConfig);
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
     
@@ -2298,12 +2440,16 @@ _syncEmptyStateUI() {
     
             if (typeChanged) {
               buildQuickFill(currentType, currentConfig);
-              const hasUI = await mountVisualEditor(currentConfig);
-              if (hasUI && __activeTab !== 'yaml') showTab('visual');
+              // Only update Visual if it’s already mounted
+              if (visualEditor) {
+                try { visualEditor.setConfig?.(currentConfig); } catch {}
+                if (__activeTab !== 'yaml') showTab('visual');
+              }
             } else {
               try { visualEditor?.setConfig?.(currentConfig); } catch {}
-              await mountPreview(currentConfig);
+              mountPreview(currentConfig);
             }
+
           } catch (e) {
             yamlErr.hidden = false;
             yamlErr.textContent = `Invalid config: ${String(e?.message || e)}`;
@@ -2321,16 +2467,8 @@ _syncEmptyStateUI() {
 
     const getStub = async (type) => {
       if (this.__stubCache.has(type)) return { ...this.__stubCache.get(type) };
-      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      let CardClass = null;
-      try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
-      let cfg;
-      const all = Object.keys(this.hass?.states || {});
-      const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
-      if (CardClass?.getStubConfig) {
-        try { cfg = await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
-      }
-      if (!cfg) cfg = await this._getStubConfigForType(type);
+      // Fast local stub first (no heavy module loads)
+      let cfg = await this._getStubConfigForType(type);
       this.__stubCache.set(type, { ...cfg });
       return { ...cfg };
     };
@@ -2348,9 +2486,11 @@ _syncEmptyStateUI() {
       buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
-      await mountPreview(currentConfig);
-      const hasUI = await mountVisualEditor(currentConfig);
-      showTab(hasUI ? 'visual' : 'yaml');
+      mountPreview(currentConfig); // debounced version (Patch 2)
+      if (visualEditor) {
+        try { visualEditor.setConfig?.(currentConfig); } catch {}
+      }
+      showTab('yaml');
       enableCommit(true);
     };
     const commit = async () => {
@@ -2371,7 +2511,12 @@ _syncEmptyStateUI() {
     addBottom.addEventListener('click', commit);
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
-    search.addEventListener('input', renderLeft);
+    let __searchTimer = null;
+    search.addEventListener('input', () => {
+      if (__searchTimer) clearTimeout(__searchTimer);
+      __searchTimer = setTimeout(renderLeft, 120);
+    });
+
 
     renderLeft();
     // --- Ensure something is selected so YAML/preview mount immediately ---
