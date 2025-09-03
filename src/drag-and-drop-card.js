@@ -2064,7 +2064,7 @@ _syncEmptyStateUI() {
     this.appendChild(modal);
 
     // Mount at top-level so fixed overlay can't be clipped by transformed parents
-    (document.body || this).appendChild(modal);
+    //(document.body || this).appendChild(modal);
 
     modal.classList.add('opening');
     const dialogEl = modal.querySelector('.dialog');
