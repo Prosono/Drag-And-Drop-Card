@@ -2061,10 +2061,10 @@ _syncEmptyStateUI() {
           </button>
         </div>
       </div>`;
-    this.appendChild(modal);
+    //this.appendChild(modal);
 
     // Mount at top-level so fixed overlay can't be clipped by transformed parents
-    //(document.body || this).appendChild(modal);
+    (document.body || this).appendChild(modal);
 
     modal.classList.add('opening');
     const dialogEl = modal.querySelector('.dialog');
@@ -2136,8 +2136,25 @@ _syncEmptyStateUI() {
       editorHost.parentElement.style.display = wantYaml ? 'none' : '';
       yamlSec.style.display = wantYaml ? '' : 'none';
     
-      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
-      __activeTab = wantYaml ? 'yaml' : 'visual';
+      const showTab = async (name) => {
+        const wantYaml = name === 'yaml';
+        tabVisual.classList.toggle('active', !wantYaml);
+        tabVisual.setAttribute('aria-selected', String(!wantYaml));
+        tabYaml.classList.toggle('active', wantYaml);
+        tabYaml.setAttribute('aria-selected', String(wantYaml));
+
+        // Show/hide the two editors
+        editorHost.parentElement.style.display = wantYaml ? 'none' : '';
+        yamlSec.style.display = wantYaml ? '' : 'none';
+
+        // Lazy-mount YAML the first time user opens that tab
+        if (wantYaml && !yamlEditorApi) {
+          await mountYaml(currentConfig || initialCfg || { type: currentType || 'entities' });
+        }
+
+        if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
+        __activeTab = wantYaml ? 'yaml' : 'visual';
+      };
     };
     
     tabVisual.addEventListener('click', () => showTab('visual'));
@@ -2553,30 +2570,31 @@ _syncEmptyStateUI() {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
-    
+
       const cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
         ? { ...initialCfg }
         : await getStub(type);
-    
+
       currentConfig = this._shapeBySchema(type, cfg);
       buildQuickFill(type, currentConfig);
-      await mountYaml(currentConfig);
+
+      // 1) Always render preview quickly
       await raf();
       await mountPreview(currentConfig);
+
+      // 2) Try Visual first
       const hasUI = await mountVisualEditor(currentConfig);
-      showTab(hasUI ? 'visual' : 'yaml');
-      enableCommit(true);
-    };
-    const commit = async () => {
-      if (!currentConfig) return;
-      const finalCfg = this._shapeBySchema(currentType, currentConfig);
-      if (mode === 'edit' && typeof onCommit === 'function') {
-        await onCommit(finalCfg);
+
+      if (hasUI) {
+        // Don’t mount YAML until user switches tab
+        if (__activeTab !== 'yaml') showTab('visual');
+        enableCommit(true);
       } else {
-        await this._addPickedCardToLayout(finalCfg);
-        this._pushRecent((finalCfg||{}).type);
+        // No visual editor → mount YAML now
+        await mountYaml(currentConfig);
+        showTab('yaml');
+        enableCommit(true);
       }
-      close();
     };
 
     cancelTop.addEventListener('click', close);
@@ -2585,7 +2603,12 @@ _syncEmptyStateUI() {
     addBottom.addEventListener('click', commit);
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
-    search.addEventListener('input', renderLeft);
+    let __srchT = null;
+    search.addEventListener('input', () => {
+      clearTimeout(__srchT);
+      __srchT = setTimeout(renderLeft, 120);
+    });
+
 
     renderLeft();
     // --- Ensure something is selected so YAML/preview mount immediately ---
