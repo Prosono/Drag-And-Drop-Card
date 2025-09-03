@@ -604,6 +604,37 @@ _applyGridVars() {
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
+          /* --- FIX: YAML editor should scroll and not overflow --- */
+          #yamlSec { min-height: 0; }
+          #yamlSec .bd { 
+            overflow: auto;        /* allow scrolling inside the YAML section */
+            max-height: 320px;     /* keep the section tidy; adjust if you like */
+          }
+
+          #quickFillSec { 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 0; 
+          }
+          #quickFillSec .bd { 
+            overflow: auto;          /* scroll inside the card */
+            max-height: 320px;       /* keep it contained; tweak as you wish */
+          }
+
+          /* ha-code-editor / CodeMirror height: fixed and scroll inside */
+          ha-code-editor { 
+            display: block; 
+            height: 260px !important; 
+          }
+          .CodeMirror { 
+            height: 260px !important; 
+          }
+
+          /* host that wraps the editor should also allow scroll if content grows */
+          #yamlHost { 
+            max-height: 260px; 
+            overflow: auto; 
+          }
 
           /* CodeMirror */
           .CodeMirror{
@@ -1850,7 +1881,6 @@ _syncEmptyStateUI() {
           <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
           <div style="display:flex;gap:10px;flex:1">
             <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
-            <input id="customType" placeholder="custom:my-card (optional)" style="max-width:260px;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)" aria-label="custom type">
           </div>
           <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
           <button class="btn" id="addBtn" disabled>${mode==='edit'
@@ -1862,7 +1892,7 @@ _syncEmptyStateUI() {
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
             <div class="rightGrid">
-              <div class="sec" style="grid-column:1;grid-row:1">
+              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
                 <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
                 <div class="bd" id="quickFill"></div>
               </div>
@@ -1920,7 +1950,6 @@ _syncEmptyStateUI() {
     const cancelTop = modal.querySelector('#cancelBtn');
     const cancelBot = modal.querySelector('#footCancel');
     const search = modal.querySelector('#search');
-    const customType = modal.querySelector('#customType');
     const cardHost = modal.querySelector('#cardHost');
     const editorHost = modal.querySelector('#editorHost');
     const editorSpin = modal.querySelector('#editorSpin');
@@ -1978,14 +2007,14 @@ _syncEmptyStateUI() {
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
-      const custom = customType.value.trim();
-      if (custom) {
-        return [{ id:'custom', name:'Custom', items:[{type:custom, name:'Custom card', icon:'mdi:puzzle-outline'}]}];
-      }
-      return catalog.map(section => ({
-        ...section,
-        items: (section.items||[]).filter(it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q))
-      })).filter(sec => sec.items && sec.items.length || sec.id==='favorites' || sec.id==='recent');
+      return catalog
+        .map(section => ({
+          ...section,
+          items: (section.items || []).filter(
+            it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
+          )
+        }))
+        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent');
     };
 
     const renderLeft = () => {
@@ -2195,7 +2224,7 @@ _syncEmptyStateUI() {
         // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
         p.style.opacity = '.7'; p.style.fontSize = '.9rem';
-        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
+        p.textContent = 'This card does not support a visual editor. Please use the YAML tab to configure it.';
         if (seq === pickSeq) {
           editorHost.appendChild(p);
           editorSpin.hidden = true;
@@ -2343,9 +2372,18 @@ _syncEmptyStateUI() {
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
     search.addEventListener('input', renderLeft);
-    customType.addEventListener('input', renderLeft);
 
     renderLeft();
+    // --- Ensure something is selected so YAML/preview mount immediately ---
+    const pickDefaultType = () => {
+      // Prefer recent if present; otherwise fall back to 'entities'
+      const r = this._getRecent?.() || [];
+      const firstRecent = r.find(Boolean);
+      return firstRecent || 'entities';
+    };
+
+    await selectType(pickDefaultType());
+    enableCommit(true);
 
     // default selection
     if (mode === 'edit' && initialCfg) {
