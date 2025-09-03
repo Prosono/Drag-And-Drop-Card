@@ -162,7 +162,7 @@ class DragAndDropCard extends HTMLElement {
       el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
       el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
       el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
-      el.querySelector('#sizePreset').value = config.container_preset || 'fhd';
+      el.querySelector('#sizePreset').value = config.container_preset || 'fullhd';
       el.querySelector('#sizeOrientation').value = config.container_preset_orientation || 'auto';
       toggleSizeControls();
     };
@@ -239,9 +239,8 @@ _isContainerFixed() { return this.containerSizeMode !== 'dynamic'; }
 
 _resolveFixedSize() {
   if (this.containerSizeMode === 'fixed_custom') {
-    const min = Math.max(1, Number(this.gridSize || 10));
-    const w = Math.max(min, Number(this.containerFixedWidth || 0));
-    const h = Math.max(min, Number(this.containerFixedHeight || 0));
+    const w = Math.max(100, Number(this.containerFixedWidth || 0));
+    const h = Math.max(100, Number(this.containerFixedHeight || 0));
     return { w, h };
   }
   if (this.containerSizeMode === 'preset') {
@@ -353,7 +352,7 @@ _applyGridVars() {
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
-    this.containerPreset          = config.container_preset || 'fhd';
+    this.containerPreset          = config.container_preset || 'fullhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
@@ -427,11 +426,12 @@ _applyGridVars() {
             background: rgba(255,193,7,.15);
             display: none; /* hidden by default, shown only in edit mode */
           }
+
           .card-container{
             position: relative;
             padding: 10px;
             border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);
+            background: var(--ddc-bg, transparent);s
             width: auto; height: auto; border-radius: 12px; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
@@ -780,33 +780,20 @@ _applyGridVars() {
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
   
-    // Remove pointer-based long-press listeners if installed
+    // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
-      cont?.removeEventListener('pointerdown', this.__lpHandlers.onPointerDown);
-      window.removeEventListener('pointermove', this.__lpHandlers.onPointerMove);
-      window.removeEventListener('pointerup', this.__lpHandlers.onPointerUpOrCancel);
-      window.removeEventListener('pointercancel', this.__lpHandlers.onPointerUpOrCancel);
-      window.removeEventListener('contextmenu', this.__lpHandlers.onContextMenu);
-      cont?.removeEventListener('dblclick', this.__lpHandlers.onDblClick);
+      cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
+      window.removeEventListener('mousemove', this.__lpHandlers.mouseMove);
+      window.removeEventListener('mouseup', this.__lpHandlers.mouseUp);
+      window.removeEventListener('contextmenu', this.__lpHandlers.contextMenu);
+      cont?.removeEventListener('touchstart', this.__lpHandlers.touchStart);
+      window.removeEventListener('touchmove', this.__lpHandlers.touchMove);
+      window.removeEventListener('touchend', this.__lpHandlers.touchEnd);
+      window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
-
-    // Remove marquee selection listeners if installed
-    if (this.__marqueeHandlers) {
-      const cont = this.cardContainer;
-      cont?.removeEventListener('mousedown', this.__marqueeHandlers.down);
-      window.removeEventListener('mousemove', this.__marqueeHandlers.move);
-      window.removeEventListener('mouseup', this.__marqueeHandlers.up);
-      window.removeEventListener('touchmove', this.__marqueeHandlers.move);
-      window.removeEventListener('touchend', this.__marqueeHandlers.up);
-      window.removeEventListener('touchcancel', this.__marqueeHandlers.up);
-      // touchstart is on the container:
-      cont?.removeEventListener('touchstart', this.__marqueeHandlers.down);
-      this.__marqueeHandlers = null;
-    }
-
   }
   
 
@@ -909,7 +896,8 @@ _applyGridVars() {
     try { this.__clearPressTimer?.(); } catch {}
     const entering = (force === null) ? !this.editMode : !!force;
     const wasOff = !this.editMode && entering;
-
+  
+    this.editMode = entering;
 
     this.editMode = entering;
     this.addButton.style.display   = this.editMode ? 'inline-block' : 'none';
@@ -930,10 +918,8 @@ _applyGridVars() {
       const handle = w.querySelector('.resize-handle');
       if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
       if (!w.dataset.placeholder && window.interact) {
-         window.interact(w)
-           .draggable({ enabled: this.editMode })
-           .resizable({ enabled: this.editMode });
-       }
+        window.interact(w).draggable(this.editMode).resizable(this.editMode);
+      }
       w.style.touchAction = this.editMode ? 'none' : 'auto';
     });
     if (!this.editMode) this._clearSelection();
@@ -1517,20 +1503,20 @@ _syncEmptyStateUI() {
   
     // In fixed modes, do NOT auto-grow/shrink — the box is hard-locked.
     if (this._isContainerFixed()) return;
-    // Dynamic mode: compute based on card positions/sizes
+  
+    // Dynamic mode: compute based on content
     const cards = Array.from(c.querySelectorAll('.card-wrapper'));
     let maxX = 0, maxY = 0;
-    for (const card of cards) {
-      const x = parseFloat(card.getAttribute('data-x')) || 0;
-      const y = parseFloat(card.getAttribute('data-y')) || 0;
-      const w = parseFloat(card.style.width)  || card.getBoundingClientRect().width;
-      const h = parseFloat(card.style.height) || card.getBoundingClientRect().height;
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
-    }
-    const snap = (v) => Math.max(100, Math.ceil(v / this.gridSize) * this.gridSize);
-    c.style.width  = `${snap(maxX)}px`;
-    c.style.height = `${snap(maxY)}px`;
+    cards.forEach((card) => {
+      const r  = card.getBoundingClientRect();
+      const cr = c.getBoundingClientRect();
+      const right  = r.left - cr.left + r.width;
+      const bottom = r.top  - cr.top  + r.height;
+      maxX = Math.max(maxX, right);
+      maxY = Math.max(maxY, bottom);
+    });
+    c.style.width  = `${Math.ceil(maxX/this.gridSize)*this.gridSize || 100}px`;
+    c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
   }
   
   
@@ -2502,9 +2488,6 @@ _syncEmptyStateUI() {
     window.addEventListener('touchmove', (e)=>{ move(e); }, {passive:false});
     window.addEventListener('touchend', up);
     window.addEventListener('touchcancel', up);
-   
-    // keep references for cleanup
-    this.__marqueeHandlers = { down, move, up };
   }
 
   /* ------------------------------ Diagnostics ------------------------------ */
