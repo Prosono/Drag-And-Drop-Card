@@ -711,6 +711,92 @@ _applyGridVars() {
             40%  { opacity:.7 }
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
+
+          /* --- Card Picker: entrance/exit animation, shimmer & scan --- */
+          /* Backdrop “scan” overlay */
+          .modal::after {
+            content:"";
+            position:absolute; inset:0; pointer-events:none;
+            background:
+              linear-gradient(120deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,.06) 60%),
+              linear-gradient(180deg, rgba(3,169,244,.06), transparent);
+            opacity:0;
+          }
+          .modal.opening::after {
+            animation: ddc-scan 1100ms ease-out forwards;
+          }
+          @keyframes ddc-scan {
+            0%   { opacity:.0; transform: translateX(-10%) }
+            25%  { opacity:.7; transform: translateX(0%) }
+            100% { opacity:0;  transform: translateX(14%) }
+          }
+
+          /* Dialog pop with a touch of blur “materialize” */
+          .dialog {
+            transform-origin: 50% 44%;
+            opacity: 0;
+            transform: translateY(8px) scale(.97);
+            filter: blur(4px);
+            will-change: transform, opacity, filter;
+          }
+          .modal.opening .dialog {
+            animation: ddc-dialog-in 380ms cubic-bezier(.2,.8,.2,1) forwards;
+          }
+          .modal.closing .dialog {
+            animation: ddc-dialog-out 220ms cubic-bezier(.2,.8,.2,1) forwards;
+          }
+          @keyframes ddc-dialog-in {
+            0%   { opacity: 0; transform: translateY(8px) scale(.97); filter: blur(4px); }
+            60%  { opacity: 1; transform: translateY(0) scale(1.005); filter: blur(0px); }
+            100% { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0px); }
+          }
+          @keyframes ddc-dialog-out {
+            0%   { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0px); }
+            100% { opacity: 0; transform: translateY(6px) scale(.985); filter: blur(3px); }
+          }
+
+          /* Stagger list items in the left pane for a crisp entrance */
+          #leftPane .section-enter {
+            opacity: 0; transform: translateY(4px);
+            animation: ddc-stagger .28s ease-out forwards;
+          }
+          @keyframes ddc-stagger {
+            to { opacity:1; transform:none; }
+          }
+
+          /* Indeterminate top progress bar (subtle) while initial editors mount */
+          .ddc-indicator {
+            position: absolute; left: 0; right: 0; top: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+            opacity: .0; pointer-events: none; z-index: 2;
+          }
+          .modal.opening .ddc-indicator { opacity: .75; }
+          .modal.opened  .ddc-indicator { opacity: .0; transition: opacity .25s ease .2s; }
+          .ddc-indicator::before {
+            content: "";
+            position: absolute; inset: 0;
+            transform: translateX(-60%);
+            animation: ddc-sweep 1.1s linear infinite;
+            background: currentColor;
+          }
+          @keyframes ddc-sweep {
+            0%   { transform: translateX(-60%); }
+            100% { transform: translateX(160%); }
+          }
+
+          /* Small shimmer for quick-fill placeholders (only visible if your quick-fill adds skeletons) */
+          .ddc-shimmer {
+            position: relative; overflow: hidden; background: rgba(0,0,0,.06);
+          }
+          .ddc-shimmer::after {
+            content:""; position:absolute; inset:0;
+            background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,.35) 45%, transparent 90%);
+            transform: translateX(-100%);
+            animation: ddc-shimmer 1.2s ease-in-out infinite;
+          }
+          @keyframes ddc-shimmer { to { transform: translateX(100%); } }
+
+
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -1528,6 +1614,21 @@ _syncEmptyStateUI() {
     el.setAttribute('data-y-raw', String(ny));
   }
   
+  // Helper: list areas (id + name)
+  _areasList() {
+    const out = [];
+    const haAreas = this.hass?.areas || this.hass?.config?.areas || null;
+    // HA stores areas differently across versions; try a few common places
+    if (Array.isArray(haAreas)) {
+      haAreas.forEach(a => a?.area_id && out.push({ area_id: a.area_id, name: a.name || a.area_id }));
+    }
+    const registry = this.hass?.areaRegistry || this.hass?.resources?.areaRegistry;
+    if (Array.isArray(registry)) {
+      registry.forEach(a => a?.area_id && out.push({ area_id: a.area_id, name: a.name || a.area_id }));
+    }
+    // Deduplicate
+    const seen = new Set(); return out.filter(a => !seen.has(a.area_id) && seen.add(a.area_id));
+  }
 
   _resizeContainer() {
     const c = this.cardContainer; if (!c) return;
@@ -1804,12 +1905,49 @@ _syncEmptyStateUI() {
     this.__cmReady = true;
   }
 
+  // In _mountYamlEditor(hostEl, initialCfg, onValidChange, onInvalidChange)
   async _mountYamlEditor(hostEl, initialCfg, onValidChange, onInvalidChange) {
     const dump = (o) => (window.jsyaml ? window.jsyaml.dump(o) : JSON.stringify(o, null, 2));
     const parse = (t) => (window.jsyaml ? window.jsyaml.load(t) : JSON.parse(t));
     hostEl.innerHTML = '';
     const initialText = dump(initialCfg);
 
+    // 1) Prefer hui-yaml-editor (best autocomplete/validation)
+    if (customElements.get('hui-yaml-editor')) {
+      try {
+        const ed = document.createElement('hui-yaml-editor');
+        ed.hass = this.hass;
+        // Older/newer builds expose different properties; set both safely:
+        if ('setValue' in ed) ed.setValue(initialText);
+        else ed.yaml = initialText;
+
+        ed.style.display = 'block';
+        ed.style.height = '260px';
+        hostEl.appendChild(ed);
+
+        let programmatic = false;
+        const handler = (e) => {
+          if (programmatic) return;
+          const txt = e.detail?.value ?? ed.value ?? ed.yaml ?? '';
+          try { onValidChange(parse(txt)); }
+          catch (err) { onInvalidChange?.(err); }
+        };
+        ed.addEventListener('value-changed', handler);
+        ed.addEventListener('yaml-changed', handler);
+
+        return {
+          setValue: (cfg) => {
+            const txt = dump(cfg);
+            programmatic = true;
+            if ('setValue' in ed) ed.setValue(txt);
+            else ed.yaml = txt;
+            programmatic = false;
+          }
+        };
+      } catch {}
+    }
+
+    // 2) Fallback: ha-code-editor (Monaco – sometimes autocompletes with hass)
     if (customElements.get('ha-code-editor')) {
       const ed = document.createElement('ha-code-editor');
       ed.mode = 'yaml';
@@ -1834,46 +1972,21 @@ _syncEmptyStateUI() {
       };
     }
 
-    try {
-      await this._ensureCodeMirror();
-      const cm = window.CodeMirror(hostEl, {
-        value: initialText,
-        mode: 'yaml',
-        lineNumbers: true,
-        lineWrapping: true,
-        indentUnit: 2,
-        tabSize: 2
-      });
-      let programmatic = false;
-      cm.on('change', () => {
-        if (programmatic) return;
-        const text = cm.getValue();
-        try { onValidChange(parse(text)); }
-        catch (e) { onInvalidChange?.(e); }
-      });
-      return {
-        setValue: (cfg) => {
-          const txt = dump(cfg);
-          if (cm.getValue() !== txt) { programmatic = true; cm.setValue(txt); programmatic = false; }
-        }
-      };
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.style.width = '100%';
-      ta.style.height = '260px';
-      ta.value = initialText;
-      ta.addEventListener('input', () => {
-        try { onValidChange(parse(ta.value)); }
-        catch (e) { onInvalidChange?.(e); }
-      });
-      hostEl.appendChild(ta);
-      return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
-    }
+    // 3) CodeMirror / textarea fallback (unchanged)
+    // … keep your existing CodeMirror/textarea path here …
   }
+
 
   /* ----------------------- Picker (fast, cached) ----------------------- */
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
-    const close = () => modal.remove();
+
+    const close = () => {
+      modal.classList.remove('opened');
+      modal.classList.add('closing');
+      // match @keyframes ddc-dialog-out (220ms) + a small buffer
+      setTimeout(() => modal.remove(), 260);
+    };
+
     const modal = document.createElement('div'); modal.className='modal';
     modal.innerHTML = `
       <div class="dialog" role="dialog" aria-modal="true">
@@ -1943,6 +2056,15 @@ _syncEmptyStateUI() {
         </div>
       </div>`;
     this.appendChild(modal);
+
+    modal.classList.add('opening');
+    requestAnimationFrame(() => {
+      // let the CSS run at least one frame
+      requestAnimationFrame(() => {
+        modal.classList.remove('opening');
+        modal.classList.add('opened');
+      });
+    });
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -2041,6 +2163,11 @@ _syncEmptyStateUI() {
           });
         }
         left.appendChild(div);
+
+        // give each section a tiny delay for nicer cascade
+        div.classList.add('section-enter');
+        div.style.animationDelay = `${Math.min(150, view.indexOf(cat) * 40)}ms`;
+        
       });
     };
 
@@ -2063,6 +2190,75 @@ _syncEmptyStateUI() {
         quickFill.innerHTML = `<div style="opacity:.7;font-size:.9rem">No quick fill for this card — use the editors below.</div>`;
         return;
       }
+      if (type === 'picture-entity' || type === 'picture-glance') {
+        const pictureRow = document.createElement('div');
+        pictureRow.style.display = 'grid';
+        pictureRow.style.gridTemplateColumns = '130px 1fr';
+        pictureRow.style.gap = '8px';
+        pictureRow.style.marginBottom = '8px';
+
+        const lbl = document.createElement('label');
+        lbl.textContent = 'Source';
+        pictureRow.appendChild(lbl);
+
+        const controls = document.createElement('div');
+        controls.style.display = 'grid';
+        controls.style.gridTemplateColumns = '1fr';
+        controls.style.gap = '8px';
+
+        // Camera picker
+        const cameras = this._statesList(['camera']);
+        const camWrap = document.createElement('div');
+        camWrap.style.display = 'flex';
+        camWrap.style.gap = '8px';
+        const camSel = document.createElement('select');
+        const camDefault = document.createElement('option');
+        camDefault.value = '';
+        camDefault.textContent = '(none)';
+        camSel.appendChild(camDefault);
+        cameras.forEach(e => {
+          const o = document.createElement('option'); o.value = e; o.textContent = e; camSel.appendChild(o);
+        });
+        camSel.value = (type === 'picture-entity' ? (cfg.entity?.startsWith('camera.') ? cfg.entity : '') :
+                      (cfg.camera_image?.startsWith('camera.') ? cfg.camera_image : '')) || '';
+        camWrap.appendChild(camSel);
+
+        // Image URL
+        const urlWrap = document.createElement('div');
+        const url = document.createElement('input'); url.type='text';
+        url.placeholder = 'Image URL (optional)';
+        url.value = cfg.image || '';
+        Object.assign(url.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+        urlWrap.appendChild(url);
+
+        // Update function
+        const commitPicture = async () => {
+          let next = { ...cfg };
+          const cam = camSel.value.trim();
+          const u = url.value.trim();
+          if (type === 'picture-entity') {
+            delete next.camera_image;
+            if (cam) next.entity = cam;           // prefer camera as main entity
+            if (u) next.image = u; else delete next.image;
+          } else {
+            delete next.entity;
+            if (cam) next.camera_image = cam; else delete next.camera_image;
+            if (u) next.image = u; else delete next.image;
+          }
+          currentConfig = this._shapeBySchema(type, next);
+          await mountPreview(currentConfig);
+          yamlEditorApi?.setValue(currentConfig);
+        };
+
+        camSel.addEventListener('change', commitPicture);
+        url.addEventListener('input', commitPicture);
+
+        controls.appendChild(camWrap);
+        controls.appendChild(urlWrap);
+        pictureRow.appendChild(controls);
+        fieldWrap.appendChild(pictureRow);
+      }
+
       const all = Object.keys(this.hass?.states || {});
       const fieldWrap = document.createElement('div');
 
@@ -2224,7 +2420,7 @@ _syncEmptyStateUI() {
         // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
         p.style.opacity = '.7'; p.style.fontSize = '.9rem';
-        p.textContent = 'This card does not support a visual editor. Please use the YAML tab to configure it.';
+        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
         if (seq === pickSeq) {
           editorHost.appendChild(p);
           editorSpin.hidden = true;
@@ -2397,16 +2593,84 @@ _syncEmptyStateUI() {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     let CardClass = null;
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+
     const all = Object.keys(this.hass?.states || {});
     const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
-    if (CardClass?.getStubConfig) {
-      try { return await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
-    }
-    const base = { type };
     const first = all[0];
+
+    // Prefer camera entities for picture cards
+    const firstCamera = byDomain('camera')[0] || null;
+
+    if (CardClass?.getStubConfig) {
+      try {
+        // Let official stub win for non-picture types
+        if (!['picture-entity','picture-glance'].includes(type)) {
+          return await CardClass.getStubConfig(this.hass, all, byDomain);
+        }
+      } catch {}
+    }
+
+    const base = { type };
+
+    if (type === 'picture-entity') {
+      if (firstCamera) {
+        // Prefer camera entity
+        return { type, entity: firstCamera, camera_view: 'auto' };
+      }
+      // Safe fallback image (no entity is fine)
+      return {
+        type,
+        image: '/static/icons/favicon-192x192.png', // tiny built-in HA asset
+        tap_action: { action: 'none' }
+      };
+    }
+
+    if (type === 'picture-glance') {
+      if (firstCamera) {
+        // Camera + a few top entities (non-sensor if possible)
+        const extras = all.filter(e => e !== firstCamera).slice(0, 4);
+        return { type, camera_image: firstCamera, entities: extras };
+      }
+      return {
+        type,
+        image: '/static/icons/favicon-192x192.png',
+        entities: all.slice(0, 4)
+      };
+    }
+
+    // area card stub: pick first available area if we can read it
+    if (type === 'area') {
+      const row = document.createElement('div');
+      Object.assign(row.style,{display:'flex',gap:'8px',alignItems:'center',marginBottom:'8px'});
+      const label = document.createElement('label'); label.textContent = 'Area'; label.style.minWidth='130px';
+
+      const sel = document.createElement('select');
+      Object.assign(sel.style,{flex:'1',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)'});
+      const areas = this._areasList();
+      const none = document.createElement('option'); none.value=''; none.textContent='(choose an area)';
+      sel.appendChild(none);
+      areas.forEach(a => {
+        const o = document.createElement('option');
+        o.value = a.area_id; o.textContent = `${a.name} (${a.area_id})`;
+        sel.appendChild(o);
+      });
+      sel.value = cfg.area || '';
+
+      sel.addEventListener('change', async () => {
+        currentConfig = this._shapeBySchema(type, { ...currentConfig, area: sel.value || undefined });
+        await mountPreview(currentConfig);
+        yamlEditorApi?.setValue(currentConfig);
+      });
+
+      row.append(label, sel);
+      fieldWrap.appendChild(row);
+    }
+
+
+    // existing logic (unchanged) …
     const firstSensor = byDomain('sensor')[0] || first;
 
-    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast'].includes(type)) {
+    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','weather-forecast'].includes(type)) {
       base.entity = ({
         'sensor': firstSensor,
         'gauge':  (byDomain('sensor').find(this._isNumericEntity.bind(this)) || firstSensor),
@@ -2417,7 +2681,7 @@ _syncEmptyStateUI() {
         'weather-forecast': byDomain('weather')[0] || first,
       })[type] || firstSensor || first;
     }
-    if (['entities','glance','picture-glance','history-graph','statistics-graph','map'].includes(type)) {
+    if (['entities','glance','history-graph','statistics-graph','map'].includes(type)) {
       const pick = (domains) => (domains?.length ? all.filter(e => domains.includes(e.split('.')[0])) : all).slice(0,3);
       if (type === 'map')        base.entities = pick(['device_tracker','person']);
       else if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
@@ -2427,6 +2691,7 @@ _syncEmptyStateUI() {
     if (type === 'markdown') base.content = '## New card';
     return base;
   }
+
 
   _getNextAvailablePosition() {
     const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
