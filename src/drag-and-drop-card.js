@@ -431,7 +431,7 @@ _applyGridVars() {
             position: relative;
             padding: 10px;
             border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);s
+            background: var(--ddc-bg, transparent);
             width: auto; height: auto; border-radius: 12px; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
@@ -788,6 +788,12 @@ _applyGridVars() {
           .ddc-shimmer {
             position: relative; overflow: hidden; background: rgba(0,0,0,.06);
           }
+          .modal.opened .dialog {
+            opacity: 1 !important;
+            transform: none !important;
+            filter: none !important;
+          }
+
           .ddc-shimmer::after {
             content:""; position:absolute; inset:0;
             background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,.35) 45%, transparent 90%);
@@ -2057,14 +2063,27 @@ _syncEmptyStateUI() {
       </div>`;
     this.appendChild(modal);
 
+    // Mount at top-level so fixed overlay can't be clipped by transformed parents
+    (document.body || this).appendChild(modal);
+
     modal.classList.add('opening');
-    requestAnimationFrame(() => {
-      // let the CSS run at least one frame
-      requestAnimationFrame(() => {
-        modal.classList.remove('opening');
-        modal.classList.add('opened');
-      });
-    });
+    const dialogEl = modal.querySelector('.dialog');
+
+    // When the "in" animation finishes, mark as opened
+    const endOpening = () => {
+      modal.classList.remove('opening');
+      modal.classList.add('opened');
+      dialogEl.removeEventListener('animationend', endOpening, true);
+    };
+    dialogEl.addEventListener('animationend', endOpening, true);
+
+    // Safety net: if the animation event never fires, force-visible
+    setTimeout(() => {
+      if (modal.isConnected && !modal.classList.contains('opened')) {
+        endOpening();
+        Object.assign(dialogEl.style, { opacity: '1', transform: 'none', filter: 'none' });
+      }
+    }, 700);
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -2167,7 +2186,6 @@ _syncEmptyStateUI() {
         // give each section a tiny delay for nicer cascade
         div.classList.add('section-enter');
         div.style.animationDelay = `${Math.min(150, view.indexOf(cat) * 40)}ms`;
-        
       });
     };
 
