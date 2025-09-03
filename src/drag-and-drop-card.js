@@ -610,7 +610,14 @@ _applyGridVars() {
             overflow: auto;        /* allow scrolling inside the YAML section */
             max-height: 320px;     /* keep the section tidy; adjust if you like */
           }
-
+          /* --- make Visual editor area scrollable, like YAML --- */
+          #optionsSec { min-height: 0; }
+          #optionsSec .bd {
+            overflow: auto;        /* scroll inside the Visual editor section */
+            max-height: 320px;     /* adjust as you prefer (e.g., 380px) */
+          }  
+          #editorHost { display:block; min-height: 0; }
+          
           #quickFillSec { 
             display: flex; 
             flex-direction: column; 
@@ -1638,6 +1645,8 @@ _syncEmptyStateUI() {
         if (el) return el;
       }
     } catch {}
+
+
   
     // 3) Known/custom-tag editors (registry hint + common conventions) with retries
     const base = String(type).replace(/^custom:/, '');
@@ -1645,6 +1654,7 @@ _syncEmptyStateUI() {
     const entry = reg.find(c =>
       c?.type === base || c?.type === type || c?.type === `custom:${base}`
     );
+    
   
     const candidates = [];
     if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
@@ -1670,6 +1680,21 @@ _syncEmptyStateUI() {
   
     // No UI editor available
     return null;
+  }
+
+  // This helps custom cards that register their editor tag after the element loads.
+  async _ensureCardModuleLoaded(type, cfg) {
+    try {
+      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      const el = helpers.createCardElement({ type, ...(cfg || {}) });
+      el.hass = this.hass;
+      const tmp = document.createElement('div');
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
+      tmp.appendChild(el);
+      document.body.appendChild(tmp);
+      await new Promise(r => requestAnimationFrame(r)); // give it a frame to run side effects
+      tmp.remove();
+    } catch {}
   }
   
   _ensureOverlayZFix() {
@@ -1968,7 +1993,7 @@ _syncEmptyStateUI() {
                 <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
               </div>
 
-              <div class="sec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
+              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
                 <div class="hd">
                   <span>Card options (official editor)</span>
                   <div id="optTabs" class="tabs">
@@ -2348,8 +2373,19 @@ _syncEmptyStateUI() {
       if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
     
       // Try to get a UI editor for *any* card type (core or custom)
-      let editor = await this._getEditorElementForType(cfg.type || currentType, cfg);
-    
+      const wantType = cfg.type || currentType;
+      let editor = await this._getEditorElementForType(wantType, cfg);
+
+      // If not available yet, warm the card module and retry a few times
+      if (!editor) {
+        await this._ensureCardModuleLoaded(wantType, cfg);
+        for (const delay of [0, 120, 250, 500, 900]) {
+          if (delay) await new Promise(r => setTimeout(r, delay));
+          editor = await this._getEditorElementForType(wantType, cfg);
+          if (editor) break;
+        }
+      }
+
       if (!editor) {
         // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
@@ -2363,11 +2399,15 @@ _syncEmptyStateUI() {
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
-      }
+}
     
       try {
         editor.hass = this.hass;
         if (!editor.isConnected) editorHost.appendChild(editor);
+
+        // small yield before setConfig to help late-attaching internals
+        await Promise.resolve();
+        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
 
         // Try official getStubConfig once (may load modules) to improve defaults
         try {
