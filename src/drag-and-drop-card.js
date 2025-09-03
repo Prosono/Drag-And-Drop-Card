@@ -2596,6 +2596,18 @@ _syncEmptyStateUI() {
         enableCommit(true);
       }
     };
+    
+    const commit = async () => {
+      if (!currentConfig) return;
+      const finalCfg = this._shapeBySchema(currentType, currentConfig);
+      if (mode === 'edit' && typeof onCommit === 'function') {
+        await onCommit(finalCfg);
+      } else {
+        await this._addPickedCardToLayout(finalCfg);
+        this._pushRecent((finalCfg||{}).type);
+      }
+      close();
+    };
 
     cancelTop.addEventListener('click', close);
     cancelBot.addEventListener('click', close);
