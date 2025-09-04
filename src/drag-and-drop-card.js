@@ -337,6 +337,9 @@ _applyGridVars() {
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+    // Track old key so we only rebuild when storage_key actually changes
+    const prevKey = this.storageKey;
+
     this._config                  = config;
     this.storageKey               = config.storage_key || undefined;
     this.gridSize                 = Number(config.grid ?? 10);
@@ -431,7 +434,7 @@ _applyGridVars() {
             position: relative;
             padding: 10px;
             border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);s
+            background: var(--ddc-bg, transparent);
             width: auto; height: auto; border-radius: 12px; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
@@ -795,14 +798,22 @@ _applyGridVars() {
     }
 
     // Persist new option knobs into storage so next load matches the config.
-    // Skip if you worry about saves during HA's preview dialog.
-    try { this._queueSave('config-change'); } catch {}
+    // Skip while in HA’s editor preview to avoid churn.
+    try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
 
     this._updateStoreBadge();
     if (this.cardContainer) this._toggleEditMode(false);
-    
-    this._initialLoad();
-  }
+
+    // Only rebuild from storage on first boot or when storage_key changes.
+    // For normal config tweaks, just reflow with the new options.
+    if (!this.__booted || prevKey !== this.storageKey) {
+      this.__booted = true;
+      this._initialLoad();
+    } else {
+      this._applyContainerSizingFromConfig(true);
+      this._resizeContainer();
+    }
+
 
   connectedCallback() {
     if (!this.__boundExitEdit) {
