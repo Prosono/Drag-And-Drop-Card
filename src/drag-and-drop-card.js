@@ -617,7 +617,7 @@ _applyGridVars() {
             max-height: 320px;     /* adjust as you prefer (e.g., 380px) */
           }  
           #editorHost { display:block; min-height: 0; }
-          
+
           #quickFillSec { 
             display: flex; 
             flex-direction: column; 
@@ -794,8 +794,13 @@ _applyGridVars() {
       });
     }
 
+    // Persist new option knobs into storage so next load matches the config.
+    // Skip if you worry about saves during HA's preview dialog.
+    try { this._queueSave('config-change'); } catch {}
+
     this._updateStoreBadge();
     if (this.cardContainer) this._toggleEditMode(false);
+    
     this._initialLoad();
   }
 
@@ -884,10 +889,22 @@ _applyGridVars() {
     this._dbgPush('boot', 'Using embedded config');
     saved = { cards: this._config.cards };
       }
-    // If persisted options exist, apply them up front
+    // 1) Apply persisted options (if any) as baseline
     if (saved?.options) this._applyImportedOptions(saved.options, true);
-    // v1 fallback: if file had top-level grid, apply it too
     else if (typeof saved?.grid === 'number') this._applyImportedOptions({ grid: saved.grid }, true);
+
+    // 2) Overlay explicit options from current Lovelace config (take precedence)
+    const cfg = this._config || {};
+    const overrideKeys = [
+      'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
+      'container_background','card_background','debug','disable_overlap',
+      'container_size_mode','container_fixed_width','container_fixed_height',
+      'container_preset','container_preset_orientation'
+    ];
+    const cfgOpts = {};
+    for (const k of overrideKeys) if (cfg[k] !== undefined) cfgOpts[k] = cfg[k];
+    if (Object.keys(cfgOpts).length) this._applyImportedOptions(cfgOpts, true);
+
 
     let builtAny = false;
     if (saved?.cards?.length) {
