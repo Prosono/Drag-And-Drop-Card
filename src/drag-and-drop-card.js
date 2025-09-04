@@ -813,7 +813,7 @@ _applyGridVars() {
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
-
+  }
 
   connectedCallback() {
     if (!this.__boundExitEdit) {
