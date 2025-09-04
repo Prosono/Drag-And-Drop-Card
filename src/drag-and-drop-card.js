@@ -1,6 +1,6 @@
 /*!
  * Drag & Drop Card (Proprietary)
- * Copyright (c) 2025 <SMARTI AS>
+ * Copyright (c) 2025 <Vetle Nikolai Prebensen Nrman - SMARTI AS>
  * Use is governed by EULA.md. Third-party notices: THIRD_PARTY_NOTICES.md
  */
 
@@ -2154,14 +2154,18 @@ _syncEmptyStateUI() {
   }
 
   async _mountYamlEditor(hostEl, initialCfg, onValidChange, onInvalidChange) {
-    const dump = (o) => (window.jsyaml ? window.jsyaml.dump(o) : JSON.stringify(o, null, 2));
-    const parse = (t) => (window.jsyaml ? window.jsyaml.load(t) : JSON.parse(t));
-    hostEl.innerHTML = '';
+    const dump  = (cfg) => (window.jsyaml ? window.jsyaml.dump(cfg, { noRefs:true }) : JSON.stringify(cfg, null, 2));
+    const parse = (txt) => (window.jsyaml ? window.jsyaml.load(txt) : JSON.parse(txt));
     const initialText = dump(initialCfg);
 
+    // Prefer HA’s built-in code editor if registered
     if (customElements.get('ha-code-editor')) {
       const ed = document.createElement('ha-code-editor');
       ed.mode = 'yaml';
+      try {
+        const ll = this._getLovelace();
+        if (ll) { ed.lovelace = ll; ed.narrow = !!ll.narrow; }
+      } catch {}
       ed.hass = this.hass;
       ed.value = initialText;
       ed.style.display = 'block';
@@ -2183,41 +2187,21 @@ _syncEmptyStateUI() {
       };
     }
 
-    try {
-      await this._ensureCodeMirror();
-      const cm = window.CodeMirror(hostEl, {
-        value: initialText,
-        mode: 'yaml',
-        lineNumbers: true,
-        lineWrapping: true,
-        indentUnit: 2,
-        tabSize: 2
-      });
-      let programmatic = false;
-      cm.on('change', () => {
-        if (programmatic) return;
-        const text = cm.getValue();
-        try { onValidChange(parse(text)); }
-        catch (e) { onInvalidChange?.(e); }
-      });
-      return {
-        setValue: (cfg) => {
-          const txt = dump(cfg);
-          if (cm.getValue() !== txt) { programmatic = true; cm.setValue(txt); programmatic = false; }
-        }
-      };
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.style.width = '100%';
-      ta.style.height = '260px';
-      ta.value = initialText;
-      ta.addEventListener('input', () => {
-        try { onValidChange(parse(ta.value)); }
-        catch (e) { onInvalidChange?.(e); }
-      });
-      hostEl.appendChild(ta);
-      return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
-    }
+    // Ultra-safe fallback (no external scripts, no CSP issues)
+    const ta = document.createElement('textarea');
+    ta.style.cssText = 'width:100%;min-height:260px;border:1px solid var(--divider-color);' +
+                      'border-radius:12px;padding:8px;box-sizing:border-box;';
+    ta.value = initialText;
+    hostEl.appendChild(ta);
+
+    const onInput = () => {
+      try { onValidChange(parse(ta.value)); }
+      catch (e) { onInvalidChange?.(e); }
+    };
+    ta.addEventListener('input', onInput);
+    ta.addEventListener('change', onInput);
+
+    return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
   }
 
   /* ----------------------- Picker (fast, cached) ----------------------- */
@@ -2821,13 +2805,13 @@ _syncEmptyStateUI() {
       visualEditor = null;
 
       buildQuickFill(type, currentConfig);
-      await mountYaml(currentConfig);
-      await raf();
-      mountPreview(currentConfig); // debounced version
 
-      // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
-      showTab('visual');
-      enableCommit(true);
+      await raf();
+      // Show the GUI editor immediately
+      await mountVisualEditor(currentConfig);
+     
+      // Spin up YAML in the background (don’t block UI)
+      mountYaml(currentConfig).catch(() => {});
 
     };
     const commit = async () => {
