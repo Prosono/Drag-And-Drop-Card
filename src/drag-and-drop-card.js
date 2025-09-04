@@ -1875,9 +1875,16 @@ _syncEmptyStateUI() {
   async _getEditorElementForType(type, cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
   
+    // Always warm the module before asking for the class.
+    // Built‑in HA cards don't expose a visual editor until they've been created at least once.
+    try {
+      await this._ensureCardModuleLoaded(type, cfg);
+    } catch {}
+  
     // Ensure the module/class is loaded
     let CardClass = null;
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+
   
     // 1) Instance-provided editor
     try {
