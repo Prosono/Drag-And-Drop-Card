@@ -2363,27 +2363,15 @@ _syncEmptyStateUI() {
     
     tabVisual.addEventListener('click', async () => {
       showTab('visual');
-      // Always mount a fresh editor when visualEditor is null; this prevents a previous card’s UI from persisting.
+      // Mount a new editor the first time; reuse it afterward by updating config.
+      // Because visualEditor is reset in selectType(), this will always mount a fresh editor for a new card type.
       if (!visualEditor) {
         await mountVisualEditor(currentConfig);
       } else {
-        // If a visual editor already exists and matches the current card type, update it.
-        // Otherwise, clear it and mount a new one.
-        try {
-          const cfgType = currentConfig?.type || currentType;
-          const editorType = visualEditor?.tagName || '';
-          if (editorType && (visualEditor._config?.type === cfgType)) {
-            visualEditor.setConfig?.(currentConfig);
-          } else {
-            visualEditor = null;
-            await mountVisualEditor(currentConfig);
-          }
-        } catch {
-          visualEditor = null;
-          await mountVisualEditor(currentConfig);
-        }
+        try { visualEditor.setConfig?.(currentConfig); } catch {}
       }
     });
+
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
