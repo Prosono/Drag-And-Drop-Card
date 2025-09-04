@@ -642,9 +642,12 @@ _applyGridVars() {
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto 1fr 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:hidden;position:relative;contain:content}
+          /* Prevent any grid item (esp. Preview) from overlaying editors */
+          #previewSec{overflow:hidden;z-index:1}
+          #optionsSec,#yamlSec,#quickFillSec{z-index:2}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -1906,6 +1909,7 @@ _syncEmptyStateUI() {
     try {
       const inst = helpers.createCardElement({ type, ...cfg });
       inst.hass = this.hass;
+      try { inst.lovelace = this._getLovelace(); } catch {}
       if (typeof inst.getConfigElement === 'function') {
         const el = await inst.getConfigElement();
         if (el) return el;
@@ -2259,7 +2263,7 @@ _syncEmptyStateUI() {
                 <div class="bd" id="quickFill"></div>
               </div>
 
-              <div class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative">
+              <div id="previewSec" class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative;overflow:hidden;z-index:1">
                 <div class="hd">Preview</div>
                 <div class="spin-center" id="previewSpin" hidden>
                   <ha-circular-progress indeterminate></ha-circular-progress>
@@ -2678,7 +2682,7 @@ _syncEmptyStateUI() {
 }
     
       try {
-        editor.hass = this.hass;
+        this._applyHaEditorContext(editor);
         if (!editor.isConnected) editorHost.appendChild(editor);
 
         // small yield before setConfig to help late-attaching internals
@@ -3404,6 +3408,35 @@ async _getStubConfigForType(type) {
       return panel?.shadowRoot?.querySelector('hui-root') || null;
     } catch { return null; }
   }
+
+  /** HA editors need the lovelace context to render properly */
+  _getLovelace(){
+    try {
+      const root = this._huiRoot();
+      if (root?.lovelace) return root.lovelace;
+      // fallback: walk up looking for a lovelace host
+      let n = this;
+      while (n) {
+        if (n.lovelace) return n.lovelace;
+        const host = n.getRootNode && n.getRootNode().host;
+        n = host || n.parentElement || null;
+      }
+    } catch {}
+    return null;
+  }
+
+  /** Apply hass/lovelace/narrow to editors in a single place */
+  _applyHaEditorContext(el){
+    if (!el) return;
+    try { el.hass = this.hass; } catch {}
+    try {
+      const ll = this._getLovelace();
+      if (ll) el.lovelace = ll;
+    } catch {}
+    try { el.narrow = window.matchMedia('(max-width: 870px)').matches; } catch {}
+    try { el.editMode = true; } catch {}
+  }
+
   getCardSize(){ return 3; }
 }
 
