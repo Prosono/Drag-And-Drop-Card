@@ -1219,107 +1219,144 @@ _syncEmptyStateUI() {
     if (!window.interact || wrap.dataset.placeholder) return;
     const gs = this.gridSize, live = !!this.dragLiveSnap;
 
-    // DRAG (supports multi-select move)
-    window.interact(wrap)
-      .draggable({
-        enabled: this.editMode,
-        inertia:false,
-        modifiers:[ window.interact.modifiers.restrictRect({ restriction:'parent', endOnly:true }) ],
-        listeners:{
-          start: (ev) => {
-            if (!this._selection.has(wrap)) {
-              if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
-              this._toggleSelection(wrap, true);
+    // DRAG (supports multi‑select move with optional live snap)
+    const restrictMod = window.interact.modifiers.restrictRect({
+      restriction: 'parent',
+      endOnly: true
+    });
+    const mods = [restrictMod];
+
+    // When dragLiveSnap is true, use Interact’s built‑in snap modifier so the pointer
+    // (and therefore the element) is snapped to the grid before your handler runs.
+    if (this.dragLiveSnap) {
+      const gridSnap = window.interact.snappers.grid({ x: this.gridSize, y: this.gridSize });
+      mods.push(window.interact.modifiers.snap({
+        targets: [gridSnap],
+        range: Infinity,
+        offset: 'startCoords'
+      }));
+    }
+
+    window.interact(wrap).draggable({
+      enabled: this.editMode,
+      inertia: false,
+      modifiers: mods,
+      listeners: {
+        start: (ev) => {
+          // ensure the clicked card is in the selection
+          if (!this._selection.has(wrap)) {
+            if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
+            this._toggleSelection(wrap, true);
+          }
+          const group = Array.from(this._selection);
+          this.__groupDrag = {
+            leader: wrap,
+            members: group,
+            startRaw: new Map(group.map(w => [w, {
+              x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
+              y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
+              w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
+              h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
+            }]))
+          };
+
+          // Capture original raw positions of all cards (non‑placeholders) so we can restore them
+          this.__collisionOriginals = new Map();
+          const allCardsStart = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
+          allCardsStart.forEach(c => {
+            const rawX = parseFloat(c.getAttribute('data-x-raw')) || parseFloat(c.getAttribute('data-x')) || 0;
+            const rawY = parseFloat(c.getAttribute('data-y-raw')) || parseFloat(c.getAttribute('data-y')) || 0;
+            this.__collisionOriginals.set(c, { x: rawX, y: rawY });
+          });
+
+          group.forEach(w => {
+            w.classList.add('dragging');
+            if (w.getAttribute('data-x-raw') === null) {
+              w.setAttribute('data-x-raw', w.getAttribute('data-x') || '0');
             }
-            const group = Array.from(this._selection);
-            this.__groupDrag = {
-              leader: wrap,
-              members: group,
-              startRaw: new Map(group.map(w => [w, {
-                x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
-                y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
-                w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
-                h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
-              }]))
-            };
-            group.forEach(w => {
-              w.classList.add('dragging');
-              if (w.getAttribute('data-x-raw') === null) w.setAttribute('data-x-raw', w.getAttribute('data-x') || '0');
-              if (w.getAttribute('data-y-raw') === null) w.setAttribute('data-y-raw', w.getAttribute('data-y') || '0');
-            });
-          },
-          move: (ev) => {
-            if (!this.__groupDrag) return;
-            const gs   = this.gridSize;
-            const live = !!this.dragLiveSnap;
-            const lead = this.__groupDrag.leader;
-            const srL  = this.__groupDrag.startRaw.get(lead);
-
-            // compute tentative leader raw position (don’t write yet)
-            const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
-            const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
-            let dxLead   = curLeadX - srL.x;
-            let dyLead   = curLeadY - srL.y;
-            
-            // Build proposed positions with both raw (unsnapped) and snapped coordinates
-            const proposed = this.__groupDrag.members.map(m => {
-              const sr = this.__groupDrag.startRaw.get(m);
-              const rawX = sr.x + dxLead;
-              const rawY = sr.y + dyLead;
-              const snapX = live ? Math.round(rawX / gs) * gs : rawX;
-              const snapY = live ? Math.round(rawY / gs) * gs : rawY;
-              return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
-            });
-
-            // If overlapping is disabled, push other cards out of the way
-            if (this.disableOverlap) {
-              this._pushCardsOutOfTheWay(proposed, dxLead, dyLead, live, gs);
+            if (w.getAttribute('data-y-raw') === null) {
+              w.setAttribute('data-y-raw', w.getAttribute('data-y') || '0');
             }
-
-            // Commit the move: store unsnapped raw positions and apply snapped transform
-            lead.setAttribute('data-x-raw', String(curLeadX));
-            lead.setAttribute('data-y-raw', String(curLeadY));
-            for (const pr of proposed) {
-              pr.el.setAttribute('data-x-raw', String(pr.rawX));
-              pr.el.setAttribute('data-y-raw', String(pr.rawY));
-              this._setCardPosition(pr.el, pr.snapX, pr.snapY);
-            }
-            this._resizeContainer();
-          },
-          end: () => {
-            if (!this.__groupDrag) return;
-            const endRects = this.__groupDrag.members.map(m => {
-              // read the current raw coordinates
-              const rawX = parseFloat(m.getAttribute('data-x-raw')) || parseFloat(m.getAttribute('data-x')) || 0;
-              const rawY = parseFloat(m.getAttribute('data-y-raw')) || parseFloat(m.getAttribute('data-y')) || 0;
-              // snap the raw coordinates to the grid
-              const snapX = Math.round(rawX / gs) * gs;
-              const snapY = Math.round(rawY / gs) * gs;
-              const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
-              const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
-              return { el: m, rawX, rawY, snapX, snapY, w, h };
-            });
-
-            // If overlapping is disabled, do a final push of other cards
-            if (this.disableOverlap) {
-              this._pushCardsOutOfTheWay(endRects, 0, 0, false, gs);
-            }
-
-            // Snap the selected cards permanently and update raw coordinates
-            for (const pr of endRects) {
-              this._setCardPosition(pr.el, pr.snapX, pr.snapY);
-              pr.el.setAttribute('data-x-raw', String(pr.snapX));
-              pr.el.setAttribute('data-y-raw', String(pr.snapY));
-            }
-
-            for (const m of this.__groupDrag.members) m.classList.remove('dragging');
-            this._resizeContainer();
-            if (this._isContainerFixed()) this._clampAllCardsInside();
-            this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
-            this.__groupDrag = null;
-          },
+          });
         },
-      });
+
+        move: (ev) => {
+          if (!this.__groupDrag) return;
+          const gs   = this.gridSize;
+          const live = !!this.dragLiveSnap;
+          const lead = this.__groupDrag.leader;
+          const srL  = this.__groupDrag.startRaw.get(lead);
+
+          // Compute new raw leader coordinates using pointer delta
+          const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
+          const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
+          const dxLead   = curLeadX - srL.x;
+          const dyLead   = curLeadY - srL.y;
+
+          // Build proposed positions for all selected cards
+          const proposed = this.__groupDrag.members.map(m => {
+            const sr = this.__groupDrag.startRaw.get(m);
+            const rawX  = sr.x + dxLead;
+            const rawY  = sr.y + dyLead;
+            const snapX = live ? Math.round(rawX / gs) * gs : rawX;
+            const snapY = live ? Math.round(rawY / gs) * gs : rawY;
+            return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
+          });
+
+          // If overlap protection is on, restore other cards and push them out of the way
+          if (this.disableOverlap) {
+            this._pushCardsOutOfTheWay(proposed, dxLead, dyLead, live, gs);
+          }
+
+          // Commit the move: update raw coordinates and apply snapped transform
+          lead.setAttribute('data-x-raw', String(curLeadX));
+          lead.setAttribute('data-y-raw', String(curLeadY));
+          for (const pr of proposed) {
+            pr.el.setAttribute('data-x-raw', String(pr.rawX));
+            pr.el.setAttribute('data-y-raw', String(pr.rawY));
+            this._setCardPosition(pr.el, pr.snapX, pr.snapY);
+          }
+          this._resizeContainer();
+        },
+
+        end: (ev) => {
+          if (!this.__groupDrag) return;
+          const gs = this.gridSize;
+
+          // Gather final positions (unsnapped and snapped) for the dragged group
+          const endRects = this.__groupDrag.members.map(m => {
+            const rawX = parseFloat(m.getAttribute('data-x-raw')) || parseFloat(m.getAttribute('data-x')) || 0;
+            const rawY = parseFloat(m.getAttribute('data-y-raw')) || parseFloat(m.getAttribute('data-y')) || 0;
+            const snapX = Math.round(rawX / gs) * gs;
+            const snapY = Math.round(rawY / gs) * gs;
+            const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
+            const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
+            return { el: m, rawX, rawY, snapX, snapY, w, h };
+          });
+
+          // On end, do a final restore/push to prevent leftover overlaps
+          if (this.disableOverlap) {
+            this._pushCardsOutOfTheWay(endRects, 0, 0, false, gs);
+          }
+
+          // Snap cards to the grid and update raw coordinates
+          for (const pr of endRects) {
+            this._setCardPosition(pr.el, pr.snapX, pr.snapY);
+            pr.el.setAttribute('data-x-raw', String(pr.snapX));
+            pr.el.setAttribute('data-y-raw', String(pr.snapY));
+          }
+
+          // Cleanup
+          for (const m of this.__groupDrag.members) m.classList.remove('dragging');
+          this._resizeContainer();
+          if (this._isContainerFixed()) this._clampAllCardsInside();
+          this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
+          this.__groupDrag = null;
+          this.__collisionOriginals = null;
+        }
+      }
+    });
+
 
 
     // RESIZE — bottom-right handle only (single card)
@@ -1587,52 +1624,151 @@ _syncEmptyStateUI() {
   }
   
   /**
-   * Push non‑selected cards out of the way when overlap is disabled.
-   * @param {Array} proposedRects – array of objects with rawX/rawY and snapX/snapY for selected cards
-   * @param {number} dxLead – delta X of the leader (used to decide push direction)
-   * @param {number} dyLead – delta Y of the leader (used to decide push direction)
-   * @param {boolean} liveSnap – true if live snap is active
-   * @param {number} gridSize – the current grid size
+  /**
+   * Restore original positions for non-selected cards, then push out of the way.
+   * This uses this.__collisionOriginals (captured on drag start) and avoids overlaps.
+   * @param {Array} proposedRects – array of { el, rawX, rawY, snapX, snapY, w, h }
+   * @param {number} dxLead – leader's delta X (to decide horizontal push direction)
+   * @param {number} dyLead – leader's delta Y (to decide vertical push direction)
+   * @param {boolean} liveSnap – true if we should snap positions visually
+   * @param {number} gridSize – current grid size
    */
   _pushCardsOutOfTheWay(proposedRects, dxLead, dyLead, liveSnap, gridSize) {
-    const selected = new Set(proposedRects.map(pr => pr.el));
-    const others = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
-      .filter(w => !selected.has(w) && !w.dataset.placeholder);
-    for (const pr of proposedRects) {
-      for (const other of others) {
-        let ox = parseFloat(other.getAttribute('data-x-raw')) || parseFloat(other.getAttribute('data-x')) || 0;
-        let oy = parseFloat(other.getAttribute('data-y-raw')) || parseFloat(other.getAttribute('data-y')) || 0;
-        const ow  = parseFloat(other.style.width)  || other.getBoundingClientRect().width;
-        const oh  = parseFloat(other.style.height) || other.getBoundingClientRect().height;
+    if (!this.__collisionOriginals) return;
 
-        // Keep shifting until it no longer overlaps with the dragged card
-        while (this._rectsOverlap(
-          { x: pr.snapX, y: pr.snapY, w: pr.w, h: pr.h },
-          { x: ox, y: oy, w: ow, h: oh }
-        )) {
-          if (Math.abs(dxLead) >= Math.abs(dyLead)) {
-            // horizontal push
-            ox = dxLead > 0
-              ? pr.snapX + pr.w
-              : pr.snapX - ow;
-          } else {
-            // vertical push
-            oy = dyLead > 0
-              ? pr.snapY + pr.h
-              : pr.snapY - oh;
-          }
-        }
+    const selectedSet = new Set(proposedRects.map(pr => pr.el));
+    const allCards = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
+      .filter(w => !w.dataset.placeholder);
 
-        // Save the unsnapped coordinates
-        other.setAttribute('data-x-raw', String(ox));
-        other.setAttribute('data-y-raw', String(oy));
-        // Snap the transform only for display
-        const snX = liveSnap ? Math.round(ox / gridSize) * gridSize : ox;
-        const snY = liveSnap ? Math.round(oy / gridSize) * gridSize : oy;
-        this._setCardPosition(other, snX, snY);
+    // Determine container bounds (for fixed modes)
+    const isFixed = this._isContainerFixed();
+    const { w: cw, h: ch } = this._getContainerSize();
+
+    // Restore every non-selected card to its original raw position
+    for (const w of allCards) {
+      if (selectedSet.has(w)) continue;
+      const orig = this.__collisionOriginals.get(w);
+      if (orig) {
+        w.setAttribute('data-x-raw', String(orig.x));
+        w.setAttribute('data-y-raw', String(orig.y));
+        const snX = liveSnap ? Math.round(orig.x / gridSize) * gridSize : orig.x;
+        const snY = liveSnap ? Math.round(orig.y / gridSize) * gridSize : orig.y;
+        this._setCardPosition(w, snX, snY);
       }
     }
-  } 
+
+    // Prepare lists for collision checks
+    const selectedRects = proposedRects.map(pr => ({
+      x: pr.snapX,
+      y: pr.snapY,
+      w: pr.w,
+      h: pr.h,
+    }));
+
+    // Map to store the final pushed positions of non-selected cards
+    const finalPos = new Map();
+
+    // Store original widths and heights
+    const cardSizes = new Map();
+    for (const w of allCards) {
+      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+      cardSizes.set(w, { w: width, h: height });
+    }
+
+    // Decide primary push direction based on leader movement
+    const signX = (dxLead > 0) ? 1 : (dxLead < 0 ? -1 : 0);
+    const signY = (dyLead > 0) ? 1 : (dyLead < 0 ? -1 : 0);
+    const horizontal = Math.abs(dxLead) >= Math.abs(dyLead);
+
+    // For each non-selected card, compute its new position
+    for (const other of allCards) {
+      if (selectedSet.has(other)) continue;
+      const orig = this.__collisionOriginals.get(other);
+      if (!orig) continue;
+
+      let { x: candidateX, y: candidateY } = orig;
+      const { w: ow, h: oh } = cardSizes.get(other);
+
+      // Determine if it overlaps with any selected rectangle
+      let overlaps = false;
+      for (const sr of selectedRects) {
+        if (this._rectsOverlap({ x: sr.x, y: sr.y, w: sr.w, h: sr.h },
+                              { x: candidateX, y: candidateY, w: ow, h: oh })) {
+          overlaps = true;
+          // Choose initial push direction
+          if (horizontal && signX !== 0) {
+            candidateX = signX > 0 ? sr.x + sr.w : sr.x - ow;
+          } else if (!horizontal && signY !== 0) {
+            candidateY = signY > 0 ? sr.y + sr.h : sr.y - oh;
+          } else {
+            // default horizontal push when no obvious direction
+            candidateX = sr.x + sr.w;
+          }
+          break;
+        }
+      }
+
+      // If overlapping, keep shifting until no collision
+      if (overlaps) {
+        let guard = 0;
+        const dx = horizontal ? (signX !== 0 ? signX * gridSize : gridSize) : 0;
+        const dy = !horizontal ? (signY !== 0 ? signY * gridSize : gridSize) : 0;
+        while (guard < 100) {
+          const candidateRect = { x: candidateX, y: candidateY, w: ow, h: oh };
+          let collision = false;
+
+          // Check against selected
+          for (const sr of selectedRects) {
+            if (this._rectsOverlap(candidateRect, sr)) {
+              collision = true;
+              break;
+            }
+          }
+          // Check against cards already assigned new positions
+          if (!collision) {
+            for (const [, fp] of finalPos) {
+              if (this._rectsOverlap(candidateRect, fp)) {
+                collision = true;
+                break;
+              }
+            }
+          }
+          // Check against container bounds (for fixed container)
+          if (!collision && isFixed) {
+            if (candidateX < 0 || candidateY < 0 ||
+                candidateX + ow > cw || candidateY + oh > ch) {
+              collision = true;
+            }
+          }
+
+          if (!collision) break;
+          // Move further along the chosen axis
+          candidateX += dx;
+          candidateY += dy;
+          guard++;
+        }
+
+        // Finally, clamp to container boundaries for fixed containers
+        if (isFixed) {
+          candidateX = Math.max(0, Math.min(candidateX, Math.max(0, cw - ow)));
+          candidateY = Math.max(0, Math.min(candidateY, Math.max(0, ch - oh)));
+        }
+      }
+
+      finalPos.set(other, { x: candidateX, y: candidateY, w: ow, h: oh });
+      selectedRects.push({ x: candidateX, y: candidateY, w: ow, h: oh });
+    }
+
+    // Apply final positions to non-selected cards
+    for (const [card, pos] of finalPos) {
+      card.setAttribute('data-x-raw', String(pos.x));
+      card.setAttribute('data-y-raw', String(pos.y));
+      const snX = liveSnap ? Math.round(pos.x / gridSize) * gridSize : pos.x;
+      const snY = liveSnap ? Math.round(pos.y / gridSize) * gridSize : pos.y;
+      this._setCardPosition(card, snX, snY);
+    }
+  }
 
   _rectFor(el, x = null, y = null, wpx = null, hpx = null) {
     const x0 = x ?? (parseFloat(el.getAttribute('data-x')) || 0);
