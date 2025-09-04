@@ -1924,27 +1924,50 @@ _syncEmptyStateUI() {
 
     // 3) known core editor tags
     const CORE_EDITOR_TAGS = {
-      'entities':'hui-entities-card-editor',
-      'entity':'hui-entity-card-editor',
-      'glance':'hui-glance-card-editor',
-      'markdown':'hui-markdown-card-editor',
-      'button':'hui-button-card-editor',
-      'tile':'hui-tile-card-editor',
-      'sensor':'hui-sensor-card-editor',
-      'gauge':'hui-gauge-card-editor',
-      'history-graph':'hui-history-graph-card-editor',
-      'statistics-graph':'hui-statistics-graph-card-editor',
-      'picture-entity':'hui-picture-entity-card-editor',
-      'picture-glance':'hui-picture-glance-card-editor',
-      'weather-forecast':'hui-weather-forecast-card-editor',
-      'map':'hui-map-card-editor',
-      'media-control':'hui-media-control-card-editor',
-      'light':'hui-light-card-editor',
-      'thermostat':'hui-thermostat-card-editor',
-      'alarm-panel':'hui-alarm-panel-card-editor',
-      'area':'hui-area-card-editor',
-      'iframe':'hui-iframe-card-editor'
+      'entities':         'hui-entities-card-editor',
+      'entity':           'hui-entity-card-editor',
+      'glance':           'hui-glance-card-editor',
+      'markdown':         'hui-markdown-card-editor',
+      'button':           'hui-button-card-editor',
+      'tile':             'hui-tile-card-editor',
+      'sensor':           'hui-sensor-card-editor',
+      'gauge':            'hui-gauge-card-editor',
+      'history-graph':    'hui-history-graph-card-editor',
+      'statistics-graph': 'hui-statistics-graph-card-editor',
+      'picture-entity':   'hui-picture-entity-card-editor',
+      'picture-glance':   'hui-picture-glance-card-editor',
+      'weather-forecast': 'hui-weather-forecast-card-editor',
+      'map':              'hui-map-card-editor',
+      'media-control':    'hui-media-control-card-editor',
+      'light':            'hui-light-card-editor',
+      'thermostat':       'hui-thermostat-card-editor',
+      'alarm-panel':      'hui-alarm-panel-card-editor',
+      'area':             'hui-area-card-editor',
+      'iframe':           'hui-iframe-card-editor'
     };
+
+    // 3.1) If this is a core card type and a dedicated editor tag exists, try to use it.
+    if (!isCustom) {
+      const baseType = String(type || '').replace(/^custom:/, '');
+      const coreTag = CORE_EDITOR_TAGS[baseType];
+      if (coreTag) {
+        // Wait for the element definition to be ready, then return it.
+        for (const delay of [0, 120, 250, 500, 900]) {
+          if (!customElements.get(coreTag)) {
+            try {
+              await Promise.race([
+                customElements.whenDefined(coreTag),
+                new Promise((r) => setTimeout(r, delay)),
+              ]);
+            } catch {}
+          }
+          if (customElements.get(coreTag)) {
+            return document.createElement(coreTag);
+          }
+        }
+      }
+    }
+
     // 3.5) Last-resort: generic core editor (covers most HA cards)
     if (!isCustom) {
       for (const delay of [0, 120, 250, 500, 900]) {
@@ -1952,7 +1975,7 @@ _syncEmptyStateUI() {
           try {
             await Promise.race([
               customElements.whenDefined('hui-card-editor'),
-              new Promise(r => setTimeout(r, delay)),
+              new Promise((r) => setTimeout(r, delay)),
             ]);
           } catch {}
         }
@@ -2383,12 +2406,12 @@ _syncEmptyStateUI() {
       tabVisual.setAttribute('aria-selected', String(!wantYaml));
       tabYaml.classList.toggle('active', wantYaml);
       tabYaml.setAttribute('aria-selected', String(wantYaml));
-    
-      // Show/hide the two editors
+
+      // Show/hide the two editors. Use 'block' to override the CSS rule that hides #yamlSec.
       editorHost.parentElement.style.display = wantYaml ? 'none' : '';
-      yamlSec.style.display = wantYaml ? '' : 'none';
-    
-      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
+      yamlSec.style.display = wantYaml ? 'block' : 'none';
+
+      if (wantYaml) yamlSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
     
