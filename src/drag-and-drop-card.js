@@ -67,13 +67,17 @@ class DragAndDropCard extends HTMLElement {
       </div>
   
       <div class="cfg-row">
-        <label>Container BG</label>
-        <input type="text" id="containerBg" placeholder="transparent">
+        <label>Container Baxckground</label>
+        <input type="text" id="containerBg"
+          placeholder="transparent or css e.g. linear-gradient(...)"
+          title="Try: transparent, #232f3e, linear-gradient(to right, #1a2a6c, #b21f1f, #fdbb2d), radial-gradient(circle, #4e54c8, #8f94fb)" />
       </div>
   
       <div class="cfg-row">
-        <label>Card BG</label>
-        <input type="text" id="cardBg" placeholder="var(--ha-card-background, var(--card-background-color))">
+        <label>Card Background</label>
+        <input type="text" id="cardBg"
+          placeholder="var(--ha-card-background) or css e.g. #ffffffcc"
+          title="Try: transparent, #151515aa, linear-gradient(135deg, #667eea 0%, #764ba2 100%)" />
       </div>
   
       <div class="cfg-row">
@@ -81,7 +85,9 @@ class DragAndDropCard extends HTMLElement {
       </div>
   
       <div class="cfg-row">
-        <label><input type="checkbox" id="noOverlap"> Disable overlapping</label>
+        <label><input type="checkbox" id="noOverlap">
+          Disable overlapping <small style="opacity:.6">(Experimental)</small>
+        </label>
       </div>
   
       <!-- NEW: container sizing -->
@@ -338,6 +344,19 @@ _applyGridVars() {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
+      // Auto‑assign a storage key if none provided
+    if (!config.storage_key) {
+      // Generate a slug based on current time (or use any preferred method)
+      const unique = `layout_${Date.now().toString(36)}`;
+      config.storage_key = unique;
+      // Optionally: persist the new key back into this._config so the editor shows it
+      this._config = { ...config };
+    }
+
+    // Now proceed with your existing logic:
+    this._config = config;
+    this.storageKey = config.storage_key || undefined;
+    
     const prevKey = this.storageKey;
 
     this._config                  = config;
