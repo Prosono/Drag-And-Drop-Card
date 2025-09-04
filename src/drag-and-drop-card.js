@@ -598,10 +598,24 @@ _applyGridVars() {
           .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
 
           .resize-handle{
-            display:none; position:absolute;bottom:6px;right:6px;width:30px;height:30px;border-radius:50%;
-            background:var(--primary-color);color:#fff;border:1px solid rgba(255,255,255,.25);
-            cursor:se-resize;z-index:22;box-shadow:0 3px 8px rgba(0,0,0,.28);
-            align-items:center;justify-content:center;transition:transform .1s, box-shadow .1s, background .12s;
+            display:none;
+            position:absolute;
+            /* Position the handle outside the card so it’s always visible and clickable,
+               even when the card is tiny or collapsed. */
+            bottom:-14px;
+            right:-14px;
+            width:30px;
+            height:30px;
+            border-radius:50%;
+            background:var(--primary-color);
+            color:#fff;
+            border:1px solid rgba(255,255,255,.25);
+            cursor:se-resize;
+            z-index:50; /* keep it above other card elements */
+            box-shadow:0 3px 8px rgba(0,0,0,.28);
+            align-items:center;
+            justify-content:center;
+            transition:transform .1s, box-shadow .1s, background .12s;
           }
           .resize-handle:hover{transform:scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.35)}
           .card-wrapper.editing .resize-handle{display:flex}
@@ -2349,11 +2363,25 @@ _syncEmptyStateUI() {
     
     tabVisual.addEventListener('click', async () => {
       showTab('visual');
-      // Mount once, then just update via setConfig
+      // Always mount a fresh editor when visualEditor is null; this prevents a previous card’s UI from persisting.
       if (!visualEditor) {
         await mountVisualEditor(currentConfig);
       } else {
-        try { visualEditor.setConfig?.(currentConfig); } catch {}
+        // If a visual editor already exists and matches the current card type, update it.
+        // Otherwise, clear it and mount a new one.
+        try {
+          const cfgType = currentConfig?.type || currentType;
+          const editorType = visualEditor?.tagName || '';
+          if (editorType && (visualEditor._config?.type === cfgType)) {
+            visualEditor.setConfig?.(currentConfig);
+          } else {
+            visualEditor = null;
+            await mountVisualEditor(currentConfig);
+          }
+        } catch {
+          visualEditor = null;
+          await mountVisualEditor(currentConfig);
+        }
       }
     });
     tabYaml.addEventListener('click', () => showTab('yaml'));
@@ -2783,15 +2811,19 @@ _syncEmptyStateUI() {
         : await getStub(type);
     
       currentConfig = this._shapeBySchema(type, cfg);
+
+      // Reset any previously mounted visual editor so the correct one loads for this card
+      visualEditor = null;
+
       buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
-      mountPreview(currentConfig); // debounced version (Patch 2)
-      if (visualEditor) {
-        try { visualEditor.setConfig?.(currentConfig); } catch {}
-      }
+      mountPreview(currentConfig); // debounced version
+
+      // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
       showTab('yaml');
       enableCommit(true);
+
     };
     const commit = async () => {
       if (!currentConfig) return;
