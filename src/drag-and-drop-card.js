@@ -1,6 +1,6 @@
 /*!
  * Drag & Drop Card (Proprietary)
- * Copyright (c) 2025 <Vetle Nikolai Prebensen Nrman - SMARTI AS>
+ * Copyright (c) 2025 <SMARTI AS>
  * Use is governed by EULA.md. Third-party notices: THIRD_PARTY_NOTICES.md
  */
 
@@ -624,14 +624,9 @@ _applyGridVars() {
           /* modal */
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
-            width:min(1220px,96vw);
-            height:min(90vh, 900px);
-            max-height:min(90vh, 900px);
-            display:flex;flex-direction:column;
-            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);
-            overflow:hidden; /* keep dialog size stable; inner panes will scroll */
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column;
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
           }
-
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
             background:
@@ -644,23 +639,12 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
-          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color)}
-          #rightPane{overflow:visible;background:var(--primary-background-color)}
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
+          #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;
-            grid-template-columns:540px 1fr;
-            grid-template-rows: auto auto minmax(280px, 1fr);
-            gap:12px;padding:12px;
-            height:100%;
-            min-height:0;         /* allow children to shrink */
-            box-sizing:border-box;
-            position:relative;
-            overflow:hidden;      /* internal sections scroll, not the dialog */
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative}
-          /* Prevent any grid item (esp. Preview) from overlaying editors */
-          #previewSec{overflow:hidden;z-index:1}
-          #optionsSec,#yamlSec,#quickFillSec{z-index:2}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -671,7 +655,7 @@ _applyGridVars() {
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height:0;} 
+          #yamlSec { min-height: 0; }
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
             /* allow the YAML editor to use the full available space instead of a fixed max height */
@@ -681,13 +665,12 @@ _applyGridVars() {
           /* --- make Visual editor area scrollable, like YAML --- */
           #optionsSec { min-height: 0; }
           #optionsSec .bd {
-            position:relative;
-            display:flex;flex-direction:column;
-            min-height:0;
-            height:100%;
-            overflow:auto; /* the Visual editor area scrolls */
+            overflow: auto;        /* scroll inside the Visual editor section */
+            /* allow the visual editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
           }
-          #editorHost { display:block; min-height:0; height:100%; overflow:auto; }
+          #editorHost { display:block; min-height: 0; }
 
           #quickFillSec { 
             display: flex; 
@@ -700,12 +683,19 @@ _applyGridVars() {
           }
 
           /* ha-code-editor / CodeMirror height: fixed and scroll inside */
-          
-          /* YAML fills its pane; the pane scrolls */
-          #yamlSec .bd { min-height:280px; overflow:auto; }
-          #yamlHost { min-height:280px; max-height:none; overflow:auto; }
-          ha-code-editor { display:block; min-height:260px !important; height:auto !important; }
-          .CodeMirror { min-height:260px !important; height:auto !important; }
+          ha-code-editor { 
+            display: block; 
+            height: 260px !important; 
+          }
+          .CodeMirror { 
+            height: 260px !important; 
+          }
+
+          /* host that wraps the editor should also allow scroll if content grows */
+          #yamlHost { 
+            max-height: 260px; 
+            overflow: auto; 
+          }
 
           /* CodeMirror */
           .CodeMirror{
@@ -1898,148 +1888,88 @@ _syncEmptyStateUI() {
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+  
+    // Warm the module before asking for the class only for built‑in HA cards.
+    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
+    try {
+      if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
+        await this._ensureCardModuleLoaded(type, cfg);
+      }
+    } catch {}
+  
+    // Ensure the module/class is loaded
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
 
-    const isCustom = String(type||'').startsWith('custom:') || type === 'custom_card';
-    if (!isCustom) { try { await this._ensureCardModuleLoaded(type, cfg); } catch {} }
-
-    // 1) instance.getConfigElement (may return a Promise)
+  
+    // 1) Instance-provided editor
     try {
       const inst = helpers.createCardElement({ type, ...cfg });
       inst.hass = this.hass;
-      const maybe = inst.getConfigElement?.();
-      const el = (maybe && typeof maybe.then === 'function') ? await maybe : maybe;
-      if (el) return el;
+      if (typeof inst.getConfigElement === 'function') {
+        const el = await inst.getConfigElement();
+        if (el) return el;
+      }
     } catch {}
-
-    // 2) class.getConfigElement (may return a Promise)
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+  
+    // 2) Static class-provided editor
     try {
-      if (CardClass?.getConfigElement) {
-        const maybe = CardClass.getConfigElement();
-        const el = (maybe && typeof maybe.then === 'function') ? await maybe : maybe;
+      if (CardClass && typeof CardClass.getConfigElement === 'function') {
+        const el = await CardClass.getConfigElement();
         if (el) return el;
       }
     } catch {}
 
-    // 3) known core editor tags
-    const CORE_EDITOR_TAGS = {
-      'entities':         'hui-entities-card-editor',
-      'entity':           'hui-entity-card-editor',
-      'glance':           'hui-glance-card-editor',
-      'markdown':         'hui-markdown-card-editor',
-      'button':           'hui-button-card-editor',
-      'tile':             'hui-tile-card-editor',
-      'sensor':           'hui-sensor-card-editor',
-      'gauge':            'hui-gauge-card-editor',
-      'history-graph':    'hui-history-graph-card-editor',
-      'statistics-graph': 'hui-statistics-graph-card-editor',
-      'picture-entity':   'hui-picture-entity-card-editor',
-      'picture-glance':   'hui-picture-glance-card-editor',
-      'weather-forecast': 'hui-weather-forecast-card-editor',
-      'map':              'hui-map-card-editor',
-      'media-control':    'hui-media-control-card-editor',
-      'light':            'hui-light-card-editor',
-      'thermostat':       'hui-thermostat-card-editor',
-      'alarm-panel':      'hui-alarm-panel-card-editor',
-      'area':             'hui-area-card-editor',
-      'iframe':           'hui-iframe-card-editor'
-    };
 
-    // 3.1) If this is a core card type and a dedicated editor tag exists, try to use it.
-    if (!isCustom) {
-      const baseType = String(type || '').replace(/^custom:/, '');
-      const coreTag = CORE_EDITOR_TAGS[baseType];
-      if (coreTag) {
-        // Wait for the element definition to be ready, then return it.
-        for (const delay of [0, 120, 250, 500, 900]) {
-          if (!customElements.get(coreTag)) {
-            try {
-              await Promise.race([
-                customElements.whenDefined(coreTag),
-                new Promise((r) => setTimeout(r, delay)),
-              ]);
-            } catch {}
-          }
-          if (customElements.get(coreTag)) {
-            return document.createElement(coreTag);
-          }
-        }
-      }
-    }
-
-    // 3.5) Last-resort: generic core editor (covers most HA cards)
-    if (!isCustom) {
-      for (const delay of [0, 120, 250, 500, 900]) {
-        if (!customElements.get('hui-card-editor')) {
-          try {
-            await Promise.race([
-              customElements.whenDefined('hui-card-editor'),
-              new Promise((r) => setTimeout(r, delay)),
-            ]);
-          } catch {}
-        }
-        if (customElements.get('hui-card-editor')) {
-          return document.createElement('hui-card-editor');
-        }
-      }
-    }
-
-
-    // 4) custom-registry & conventions
-    const base = String(type).replace(/^custom:/,'');
+  
+    // 3) Known/custom-tag editors (registry hint + common conventions) with retries
+    const base = String(type).replace(/^custom:/, '');
     const reg = Array.isArray(window.customCards) ? window.customCards : [];
-    const entry = reg.find(c => c?.type === base || c?.type === type || c?.type === `custom:${base}`);
+    const entry = reg.find(c =>
+      c?.type === base || c?.type === type || c?.type === `custom:${base}`
+    );
+    
+  
     const candidates = [];
-    if (entry?.editor) candidates.push(entry.editor);
-    candidates.push(`${base}-editor`, `${base}-config-editor`);
+    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
+    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+  
     for (const tag of candidates) {
-      if (!tag) continue;
-      for (const delay of [0,120,250,500,900]) {
-        if (!customElements.get(tag)) {
-          try { await Promise.race([customElements.whenDefined(tag), new Promise(r=>setTimeout(r, delay))]); } catch {}
-        }
-        if (customElements.get(tag)) return document.createElement(tag);
+      if (!tag || typeof tag !== 'string') continue;
+      // Try a few times: 0ms, 100ms, 300ms, 700ms
+      for (const delay of [0, 100, 300, 700]) {
+        try {
+          if (!customElements.get(tag)) {
+            await Promise.race([
+              customElements.whenDefined(tag),
+              new Promise(r => setTimeout(r, delay))
+            ]);
+          }
+          if (customElements.get(tag)) {
+            return document.createElement(tag);
+          }
+        } catch {}
       }
     }
-
+  
+    // No UI editor available
     return null;
   }
 
   // This helps custom cards that register their editor tag after the element loads.
-  // Warm both the card element and (for core types) the corresponding editor bundle.
   async _ensureCardModuleLoaded(type, cfg) {
     try {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-
-      // 1) mount the card once (loads the card chunk and side-effects)
-      let el;
-      try { el = helpers.createCardElement({ type }); }
-      catch { el = helpers.createCardElement({ type, ...(cfg || {}) }); }
+      const el = helpers.createCardElement({ type, ...(cfg || {}) });
       el.hass = this.hass;
       const tmp = document.createElement('div');
-      tmp.style.cssText = 'position:fixed;left:-10000px;top:-10000px;opacity:0;pointer-events:none;';
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
       tmp.appendChild(el);
       document.body.appendChild(tmp);
-      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => requestAnimationFrame(r)); // give it a frame to run side effects
       tmp.remove();
-
-      // 2) for core cards, prime the editor by instantiating hui-card-editor offscreen
-      const isCustom = String(type||'').startsWith('custom:') || type === 'custom_card';
-      if (!isCustom) {
-        const shell = document.createElement('hui-card-editor');
-        shell.style.cssText = 'position:fixed;left:-10000px;top:-10000px;opacity:0;pointer-events:none;';
-        shell.hass = this.hass;
-        const ll = this._huiRoot()?.lovelace;
-        if (ll) { shell.lovelace = ll; shell.narrow = !!ll.narrow; }
-        try { shell.setConfig({ type, ...(cfg||{}) }); } catch {}
-        document.body.appendChild(shell);
-        for (const d of [150, 250, 350]) await new Promise(r => setTimeout(r, d));
-        shell.remove();
-      }
     } catch {}
   }
-
   
   _ensureOverlayZFix() {
     if (document.querySelector('style[data-ddc-overlay-fix]')) return;
@@ -2185,18 +2115,14 @@ _syncEmptyStateUI() {
   }
 
   async _mountYamlEditor(hostEl, initialCfg, onValidChange, onInvalidChange) {
-    const dump  = (cfg) => (window.jsyaml ? window.jsyaml.dump(cfg, { noRefs:true }) : JSON.stringify(cfg, null, 2));
-    const parse = (txt) => (window.jsyaml ? window.jsyaml.load(txt) : JSON.parse(txt));
+    const dump = (o) => (window.jsyaml ? window.jsyaml.dump(o) : JSON.stringify(o, null, 2));
+    const parse = (t) => (window.jsyaml ? window.jsyaml.load(t) : JSON.parse(t));
+    hostEl.innerHTML = '';
     const initialText = dump(initialCfg);
 
-    // Prefer HA’s built-in code editor if registered
     if (customElements.get('ha-code-editor')) {
       const ed = document.createElement('ha-code-editor');
       ed.mode = 'yaml';
-      try {
-        const ll = this._getLovelace();
-        if (ll) { ed.lovelace = ll; ed.narrow = !!ll.narrow; }
-      } catch {}
       ed.hass = this.hass;
       ed.value = initialText;
       ed.style.display = 'block';
@@ -2218,21 +2144,41 @@ _syncEmptyStateUI() {
       };
     }
 
-    // Ultra-safe fallback (no external scripts, no CSP issues)
-    const ta = document.createElement('textarea');
-    ta.style.cssText = 'width:100%;min-height:260px;border:1px solid var(--divider-color);' +
-                      'border-radius:12px;padding:8px;box-sizing:border-box;';
-    ta.value = initialText;
-    hostEl.appendChild(ta);
-
-    const onInput = () => {
-      try { onValidChange(parse(ta.value)); }
-      catch (e) { onInvalidChange?.(e); }
-    };
-    ta.addEventListener('input', onInput);
-    ta.addEventListener('change', onInput);
-
-    return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
+    try {
+      await this._ensureCodeMirror();
+      const cm = window.CodeMirror(hostEl, {
+        value: initialText,
+        mode: 'yaml',
+        lineNumbers: true,
+        lineWrapping: true,
+        indentUnit: 2,
+        tabSize: 2
+      });
+      let programmatic = false;
+      cm.on('change', () => {
+        if (programmatic) return;
+        const text = cm.getValue();
+        try { onValidChange(parse(text)); }
+        catch (e) { onInvalidChange?.(e); }
+      });
+      return {
+        setValue: (cfg) => {
+          const txt = dump(cfg);
+          if (cm.getValue() !== txt) { programmatic = true; cm.setValue(txt); programmatic = false; }
+        }
+      };
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.style.width = '100%';
+      ta.style.height = '260px';
+      ta.value = initialText;
+      ta.addEventListener('input', () => {
+        try { onValidChange(parse(ta.value)); }
+        catch (e) { onInvalidChange?.(e); }
+      });
+      hostEl.appendChild(ta);
+      return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
+    }
   }
 
   /* ----------------------- Picker (fast, cached) ----------------------- */
@@ -2286,8 +2232,9 @@ _syncEmptyStateUI() {
     };
   }
   
-/* ----------------------- Picker (fast, cached) ----------------------- */
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
+
+    
     const close = () => modal.remove();
     const modal = document.createElement('div'); modal.className='modal';
     modal.innerHTML = `
@@ -2296,7 +2243,6 @@ _syncEmptyStateUI() {
           <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
           <div style="display:flex;gap:10px;flex:1">
             <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
-            <input id="customType" placeholder="custom:my-card (optional)" style="max-width:260px;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)" aria-label="custom type">
           </div>
           <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
           <button class="btn" id="addBtn" disabled>${mode==='edit'
@@ -2308,7 +2254,7 @@ _syncEmptyStateUI() {
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
             <div class="rightGrid">
-              <div class="sec" style="grid-column:1;grid-row:1">
+              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
                 <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
                 <div class="bd" id="quickFill"></div>
               </div>
@@ -2321,7 +2267,7 @@ _syncEmptyStateUI() {
                 <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
               </div>
 
-              <div class="sec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
+              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
                 <div class="hd">
                   <span>Card options (official editor)</span>
                   <div id="optTabs" class="tabs">
@@ -2366,7 +2312,6 @@ _syncEmptyStateUI() {
     const cancelTop = modal.querySelector('#cancelBtn');
     const cancelBot = modal.querySelector('#footCancel');
     const search = modal.querySelector('#search');
-    const customType = modal.querySelector('#customType');
     const cardHost = modal.querySelector('#cardHost');
     const editorHost = modal.querySelector('#editorHost');
     const editorSpin = modal.querySelector('#editorSpin');
@@ -2416,22 +2361,32 @@ _syncEmptyStateUI() {
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
     
-    tabVisual.addEventListener('click', () => showTab('visual'));
+    tabVisual.addEventListener('click', async () => {
+      showTab('visual');
+      // Mount a new editor the first time; reuse it afterward by updating config.
+      // Because visualEditor is reset in selectType(), this will always mount a fresh editor for a new card type.
+      if (!visualEditor) {
+        await mountVisualEditor(currentConfig);
+      } else {
+        try { visualEditor.setConfig?.(currentConfig); } catch {}
+      }
+    });
+
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
-    showTab('visual');
+    showTab('yaml');
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
-      const custom = customType.value.trim();
-      if (custom) {
-        return [{ id:'custom', name:'Custom', items:[{type:custom, name:'Custom card', icon:'mdi:puzzle-outline'}]}];
-      }
-      return catalog.map(section => ({
-        ...section,
-        items: (section.items||[]).filter(it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q))
-      })).filter(sec => sec.items && sec.items.length || sec.id==='favorites' || sec.id==='recent');
+      return catalog
+        .map(section => ({
+          ...section,
+          items: (section.items || []).filter(
+            it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
+          )
+        }))
+        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent');
     };
 
     const renderLeft = () => {
@@ -2472,6 +2427,8 @@ _syncEmptyStateUI() {
     let yamlEditorApi = null;
     let visualEditor = null;
     let pickSeq = 0; // stale-select guard
+    let __previewTimer = null;
+    let __lastPreviewCfgJSON = '';
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -2499,7 +2456,7 @@ _syncEmptyStateUI() {
           div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
           div.querySelector('ha-icon').setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
           currentConfig = this._shapeBySchema(type, {...currentConfig, [keyForMulti]: [...arr]});
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         });
         container.appendChild(div);
@@ -2511,17 +2468,68 @@ _syncEmptyStateUI() {
 
         if (f.type === 'entities') {
           const wrap = document.createElement('div'); wrap.style.flex='1';
-          const filter = document.createElement('input'); Object.assign(filter,{placeholder:'Filter entities…'}); Object.assign(filter.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)',background:'var(--card-background-color)',color:'var(--primary-text-color)'});
-          const list = document.createElement('div'); Object.assign(list.style,{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'8px',maxHeight:'220px',overflow:'auto',marginTop:'8px'});
+          const filter = document.createElement('input');
+          Object.assign(filter, { placeholder:'Filter entities…' });
+          Object.assign(filter.style, {
+            width:'100%', padding:'8px 10px', borderRadius:'10px',
+            border:'1px solid var(--divider-color)',
+            background:'var(--card-background-color)', color:'var(--primary-text-color)'
+          });
+          const list = document.createElement('div');
+          Object.assign(list.style, {
+            maxHeight:'220px', overflow:'auto', marginTop:'8px',
+            border:'1px solid var(--divider-color)', borderRadius:'10px', padding:'6px'
+          });
           const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : all;
           const selected = Array.isArray(cfg[f.key]) ? [...cfg[f.key]] : (cfg[f.key] ? [cfg[f.key]] : []);
-          const renderList = () => {
-            const q = filter.value.trim().toLowerCase();
-            list.innerHTML = '';
-            pool.filter(eid => !q || eid.toLowerCase().includes(q)).forEach(eid => addEntityItem(eid, selected, list, f.key));
+
+          // virtualized row renderer
+          const renderRow = (eid) => {
+            const div = document.createElement('div');
+            Object.assign(div.style, {
+              padding:'6px 10px', margin:'4px 0',
+              border:'1px solid var(--divider-color)', borderRadius:'10px',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', background:''
+            });
+            const icon = document.createElement('ha-icon');
+            icon.setAttribute('icon','mdi:checkbox-blank-outline');
+            icon.style.setProperty('--mdc-icon-size','18px');
+            const text = document.createElement('span');
+            text.textContent = eid;
+            text.style.whiteSpace = 'nowrap';
+            text.style.overflow = 'hidden';
+            text.style.textOverflow = 'ellipsis';
+            div.append(icon, text);
+
+            const paint = () => {
+              const on = selected.includes(eid);
+              div.style.background = on ? 'rgba(3,169,244,.12)' : '';
+              div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
+              icon.setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
+            };
+            paint();
+
+            div.addEventListener('click', () => {
+              const idx = selected.indexOf(eid);
+              if (idx >= 0) selected.splice(idx, 1); else selected.push(eid);
+              currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: [...selected]});
+              mountPreview(currentConfig);
+              yamlEditorApi?.setValue(currentConfig);
+              paint();
+            });
+
+            return div;
           };
-          filter.addEventListener('input', renderList);
-          renderList();
+
+          let filtered = pool;
+          this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+
+          filter.addEventListener('input', () => {
+            const q = filter.value.trim().toLowerCase();
+            filtered = pool.filter(eid => !q || eid.toLowerCase().includes(q));
+            this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+          });
+
           wrap.append(filter, list);
           row.append(label, wrap);
           currentConfig = this._shapeBySchema(type, {...cfg, [f.key]: selected});
@@ -2540,7 +2548,7 @@ _syncEmptyStateUI() {
           ds.value = Array.isArray(cfg[f.key]) ? (cfg[f.key][0] || '') : (cfg[f.key] || '');
           ds.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ds.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           dsWrap.append(iconLead, ds, dl);
@@ -2556,7 +2564,7 @@ _syncEmptyStateUI() {
           inp.addEventListener('input', async () => {
             const v = inp.value==='' ? undefined : Number(inp.value);
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: isNaN(v)? undefined : v});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(numIcon, inp);
@@ -2571,7 +2579,7 @@ _syncEmptyStateUI() {
           sel.value = cfg[f.key] ?? f.default ?? (f.options?.[0] || '');
           sel.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: sel.value});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           selWrap.append(selIcon, sel);
@@ -2586,7 +2594,7 @@ _syncEmptyStateUI() {
           inp.value = cfg[f.key] ?? '';
           inp.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: inp.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(tIcon, inp);
@@ -2599,7 +2607,7 @@ _syncEmptyStateUI() {
           ta.value = cfg[f.key] ?? '';
           ta.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ta.value || ''});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           row.append(label, ta);
@@ -2612,19 +2620,25 @@ _syncEmptyStateUI() {
       quickFill.appendChild(fieldWrap);
     };
 
-    const mountPreview = async (cfg) => {
-      const seq = ++pickSeq;
-      previewSpin.hidden = false;
-      cardHost.innerHTML = '';
-      await raf();
-      try {
-        const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-        if (seq !== pickSeq) return;
-        const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
-        if (seq !== pickSeq) return;
-        cardHost.appendChild(temp);
-      } catch {}
-      finally { if (seq === pickSeq) previewSpin.hidden = true; }
+    const mountPreview = (cfg) => {
+      const cfgJSON = JSON.stringify(cfg || {});
+      if (cfgJSON === __lastPreviewCfgJSON) return; // same config, skip
+      __lastPreviewCfgJSON = cfgJSON;
+      if (__previewTimer) clearTimeout(__previewTimer);
+      __previewTimer = setTimeout(async () => {
+        const seq = ++pickSeq;
+        previewSpin.hidden = false;
+        cardHost.innerHTML = '';
+        await raf();
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          if (seq !== pickSeq) return;
+          const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+          if (seq !== pickSeq) return;
+          cardHost.appendChild(temp);
+        } catch {}
+        finally { if (seq === pickSeq) previewSpin.hidden = true; }
+      }, 150); // 150–250ms is a sweet spot
     };
 
     const mountVisualEditor = async (cfg) => {
@@ -2635,13 +2649,24 @@ _syncEmptyStateUI() {
       if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
     
       // Try to get a UI editor for *any* card type (core or custom)
-      let editor = await this._getEditorElementForType(cfg.type || currentType, cfg);
-    
+      const wantType = cfg.type || currentType;
+      let editor = await this._getEditorElementForType(wantType, cfg);
+
+      // If not available yet, warm the card module and retry a few times
+      if (!editor) {
+        await this._ensureCardModuleLoaded(wantType, cfg);
+        for (const delay of [0, 120, 250, 500, 900]) {
+          if (delay) await new Promise(r => setTimeout(r, delay));
+          editor = await this._getEditorElementForType(wantType, cfg);
+          if (editor) break;
+        }
+      }
+
       if (!editor) {
         // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
         p.style.opacity = '.7'; p.style.fontSize = '.9rem';
-        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
+        p.textContent = 'This card does not support a visual editor. Please use the YAML tab to configure it.';
         if (seq === pickSeq) {
           editorHost.appendChild(p);
           editorSpin.hidden = true;
@@ -2650,12 +2675,28 @@ _syncEmptyStateUI() {
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
-      }
+}
     
       try {
         editor.hass = this.hass;
         if (!editor.isConnected) editorHost.appendChild(editor);
-    
+
+        // small yield before setConfig to help late-attaching internals
+        await Promise.resolve();
+        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
+
+        // Try official getStubConfig once (may load modules) to improve defaults
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
+          if (CardClass?.getStubConfig) {
+            const all = Object.keys(this.hass?.states || {});
+            const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+            const better = await CardClass.getStubConfig(this.hass, all, byDomain);
+            if (better) cfg = this._shapeBySchema(cfg.type || currentType, { ...better });
+          }
+        } catch {}
+
         // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
         try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
@@ -2676,7 +2717,7 @@ _syncEmptyStateUI() {
           setError('');
           enableCommit(true);
           buildQuickFill(currentType, currentConfig);
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
     
@@ -2715,12 +2756,16 @@ _syncEmptyStateUI() {
     
             if (typeChanged) {
               buildQuickFill(currentType, currentConfig);
-              const hasUI = await mountVisualEditor(currentConfig);
-              if (hasUI && __activeTab !== 'yaml') showTab('visual');
+              // Only update Visual if it’s already mounted
+              if (visualEditor) {
+                try { visualEditor.setConfig?.(currentConfig); } catch {}
+                if (__activeTab !== 'yaml') showTab('visual');
+              }
             } else {
               try { visualEditor?.setConfig?.(currentConfig); } catch {}
-              await mountPreview(currentConfig);
+              mountPreview(currentConfig);
             }
+
           } catch (e) {
             yamlErr.hidden = false;
             yamlErr.textContent = `Invalid config: ${String(e?.message || e)}`;
@@ -2738,16 +2783,8 @@ _syncEmptyStateUI() {
 
     const getStub = async (type) => {
       if (this.__stubCache.has(type)) return { ...this.__stubCache.get(type) };
-      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      let CardClass = null;
-      try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
-      let cfg;
-      const all = Object.keys(this.hass?.states || {});
-      const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
-      if (CardClass?.getStubConfig) {
-        try { cfg = await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
-      }
-      if (!cfg) cfg = await this._getStubConfigForType(type);
+      // Fast local stub first (no heavy module loads)
+      let cfg = await this._getStubConfigForType(type);
       this.__stubCache.set(type, { ...cfg });
       return { ...cfg };
     };
@@ -2762,13 +2799,19 @@ _syncEmptyStateUI() {
         : await getStub(type);
     
       currentConfig = this._shapeBySchema(type, cfg);
+
+      // Reset any previously mounted visual editor so the correct one loads for this card
+      visualEditor = null;
+
       buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
-      await mountPreview(currentConfig);
-      const hasUI = await mountVisualEditor(currentConfig);
-      showTab(hasUI ? 'visual' : 'yaml');
+      mountPreview(currentConfig); // debounced version
+
+      // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
+      showTab('yaml');
       enableCommit(true);
+
     };
     const commit = async () => {
       if (!currentConfig) return;
@@ -2788,10 +2831,24 @@ _syncEmptyStateUI() {
     addBottom.addEventListener('click', commit);
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
-    search.addEventListener('input', renderLeft);
-    customType.addEventListener('input', renderLeft);
+    let __searchTimer = null;
+    search.addEventListener('input', () => {
+      if (__searchTimer) clearTimeout(__searchTimer);
+      __searchTimer = setTimeout(renderLeft, 120);
+    });
+
 
     renderLeft();
+    // --- Ensure something is selected so YAML/preview mount immediately ---
+    const pickDefaultType = () => {
+      // Prefer recent if present; otherwise fall back to 'entities'
+      const r = this._getRecent?.() || [];
+      const firstRecent = r.find(Boolean);
+      return firstRecent || 'entities';
+    };
+
+    await selectType(pickDefaultType());
+    enableCommit(true);
 
     // default selection
     if (mode === 'edit' && initialCfg) {
@@ -3347,35 +3404,6 @@ async _getStubConfigForType(type) {
       return panel?.shadowRoot?.querySelector('hui-root') || null;
     } catch { return null; }
   }
-
-  /** HA editors need the lovelace context to render properly */
-  _getLovelace(){
-    try {
-      const root = this._huiRoot();
-      if (root?.lovelace) return root.lovelace;
-      // fallback: walk up looking for a lovelace host
-      let n = this;
-      while (n) {
-        if (n.lovelace) return n.lovelace;
-        const host = n.getRootNode && n.getRootNode().host;
-        n = host || n.parentElement || null;
-      }
-    } catch {}
-    return null;
-  }
-
-  /** Apply hass/lovelace/narrow to editors in a single place */
-  _applyHaEditorContext(el){
-    if (!el) return;
-    try { el.hass = this.hass; } catch {}
-    try {
-      const ll = this._getLovelace();
-      if (ll) el.lovelace = ll;
-    } catch {}
-    try { el.narrow = window.matchMedia('(max-width: 870px)').matches; } catch {}
-    try { el.editMode = true; } catch {}
-  }
-
   getCardSize(){ return 3; }
 }
 
