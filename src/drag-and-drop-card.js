@@ -901,11 +901,14 @@ _applyGridVars() {
     saved = { cards: this._config.cards };
       }
     // 1) Apply persisted options (if any) as baseline
+    // Snapshot current YAML/visual config BEFORE touching live props
+    const yamlCfg = { ...(this._config || {}) };
+
+    // 1) Apply persisted options (if any) as baseline
     if (saved?.options) this._applyImportedOptions(saved.options, true);
     else if (typeof saved?.grid === 'number') this._applyImportedOptions({ grid: saved.grid }, true);
 
-    // 2) Overlay explicit options from current Lovelace config (take precedence)
-    const cfg = this._config || {};
+    // 2) Overlay explicit options from YAML (take precedence over saved snapshot)
     const overrideKeys = [
       'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
       'container_background','card_background','debug','disable_overlap',
@@ -913,7 +916,7 @@ _applyGridVars() {
       'container_preset','container_preset_orientation'
     ];
     const cfgOpts = {};
-    for (const k of overrideKeys) if (cfg[k] !== undefined) cfgOpts[k] = cfg[k];
+    for (const k of overrideKeys) if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
     if (Object.keys(cfgOpts).length) this._applyImportedOptions(cfgOpts, true);
 
 
