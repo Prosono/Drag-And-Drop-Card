@@ -1875,10 +1875,12 @@ _syncEmptyStateUI() {
   async _getEditorElementForType(type, cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
   
-    // Always warm the module before asking for the class.
-    // Built‑in HA cards don't expose a visual editor until they've been created at least once.
+    // Warm the module before asking for the class only for built‑in HA cards.
+    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
     try {
-      await this._ensureCardModuleLoaded(type, cfg);
+      if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
+        await this._ensureCardModuleLoaded(type, cfg);
+      }
     } catch {}
   
     // Ensure the module/class is loaded
@@ -2843,7 +2845,7 @@ async _getStubConfigForType(type) {
     // Provide a blank stub when the user selects the "Custom Card" entry.
     // A blank type lets the YAML editor drive the configuration entirely.
     if (type === 'custom_card') {
-      return { type: '' };
+      return { type: 'custom_card' };
     }
 
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
