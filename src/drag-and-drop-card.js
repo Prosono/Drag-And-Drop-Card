@@ -1261,59 +1261,57 @@ _syncEmptyStateUI() {
             let dxLead   = curLeadX - srL.x;
             let dyLead   = curLeadY - srL.y;
             
-            // build proposed rects for group
+            // Build proposed positions with both raw (unsnapped) and snapped coordinates
             const proposed = this.__groupDrag.members.map(m => {
               const sr = this.__groupDrag.startRaw.get(m);
-              const rx = sr.x + dxLead;
-              const ry = sr.y + dyLead;
-              const px = live ? Math.round(rx/gs)*gs : rx;
-              const py = live ? Math.round(ry/gs)*gs : ry;
-              return this._rectFor(m, px, py, sr.w, sr.h);
+              const rawX = sr.x + dxLead;
+              const rawY = sr.y + dyLead;
+              const snapX = live ? Math.round(rawX / gs) * gs : rawX;
+              const snapY = live ? Math.round(rawY / gs) * gs : rawY;
+              return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
             });
 
-            // if overlap protection on and collision → abort this move frame
-            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
-              return;
+            // If overlapping is disabled, push other cards out of the way
+            if (this.disableOverlap) {
+              this._pushCardsOutOfTheWay(proposed, dxLead, dyLead, live, gs);
             }
 
-            // commit move
+            // Commit the move: store unsnapped raw positions and apply snapped transform
             lead.setAttribute('data-x-raw', String(curLeadX));
             lead.setAttribute('data-y-raw', String(curLeadY));
-            for (let i = 0; i < this.__groupDrag.members.length; i++) {
-              const m  = this.__groupDrag.members[i];
-              const pr = proposed[i];
-              m.setAttribute('data-x-raw', String(pr.x));
-              m.setAttribute('data-y-raw', String(pr.y));
-              this._setCardPosition(m, pr.x, pr.y);
+            for (const pr of proposed) {
+              pr.el.setAttribute('data-x-raw', String(pr.rawX));
+              pr.el.setAttribute('data-y-raw', String(pr.rawY));
+              this._setCardPosition(pr.el, pr.snapX, pr.snapY);
             }
             this._resizeContainer();
           },
           end: () => {
             if (!this.__groupDrag) return;
-            const gs = this.gridSize;
-            // snap + final collision guard
-            const proposed = this.__groupDrag.members.map(m => {
-              const rx = Math.round((parseFloat(m.getAttribute('data-x-raw')) || 0)/gs)*gs;
-              const ry = Math.round((parseFloat(m.getAttribute('data-y-raw')) || 0)/gs)*gs;
+            const endRects = this.__groupDrag.members.map(m => {
+              // read the current raw coordinates
+              const rawX = parseFloat(m.getAttribute('data-x-raw')) || parseFloat(m.getAttribute('data-x')) || 0;
+              const rawY = parseFloat(m.getAttribute('data-y-raw')) || parseFloat(m.getAttribute('data-y')) || 0;
+              // snap the raw coordinates to the grid
+              const snapX = Math.round(rawX / gs) * gs;
+              const snapY = Math.round(rawY / gs) * gs;
               const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
               const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
-              return this._rectFor(m, rx, ry, w, h);
+              return { el: m, rawX, rawY, snapX, snapY, w, h };
             });
-            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
-              // don’t move; revert to start positions
-              for (const m of this.__groupDrag.members) {
-                const sr = this.__groupDrag.startRaw.get(m);
-                this._setCardPosition(m, sr.x, sr.y);
-                m.setAttribute('data-x-raw', String(sr.x));
-                m.setAttribute('data-y-raw', String(sr.y));
-              }
-            } else {
-              for (const pr of proposed) {
-                this._setCardPosition(pr.el, pr.x, pr.y);
-                pr.el.setAttribute('data-x-raw', String(pr.x));
-                pr.el.setAttribute('data-y-raw', String(pr.y));
-              }
+
+            // If overlapping is disabled, do a final push of other cards
+            if (this.disableOverlap) {
+              this._pushCardsOutOfTheWay(endRects, 0, 0, false, gs);
             }
+
+            // Snap the selected cards permanently and update raw coordinates
+            for (const pr of endRects) {
+              this._setCardPosition(pr.el, pr.snapX, pr.snapY);
+              pr.el.setAttribute('data-x-raw', String(pr.snapX));
+              pr.el.setAttribute('data-y-raw', String(pr.snapY));
+            }
+
             for (const m of this.__groupDrag.members) m.classList.remove('dragging');
             this._resizeContainer();
             if (this._isContainerFixed()) this._clampAllCardsInside();
@@ -1588,7 +1586,53 @@ _syncEmptyStateUI() {
     c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
   }
   
-  
+  /**
+   * Push non‑selected cards out of the way when overlap is disabled.
+   * @param {Array} proposedRects – array of objects with rawX/rawY and snapX/snapY for selected cards
+   * @param {number} dxLead – delta X of the leader (used to decide push direction)
+   * @param {number} dyLead – delta Y of the leader (used to decide push direction)
+   * @param {boolean} liveSnap – true if live snap is active
+   * @param {number} gridSize – the current grid size
+   */
+  _pushCardsOutOfTheWay(proposedRects, dxLead, dyLead, liveSnap, gridSize) {
+    const selected = new Set(proposedRects.map(pr => pr.el));
+    const others = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
+      .filter(w => !selected.has(w) && !w.dataset.placeholder);
+    for (const pr of proposedRects) {
+      for (const other of others) {
+        let ox = parseFloat(other.getAttribute('data-x-raw')) || parseFloat(other.getAttribute('data-x')) || 0;
+        let oy = parseFloat(other.getAttribute('data-y-raw')) || parseFloat(other.getAttribute('data-y')) || 0;
+        const ow  = parseFloat(other.style.width)  || other.getBoundingClientRect().width;
+        const oh  = parseFloat(other.style.height) || other.getBoundingClientRect().height;
+
+        // Keep shifting until it no longer overlaps with the dragged card
+        while (this._rectsOverlap(
+          { x: pr.snapX, y: pr.snapY, w: pr.w, h: pr.h },
+          { x: ox, y: oy, w: ow, h: oh }
+        )) {
+          if (Math.abs(dxLead) >= Math.abs(dyLead)) {
+            // horizontal push
+            ox = dxLead > 0
+              ? pr.snapX + pr.w
+              : pr.snapX - ow;
+          } else {
+            // vertical push
+            oy = dyLead > 0
+              ? pr.snapY + pr.h
+              : pr.snapY - oh;
+          }
+        }
+
+        // Save the unsnapped coordinates
+        other.setAttribute('data-x-raw', String(ox));
+        other.setAttribute('data-y-raw', String(oy));
+        // Snap the transform only for display
+        const snX = liveSnap ? Math.round(ox / gridSize) * gridSize : ox;
+        const snY = liveSnap ? Math.round(oy / gridSize) * gridSize : oy;
+        this._setCardPosition(other, snX, snY);
+      }
+    }
+  } 
 
   _rectFor(el, x = null, y = null, wpx = null, hpx = null) {
     const x0 = x ?? (parseFloat(el.getAttribute('data-x')) || 0);
