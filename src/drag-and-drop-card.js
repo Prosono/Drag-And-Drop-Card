@@ -2289,6 +2289,30 @@ _syncEmptyStateUI() {
             : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
           </button>
         </div>
+        <div class="config-row">
+          <label>Container size</label>
+          <select id="sizeMode">
+            <option value="dynamic">Dynamic (auto)</option>
+            <option value="fixed_custom">User preference (px)</option>
+            <option value="preset">Preset</option>
+          </select>
+
+          <span id="sizeCustom" style="display:none">
+            W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
+            H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
+          </span>
+
+          <span id="sizePresetWrap" style="display:none">
+            <select id="sizePreset" style="min-width:240px"></select>
+            <select id="sizeOrientation">
+              <option value="auto">Auto</option>
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </span>
+          <span class="hint">In fixed mode, cards cannot leave the box.</span>
+        </div>
+
         <div id="layoutGrid" class="layout">
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
