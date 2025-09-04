@@ -484,7 +484,10 @@ _applyGridVars() {
             box-sizing: border-box;      /* include the 2px border in the set width/height */
             border:2px solid transparent;
             background:var(--ddc-card-bg, var(--card-background-color));
-            cursor:grab; overflow:hidden; border-radius:14px;
+            cursor:grab;
+            /* ensure buttons and resize handles remain visible on very small cards */
+            overflow:visible;
+            border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
@@ -548,10 +551,21 @@ _applyGridVars() {
           .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px }
 
           /* ---- chip ---- */
-          .chip{
-            position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .15s;
+        .chip{
+            position:absolute;
+            top:8px;
+            right:8px;
+            display:flex;
+            gap:6px;
+            flex-wrap:wrap;             /* allow chip buttons to wrap when space is limited */
+            opacity:0;
+            transition:opacity .15s;
             z-index:30;
             pointer-events: none;
+          }
+          .card-wrapper.editing .chip{
+            opacity:1;
+            pointer-events: auto;
           }
           .card-wrapper.editing .chip{
             opacity:1;
@@ -630,14 +644,18 @@ _applyGridVars() {
           #yamlSec { min-height: 0; }
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
-            max-height: 320px;     /* keep the section tidy; adjust if you like */
+            /* allow the YAML editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
           #optionsSec { min-height: 0; }
           #optionsSec .bd {
             overflow: auto;        /* scroll inside the Visual editor section */
-            max-height: 320px;     /* adjust as you prefer (e.g., 380px) */
-          }  
+            /* allow the visual editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
+          }
           #editorHost { display:block; min-height: 0; }
 
           #quickFillSec { 
@@ -1826,7 +1844,10 @@ _syncEmptyStateUI() {
         {type:'button',            name:'Button',            icon:'mdi:gesture-tap-button'},
         {type:'glance',            name:'Glance',            icon:'mdi:eye-outline'},
         {type:'markdown',          name:'Markdown',          icon:'mdi:language-markdown'},
+        // NEW: allow adding an empty custom card that the user can edit manually
+        {type:'custom_card',       name:'Custom Card',       icon:'mdi:puzzle-outline'},
       ]},
+
       { id:'sensors',   name:'Sensors', items:[
         {type:'sensor',            name:'Sensor',            icon:'mdi:antenna'},
         {type:'gauge',             name:'Gauge',             icon:'mdi:gauge'},
@@ -2808,9 +2829,16 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
-  async _getStubConfigForType(type) {
+async _getStubConfigForType(type) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     let CardClass = null;
+
+    // Provide a blank stub when the user selects the "Custom Card" entry.
+    // A blank type lets the YAML editor drive the configuration entirely.
+    if (type === 'custom_card') {
+      return { type: '' };
+    }
+
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
     const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
