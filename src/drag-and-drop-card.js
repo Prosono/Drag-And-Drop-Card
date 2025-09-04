@@ -649,7 +649,7 @@ _applyGridVars() {
           .rightGrid{
             display:grid;
             grid-template-columns:540px 1fr;
-            grid-template-rows:auto auto 1fr;
+            grid-template-rows: auto auto minmax(280px, 1fr);
             gap:12px;padding:12px;
             height:100%;
             min-height:0;         /* allow children to shrink */
@@ -700,11 +700,12 @@ _applyGridVars() {
           }
 
           /* ha-code-editor / CodeMirror height: fixed and scroll inside */
+          
           /* YAML fills its pane; the pane scrolls */
-          #yamlSec .bd { height:100%; overflow:auto; }
-          #yamlHost { height:100%; max-height:none; overflow:auto; }
-          ha-code-editor { display:block; height:100% !important; }
-          .CodeMirror { height:100% !important; }
+          #yamlSec .bd { min-height:280px; overflow:auto; }
+          #yamlHost { min-height:280px; max-height:none; overflow:auto; }
+          ha-code-editor { display:block; min-height:260px !important; height:auto !important; }
+          .CodeMirror { min-height:260px !important; height:auto !important; }
 
           /* CodeMirror */
           .CodeMirror{
@@ -1944,18 +1945,23 @@ _syncEmptyStateUI() {
       'area':'hui-area-card-editor',
       'iframe':'hui-iframe-card-editor'
     };
+    // 3.5) Last-resort: generic core editor (covers most HA cards)
     if (!isCustom) {
-      const tag = CORE_EDITOR_TAGS[String(type)];
-      if (tag) {
-        // ensure tag registers
-        for (const delay of [0,120,250,500,900]) {
-          if (!customElements.get(tag)) {
-            try { await Promise.race([customElements.whenDefined(tag), new Promise(r=>setTimeout(r, delay))]); } catch {}
-          }
-          if (customElements.get(tag)) return document.createElement(tag);
+      for (const delay of [0, 120, 250, 500, 900]) {
+        if (!customElements.get('hui-card-editor')) {
+          try {
+            await Promise.race([
+              customElements.whenDefined('hui-card-editor'),
+              new Promise(r => setTimeout(r, delay)),
+            ]);
+          } catch {}
+        }
+        if (customElements.get('hui-card-editor')) {
+          return document.createElement('hui-card-editor');
         }
       }
     }
+
 
     // 4) custom-registry & conventions
     const base = String(type).replace(/^custom:/,'');
@@ -1984,7 +1990,9 @@ _syncEmptyStateUI() {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
 
       // 1) mount the card once (loads the card chunk and side-effects)
-      const el = helpers.createCardElement({ type, ...(cfg || {}) });
+      let el;
+      try { el = helpers.createCardElement({ type }); }
+      catch { el = helpers.createCardElement({ type, ...(cfg || {}) }); }
       el.hass = this.hass;
       const tmp = document.createElement('div');
       tmp.style.cssText = 'position:fixed;left:-10000px;top:-10000px;opacity:0;pointer-events:none;';
@@ -2003,7 +2011,7 @@ _syncEmptyStateUI() {
         if (ll) { shell.lovelace = ll; shell.narrow = !!ll.narrow; }
         try { shell.setConfig({ type, ...(cfg||{}) }); } catch {}
         document.body.appendChild(shell);
-        await new Promise(r => setTimeout(r, 150));  // give it a tick to register editor tags
+        for (const d of [150, 250, 350]) await new Promise(r => setTimeout(r, d));
         shell.remove();
       }
     } catch {}
