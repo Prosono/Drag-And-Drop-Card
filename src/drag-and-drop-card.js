@@ -671,7 +671,7 @@ _applyGridVars() {
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height:0; display:none; } 
+          #yamlSec { min-height:0;} 
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
             /* allow the YAML editor to use the full available space instead of a fixed max height */
@@ -2286,9 +2286,8 @@ _syncEmptyStateUI() {
     };
   }
   
+/* ----------------------- Picker (fast, cached) ----------------------- */
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
-
-    
     const close = () => modal.remove();
     const modal = document.createElement('div'); modal.className='modal';
     modal.innerHTML = `
@@ -2297,6 +2296,7 @@ _syncEmptyStateUI() {
           <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
           <div style="display:flex;gap:10px;flex:1">
             <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
+            <input id="customType" placeholder="custom:my-card (optional)" style="max-width:260px;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)" aria-label="custom type">
           </div>
           <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
           <button class="btn" id="addBtn" disabled>${mode==='edit'
@@ -2308,12 +2308,12 @@ _syncEmptyStateUI() {
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
             <div class="rightGrid">
-              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
+              <div class="sec" style="grid-column:1;grid-row:1">
                 <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
                 <div class="bd" id="quickFill"></div>
               </div>
 
-              <div id="previewSec" class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative;overflow:hidden;z-index:1">
+              <div class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative">
                 <div class="hd">Preview</div>
                 <div class="spin-center" id="previewSpin" hidden>
                   <ha-circular-progress indeterminate></ha-circular-progress>
@@ -2321,7 +2321,7 @@ _syncEmptyStateUI() {
                 <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
               </div>
 
-              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
+              <div class="sec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
                 <div class="hd">
                   <span>Card options (official editor)</span>
                   <div id="optTabs" class="tabs">
@@ -2366,6 +2366,7 @@ _syncEmptyStateUI() {
     const cancelTop = modal.querySelector('#cancelBtn');
     const cancelBot = modal.querySelector('#footCancel');
     const search = modal.querySelector('#search');
+    const customType = modal.querySelector('#customType');
     const cardHost = modal.querySelector('#cardHost');
     const editorHost = modal.querySelector('#editorHost');
     const editorSpin = modal.querySelector('#editorSpin');
@@ -2406,26 +2407,16 @@ _syncEmptyStateUI() {
       tabVisual.setAttribute('aria-selected', String(!wantYaml));
       tabYaml.classList.toggle('active', wantYaml);
       tabYaml.setAttribute('aria-selected', String(wantYaml));
-
-      // Show/hide the two editors. Use 'block' to override the CSS rule that hides #yamlSec.
+    
+      // Show/hide the two editors
       editorHost.parentElement.style.display = wantYaml ? 'none' : '';
-      yamlSec.style.display = wantYaml ? 'block' : 'none';
-
-      if (wantYaml) yamlSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      yamlSec.style.display = wantYaml ? '' : 'none';
+    
+      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
     
-    tabVisual.addEventListener('click', async () => {
-      showTab('visual');
-      // Mount a new editor the first time; reuse it afterward by updating config.
-      // Because visualEditor is reset in selectType(), this will always mount a fresh editor for a new card type.
-      if (!visualEditor) {
-        await mountVisualEditor(currentConfig);
-      } else {
-        try { visualEditor.setConfig?.(currentConfig); } catch {}
-      }
-    });
-
+    tabVisual.addEventListener('click', () => showTab('visual'));
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
@@ -2433,14 +2424,14 @@ _syncEmptyStateUI() {
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
-      return catalog
-        .map(section => ({
-          ...section,
-          items: (section.items || []).filter(
-            it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
-          )
-        }))
-        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent');
+      const custom = customType.value.trim();
+      if (custom) {
+        return [{ id:'custom', name:'Custom', items:[{type:custom, name:'Custom card', icon:'mdi:puzzle-outline'}]}];
+      }
+      return catalog.map(section => ({
+        ...section,
+        items: (section.items||[]).filter(it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q))
+      })).filter(sec => sec.items && sec.items.length || sec.id==='favorites' || sec.id==='recent');
     };
 
     const renderLeft = () => {
@@ -2481,8 +2472,6 @@ _syncEmptyStateUI() {
     let yamlEditorApi = null;
     let visualEditor = null;
     let pickSeq = 0; // stale-select guard
-    let __previewTimer = null;
-    let __lastPreviewCfgJSON = '';
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -2510,7 +2499,7 @@ _syncEmptyStateUI() {
           div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
           div.querySelector('ha-icon').setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
           currentConfig = this._shapeBySchema(type, {...currentConfig, [keyForMulti]: [...arr]});
-          mountPreview(currentConfig);
+          await mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         });
         container.appendChild(div);
@@ -2522,68 +2511,17 @@ _syncEmptyStateUI() {
 
         if (f.type === 'entities') {
           const wrap = document.createElement('div'); wrap.style.flex='1';
-          const filter = document.createElement('input');
-          Object.assign(filter, { placeholder:'Filter entities…' });
-          Object.assign(filter.style, {
-            width:'100%', padding:'8px 10px', borderRadius:'10px',
-            border:'1px solid var(--divider-color)',
-            background:'var(--card-background-color)', color:'var(--primary-text-color)'
-          });
-          const list = document.createElement('div');
-          Object.assign(list.style, {
-            maxHeight:'220px', overflow:'auto', marginTop:'8px',
-            border:'1px solid var(--divider-color)', borderRadius:'10px', padding:'6px'
-          });
+          const filter = document.createElement('input'); Object.assign(filter,{placeholder:'Filter entities…'}); Object.assign(filter.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)',background:'var(--card-background-color)',color:'var(--primary-text-color)'});
+          const list = document.createElement('div'); Object.assign(list.style,{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'8px',maxHeight:'220px',overflow:'auto',marginTop:'8px'});
           const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : all;
           const selected = Array.isArray(cfg[f.key]) ? [...cfg[f.key]] : (cfg[f.key] ? [cfg[f.key]] : []);
-
-          // virtualized row renderer
-          const renderRow = (eid) => {
-            const div = document.createElement('div');
-            Object.assign(div.style, {
-              padding:'6px 10px', margin:'4px 0',
-              border:'1px solid var(--divider-color)', borderRadius:'10px',
-              cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', background:''
-            });
-            const icon = document.createElement('ha-icon');
-            icon.setAttribute('icon','mdi:checkbox-blank-outline');
-            icon.style.setProperty('--mdc-icon-size','18px');
-            const text = document.createElement('span');
-            text.textContent = eid;
-            text.style.whiteSpace = 'nowrap';
-            text.style.overflow = 'hidden';
-            text.style.textOverflow = 'ellipsis';
-            div.append(icon, text);
-
-            const paint = () => {
-              const on = selected.includes(eid);
-              div.style.background = on ? 'rgba(3,169,244,.12)' : '';
-              div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
-              icon.setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
-            };
-            paint();
-
-            div.addEventListener('click', () => {
-              const idx = selected.indexOf(eid);
-              if (idx >= 0) selected.splice(idx, 1); else selected.push(eid);
-              currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: [...selected]});
-              mountPreview(currentConfig);
-              yamlEditorApi?.setValue(currentConfig);
-              paint();
-            });
-
-            return div;
-          };
-
-          let filtered = pool;
-          this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
-
-          filter.addEventListener('input', () => {
+          const renderList = () => {
             const q = filter.value.trim().toLowerCase();
-            filtered = pool.filter(eid => !q || eid.toLowerCase().includes(q));
-            this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
-          });
-
+            list.innerHTML = '';
+            pool.filter(eid => !q || eid.toLowerCase().includes(q)).forEach(eid => addEntityItem(eid, selected, list, f.key));
+          };
+          filter.addEventListener('input', renderList);
+          renderList();
           wrap.append(filter, list);
           row.append(label, wrap);
           currentConfig = this._shapeBySchema(type, {...cfg, [f.key]: selected});
@@ -2602,7 +2540,7 @@ _syncEmptyStateUI() {
           ds.value = Array.isArray(cfg[f.key]) ? (cfg[f.key][0] || '') : (cfg[f.key] || '');
           ds.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ds.value || undefined});
-            mountPreview(currentConfig);
+            await mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           dsWrap.append(iconLead, ds, dl);
@@ -2618,7 +2556,7 @@ _syncEmptyStateUI() {
           inp.addEventListener('input', async () => {
             const v = inp.value==='' ? undefined : Number(inp.value);
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: isNaN(v)? undefined : v});
-            mountPreview(currentConfig);
+            await mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(numIcon, inp);
@@ -2633,7 +2571,7 @@ _syncEmptyStateUI() {
           sel.value = cfg[f.key] ?? f.default ?? (f.options?.[0] || '');
           sel.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: sel.value});
-            mountPreview(currentConfig);
+            await mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           selWrap.append(selIcon, sel);
@@ -2648,7 +2586,7 @@ _syncEmptyStateUI() {
           inp.value = cfg[f.key] ?? '';
           inp.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: inp.value || undefined});
-            mountPreview(currentConfig);
+            await mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(tIcon, inp);
@@ -2661,7 +2599,7 @@ _syncEmptyStateUI() {
           ta.value = cfg[f.key] ?? '';
           ta.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ta.value || ''});
-            mountPreview(currentConfig);
+            await mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           row.append(label, ta);
@@ -2674,25 +2612,19 @@ _syncEmptyStateUI() {
       quickFill.appendChild(fieldWrap);
     };
 
-    const mountPreview = (cfg) => {
-      const cfgJSON = JSON.stringify(cfg || {});
-      if (cfgJSON === __lastPreviewCfgJSON) return; // same config, skip
-      __lastPreviewCfgJSON = cfgJSON;
-      if (__previewTimer) clearTimeout(__previewTimer);
-      __previewTimer = setTimeout(async () => {
-        const seq = ++pickSeq;
-        previewSpin.hidden = false;
-        cardHost.innerHTML = '';
-        await raf();
-        try {
-          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-          if (seq !== pickSeq) return;
-          const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
-          if (seq !== pickSeq) return;
-          cardHost.appendChild(temp);
-        } catch {}
-        finally { if (seq === pickSeq) previewSpin.hidden = true; }
-      }, 150); // 150–250ms is a sweet spot
+    const mountPreview = async (cfg) => {
+      const seq = ++pickSeq;
+      previewSpin.hidden = false;
+      cardHost.innerHTML = '';
+      await raf();
+      try {
+        const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+        if (seq !== pickSeq) return;
+        const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+        if (seq !== pickSeq) return;
+        cardHost.appendChild(temp);
+      } catch {}
+      finally { if (seq === pickSeq) previewSpin.hidden = true; }
     };
 
     const mountVisualEditor = async (cfg) => {
@@ -2701,67 +2633,62 @@ _syncEmptyStateUI() {
       editorHost.innerHTML = '';
       await idle();
       if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
-
-      const wantType = cfg.type || currentType;
-      let editor = await this._getEditorElementForType(wantType, cfg);
-
+    
+      // Try to get a UI editor for *any* card type (core or custom)
+      let editor = await this._getEditorElementForType(cfg.type || currentType, cfg);
+    
       if (!editor) {
-        try { await this._ensureCardModuleLoaded(wantType, cfg); } catch {}
-        for (const delay of [0,120,250,500,900]) {
-          if (delay) await new Promise(r=>setTimeout(r, delay));
-          editor = await this._getEditorElementForType(wantType, cfg);
-          if (editor) break;
-        }
-      }
-
-      if (!editor) {
+        // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
-        p.style.opacity='.7'; p.style.fontSize='.9rem';
-        p.textContent = 'No visual editor available for this card.';
-        if (seq === pickSeq) { editorHost.appendChild(p); editorSpin.hidden = true; }
+        p.style.opacity = '.7'; p.style.fontSize = '.9rem';
+        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
+        if (seq === pickSeq) {
+          editorHost.appendChild(p);
+          editorSpin.hidden = true;
+        }
         visualEditor = null;
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
       }
-
+    
       try {
-        // give core editors all their context before setConfig
-        const ll = this._huiRoot()?.lovelace;
-        if (ll) { editor.lovelace = ll; editor.narrow = !!ll.narrow; }
         editor.hass = this.hass;
-
         if (!editor.isConnected) editorHost.appendChild(editor);
+    
+        // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
-        try { editor.setConfig(cfg); } catch {}
-
-        // drop old listeners (prevents “last editor sticks”)
+        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
+    
+        // Remove old listeners if any
         if (visualEditor && this.__onEditorChange) {
           visualEditor.removeEventListener('config-changed', this.__onEditorChange);
           visualEditor.removeEventListener('value-changed', this.__onEditorChange);
-          visualEditor.removeEventListener('editor-value-changed', this.__onEditorChange);
         }
-
-        const onChange = (e) => {
-          const next = e.detail?.config ?? e.detail?.value;
+    
+        const onChange = async (e) => {
+          const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
           if (!next) return;
           const nextType = next.type || currentType;
           currentType = nextType;
           currentConfig = this._shapeBySchema(nextType, next);
+    
           setError('');
           enableCommit(true);
           buildQuickFill(currentType, currentConfig);
-          mountPreview(currentConfig);
+          await mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
-
+    
         this.__onEditorChange = onChange;
         editor.addEventListener('config-changed', onChange);
         editor.addEventListener('value-changed', onChange);
-        editor.addEventListener('editor-value-changed', onChange); // some core editors use this
-
+    
         visualEditor = editor;
+    
+        // If a UI exists and the user hasn’t explicitly chosen YAML → show Visual
         if (__activeTab !== 'yaml') showTab('visual');
+    
         enableCommit(true);
         return true;
       } finally {
@@ -2788,16 +2715,12 @@ _syncEmptyStateUI() {
     
             if (typeChanged) {
               buildQuickFill(currentType, currentConfig);
-              // Only update Visual if it’s already mounted
-              if (visualEditor) {
-                try { visualEditor.setConfig?.(currentConfig); } catch {}
-                if (__activeTab !== 'yaml') showTab('visual');
-              }
+              const hasUI = await mountVisualEditor(currentConfig);
+              if (hasUI && __activeTab !== 'yaml') showTab('visual');
             } else {
               try { visualEditor?.setConfig?.(currentConfig); } catch {}
-              mountPreview(currentConfig);
+              await mountPreview(currentConfig);
             }
-
           } catch (e) {
             yamlErr.hidden = false;
             yamlErr.textContent = `Invalid config: ${String(e?.message || e)}`;
@@ -2815,8 +2738,16 @@ _syncEmptyStateUI() {
 
     const getStub = async (type) => {
       if (this.__stubCache.has(type)) return { ...this.__stubCache.get(type) };
-      // Fast local stub first (no heavy module loads)
-      let cfg = await this._getStubConfigForType(type);
+      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      let CardClass = null;
+      try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+      let cfg;
+      const all = Object.keys(this.hass?.states || {});
+      const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+      if (CardClass?.getStubConfig) {
+        try { cfg = await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
+      }
+      if (!cfg) cfg = await this._getStubConfigForType(type);
       this.__stubCache.set(type, { ...cfg });
       return { ...cfg };
     };
@@ -2831,19 +2762,13 @@ _syncEmptyStateUI() {
         : await getStub(type);
     
       currentConfig = this._shapeBySchema(type, cfg);
-
-      // Reset any previously mounted visual editor so the correct one loads for this card
-      visualEditor = null;
-
       buildQuickFill(type, currentConfig);
-
+      await mountYaml(currentConfig);
       await raf();
-      // Show the GUI editor immediately
-      await mountVisualEditor(currentConfig);
-     
-      // Spin up YAML in the background (don’t block UI)
-      mountYaml(currentConfig).catch(() => {});
-
+      await mountPreview(currentConfig);
+      const hasUI = await mountVisualEditor(currentConfig);
+      showTab(hasUI ? 'visual' : 'yaml');
+      enableCommit(true);
     };
     const commit = async () => {
       if (!currentConfig) return;
@@ -2863,24 +2788,10 @@ _syncEmptyStateUI() {
     addBottom.addEventListener('click', commit);
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
-    let __searchTimer = null;
-    search.addEventListener('input', () => {
-      if (__searchTimer) clearTimeout(__searchTimer);
-      __searchTimer = setTimeout(renderLeft, 120);
-    });
-
+    search.addEventListener('input', renderLeft);
+    customType.addEventListener('input', renderLeft);
 
     renderLeft();
-    // --- Ensure something is selected so YAML/preview mount immediately ---
-    const pickDefaultType = () => {
-      // Prefer recent if present; otherwise fall back to 'entities'
-      const r = this._getRecent?.() || [];
-      const firstRecent = r.find(Boolean);
-      return firstRecent || 'entities';
-    };
-
-    await selectType(pickDefaultType());
-    enableCommit(true);
 
     // default selection
     if (mode === 'edit' && initialCfg) {
