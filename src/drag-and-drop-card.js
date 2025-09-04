@@ -639,12 +639,12 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
-          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
-          #rightPane{overflow:hidden;background:var(--primary-background-color)}
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color)}
+          #rightPane{overflow:visible;background:var(--primary-background-color)}
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto 1fr 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:hidden;position:relative;contain:content}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative}
           /* Prevent any grid item (esp. Preview) from overlaying editors */
           #previewSec{overflow:hidden;z-index:1}
           #optionsSec,#yamlSec,#quickFillSec{z-index:2}
@@ -658,7 +658,7 @@ _applyGridVars() {
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height: 0; }
+          #yamlSec { min-height: 0; display:none; }
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
             /* allow the YAML editor to use the full available space instead of a fixed max height */
@@ -668,12 +668,14 @@ _applyGridVars() {
           /* --- make Visual editor area scrollable, like YAML --- */
           #optionsSec { min-height: 0; }
           #optionsSec .bd {
-            overflow: auto;        /* scroll inside the Visual editor section */
-            /* allow the visual editor to use the full available space instead of a fixed max height */
-            max-height: none;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
             height: 100%;
+            overflow: auto; /* internal scroll */
           }
-          #editorHost { display:block; min-height: 0; }
+          #editorHost { display:block; min-height:0; height:100%; overflow:auto; }
 
           #quickFillSec { 
             display: flex; 
@@ -1891,72 +1893,94 @@ _syncEmptyStateUI() {
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-  
-    // Warm the module before asking for the class only for built‑in HA cards.
-    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
-    try {
-      if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
-        await this._ensureCardModuleLoaded(type, cfg);
-      }
-    } catch {}
-  
-    // Ensure the module/class is loaded
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
 
-  
-    // 1) Instance-provided editor
+    // For core types, warm the card *and* be ready to resolve the editor tag.
+    const isCustom = String(type || '').startsWith('custom:') || type === 'custom_card';
+    if (!isCustom) {
+      try { await this._ensureCardModuleLoaded(type, cfg); } catch {}
+    }
+
+    // 1) Try instance.getConfigElement() — handles many custom cards
     try {
       const inst = helpers.createCardElement({ type, ...cfg });
       inst.hass = this.hass;
-      try { inst.lovelace = this._getLovelace(); } catch {}
       if (typeof inst.getConfigElement === 'function') {
-        const el = await inst.getConfigElement();
+        const maybe = inst.getConfigElement();
+        const el = (maybe && typeof maybe.then === 'function') ? await maybe : maybe;
         if (el) return el;
       }
     } catch {}
-  
-    // 2) Static class-provided editor
+
+    // 2) Try class.getConfigElement() — HA core often goes this path (may return a Promise)
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     try {
       if (CardClass && typeof CardClass.getConfigElement === 'function') {
-        const el = await CardClass.getConfigElement();
+        const maybe = CardClass.getConfigElement();
+        const el = (maybe && typeof maybe.then === 'function') ? await maybe : maybe;
         if (el) return el;
       }
     } catch {}
 
+    // 3) If still nothing: resolve a *known* editor tag and instantiate it.
+    //    This fixes cases where HA hasn't imported the editor chunk yet.
+    const CORE_EDITOR_TAGS = {
+      'entities':'hui-entities-card-editor',
+      'entity':'hui-entity-card-editor',
+      'glance':'hui-glance-card-editor',
+      'markdown':'hui-markdown-card-editor',
+      'button':'hui-button-card-editor',
+      'tile':'hui-tile-card-editor',
+      'sensor':'hui-sensor-card-editor',
+      'gauge':'hui-gauge-card-editor',
+      'history-graph':'hui-history-graph-card-editor',
+      'statistics-graph':'hui-statistics-graph-card-editor',
+      'picture-entity':'hui-picture-entity-card-editor',
+      'picture-glance':'hui-picture-glance-card-editor',
+      'weather-forecast':'hui-weather-forecast-card-editor',
+      'map':'hui-map-card-editor',
+      'media-control':'hui-media-control-card-editor',
+      'light':'hui-light-card-editor',
+      'thermostat':'hui-thermostat-card-editor',
+      'alarm-panel':'hui-alarm-panel-card-editor',
+      'area':'hui-area-card-editor',
+      'iframe':'hui-iframe-card-editor'
+    };
 
-  
-    // 3) Known/custom-tag editors (registry hint + common conventions) with retries
-    const base = String(type).replace(/^custom:/, '');
-    const reg = Array.isArray(window.customCards) ? window.customCards : [];
-    const entry = reg.find(c =>
-      c?.type === base || c?.type === type || c?.type === `custom:${base}`
-    );
-    
-  
-    const candidates = [];
-    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
-    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
-  
-    for (const tag of candidates) {
-      if (!tag || typeof tag !== 'string') continue;
-      // Try a few times: 0ms, 100ms, 300ms, 700ms
-      for (const delay of [0, 100, 300, 700]) {
-        try {
+    if (!isCustom) {
+      const tag = CORE_EDITOR_TAGS[String(type)] || null;
+      if (tag) {
+        // make a good-faith attempt to ensure the module is around
+        try { await this._ensureCardModuleLoaded(type, cfg); } catch {}
+        // wait a bit for the tag to register
+        for (const delay of [0, 120, 250, 500, 900]) {
           if (!customElements.get(tag)) {
-            await Promise.race([
-              customElements.whenDefined(tag),
-              new Promise(r => setTimeout(r, delay))
-            ]);
+            try { await Promise.race([customElements.whenDefined(tag), new Promise(r => setTimeout(r, delay))]); } catch {}
           }
-          if (customElements.get(tag)) {
-            return document.createElement(tag);
-          }
-        } catch {}
+          if (customElements.get(tag)) return document.createElement(tag);
+        }
       }
     }
-  
-    // No UI editor available
+
+    // 4) Registry / custom tag fallbacks (common conventions)
+    const base = String(type).replace(/^custom:/, '');
+    const reg = Array.isArray(window.customCards) ? window.customCards : [];
+    const entry = reg.find(c => c?.type === base || c?.type === type || c?.type === `custom:${base}`);
+    const candidates = [];
+    if (entry?.editor) candidates.push(entry.editor);
+    candidates.push(`${base}-editor`, `${base}-config-editor`);
+
+    for (const tag of candidates) {
+      if (!tag || typeof tag !== 'string') continue;
+      for (const delay of [0, 120, 250, 500, 900]) {
+        if (!customElements.get(tag)) {
+          try { await Promise.race([customElements.whenDefined(tag), new Promise(r => setTimeout(r, delay))]); } catch {}
+        }
+        if (customElements.get(tag)) return document.createElement(tag);
+      }
+    }
+
+    // Nothing found
     return null;
   }
 
@@ -2379,7 +2403,7 @@ _syncEmptyStateUI() {
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
-    showTab('yaml');
+    showTab('visual');
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
@@ -2651,14 +2675,15 @@ _syncEmptyStateUI() {
       editorHost.innerHTML = '';
       await idle();
       if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
-    
-      // Try to get a UI editor for *any* card type (core or custom)
+
       const wantType = cfg.type || currentType;
+
+      // Always resolve a brand-new editor for the current type
       let editor = await this._getEditorElementForType(wantType, cfg);
 
-      // If not available yet, warm the card module and retry a few times
+      // One more warm-retry loop (helps HA core editors on first touch)
       if (!editor) {
-        await this._ensureCardModuleLoaded(wantType, cfg);
+        try { await this._ensureCardModuleLoaded(wantType, cfg); } catch {}
         for (const delay of [0, 120, 250, 500, 900]) {
           if (delay) await new Promise(r => setTimeout(r, delay));
           editor = await this._getEditorElementForType(wantType, cfg);
@@ -2667,10 +2692,10 @@ _syncEmptyStateUI() {
       }
 
       if (!editor) {
-        // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
-        p.style.opacity = '.7'; p.style.fontSize = '.9rem';
-        p.textContent = 'This card does not support a visual editor. Please use the YAML tab to configure it.';
+        p.style.opacity = '.7';
+        p.style.fontSize = '.9rem';
+        p.textContent = 'No visual editor available for this card.';
         if (seq === pickSeq) {
           editorHost.appendChild(p);
           editorSpin.hidden = true;
@@ -2679,61 +2704,47 @@ _syncEmptyStateUI() {
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
-}
-    
+      }
+
       try {
-        this._applyHaEditorContext(editor);
+        // Pass lovelace context (some core editors rely on it)
+        const ll = this._huiRoot()?.lovelace;
+        if (ll) {
+          editor.lovelace = ll;
+          editor.narrow = !!ll.narrow;
+        }
+        editor.hass = this.hass;
+
         if (!editor.isConnected) editorHost.appendChild(editor);
-
-        // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
-        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
+        try { editor.setConfig(cfg); } catch {}
 
-        // Try official getStubConfig once (may load modules) to improve defaults
-        try {
-          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-          const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
-          if (CardClass?.getStubConfig) {
-            const all = Object.keys(this.hass?.states || {});
-            const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
-            const better = await CardClass.getStubConfig(this.hass, all, byDomain);
-            if (better) cfg = this._shapeBySchema(cfg.type || currentType, { ...better });
-          }
-        } catch {}
-
-        // small yield before setConfig to help late-attaching internals
-        await Promise.resolve();
-        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
-    
-        // Remove old listeners if any
+        // Drop previous listeners (avoid “last editor sticks”)
         if (visualEditor && this.__onEditorChange) {
           visualEditor.removeEventListener('config-changed', this.__onEditorChange);
           visualEditor.removeEventListener('value-changed', this.__onEditorChange);
         }
-    
-        const onChange = async (e) => {
-          const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
+
+        const onChange = (e) => {
+          const next = e.detail?.config ?? e.detail?.value;
           if (!next) return;
           const nextType = next.type || currentType;
           currentType = nextType;
           currentConfig = this._shapeBySchema(nextType, next);
-    
           setError('');
           enableCommit(true);
           buildQuickFill(currentType, currentConfig);
           mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
-    
+
         this.__onEditorChange = onChange;
         editor.addEventListener('config-changed', onChange);
         editor.addEventListener('value-changed', onChange);
-    
+
         visualEditor = editor;
-    
-        // If a UI exists and the user hasn’t explicitly chosen YAML → show Visual
+
         if (__activeTab !== 'yaml') showTab('visual');
-    
         enableCommit(true);
         return true;
       } finally {
