@@ -35,127 +35,87 @@ class DragAndDropCard extends HTMLElement {
     const el = document.createElement('div');
     el.innerHTML = `
       <style>
-        /* Overall container for the editor */
-        .config-container {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          background: var(--ha-card-background, var(--card-background-color));
-          border-radius: 12px;
-          padding: 16px;
-          box-shadow: var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,0.18));
+        .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
+        input[type="text"],input[type="number"],select{
+          padding:6px;border-radius:8px;border:1px solid var(--divider-color);
+          background:var(--primary-background-color);color:var(--primary-text-color)
         }
-        /* Individual section with a heading */
-        .config-section {
-          border: 1px solid var(--divider-color);
-          border-radius: 8px;
-          padding: 12px;
-        }
-        .config-section h3 {
-          margin: 0 0 12px 0;
-          font-size: 1rem;
-          color: var(--primary-color);
-        }
-        /* A row for each setting */
-        .config-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 12px;
-          flex-wrap: wrap;
-        }
-        .config-row label {
-          flex: 0 0 140px;
-          font-weight: 600;
-        }
-        .config-row input[type="text"],
-        .config-row input[type="number"],
-        .config-row select {
-          flex: 1;
-          min-width: 160px;
-          padding: 8px;
-          border-radius: 6px;
-          border: 1px solid var(--divider-color);
-          background: var(--primary-background-color);
-          color: var(--primary-text-color);
-        }
-        /* Larger click target for checkboxes */
-        .config-row input[type="checkbox"] {
-          margin-right: 8px;
-          transform: scale(1.2);
-        }
-        .config-row small {
-          opacity: 0.6;
-        }
+        label{font-weight:600;min-width:130px}
+        .inline{display:inline-flex;gap:8px;align-items:center}
+        .hint{opacity:.65;font-size:.85rem}
       </style>
-
-      <div class="config-container">
-        <!-- General section -->
-        <div class="config-section">
-          <h3>General</h3>
-          <div class="config-row">
-            <label>Storage key</label>
-            <input type="text" id="storage_key" placeholder="e.g. living_room_layout">
-          </div>
-          <div class="config-row">
-            <label>Grid size (px)</label>
-            <input type="number" id="grid" min="5" step="1">
-          </div>
-          <div class="config-row">
-            <label>Auto-save</label>
-            <input type="checkbox" id="autoSave">
-            <span style="margin-left:auto">Debounce (ms)</span>
-            <input type="number" id="autoSaveDebounce" min="0" step="50" style="width:100px">
-          </div>
-        </div>
-
-        <!-- Appearance section -->
-        <div class="config-section">
-          <h3>Appearance</h3>
-          <div class="config-row">
-            <label>Container BG</label>
-            <input type="text" id="containerBg"
-              placeholder="transparent, #1e1e2e, linear-gradient(...)"
-              title="Try: transparent, #232f3e, linear-gradient(to right, #1a2a6c, #b21f1f, #fdbb2d), radial-gradient(circle, #4e54c8, #8f94fb)">
-          </div>
-          <div class="config-row">
-            <label>Card BG</label>
-            <input type="text" id="cardBg"
-              placeholder="var(--ha-card-background) or gradient"
-              title="Try: transparent, #151515aa, linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
-          </div>
-          <div class="config-row">
-            <input type="checkbox" id="liveSnap">
-            <label for="liveSnap">Snap while dragging (live)</label>
-          </div>
-        </div>
-
-        <!-- Advanced section -->
-        <div class="config-section">
-          <h3>Advanced</h3>
-          <div class="config-row">
-            <input type="checkbox" id="debug">
-            <label for="debug">Debug logs</label>
-          </div>
-          <div class="config-row">
-            <input type="checkbox" id="noOverlap">
-            <label for="noOverlap">
-              Disable overlapping <small>(Experimental)</small>
-            </label>
-          </div>
-          <div class="config-row">
-            <label>Container size</label>
-            <select id="sizeMode">
-              <option value="dynamic">Dynamic (auto)</option>
-              <option value="fixed_custom">User preference (px)</option>
-              <option value="preset">Preset</option>
-            </select>
-            <!-- Additional inputs for custom width/height or presets go here -->
-          </div>
-        </div>
+  
+      <div class="cfg-row">
+        <label>Storage key</label>
+        <input type="text" id="storage_key" placeholder="e.g. livingroom_layout">
+      </div>
+  
+      <div class="cfg-row">
+        <label>Grid (px)</label>
+        <input type="number" id="grid" min="5" step="1" value="10">
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="liveSnap"> Snap while dragging (live)</label>
+      </div>
+  
+      <div class="cfg-row">
+        <label>Auto-save</label>
+        <input type="checkbox" id="autoSave" checked>
+        <span style="margin-left:auto">Debounce (ms)</span>
+        <input type="number" id="autoSaveDebounce" min="0" step="50" value="800" style="width:90px">
+      </div>
+  
+      <div class="cfg-row">
+        <label>Container Baxckground</label>
+        <input type="text" id="containerBg"
+          placeholder="transparent or css e.g. linear-gradient(...)"
+          title="Try: transparent, #232f3e, linear-gradient(to right, #1a2a6c, #b21f1f, #fdbb2d), radial-gradient(circle, #4e54c8, #8f94fb)" />
+      </div>
+  
+      <div class="cfg-row">
+        <label>Card Background</label>
+        <input type="text" id="cardBg"
+          placeholder="var(--ha-card-background) or css e.g. #ffffffcc"
+          title="Try: transparent, #151515aa, linear-gradient(135deg, #667eea 0%, #764ba2 100%)" />
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="debug"> Debug logs</label>
+      </div>
+  
+      <div class="cfg-row">
+        <label><input type="checkbox" id="noOverlap">
+          Disable overlapping <small style="opacity:.6">(Experimental)</small>
+        </label>
+      </div>
+  
+      <!-- NEW: container sizing -->
+      <div class="cfg-row">
+        <label>Container size</label>
+        <select id="sizeMode">
+          <option value="dynamic">Dynamic (auto)</option>
+          <option value="fixed_custom">User preference (px)</option>
+          <option value="preset">Preset</option>
+        </select>
+  
+        <span id="sizeCustom" class="inline" style="display:none">
+          W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
+          H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
+        </span>
+  
+        <span id="sizePresetWrap" class="inline" style="display:none">
+          <select id="sizePreset" style="min-width:240px"></select>
+          <select id="sizeOrientation">
+            <option value="auto">Auto</option>
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+          </select>
+        </span>
+        <span class="hint">In fixed mode, cards cannot leave the box.</span>
       </div>
     `;
-    
+  
     // ----- helpers to populate presets -----
     const PRESETS = DragAndDropCard._sizePresets(); // static helper below
     const presetSel = el.querySelector('#sizePreset');
@@ -396,7 +356,7 @@ _applyGridVars() {
     // Now proceed with your existing logic:
     this._config = config;
     this.storageKey = config.storage_key || undefined;
-
+    
     const prevKey = this.storageKey;
 
     this._config                  = config;
@@ -780,42 +740,6 @@ _applyGridVars() {
             40%  { opacity:.7 }
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
-
-          /* Make placeholders stand out with a dashed border */
-          .card-wrapper.ddc-placeholder {
-            border: 2px dashed var(--divider-color);
-            border-radius: 14px;
-            background: var(--ddc-bg, transparent);
-          }
-
-          /* Center the icon and text and give them breathing room */
-          .placeholder-content {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            pointer-events: none;
-            color: var(--primary-text-color);
-            font-size: 0.9rem;
-          }
-
-          /* Enlarge and animate the plus icon */
-          .placeholder-content ha-icon {
-            --mdc-icon-size: 36px;
-            width: 36px;
-            height: 36px;
-            color: var(--primary-color);
-            animation: placeholderPulse 1.5s ease-in-out infinite;
-          }
-
-          /* Subtle pulsing animation to draw attention */
-          @keyframes placeholderPulse {
-            0%   { transform: scale(1);   opacity: 0.7; }
-            50%  { transform: scale(1.1); opacity: 1;   }
-            100% { transform: scale(1);   opacity: 0.7; }
-          }          
-          
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -1631,31 +1555,24 @@ _syncEmptyStateUI() {
     return wrap;
   }
 
-  _makePlaceholderAt(x = 0, y = 0, w = 100, h = 100) {
+  _makePlaceholderAt(x=0,y=0,w=100,h=100) {
     const wrap = document.createElement('div');
-    wrap.classList.add('card-wrapper', 'ddc-placeholder');
+    wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
     if (this.editMode) wrap.classList.add('editing');
     this._setCardPosition(wrap, x, y);
     wrap.style.width = `${w}px`;
     wrap.style.height = `${h}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
-
-    // Inner placeholder content with icon and text
+  
     const inner = document.createElement('div');
     inner.className = 'ddc-placeholder-inner';
-    inner.innerHTML = `
-      <div class="placeholder-content">
-        <ha-icon icon="mdi:plus-circle-outline"></ha-icon>
-        <span>Add your first card</span>
-      </div>
-    `;
-    inner.setAttribute('aria-hidden', 'true');
-
-    // Shield to capture drag events
+    // purely decorative; nothing clickable
+    inner.setAttribute('aria-hidden','true');
+  
     const shield = document.createElement('div');
     shield.className = 'shield';
-
+  
     wrap.append(inner, shield);
     return wrap;
   }
@@ -2289,30 +2206,6 @@ _syncEmptyStateUI() {
             : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
           </button>
         </div>
-        <div class="config-row">
-          <label>Container size</label>
-          <select id="sizeMode">
-            <option value="dynamic">Dynamic (auto)</option>
-            <option value="fixed_custom">User preference (px)</option>
-            <option value="preset">Preset</option>
-          </select>
-
-          <span id="sizeCustom" style="display:none">
-            W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
-            H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
-          </span>
-
-          <span id="sizePresetWrap" style="display:none">
-            <select id="sizePreset" style="min-width:240px"></select>
-            <select id="sizeOrientation">
-              <option value="auto">Auto</option>
-              <option value="portrait">Portrait</option>
-              <option value="landscape">Landscape</option>
-            </select>
-          </span>
-          <span class="hint">In fixed mode, cards cannot leave the box.</span>
-        </div>
-
         <div id="layoutGrid" class="layout">
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
