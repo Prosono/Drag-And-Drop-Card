@@ -687,7 +687,7 @@ _applyGridVars() {
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto 1fr 0;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
           .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
@@ -698,35 +698,6 @@ _applyGridVars() {
             background:var(--primary-background-color);color:var(--primary-text-color);cursor:pointer
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
-          /* Selected card header */
-          #selHeaderSec .hd #selCardTitle { font-weight:700; }
-          #selHeaderSec .tabs .tab { display:inline-flex; align-items:center; gap:6px; }
-          #selHeaderSec [aria-pressed="true"] ha-icon { color: #f5c518; }
-
-          /* Left list styling and active highlight */
-          #leftPane button { position: relative; }
-          #leftPane button.active { 
-            background: color-mix(in srgb, var(--primary-color) 12%, transparent); 
-            border: 1px solid var(--primary-color);
-          }
-          #leftPane button .row-star { 
-            margin-left:auto; border:none; background:transparent; cursor:pointer; 
-            display:inline-flex; align-items:center; padding:4px; border-radius:8px;
-          }
-          #leftPane button .row-star ha-icon { opacity:.8 }
-          #leftPane button .row-star[aria-pressed="true"] ha-icon { opacity:1; color:#f5c518 }
-
-          /* Make editor sections grow to full height */
-          #optionsSec, #yamlSec { min-height:0; }
-          #optionsSec .bd, #yamlSec .bd { 
-            min-height: 0; height: 100%; overflow:auto;
-          }
-          #editorHost { display:block; min-height:0; height:100%; }
-          /* Make code editor stretch */
-          ha-code-editor, .CodeMirror, #yamlHost, #yamlHost textarea {
-            height: 100% !important;
-          }
-
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
           #yamlSec { min-height: 0; }
@@ -757,11 +728,19 @@ _applyGridVars() {
           }
 
           /* ha-code-editor / CodeMirror height: fixed and scroll inside */
-          ha-code-editor { display:block; height: 100% !important; }
-          .CodeMirror { height: 100% !important; }
+          ha-code-editor { 
+            display: block; 
+            height: 260px !important; 
+          }
+          .CodeMirror { 
+            height: 260px !important; 
+          }
 
           /* host that wraps the editor should also allow scroll if content grows */
-          #yamlHost { max-height: none; height: 100%; overflow: auto; }
+          #yamlHost { 
+            max-height: 260px; 
+            overflow: auto; 
+          }
 
           /* CodeMirror */
           .CodeMirror{
@@ -2293,7 +2272,7 @@ _syncEmptyStateUI() {
       ed.hass = this.hass;
       ed.value = initialText;
       ed.style.display = 'block';
-      ed.style.height = '100%';
+      ed.style.height = '260px';
       hostEl.appendChild(ed);
 
       let programmatic = false;
@@ -2337,7 +2316,7 @@ _syncEmptyStateUI() {
     } catch {
       const ta = document.createElement('textarea');
       ta.style.width = '100%';
-      ta.style.height = '100%';
+      ta.style.height = '260px';
       ta.value = initialText;
       ta.addEventListener('input', () => {
         try { onValidChange(parse(ta.value)); }
@@ -2420,18 +2399,10 @@ _syncEmptyStateUI() {
         <div id="layoutGrid" class="layout">
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
-            <div class="rightGrid" id="rightGrid">
-              
-              <div class="sec" id="selHeaderSec" style="grid-column:1;grid-row:1;min-height:auto">
-                <div class="hd">
-                  <span id="selCardTitle">No card selected</span>
-                  <div class="tabs" style="margin-left:auto">
-                    <button id="selFavBtn" class="tab" title="Favorite this card" aria-pressed="false">
-                      <ha-icon icon="mdi:star-outline"></ha-icon>
-                    </button>
-                  </div>
-                </div>
-                <div class="bd" style="display:none"></div>
+            <div class="rightGrid">
+              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
+                <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
+                <div class="bd" id="quickFill"></div>
               </div>
 
               <div class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative">
@@ -2507,28 +2478,6 @@ _syncEmptyStateUI() {
     const favSection = catalog.find(c=>c.id==='favorites');
     const recSection = catalog.find(c=>c.id==='recent');
     const allItems = catalog.flatMap(c => c.items || []);
-
-    const updateSelHeader = () => {
-      const item = (allItems || []).find(i => i.type === currentType);
-      const title = item ? (item.name || item.type) : (currentType || 'No card');
-      if (selTitle) selTitle.textContent = title;
-      const favOn = faves.has(currentType);
-      if (selFavBtn) {
-        selFavBtn.setAttribute('aria-pressed', String(favOn));
-        const ic = selFavBtn.querySelector('ha-icon');
-        if (ic) ic.setAttribute('icon', favOn ? 'mdi:star' : 'mdi:star-outline');
-      }
-    };
-    const toggleFavorite = (type) => {
-      if (!type) return;
-      if (faves.has(type)) faves.delete(type); else faves.add(type);
-      this._setFaves(faves);
-      const favSection = catalog.find(c=>c.id==='favorites');
-      if (favSection) favSection.items = allItems.filter(i => faves.has(i.type));
-      renderLeft();
-      updateSelHeader();
-    };
-    selFavBtn?.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorite(currentType); });
     favSection.items = allItems.filter(i => faves.has(i.type));
     recSection.items = recent.map(t => allItems.find(i => i.type===t)).filter(Boolean);
 
@@ -2543,29 +2492,20 @@ _syncEmptyStateUI() {
 
     let __activeTab = 'visual';
 
-    
     const showTab = (name) => {
       const wantYaml = name === 'yaml';
       tabVisual.classList.toggle('active', !wantYaml);
       tabVisual.setAttribute('aria-selected', String(!wantYaml));
       tabYaml.classList.toggle('active', wantYaml);
       tabYaml.setAttribute('aria-selected', String(wantYaml));
-
-      // Toggle visibility
-      const rg = document.getElementById('rightGrid');
-      if (wantYaml) {
-        editorHost.parentElement.style.display = 'none';
-        yamlSec.style.display = '';
-        if (rg) rg.style.gridTemplateRows = 'auto 0 1fr';
-        yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
-      } else {
-        editorHost.parentElement.style.display = '';
-        yamlSec.style.display = 'none';
-        if (rg) rg.style.gridTemplateRows = 'auto 1fr 0';
-      }
+    
+      // Show/hide the two editors
+      editorHost.parentElement.style.display = wantYaml ? 'none' : '';
+      yamlSec.style.display = wantYaml ? '' : 'none';
+    
+      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
-
     
     tabVisual.addEventListener('click', async () => {
       showTab('visual');
@@ -2596,7 +2536,10 @@ _syncEmptyStateUI() {
     };
 
     const renderLeft = () => {
-      const view = filteredCatalog();
+      let view = filteredCatalog();
+      if (!Array.isArray(view) || view.length === 0) {
+        try { view = catalog || this._catalog(); } catch { view = this._catalog(); }
+      }
       left.innerHTML = '';
       view.forEach(cat => {
         const div = document.createElement('div');
@@ -2608,36 +2551,25 @@ _syncEmptyStateUI() {
         if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent')) {
           const p = document.createElement('div'); p.style.opacity='.6'; p.style.fontSize='.85rem'; p.textContent = cat.id==='favorites' ? 'No favorites yet.' : 'No recent items yet.'; div.appendChild(p);
         } else {
-          
           cat.items.forEach(item => {
             const b = document.createElement('button');
-            Object.assign(b.style,{display:'flex',alignItems:'center',gap:'8px',width:'100%',textAlign:'left',border:'none',background:'transparent',padding:'8px',borderRadius:'10px',cursor:'pointer'});
-            const leftWrap = document.createElement('span');
-            leftWrap.style.display='inline-flex';
-            leftWrap.style.alignItems='center';
-            leftWrap.style.gap='8px';
-            leftWrap.innerHTML = `<ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span>`;
-            const star = document.createElement('button');
-            star.className='row-star';
-            star.setAttribute('aria-pressed', String(faves.has(item.type)));
-            star.innerHTML = `<ha-icon icon="${faves.has(item.type)?'mdi:star':'mdi:star-outline'}"></ha-icon>`;
-            star.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorite(item.type); });
-            b.append(leftWrap, star);
+            b.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px">
+              <ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span>
+            </span>`;
+            Object.assign(b.style,{display:'block',width:'100%',textAlign:'left',border:'none',background:'transparent',padding:'8px',borderRadius:'10px',cursor:'pointer'});
             b.addEventListener('click', async () => { highlight(b); await selectType(item.type); });
             div.appendChild(b);
           });
-
         }
         left.appendChild(div);
       });
     };
 
-    
     const highlight = (btn) => {
       left.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       btn?.classList.add('active');
+      if (btn) btn.style.background='rgba(0,0,0,.06)';
     };
-
 
     let currentConfig = null;
     let currentType = null;
@@ -3020,14 +2952,13 @@ _syncEmptyStateUI() {
       // Reset any previously mounted visual editor so the correct one loads for this card
       visualEditor = null;
 
-      /* quick fill removed */
+      buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
       mountPreview(currentConfig); // debounced version
 
       // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
-      updateSelHeader();
-      showTab('visual');
+      showTab('yaml');
       enableCommit(true);
 
     };
