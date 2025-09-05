@@ -31,13 +31,37 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
+  // Deep query across shadow roots
+  _deepQueryAll(selector, root = document) {
+    const results = [];
+    const visit = (node) => {
+      if (!node) return;
+      if (node.querySelectorAll) {
+        try {
+          node.querySelectorAll(selector).forEach(el => results.push(el));
+        } catch {}
+      }
+      // Recurse into shadow roots
+      const treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
+      let el = node;
+      while (el) {
+        const sr = el.shadowRoot;
+        if (sr) visit(sr);
+        el = treeWalker.nextNode();
+      }
+    };
+    visit(root);
+    return results;
+  }
+
+
   // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
   _syncEditorsStorageKey() {
     try {
       const val = this.storageKey || '';
       // Update any open editor input fields for this card
       // We look for our known editor markup within the DOM and set the storage key input.
-      const nodes = document.querySelectorAll('div #storage_key');
+      const nodes = this._deepQueryAll('#storage_key');
       nodes.forEach((inp) => {
         try {
           if (inp && inp.tagName === 'INPUT') {
