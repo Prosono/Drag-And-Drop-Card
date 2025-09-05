@@ -1983,8 +1983,8 @@ _syncEmptyStateUI() {
   
     for (const tag of candidates) {
       if (!tag || typeof tag !== 'string') continue;
-      // Try a few times: 0ms, 100ms, 300ms, 700ms
-      for (const delay of [0, 100, 300, 700]) {
+      // Try multiple times: immediate and with increasing delays up to ~3s
+      for (const delay of [0, 100, 300, 700, 1500, 3000]) {
         try {
           if (!customElements.get(tag)) {
             await Promise.race([
@@ -2721,7 +2721,7 @@ _syncEmptyStateUI() {
       // If not available yet, warm the card module and retry a few times
       if (!editor) {
         await this._ensureCardModuleLoaded(wantType, cfg);
-        for (const delay of [0, 120, 250, 500, 900]) {
+        for (const delay of [0, 120, 250, 500, 900, 2000, 4000]) {
           if (delay) await new Promise(r => setTimeout(r, delay));
           editor = await this._getEditorElementForType(wantType, cfg);
           if (editor) break;
@@ -2944,8 +2944,9 @@ async _getStubConfigForType(type) {
     const first = all[0];
     const firstSensor = byDomain('sensor')[0] || first;
 
-    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast'].includes(type)) {
-      base.entity = ({
+    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast','map'].includes(type)) {
+      // Provide sensible defaults for cards that require an `entity` field.
+      const defaultEntity = ({
         'sensor': firstSensor,
         'gauge':  (byDomain('sensor').find(this._isNumericEntity.bind(this)) || firstSensor),
         'media-control': byDomain('media_player')[0] || first,
@@ -2953,16 +2954,79 @@ async _getStubConfigForType(type) {
         'thermostat': byDomain('climate')[0] || first,
         'alarm-panel': byDomain('alarm_control_panel')[0] || first,
         'weather-forecast': byDomain('weather')[0] || first,
+        'map': byDomain('device_tracker')[0] || byDomain('person')[0] || first,
       })[type] || firstSensor || first;
+      if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel'].includes(type)) {
+        base.entity = defaultEntity;
+      } else if (type === 'weather-forecast') {
+        base.entity = defaultEntity;
+        base.show_current = true;
+        base.show_forecast = true;
+        base.forecast_type = 'daily';
+      } else if (type === 'map') {
+        base.entities = [defaultEntity].filter(Boolean);
+        base.theme_mode = 'auto';
+      }
     }
-    if (['entities','glance','picture-glance','history-graph','statistics-graph','map'].includes(type)) {
+    if (['entities','glance','picture-glance','history-graph','statistics-graph'].includes(type)) {
       const pick = (domains) => (domains?.length ? all.filter(e => domains.includes(e.split('.')[0])) : all).slice(0,3);
-      if (type === 'map')        base.entities = pick(['device_tracker','person']);
-      else if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
+      if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
       else base.entities = pick();
     }
-    if (type === 'iframe') base.url = 'https://www.home-assistant.io';
-    if (type === 'markdown') base.content = '## New card';
+    if (type === 'markdown') {
+      // Provide a minimal content so the card does not error
+      base.content = 'Markdown card';
+    }
+    if (type === 'sensor') {
+      base.graph = 'line';
+    }
+    if (type === 'button') {
+      base.show_name = true;
+      base.show_icon = true;
+    }
+    if (type === 'tile') {
+      base.features_position = 'bottom';
+      base.vertical = false;
+    }
+    if (type === 'picture-glance') {
+      base.title = base.title || 'Glance';
+      // Provide placeholder image if none available
+      base.image = base.image || 'https://demo.home-assistant.io/stub_config/kitchen.png';
+    }
+    if (type === 'picture-entity') {
+      base.image = base.image || 'https://demo.home-assistant.io/stub_config/bedroom.png';
+    }
+    if (type === 'iframe') {
+      base.url = base.url || 'https://www.home-assistant.io';
+      base.aspect_ratio = base.aspect_ratio || '50%';
+    }
+    if (type === 'history-graph') {
+      // Entities already set; nothing extra
+    }
+    if (type === 'statistics-graph') {
+      // Entities already set; nothing extra
+    }
+    if (type === 'alarm-panel') {
+      base.states = base.states || ['arm_home','arm_away'];
+    }
+    if (type === 'area') {
+      // pick first area from hass.areas if available; else use the first area name from states (area). This is a guess.
+      try {
+        const areas = (this.hass && this.hass.areas) ? Object.values(this.hass.areas) : [];
+        if (areas.length) {
+          base.area = areas[0].area_id || areas[0].name || areas[0].id;
+        } else {
+          // fallback: pick the domain of the first entity as area name
+          base.area = first ? first.split('.')[0] : 'default_area';
+        }
+        // Add optional defaults similar to built-in card example
+        base.display_type = 'picture';
+        base.alert_classes = base.alert_classes || ['moisture','motion'];
+        base.sensor_classes = base.sensor_classes || ['temperature','humidity'];
+        base.features_position = 'bottom';
+      } catch {}
+    }
+    // Note: area card and other complex cards are not given defaults here
     return base;
   }
 
