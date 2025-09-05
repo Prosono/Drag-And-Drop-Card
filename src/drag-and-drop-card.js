@@ -1928,15 +1928,15 @@ _syncEmptyStateUI() {
     const entry = reg.find(c =>
       c?.type === base || c?.type === type || c?.type === `custom:${base}`
     );
+
     
   
+
     const candidates = [];
-    // If the custom card registry entry explicitly provides an editor tag, prefer it
-    if (entry?.editor) candidates.push(entry.editor);
-    // Common naming conventions used by custom cards
-    candidates.push(`${base}-editor`, `${base}-config-editor`);
-    // New: Home Assistant core cards expose GUI editors under the
-    // `hui-<card-type>-card-editor` tag (e.g. `hui-entities-card-editor`).
+    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
+    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+
+    // New: add the “hui-<type>-card-editor” convention used by core HA cards
     if (base && typeof base === 'string') {
       candidates.push(`hui-${base}-card-editor`);
     }
@@ -1968,15 +1968,18 @@ _syncEmptyStateUI() {
   async _ensureCardModuleLoaded(type, cfg) {
     try {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      const el = helpers.createCardElement({ type, ...(cfg || {}) });
+      // Always warm using `{ type }` only; do not spread cfg here.
+      const el = helpers.createCardElement({ type });
       el.hass = this.hass;
       const tmp = document.createElement('div');
       tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
       tmp.appendChild(el);
       document.body.appendChild(tmp);
-      await new Promise(r => requestAnimationFrame(r)); // give it a frame to run side effects
+      await new Promise(r => requestAnimationFrame(r)); // Give the element a frame to run side-effects
       tmp.remove();
-    } catch {}
+    } catch {
+      // Ignore errors; if loading fails silently, the helpers call still registers the module
+    }
   }
   
   _ensureOverlayZFix() {
