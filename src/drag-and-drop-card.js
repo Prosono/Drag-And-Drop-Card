@@ -1931,8 +1931,16 @@ _syncEmptyStateUI() {
     
   
     const candidates = [];
-    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
-    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+    // If the custom card registry entry explicitly provides an editor tag, prefer it
+    if (entry?.editor) candidates.push(entry.editor);
+    // Common naming conventions used by custom cards
+    candidates.push(`${base}-editor`, `${base}-config-editor`);
+    // New: Home Assistant core cards expose GUI editors under the
+    // `hui-<card-type>-card-editor` tag (e.g. `hui-entities-card-editor`).
+    if (base && typeof base === 'string') {
+      candidates.push(`hui-${base}-card-editor`);
+    }
+
   
     for (const tag of candidates) {
       if (!tag || typeof tag !== 'string') continue;
