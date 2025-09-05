@@ -1898,31 +1898,24 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    // 1) Instance-provided editor
-    try {
-      const inst = helpers.createCardElement({ type, ...cfg });
-      inst.hass = this.hass;
-      if (typeof inst.getConfigElement === 'function') {
-        const el = await inst.getConfigElement();
-        if (el) {
-          try { this._dbgPush?.('editor', 'Found instance-level editor', { type }); } catch {}
-          return el;
-        }
+    // 1) prefer static class editor
+    if (CardClass && typeof CardClass.getConfigElement === 'function') {
+      const el = await CardClass.getConfigElement();
+      if (el) {
+        console.info('[ddc:editor] Found static class editor', { type });
+        return el;
       }
-    } catch {}
-
-    // 2) Static class-provided editor
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
-    try {
-      if (CardClass && typeof CardClass.getConfigElement === 'function') {
-        const el = await CardClass.getConfigElement();
-        if (el) {
-          try { this._dbgPush?.('editor', 'Found static class editor', { type }); } catch {}
-          return el;
-        }
+    }
+    // 2) instance‑provided editor using a bare config
+    const inst = helpers.createCardElement({ type });
+    inst.hass = this.hass;
+    if (typeof inst.getConfigElement === 'function') {
+      const el = await inst.getConfigElement();
+      if (el) {
+        console.info('[ddc:editor] Found instance-level editor', { type });
+        return el;
       }
-    } catch {}
+    }
 
     // 3) Fallback to known editor tags, including “hui-<type>-card-editor”
     const base = String(type).replace(/^custom:/, '');
