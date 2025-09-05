@@ -344,23 +344,20 @@ _applyGridVars() {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
-      // Auto‑assign a storage key if none provided
+    // Auto‑assign a storage key if none provided
     if (!config.storage_key) {
-      // Generate a slug based on current time (or use any preferred method)
       const unique = `layout_${Date.now().toString(36)}`;
       config.storage_key = unique;
-      // Optionally: persist the new key back into this._config so the editor shows it
+      // persist the new key into this._config so the editor shows it
       this._config = { ...config };
     }
 
-    // Now proceed with your existing logic:
-    this._config = config;
-    this.storageKey = config.storage_key || undefined;
-    
+    // Capture previous storageKey before updating it so we can detect changes
     const prevKey = this.storageKey;
 
-    this._config                  = config;
-    this.storageKey               = config.storage_key || undefined;
+    // Store incoming config and update properties
+    this._config = config;
+    this.storageKey = config.storage_key || undefined;
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -382,7 +379,7 @@ _applyGridVars() {
     // Grid-related
     this._applyGridVars();
 
-    // Overlya fix for UI based cards
+    // Overlay fix for UI based cards
     this._ensureOverlayZFix();
 
     // selection state
@@ -849,7 +846,7 @@ _applyGridVars() {
     }
 
     // Persist new option knobs into storage so next load matches the config.
-    // Skip while in HA’s editor preview to avoid churn.
+    // Skip while in HA’s editor preview to avoid churn. Only queue save in edit mode (handled in _queueSave)
     try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
 
     this._updateStoreBadge();
@@ -919,6 +916,8 @@ _applyGridVars() {
 
   /* ------------------------ Initial load / rebuild ------------------------ */
   async _initialLoad(force=false) {
+    // mark loading in progress to prevent autosave during rebuild
+    this._loading = true;
     if (force && this.cardContainer) this.cardContainer.innerHTML = '';
     this._dbgPush('boot', 'Initial load start', { force });
 
@@ -1008,6 +1007,9 @@ _applyGridVars() {
     }
     this._updateStoreBadge();
     this._syncEmptyStateUI();
+
+    // loading complete
+    this._loading = false;
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1569,6 +1571,10 @@ _syncEmptyStateUI() {
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
+          // update dataset with the new configuration for persistence
+          try {
+            wrap.dataset.cfg = JSON.stringify(newCfg);
+          } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
           this._queueSave('edit');
         });
@@ -1582,6 +1588,14 @@ _syncEmptyStateUI() {
     handle.classList.add('resize-handle');
     handle.title = 'Resize';
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
+
+    // cache the card config on the wrapper so that future saves can recover it
+    try {
+      const cfg = cardEl._config || cardEl.config;
+      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+        wrap.dataset.cfg = JSON.stringify(cfg);
+      }
+    } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
     return wrap;
@@ -1842,7 +1856,25 @@ _syncEmptyStateUI() {
     }
     return false;
   }
-  _extractCardConfig(cardEl){ return cardEl?._config || cardEl?.config || {}; }
+  _extractCardConfig(cardEl){
+    if (!cardEl) return {};
+    // attempt to read the card's own config
+    const cfg = cardEl._config || cardEl.config;
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+      return cfg;
+    }
+    // fallback: if the wrapper cached a config, use it
+    try {
+      // walk up to the wrapper; .closest may not exist on text nodes
+      const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
+      const raw  = wrap?.dataset?.cfg;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {}
+    return {};
+  }
 
   /* ------------------------------- Picker UI ------------------------------- */
   async _openCardManager() { await this._openSmartPicker('add'); }
@@ -3423,7 +3455,12 @@ async _getStubConfigForType(type) {
 
   /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
+    // only queue save when autosave is enabled, not loading, and in edit mode
     if (!this.autoSave) return;
+    // skip saving while the layout is still loading
+    if (this._loading) return;
+    // respect the user expectation that saving should only happen in edit mode
+    if (!this.editMode) return;
     this._dbgPush('autosave', 'Queued', { reason, debounce: this.autoSaveDebounce });
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce);
