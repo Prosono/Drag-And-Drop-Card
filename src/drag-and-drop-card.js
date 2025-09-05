@@ -3272,6 +3272,15 @@ async _getStubConfigForType(type) {
         try {
           const json = JSON.parse(txt);
           this._dbgPush('import', 'Loaded file', { bytes: txt.length });
+
+          // Detect single-card export (full Lovelace card config)
+          if (json && (json.type === 'custom:drag-and-drop-card' || json.type === 'drag-and-drop-card')) {
+            // Apply entire config so storage_key (and other options) replace the editor values
+            this.setConfig(json);
+            this._resizeContainer();
+            await this._saveLayout(false);
+            return;
+          }
           this.cardContainer.innerHTML = '';
           if (json.cards?.length) {
             for (const conf of json.cards) {
@@ -3418,6 +3427,14 @@ async _getStubConfigForType(type) {
         const txt = await file.text();
       try {
         const json = JSON.parse(txt);
+        // If a full card config was provided, apply it directly so storage_key updates editor + storage.
+        if (json && (json.type === 'custom:drag-and-drop-card' || json.type === 'drag-and-drop-card')) {
+          this.setConfig(json);
+          this._resizeContainer();
+          await this._saveLayout(false);
+          this._toast('Design imported.');
+          return;
+        }
         // Apply options (if present) before building cards
         if (json.options) this._applyImportedOptions(json.options, true);
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
