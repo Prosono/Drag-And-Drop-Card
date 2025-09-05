@@ -1903,7 +1903,22 @@ _syncEmptyStateUI() {
     // to a potentially undefined variable across different scopes.
     const getCardClass = async () => {
       try {
-        return helpers.getCardElementClass ? await helpers.getCardElementClass(type) : null;
+        if (helpers.getCardElementClass) {
+          // Use the helper if available
+          return await helpers.getCardElementClass(type);
+        }
+        // Fallback: instantiate the card (using a stub) and return its constructor.
+        let baseCfg;
+        if (cfg && typeof cfg === 'object') {
+          // Use the provided config if available to obtain the constructor
+          baseCfg = { type, ...cfg };
+        } else {
+          let stubCfg;
+          try { stubCfg = await this._getStubConfigForType(type); } catch {}
+          baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+        }
+        const inst = helpers.createCardElement(baseCfg);
+        return inst?.constructor || null;
       } catch {
         return null;
       }
@@ -1922,27 +1937,27 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    // 2) Instance-provided editor. If the class didn't expose a static editor and no
-    // known tag exists, try creating an instance using a stub config. We compute
-    // a minimal stub (e.g. with a valid `entity` or `entities` property) to satisfy
-    // each card's `setConfig` validation. Without this, createCardElement({type})
-    // would throw errors like "Entities must be specified".
-    try {
-      let stubCfg = undefined;
+    // 2) Instance-provided editor. Only try this for custom cards. Most built‑in
+    // cards either expose a static editor or register a `hui-<type>-card-editor`
+    // tag; instantiating them with invalid or empty configs causes errors (e.g.
+    // "Entities must be specified"). For custom cards, we derive a stub config
+    // to satisfy basic validation and then ask the instance for its editor.
+    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card')) {
       try {
-        stubCfg = await this._getStubConfigForType(type);
-      } catch {}
-      const baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
-      const inst = helpers.createCardElement(baseCfg);
-      inst.hass = this.hass;
-      if (typeof inst.getConfigElement === 'function') {
-        const el = await inst.getConfigElement();
-        if (el) {
-          try { console.info('[ddc:editor] Found instance-level editor', { type }); } catch {}
-          return el;
+        let stubCfg = undefined;
+        try { stubCfg = await this._getStubConfigForType(type); } catch {}
+        const baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+        const inst = helpers.createCardElement(baseCfg);
+        inst.hass = this.hass;
+        if (typeof inst.getConfigElement === 'function') {
+          const el = await inst.getConfigElement();
+          if (el) {
+            try { console.info('[ddc:editor] Found instance-level editor', { type }); } catch {}
+            return el;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
 
   
@@ -1993,10 +2008,30 @@ _syncEmptyStateUI() {
   async _ensureCardModuleLoaded(type, cfg) {
     try {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      if (helpers?.getCardElementClass) {
-        await helpers.getCardElementClass(type);
-        try { console.info('[ddc:editor] Warmed card module', { type }); } catch {}
+      // Use stub configuration to warm the module by instantiating the card. This
+      // triggers the dynamic import of the card and its editor without causing
+      // validation errors (we'll ignore errors silently). After warmup, the
+      // module should have registered its static methods and editor tags.
+      // Use the provided cfg if present (for existing cards) to ensure valid keys,
+      // otherwise fall back to a stub. Spreading cfg over type ensures the card
+      // receives all its current properties, avoiding validation errors.
+      let baseCfg;
+      if (cfg && typeof cfg === 'object') {
+        baseCfg = { type, ...cfg };
+      } else {
+        let stubCfg = undefined;
+        try { stubCfg = await this._getStubConfigForType(type); } catch {}
+        baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
       }
+      const el = helpers.createCardElement(baseCfg);
+      el.hass = this.hass;
+      const tmp = document.createElement('div');
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
+      tmp.appendChild(el);
+      document.body.appendChild(tmp);
+      await new Promise(r => requestAnimationFrame(r));
+      tmp.remove();
+      try { console.info('[ddc:editor] Warmed card module', { type }); } catch {}
     } catch {
       // swallow errors – the module may still register
     }
