@@ -684,6 +684,13 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
+          /* enhanced selection styling */
+          #leftPane button{border:1px solid var(--divider-color);}
+          #leftPane button.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color);}
+          #leftPane button.active ha-icon{filter:brightness(0) invert(1);}
+          .sel-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+          .sel-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.0rem;}
+          .icon{background:transparent;border:none;cursor:pointer;padding:4px;border-radius:8px;}
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
@@ -2400,9 +2407,7 @@ _syncEmptyStateUI() {
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
             <div class="rightGrid">
-              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
-                <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
-                <div class="bd" id="quickFill"></div>
+              <div class="bd" id="quickFill"></div>
               </div>
 
               <div class="sec" style="grid-column:2;grid-row:1 / span 3;min-height:0;position:relative">
@@ -2413,13 +2418,8 @@ _syncEmptyStateUI() {
                 <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
               </div>
 
-              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
-                <div class="hd">
-                  <span>Card options (official editor)</span>
-                  <div id="optTabs" class="tabs">
-                    <button id="tabVisual" class="tab active" aria-selected="true">Visual</button>
-                    <button id="tabYaml" class="tab">YAML</button>
-                  </div>
+              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:1 / span 3;min-height:0;position:relative">
+                <div class="hd"><div class="sel-top">  <div class="sel-title"><span id="selectedCardTitle">No card selected</span>    <button class="icon" id="favToggle" title="Favorite"><ha-icon icon="mdi:star-outline"></ha-icon></button>  </div>  <div id="optTabs" class="tabs">    <button id="tabVisual" class="tab active" aria-selected="true">Visual</button>    <button id="tabYaml" class="tab">YAML</button>  </div></div></div>
                 </div>
                 <div class="spin-center" id="editorSpin" hidden>
                   <ha-circular-progress indeterminate></ha-circular-progress>
@@ -2518,7 +2518,18 @@ _syncEmptyStateUI() {
       }
     });
 
-    tabYaml.addEventListener('click', () => showTab('yaml'));
+        // Favorite toggle for selected card
+    const favToggle = modal.querySelector('#favToggle');
+    favToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!currentType) return;
+      if (faves.has(currentType)) faves.delete(currentType); else faves.add(currentType);
+      this._setFaves(faves);
+      const icon = favToggle.querySelector('ha-icon');
+      if (icon) icon.setAttribute('icon', faves.has(currentType)?'mdi:star':'mdi:star-outline');
+      renderLeft();
+    });
+tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
     showTab('yaml');
@@ -2550,12 +2561,23 @@ _syncEmptyStateUI() {
         } else {
           cat.items.forEach(item => {
             const b = document.createElement('button');
-            b.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px">
-              <ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span>
+            b.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;justify-content:space-between;width:100%">
+              <span style="display:inline-flex;align-items:center;gap:8px"><ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span></span>
+              <button class="icon fave-btn" title="Favorite" data-type="${item.type}" onclick="event.stopPropagation()">
+                <ha-icon icon="${faves.has(item.type)?'mdi:star':'mdi:star-outline'}"></ha-icon>
+              </button>
             </span>`;
             Object.assign(b.style,{display:'block',width:'100%',textAlign:'left',border:'none',background:'transparent',padding:'8px',borderRadius:'10px',cursor:'pointer'});
             b.addEventListener('click', async () => { highlight(b); await selectType(item.type); });
             div.appendChild(b);
+            const fbtn = b.querySelector('.fave-btn');
+            fbtn?.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              const t = fbtn.getAttribute('data-type');
+              if (faves.has(t)) faves.delete(t); else faves.add(t);
+              this._setFaves(faves);
+              renderLeft();
+            });
           });
         }
         left.appendChild(div);
@@ -2862,7 +2884,6 @@ _syncEmptyStateUI() {
     
           setError('');
           enableCommit(true);
-          buildQuickFill(currentType, currentConfig);
           mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
@@ -2901,7 +2922,6 @@ _syncEmptyStateUI() {
             enableCommit(true);
     
             if (typeChanged) {
-              buildQuickFill(currentType, currentConfig);
               // Only update Visual if it’s already mounted
               if (visualEditor) {
                 try { visualEditor.setConfig?.(currentConfig); } catch {}
@@ -2939,6 +2959,12 @@ _syncEmptyStateUI() {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
+      // update header title and star
+      const titleEl = modal.querySelector('#selectedCardTitle');
+      const favBtn = modal.querySelector('#favToggle ha-icon');
+      const it = allItems.find(i=>i.type===type) || { name: type };
+      if (titleEl) titleEl.textContent = it.name || type;
+      if (favBtn) favBtn.setAttribute('icon', faves.has(type)?'mdi:star':'mdi:star-outline');
     
       const cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
         ? { ...initialCfg }
@@ -2948,8 +2974,6 @@ _syncEmptyStateUI() {
 
       // Reset any previously mounted visual editor so the correct one loads for this card
       visualEditor = null;
-
-      buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
       mountPreview(currentConfig); // debounced version
