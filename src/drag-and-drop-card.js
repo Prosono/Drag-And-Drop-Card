@@ -1887,64 +1887,59 @@ _syncEmptyStateUI() {
 
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
+    // Log the start of an editor lookup
+    try { this._dbgPush?.('editor', 'Requesting editor element', { type, cfg }); } catch {}
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-  
-    // Warm the module before asking for the class only for built‑in HA cards.
-    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
+
+    // Preload the module for core cards
     try {
       if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
         await this._ensureCardModuleLoaded(type, cfg);
       }
     } catch {}
-  
-    // Ensure the module/class is loaded
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
 
-  
     // 1) Instance-provided editor
     try {
       const inst = helpers.createCardElement({ type, ...cfg });
       inst.hass = this.hass;
       if (typeof inst.getConfigElement === 'function') {
         const el = await inst.getConfigElement();
-        if (el) return el;
+        if (el) {
+          try { this._dbgPush?.('editor', 'Found instance-level editor', { type }); } catch {}
+          return el;
+        }
       }
     } catch {}
-  
+
     // 2) Static class-provided editor
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     try {
       if (CardClass && typeof CardClass.getConfigElement === 'function') {
         const el = await CardClass.getConfigElement();
-        if (el) return el;
+        if (el) {
+          try { this._dbgPush?.('editor', 'Found static class editor', { type }); } catch {}
+          return el;
+        }
       }
     } catch {}
 
-
-  
-    // 3) Known/custom-tag editors (registry hint + common conventions) with retries
+    // 3) Fallback to known editor tags, including “hui-<type>-card-editor”
     const base = String(type).replace(/^custom:/, '');
     const reg = Array.isArray(window.customCards) ? window.customCards : [];
     const entry = reg.find(c =>
       c?.type === base || c?.type === type || c?.type === `custom:${base}`
     );
 
-    
-  
-
     const candidates = [];
-    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
-    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
-
-    // New: add the “hui-<type>-card-editor” convention used by core HA cards
+    if (entry?.editor) candidates.push(entry.editor);
+    candidates.push(`${base}-editor`, `${base}-config-editor`);
     if (base && typeof base === 'string') {
       candidates.push(`hui-${base}-card-editor`);
     }
 
-  
     for (const tag of candidates) {
       if (!tag || typeof tag !== 'string') continue;
-      // Try a few times: 0ms, 100ms, 300ms, 700ms
       for (const delay of [0, 100, 300, 700]) {
         try {
           if (!customElements.get(tag)) {
@@ -1954,13 +1949,14 @@ _syncEmptyStateUI() {
             ]);
           }
           if (customElements.get(tag)) {
+            try { this._dbgPush?.('editor', 'Found editor by tag', { type, tag }); } catch {}
             return document.createElement(tag);
           }
         } catch {}
       }
     }
-  
-    // No UI editor available
+
+    // No editor available
     return null;
   }
 
@@ -1968,17 +1964,13 @@ _syncEmptyStateUI() {
   async _ensureCardModuleLoaded(type, cfg) {
     try {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      // Always warm using `{ type }` only; do not spread cfg here.
-      const el = helpers.createCardElement({ type });
-      el.hass = this.hass;
-      const tmp = document.createElement('div');
-      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
-      tmp.appendChild(el);
-      document.body.appendChild(tmp);
-      await new Promise(r => requestAnimationFrame(r)); // Give the element a frame to run side-effects
-      tmp.remove();
+      if (helpers?.getCardElementClass) {
+        // This call triggers the dynamic import of the card module
+        await helpers.getCardElementClass(type);
+        try { this._dbgPush?.('editor', 'Warmed card module', { type }); } catch {}
+      }
     } catch {
-      // Ignore errors; if loading fails silently, the helpers call still registers the module
+      // Swallow errors; the module may still register even if this fails
     }
   }
   
