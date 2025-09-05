@@ -30,6 +30,29 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+
+  // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
+  _syncEditorsStorageKey() {
+    try {
+      const val = this.storageKey || '';
+      // Update any open editor input fields for this card
+      // We look for our known editor markup within the DOM and set the storage key input.
+      const nodes = document.querySelectorAll('div #storage_key');
+      nodes.forEach((inp) => {
+        try {
+          if (inp && inp.tagName === 'INPUT') {
+            if (inp.value !== val) {
+              inp.value = val;
+              // Fire input event so editor UIs update their internal state
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        } catch {}
+      });
+    } catch {}
+  }
+
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
@@ -358,6 +381,7 @@ _applyGridVars() {
     // Store incoming config and update properties
     this._config = config;
     this.storageKey = config.storage_key || undefined;
+    this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -3364,6 +3388,7 @@ async _getStubConfigForType(type) {
     this._config = { ...(this._config || {}), ...opts };
 
     if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
+    this._syncEditorsStorageKey();
     if ('grid' in opts)               this.gridSize = Number(opts.grid) || 10;
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
@@ -3435,6 +3460,7 @@ async _getStubConfigForType(type) {
           const newKey = json.options.storage_key;
           this._config = { ...(this._config || {}), storage_key: newKey };
           this.storageKey = newKey;
+          this._syncEditorsStorageKey();
           try {
             // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
             const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
