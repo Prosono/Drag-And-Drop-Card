@@ -1942,7 +1942,7 @@ _syncEmptyStateUI() {
     // tag; instantiating them with invalid or empty configs causes errors (e.g.
     // "Entities must be specified"). For custom cards, we derive a stub config
     // to satisfy basic validation and then ask the instance for its editor.
-    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card')) {
+    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card' || type === 'entity')) {
       try {
         let stubCfg = undefined;
         try { stubCfg = await this._getStubConfigForType(type); } catch {}
@@ -2956,7 +2956,7 @@ async _getStubConfigForType(type) {
         'weather-forecast': byDomain('weather')[0] || first,
         'map': byDomain('device_tracker')[0] || byDomain('person')[0] || first,
       })[type] || firstSensor || first;
-      if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel'].includes(type)) {
+      if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity'].includes(type)) {
         base.entity = defaultEntity;
       } else if (type === 'weather-forecast') {
         base.entity = defaultEntity;
