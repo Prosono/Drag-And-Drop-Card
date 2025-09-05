@@ -1899,13 +1899,20 @@ _syncEmptyStateUI() {
       }
     } catch {}
   
-    // Ensure the module/class is loaded
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
+    // We will compute the card class on demand when needed. Avoid keeping a reference
+    // to a potentially undefined variable across different scopes.
+    const getCardClass = async () => {
+      try {
+        return helpers.getCardElementClass ? await helpers.getCardElementClass(type) : null;
+      } catch {
+        return null;
+      }
+    };
 
   
     // 1) Static class-provided editor (preferred)
     try {
+      const CardClass = await getCardClass();
       if (CardClass && typeof CardClass.getConfigElement === 'function') {
         const el = await CardClass.getConfigElement();
         if (el) {
