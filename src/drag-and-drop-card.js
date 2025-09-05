@@ -1887,52 +1887,74 @@ _syncEmptyStateUI() {
 
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
-    // Log the start of an editor lookup
-    try { this._dbgPush?.('editor', 'Requesting editor element', { type, cfg }); } catch {}
+    // Log the start of an editor lookup; this uses console.debug so it is visible
+    try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-
-    // Preload the module for core cards
+  
+    // Warm the module before asking for the class only for built‑in HA cards.
+    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
     try {
       if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
         await this._ensureCardModuleLoaded(type, cfg);
       }
     } catch {}
+  
+    // Ensure the module/class is loaded
+    let CardClass = null;
+    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
 
-    // 1) prefer static class editor
-    if (CardClass && typeof CardClass.getConfigElement === 'function') {
-      const el = await CardClass.getConfigElement();
-      if (el) {
-        console.info('[ddc:editor] Found static class editor', { type });
-        return el;
+  
+    // 1) Static class-provided editor (preferred)
+    try {
+      if (CardClass && typeof CardClass.getConfigElement === 'function') {
+        const el = await CardClass.getConfigElement();
+        if (el) {
+          try { console.info('[ddc:editor] Found static class editor', { type }); } catch {}
+          return el;
+        }
       }
-    }
-    // 2) instance‑provided editor using a bare config
-    const inst = helpers.createCardElement({ type });
-    inst.hass = this.hass;
-    if (typeof inst.getConfigElement === 'function') {
-      const el = await inst.getConfigElement();
-      if (el) {
-        console.info('[ddc:editor] Found instance-level editor', { type });
-        return el;
-      }
-    }
+    } catch {}
 
-    // 3) Fallback to known editor tags, including “hui-<type>-card-editor”
+    // 2) Instance-provided editor. Create a bare instance using only the type. Avoid spreading
+    // the full config here, as unknown keys can cause built‑in cards to throw when
+    // validating the config. Assign hass to allow getConfigElement() to work.
+    try {
+      const inst = helpers.createCardElement({ type });
+      inst.hass = this.hass;
+      if (typeof inst.getConfigElement === 'function') {
+        const el = await inst.getConfigElement();
+        if (el) {
+          try { console.info('[ddc:editor] Found instance-level editor', { type }); } catch {}
+          return el;
+        }
+      }
+    } catch {}
+
+
+  
+    // 3) Known/custom-tag editors (registry hint + common conventions) with retries
     const base = String(type).replace(/^custom:/, '');
     const reg = Array.isArray(window.customCards) ? window.customCards : [];
     const entry = reg.find(c =>
       c?.type === base || c?.type === type || c?.type === `custom:${base}`
     );
 
+    
+  
+
     const candidates = [];
-    if (entry?.editor) candidates.push(entry.editor);
-    candidates.push(`${base}-editor`, `${base}-config-editor`);
+    if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
+    candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+
+    // New: add the “hui-<type>-card-editor” convention used by core HA cards
     if (base && typeof base === 'string') {
       candidates.push(`hui-${base}-card-editor`);
     }
 
+  
     for (const tag of candidates) {
       if (!tag || typeof tag !== 'string') continue;
+      // Try a few times: 0ms, 100ms, 300ms, 700ms
       for (const delay of [0, 100, 300, 700]) {
         try {
           if (!customElements.get(tag)) {
@@ -1942,14 +1964,14 @@ _syncEmptyStateUI() {
             ]);
           }
           if (customElements.get(tag)) {
-            try { this._dbgPush?.('editor', 'Found editor by tag', { type, tag }); } catch {}
+            try { console.info('[ddc:editor] Found editor by tag', { type, tag }); } catch {}
             return document.createElement(tag);
           }
         } catch {}
       }
     }
-
-    // No editor available
+  
+    // No UI editor available
     return null;
   }
 
@@ -1958,12 +1980,11 @@ _syncEmptyStateUI() {
     try {
       const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
       if (helpers?.getCardElementClass) {
-        // This call triggers the dynamic import of the card module
         await helpers.getCardElementClass(type);
-        try { this._dbgPush?.('editor', 'Warmed card module', { type }); } catch {}
+        try { console.info('[ddc:editor] Warmed card module', { type }); } catch {}
       }
     } catch {
-      // Swallow errors; the module may still register even if this fails
+      // swallow errors – the module may still register
     }
   }
   
