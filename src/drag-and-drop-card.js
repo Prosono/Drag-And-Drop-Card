@@ -1922,11 +1922,18 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    // 2) Instance-provided editor. Create a bare instance using only the type. Avoid spreading
-    // the full config here, as unknown keys can cause built‑in cards to throw when
-    // validating the config. Assign hass to allow getConfigElement() to work.
+    // 2) Instance-provided editor. If the class didn't expose a static editor and no
+    // known tag exists, try creating an instance using a stub config. We compute
+    // a minimal stub (e.g. with a valid `entity` or `entities` property) to satisfy
+    // each card's `setConfig` validation. Without this, createCardElement({type})
+    // would throw errors like "Entities must be specified".
     try {
-      const inst = helpers.createCardElement({ type });
+      let stubCfg = undefined;
+      try {
+        stubCfg = await this._getStubConfigForType(type);
+      } catch {}
+      const baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+      const inst = helpers.createCardElement(baseCfg);
       inst.hass = this.hass;
       if (typeof inst.getConfigElement === 'function') {
         const el = await inst.getConfigElement();
