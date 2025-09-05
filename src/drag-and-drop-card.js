@@ -3272,15 +3272,6 @@ async _getStubConfigForType(type) {
         try {
           const json = JSON.parse(txt);
           this._dbgPush('import', 'Loaded file', { bytes: txt.length });
-
-          // Detect single-card export (full Lovelace card config)
-          if (json && (json.type === 'custom:drag-and-drop-card' || json.type === 'drag-and-drop-card')) {
-            // Apply entire config so storage_key (and other options) replace the editor values
-            this.setConfig(json);
-            this._resizeContainer();
-            await this._saveLayout(false);
-            return;
-          }
           this.cardContainer.innerHTML = '';
           if (json.cards?.length) {
             for (const conf of json.cards) {
@@ -3361,6 +3352,14 @@ async _getStubConfigForType(type) {
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
+    // If storage_key changed, push it into HA editor immediately
+    if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
+      try {
+        const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+        this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updatedCfg } }));
+      } catch {}
+    }
+
     // keep the original config around, but merge options into live props
     this._config = { ...(this._config || {}), ...opts };
 
@@ -3427,17 +3426,22 @@ async _getStubConfigForType(type) {
         const txt = await file.text();
       try {
         const json = JSON.parse(txt);
-        // If a full card config was provided, apply it directly so storage_key updates editor + storage.
-        if (json && (json.type === 'custom:drag-and-drop-card' || json.type === 'drag-and-drop-card')) {
-          this.setConfig(json);
-          this._resizeContainer();
-          await this._saveLayout(false);
-          this._toast('Design imported.');
-          return;
-        }
         // Apply options (if present) before building cards
         if (json.options) this._applyImportedOptions(json.options, true);
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
+
+        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        if (json?.options?.storage_key) {
+          const newKey = json.options.storage_key;
+          this._config = { ...(this._config || {}), storage_key: newKey };
+          this.storageKey = newKey;
+          try {
+            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updated } }));
+          } catch {}
+        }
+ // v1 fallback     
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
