@@ -2490,6 +2490,93 @@ _syncEmptyStateUI() {
       });
     }
 
+    // ---------------------------------------------------------------------------
+    // UI tweaks: hide quick fill area, add selected-card headline and fave toggle
+    // Hide the quick fill section entirely so the editor can use the full height.
+    const quickFillSecDiv = modal.querySelector('#quickFillSec');
+    if (quickFillSecDiv) quickFillSecDiv.style.display = 'none';
+    // Reposition the options and YAML sections upward now that quick fill is hidden
+    const optionsSecDiv = modal.querySelector('#optionsSec');
+    const yamlSecDiv = modal.querySelector('#yamlSec');
+    if (optionsSecDiv) optionsSecDiv.style.gridRow = '1';
+    if (yamlSecDiv) yamlSecDiv.style.gridRow = '2';
+
+    // Set up a header in the editor for showing the selected card and a star to
+    // favorite the current card.  We create the elements once and update them
+    // whenever a different card is selected.  Favorites are persisted using
+    // existing _getFaves/_setFaves helpers.
+    const optionsHd = modal.querySelector('#optionsSec .hd');
+    // Local references for the header label and star button
+    let selInfo;
+    let favBtn;
+    // Function to update the star icon state based on whether the current card
+    // type is favorited.  Called whenever the favorites set or currentType changes.
+    const updateFavStar = () => {
+      if (!favBtn) return;
+      const on = currentType && faves.has(currentType);
+      const icon = favBtn.querySelector('ha-icon');
+      if (icon) icon.setAttribute('icon', on ? 'mdi:star' : 'mdi:star-outline');
+    };
+    // Function to update the headline text and star icon.  Called from selectType.
+    const updateHeader = (type) => {
+      if (selInfo) {
+        const item = allItems.find(i => i.type === type);
+        const nm = item ? item.name : (type || '');
+        selInfo.textContent = nm;
+      }
+      updateFavStar();
+    };
+    // Only initialize the header once.
+    if (optionsHd && !optionsHd.querySelector('.sel-info')) {
+      // Hide the existing static label if present
+      const titleSpan = optionsHd.querySelector('span');
+      if (titleSpan) {
+        titleSpan.style.display = 'none';
+      }
+      // Create the dynamic selected-card label
+      selInfo = document.createElement('span');
+      selInfo.className = 'sel-info';
+      // Flex so it grows to fill space before the star button
+      selInfo.style.flex = '1';
+      selInfo.style.fontWeight = 'bold';
+      selInfo.style.paddingRight = '8px';
+      optionsHd.insertBefore(selInfo, optionsHd.firstChild);
+      // Create the favorite star button
+      favBtn = document.createElement('button');
+      favBtn.className = 'icon-btn';
+      favBtn.setAttribute('title','Favorite');
+      Object.assign(favBtn.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '6px',
+        border: '1px solid var(--divider-color)',
+        background: 'var(--primary-background-color)',
+        padding: '0',
+        marginLeft: '4px',
+        cursor: 'pointer'
+      });
+      favBtn.innerHTML = '<ha-icon icon="mdi:star-outline"></ha-icon>';
+      optionsHd.appendChild(favBtn);
+      // Clicking the star toggles favorite status for the current card.
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentType) return;
+        if (faves.has(currentType)) {
+          faves.delete(currentType);
+        } else {
+          faves.add(currentType);
+        }
+        this._setFaves(faves);
+        updateFavStar();
+        // Re-render the list so the favorites section reflects the new state
+        renderLeft();
+      });
+    }
+    // End of UI tweaks
+
     let __activeTab = 'visual';
 
     const showTab = (name) => {
@@ -2536,10 +2623,7 @@ _syncEmptyStateUI() {
     };
 
     const renderLeft = () => {
-      let view = filteredCatalog();
-      if (!Array.isArray(view) || view.length === 0) {
-        try { view = catalog || this._catalog(); } catch { view = this._catalog(); }
-      }
+      const view = filteredCatalog();
       left.innerHTML = '';
       view.forEach(cat => {
         const div = document.createElement('div');
@@ -2566,9 +2650,19 @@ _syncEmptyStateUI() {
     };
 
     const highlight = (btn) => {
-      left.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn?.classList.add('active');
-      if (btn) btn.style.background='rgba(0,0,0,.06)';
+      // Reset all buttons to default appearance
+      left.querySelectorAll('button').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = '';
+      });
+      // Highlight the selected button so it is obvious which one is active.
+      if (btn) {
+        btn.classList.add('active');
+        // Soft highlight background and primary color text for contrast
+        btn.style.background = 'rgba(3,169,244,.12)';
+        btn.style.color = 'var(--primary-color)';
+      }
     };
 
     let currentConfig = null;
@@ -2942,6 +3036,12 @@ _syncEmptyStateUI() {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
+      // Update the selected-card headline and favorite star when a new card is chosen
+      try {
+        if (typeof updateHeader === 'function') updateHeader(type);
+      } catch {
+        // ignore if updateHeader is undefined or throws
+      }
     
       const cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
         ? { ...initialCfg }
