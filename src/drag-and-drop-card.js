@@ -392,25 +392,19 @@ _applyGridVars() {
 setConfig(config = {}) {
     // Never mutate Home Assistant's frozen config object.
     const incoming   = config || {};
-    const genKey     = incoming.storage_key || `layout_${Date.now().toString(36)}`;
 
-    // Capture previous storageKey before updating it so we can detect changes
+  // storage_key handling
     const prevKey = this.storageKey;
-
-    // Store a *copy* with our defaults merged in
+    const genKey = incoming.storage_key || `layout_${Date.now().toString(36)}`;
     this._config    = { ...incoming, storage_key: genKey };
     this.storageKey = genKey;
-    this._syncEditorsStorageKey();
+    this._syncEditorsStorageKey?.();
 
       // child styling: accept string or {style} or {card_mod:{style}}
     const cm = incoming.child_card_mod;
     this._childCardStyle =
       typeof cm === "string" ? cm :
       (cm?.style ?? cm?.card_mod?.style ?? "");
-
-    // root styling: accept string or {style} or {card_mod:{style}}
-    // card-mod users may specify a top-level `card_mod` config; store it for later
-    this._rootCardModCfg = incoming.card_mod || null;
 
     this.gridSize                 = Number(incoming.grid ?? 10);
     this.dragLiveSnap             = !!incoming.drag_live_snap;
@@ -923,10 +917,6 @@ setConfig(config = {}) {
         if (e.target.closest('.card-wrapper')) return; // handled per-card
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) this._clearSelection();
       });
-
-      // After the UI markup has been constructed, apply any root-level card-mod styling.
-      // This call installs a <style> tag inside the card to honor user-defined card_mod styles.
-      this._applyRootCardMod();
     }
 
     // Persist new option knobs into storage so next load matches the config.
@@ -944,17 +934,6 @@ setConfig(config = {}) {
     } else {
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
-    }
-
-    // Reapply root card-mod styling on config updates (defer to ensure the DOM exists)
-    if (this._built) {
-      setTimeout(() => {
-        try {
-          this._applyRootCardMod();
-        } catch (e) {
-          /* no-op */
-        }
-      }, 0);
     }
   }
 
@@ -1104,9 +1083,6 @@ setConfig(config = {}) {
     this._syncEmptyStateUI();
 
     // loading complete
-    // After loading cards, apply any root-level card-mod style and dispatch rebuild
-    try { this._applyRootCardMod(); } catch (e) { /* no-op */ }
-    this._dispatchLLRebuild();
     this._loading = false;
   }
 
@@ -1675,8 +1651,6 @@ _syncEmptyStateUI() {
         }
         this._resizeContainer();
         this._queueSave('duplicate');
-        // Trigger card-mod to reapply on dynamically duplicated cards
-        this._dispatchLLRebuild();
       } else if (act === 'front') {
         this._adjustZ(wrap, +1);
       } else if (act === 'back')  {
@@ -1692,8 +1666,6 @@ _syncEmptyStateUI() {
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
           this._queueSave('edit');
-          // Trigger card-mod to reapply on edited cards
-          this._dispatchLLRebuild();
         });
       }
     });
@@ -3315,8 +3287,6 @@ async _getStubConfigForType(type) {
     this._queueSave('add');
     this._toast('Card added to layout.');
     this._syncEmptyStateUI();
-    // Trigger card-mod to reapply on newly added card
-    this._dispatchLLRebuild();
   }
 
   /* ------------------------------ Selection utils ------------------------------ */
@@ -3687,9 +3657,6 @@ async _getStubConfigForType(type) {
           this._showEmptyPlaceholder();
         }
         this._resizeContainer();
-        // Apply root-level card-mod styling after importing cards and trigger reapplication
-        try { this._applyRootCardMod(); } catch (e) {}
-        this._dispatchLLRebuild();
         await this._saveLayout(false);
         this._toast('Design imported.');
       } catch (e) {
@@ -3820,53 +3787,6 @@ async _getStubConfigForType(type) {
     } catch { return null; }
   }
   getCardSize(){ return 3; }
-
-  /**
-   * Dispatch the Home Assistant `ll-rebuild` event.  Card-mod listens for
-   * this event to reapply styles when cards are dynamically inserted or
-   * replaced.  Bubbling and composed ensure the event escapes shadow DOM.
-   */
-  _dispatchLLRebuild() {
-    try {
-      const ev = new Event('ll-rebuild', { bubbles: true, composed: true });
-      this.dispatchEvent(ev);
-    } catch (e) {
-      // ignore if event cannot be dispatched
-    }
-  }
-
-  /**
-   * Apply root-level card-mod styling.  If a `card_mod` entry was
-   * specified in the card configuration, this helper injects the style into
-   * the card's ha-card element.  It removes any previous injection and
-   * dispatches a rebuild event afterwards to notify card-mod.
-   */
-  _applyRootCardMod() {
-    const cfg = this._rootCardModCfg;
-    if (!cfg) return;
-    let style = '';
-    if (typeof cfg === 'string') {
-      style = cfg;
-    } else if (cfg && typeof cfg === 'object') {
-      if (typeof cfg.style === 'string') style = cfg.style;
-      else if (cfg.card_mod && typeof cfg.card_mod.style === 'string') style = cfg.card_mod.style;
-    }
-    if (!style) return;
-    // locate the top-level ha-card; drag-and-drop-card uses light DOM
-    const card = this.querySelector('ha-card');
-    if (!card) return;
-    // remove any previously injected style element
-    if (this.__rootModStyleEl) {
-      try { this.__rootModStyleEl.remove(); } catch {}
-      this.__rootModStyleEl = null;
-    }
-    const styleEl = document.createElement('style');
-    styleEl.innerHTML = style;
-    card.appendChild(styleEl);
-    this.__rootModStyleEl = styleEl;
-    // dispatch a rebuild so card-mod can reapply
-    this._dispatchLLRebuild();
-  }
 }
 
 if (!customElements.get('drag-and-drop-card')) {
