@@ -389,30 +389,29 @@ _applyGridVars() {
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   /* --------------------------- Card lifecycle --------------------------- */
-  setConfig(config = {}) {
-    // Track old key so we only rebuild when storage_key actually changes
-    // Auto‑assign a storage key if none provided
-    if (!config.storage_key) {
-      const unique = `layout_${Date.now().toString(36)}`;
-      config.storage_key = unique;
-      // persist the new key into this._config so the editor shows it
-      this._config = { ...config };
-    }
+setConfig(config = {}) {
+    // Never mutate Home Assistant's frozen config object.
+    const incoming   = config || {};
+    const genKey     = incoming.storage_key || `layout_${Date.now().toString(36)}`;
 
     // Capture previous storageKey before updating it so we can detect changes
     const prevKey = this.storageKey;
 
-    // Store incoming config and update properties
-    this._config = config;
-    this.storageKey = config.storage_key || undefined;
+    // Store a *copy* with our defaults merged in
+    this._config    = { ...incoming, storage_key: genKey };
+    this.storageKey = genKey;
     this._syncEditorsStorageKey();
-    this.gridSize                 = Number(config.grid ?? 10);
-    this.dragLiveSnap             = !!config.drag_live_snap;
-    this.autoSave                 = config.auto_save !== false;
-    this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
-    this.containerBackground      = config.container_background ?? 'transparent';
-    this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
-    this.debug                    = !!config.debug;
+
+    // Read child card-mod style (used below to wrap each child)
+    this._childCardMod = incoming.child_card_mod || null;
+
+    this.gridSize                 = Number(incoming.grid ?? 10);
+    this.dragLiveSnap             = !!incoming.drag_live_snap;
+    this.autoSave                 = incoming.auto_save !== false;
+    this.autoSaveDebounce         = Number(incoming.auto_save_debounce ?? 800);
+    this.containerBackground      = incoming.container_background ?? 'transparent';
+    this.cardBackground           = incoming.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    this.debug                    = !!incoming.debug;
     this.editMode                 = false;
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
@@ -1576,7 +1575,21 @@ _syncEmptyStateUI() {
   /* ------------------------ Card creation & wrapper ------------------------ */
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-    const el = helpers.createCardElement(cfg);
+
+    // If user provided child_card_mod, auto-wrap each child in custom:mod-card
+    let finalCfg = cfg;
+    try {
+      const t = String(cfg?.type || '').toLowerCase();
+      if (this._childCardMod && t !== 'custom:mod-card') {
+        finalCfg = {
+          type: 'custom:mod-card',
+          card_mod: this._childCardMod,
+          card: cfg, // do not mutate original cfg (HA can freeze it)
+        };
+      }
+    } catch { /* noop */ }
+
+    const el = helpers.createCardElement(finalCfg);
     el.hass = this.hass;
     return el;
   }
