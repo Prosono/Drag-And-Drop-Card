@@ -395,7 +395,11 @@ setConfig(config = {}) {
 
   // storage_key handling
     const prevKey = this.storageKey;
-    const genKey = incoming.storage_key || `layout_${Date.now().toString(36)}`;
+    const genKey =
+      incoming.storage_key ??
+      this.storageKey ??
+      this._config?.storage_key ??
+      'layout_default';
     this._config    = { ...incoming, storage_key: genKey };
     this.storageKey = genKey;
     this._syncEditorsStorageKey?.();
