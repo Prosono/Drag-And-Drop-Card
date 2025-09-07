@@ -1,6 +1,6 @@
 {
   "name": "drag-and-drop-card",
-  "version": "0.1.63",
+  "version": "0.1.64",
   "description": "A true drag and drop card for Home Assistant. Make it as large (or small) as you want where you can add as many cards as you like, ANYWHERE you like.",
   "type": "module",
   "license": "UNLICENSED",

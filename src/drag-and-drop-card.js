@@ -470,6 +470,16 @@ _applyGridVars() {
       this._built = true;
       this.innerHTML = `
         <style>
+
+          :host{
+            display:block;
+
+            /* Defaults that card-mod can override from :host {} */
+            --ddc-bg: var(--card-background-color);
+            --ha-card-border-radius: 12px;
+            --ha-card-box-shadow: var(--mdc-elevation-z2, 0 2px 12px rgba(0,0,0,.18));
+          }
+
           .ddc-root{
             position:relative;
             /* JS will keep this in sync with your “Grid (px)” */
@@ -477,13 +487,13 @@ _applyGridVars() {
             /* Good contrast on light/dark themes */
             --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
           }
-          ha-card.ddc-card{
+          ha-card{
             background: var(--ddc-bg, var(--card-background-color));
             border-radius: var(--ha-card-border-radius, 12px);
             box-shadow: var(--ha-card-box-shadow, var(--mdc-elevation-z2));
             overflow: hidden;
             padding: 0;
-          }            
+          }          
           .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
           .btn{
             background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
@@ -504,14 +514,18 @@ _applyGridVars() {
           .card-container{
             position: relative;
             padding: 10px;
-            /* moved visuals to ha-card; keep container clean */
-            border: none;
-            background: transparent;
-            width: auto; height: auto;
-            border-radius: 0; overflow: visible;
+
+            /* All visuals now flow through variables that card-mod can set on :host */
+            background: var(--ddc-bg, var(--card-background-color));
+            border-radius: var(--ha-card-border-radius, 12px);
+            box-shadow: var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,.18));
+            border: var(--ddc-border, 1px solid var(--divider-color));
+
+            width: auto; height: auto; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
           }
+
 
           /* make the grid only on the background, aligned to the same origin as cards */
           .card-container::before{
