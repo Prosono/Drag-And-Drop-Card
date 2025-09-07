@@ -1581,10 +1581,16 @@ _syncEmptyStateUI() {
     try {
       const t = String(cfg?.type || '').toLowerCase();
       if (this._childCardMod && t !== 'custom:mod-card') {
+        // Accept either a raw string, {style: "..."} or {card_mod:{style:"..."}}
+        const childStyle =
+          typeof this._childCardMod === 'string'
+            ? this._childCardMod
+            : this._childCardMod?.style ?? this._childCardMod?.card_mod?.style ?? '';
+
         finalCfg = {
           type: 'custom:mod-card',
-          card_mod: this._childCardMod,
-          card: cfg, // do not mutate original cfg (HA can freeze it)
+          style: childStyle,              // ✅ mod-card uses this
+          card: cfg,
         };
       }
     } catch { /* noop */ }
