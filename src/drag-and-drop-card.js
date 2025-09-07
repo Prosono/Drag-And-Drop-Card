@@ -392,18 +392,19 @@ _applyGridVars() {
 setConfig(config = {}) {
     // Never mutate Home Assistant's frozen config object.
     const incoming   = config || {};
-    const genKey     = incoming.storage_key || `layout_${Date.now().toString(36)}`;
 
-    // Capture previous storageKey before updating it so we can detect changes
+  // storage_key handling
     const prevKey = this.storageKey;
-
-    // Store a *copy* with our defaults merged in
+    const genKey = incoming.storage_key || `layout_${Date.now().toString(36)}`;
     this._config    = { ...incoming, storage_key: genKey };
     this.storageKey = genKey;
-    this._syncEditorsStorageKey();
+    this._syncEditorsStorageKey?.();
 
-    // Read child card-mod style (used below to wrap each child)
-    this._childCardMod = incoming.child_card_mod || null;
+      // child styling: accept string or {style} or {card_mod:{style}}
+    const cm = incoming.child_card_mod;
+    this._childCardStyle =
+      typeof cm === "string" ? cm :
+      (cm?.style ?? cm?.card_mod?.style ?? "");
 
     this.gridSize                 = Number(incoming.grid ?? 10);
     this.dragLiveSnap             = !!incoming.drag_live_snap;
@@ -1576,29 +1577,24 @@ _syncEmptyStateUI() {
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
 
-    // If user provided child_card_mod, auto-wrap each child in custom:mod-card
     let finalCfg = cfg;
     try {
-      const t = String(cfg?.type || '').toLowerCase();
-      if (this._childCardMod && t !== 'custom:mod-card') {
-        // Accept either a raw string, {style: "..."} or {card_mod:{style:"..."}}
-        const childStyle =
-          typeof this._childCardMod === 'string'
-            ? this._childCardMod
-            : this._childCardMod?.style ?? this._childCardMod?.card_mod?.style ?? '';
-
+      const t = String(cfg?.type || "").toLowerCase();
+      // only wrap when user provided styles and it's not already a mod-card
+      if (this._childCardStyle && t !== "custom:mod-card") {
         finalCfg = {
-          type: 'custom:mod-card',
-          style: childStyle,              // ✅ mod-card uses this
+          type: "custom:mod-card",
+          style: this._childCardStyle,   // NOTE: mod-card expects `style`, not `card_mod`
           card: cfg,
         };
       }
-    } catch { /* noop */ }
+    } catch { /* ignore */ }
 
     const el = helpers.createCardElement(finalCfg);
     el.hass = this.hass;
     return el;
   }
+
 
   _makeWrapper(cardEl) {
     const wrap = document.createElement('div');
