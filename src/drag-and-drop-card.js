@@ -392,17 +392,15 @@ _applyGridVars() {
 setConfig(config = {}) {
     // Never mutate Home Assistant's frozen config object.
     const incoming   = config || {};
+    const genKey     = incoming.storage_key || `layout_${Date.now().toString(36)}`;
 
-  // storage_key handling
+    // Capture previous storageKey before updating it so we can detect changes
     const prevKey = this.storageKey;
-    const genKey =
-      incoming.storage_key ??
-      this.storageKey ??
-      this._config?.storage_key ??
-      'layout_default';
+
+    // Store a *copy* with our defaults merged in
     this._config    = { ...incoming, storage_key: genKey };
     this.storageKey = genKey;
-    this._syncEditorsStorageKey?.();
+    this._syncEditorsStorageKey();
 
       // child styling: accept string or {style} or {card_mod:{style}}
     const cm = incoming.child_card_mod;
