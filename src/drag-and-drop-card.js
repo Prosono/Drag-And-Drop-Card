@@ -477,6 +477,13 @@ _applyGridVars() {
             /* Good contrast on light/dark themes */
             --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
           }
+          ha-card.ddc-card{
+            background: var(--ddc-bg, var(--card-background-color));
+            border-radius: var(--ha-card-border-radius, 12px);
+            box-shadow: var(--ha-card-box-shadow, var(--mdc-elevation-z2));
+            overflow: hidden;
+            padding: 0;
+          }            
           .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
           .btn{
             background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
@@ -497,12 +504,15 @@ _applyGridVars() {
           .card-container{
             position: relative;
             padding: 10px;
-            border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);
-            width: auto; height: auto; border-radius: 12px; overflow: hidden;
+            /* moved visuals to ha-card; keep container clean */
+            border: none;
+            background: transparent;
+            width: auto; height: auto;
+            border-radius: 0; overflow: visible;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
           }
+
           /* make the grid only on the background, aligned to the same origin as cards */
           .card-container::before{
             content:'';
@@ -818,40 +828,42 @@ _applyGridVars() {
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
         </style>
-        <div class="ddc-root">
-          <div class="toolbar">
-            <button class="btn" id="addCardBtn" style="display:none">
-              <ha-icon icon="mdi:plus"></ha-icon>
-              <span style="margin-left:6px">Add Card</span>
-            </button>
-            <button class="btn secondary" id="reloadBtn" style="display:none">
-              <ha-icon icon="mdi:refresh"></ha-icon>
-              <span style="margin-left:6px">Reload</span>
-            </button>
-            <button class="btn secondary" id="diagBtn" style="display:none">
-              <ha-icon icon="mdi:play-circle-outline"></ha-icon>
-              <span style="margin-left:6px">Diagnostics</span>
-            </button>
-            <button class="btn secondary" id="exportBtn" style="display:none">
-              <ha-icon icon="mdi:download"></ha-icon>
-              <span style="margin-left:6px">Export Design</span>
-            </button>
-            <button class="btn secondary" id="importBtn" style="display:none">
-              <ha-icon icon="mdi:upload"></ha-icon>
-              <span style="margin-left:6px">Import Design</span>
-            </button>
-            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
-              <ha-icon icon="mdi:storefront-outline"></ha-icon>
-              <span>Open HADS</span>
-            </button>
-            <button class="btn warning" id="exitEditBtn" style="display:none">
-              <ha-icon icon="mdi:exit-run"></ha-icon>
-              <span>Exit edit mode</span>
-            </button>
-            <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
+        <ha-card class="ddc-card">
+          <div class="ddc-root">
+            <div class="toolbar">
+              <button class="btn" id="addCardBtn" style="display:none">
+                <ha-icon icon="mdi:plus"></ha-icon>
+                <span style="margin-left:6px">Add Card</span>
+              </button>
+              <button class="btn secondary" id="reloadBtn" style="display:none">
+                <ha-icon icon="mdi:refresh"></ha-icon>
+                <span style="margin-left:6px">Reload</span>
+              </button>
+              <button class="btn secondary" id="diagBtn" style="display:none">
+                <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+                <span style="margin-left:6px">Diagnostics</span>
+              </button>
+              <button class="btn secondary" id="exportBtn" style="display:none">
+                <ha-icon icon="mdi:download"></ha-icon>
+                <span style="margin-left:6px">Export Design</span>
+              </button>
+              <button class="btn secondary" id="importBtn" style="display:none">
+                <ha-icon icon="mdi:upload"></ha-icon>
+                <span style="margin-left:6px">Import Design</span>
+              </button>
+              <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
+                <ha-icon icon="mdi:storefront-outline"></ha-icon>
+                <span>Open HADS</span>
+              </button>
+              <button class="btn warning" id="exitEditBtn" style="display:none">
+                <ha-icon icon="mdi:exit-run"></ha-icon>
+                <span>Exit edit mode</span>
+              </button>
+              <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
+            </div>
+            <div class="card-container" id="cardContainer"></div>
           </div>
-          <div class="card-container" id="cardContainer"></div>
-        </div>
+        </ha-card>          
       `;
       this.cardContainer = this.querySelector('#cardContainer');
       this.addButton     = this.querySelector('#addCardBtn');

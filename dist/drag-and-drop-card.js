@@ -29,7 +29,7 @@ var Po=Object.create;var vi=Object.defineProperty;var Io=Object.getOwnPropertyDe
 `+e.slice(c,p),c=p+1),u=g;return m+=`
 `,e.length-c>i&&u>c?m+=e.slice(c,u)+`
 `+e.slice(u+1):m+=e.slice(c),m.slice(1)}function Ds(e){for(var i="",a=0,l,c=0;c<e.length;a>=65536?c+=2:c++)a=qt(e,c),l=Ee[a],!l&&Kt(a)?(i+=e[c],a>=65536&&(i+=e[c+1])):i+=l||As(a);return i}function Rs(e,i,a){var l="",c=e.tag,p,u,g;for(p=0,u=a.length;p<u;p+=1)g=a[p],e.replacer&&(g=e.replacer.call(a,String(p),g)),(et(e,i,g,!1,!1)||typeof g=="undefined"&&et(e,i,null,!1,!1))&&(l!==""&&(l+=","+(e.condenseFlow?"":" ")),l+=e.dump);e.tag=c,e.dump="["+l+"]"}function Ii(e,i,a,l){var c="",p=e.tag,u,g,m;for(u=0,g=a.length;u<g;u+=1)m=a[u],e.replacer&&(m=e.replacer.call(a,String(u),m)),(et(e,i+1,m,!0,!0,!1,!0)||typeof m=="undefined"&&et(e,i+1,null,!0,!0,!1,!0))&&((!l||c!=="")&&(c+=Pn(e,i)),e.dump&&Yt===e.dump.charCodeAt(0)?c+="-":c+="- ",c+=e.dump);e.tag=p,e.dump=c||"[]"}function Bs(e,i,a){var l="",c=e.tag,p=Object.keys(a),u,g,m,v,w;for(u=0,g=p.length;u<g;u+=1)w="",l!==""&&(w+=", "),e.condenseFlow&&(w+='"'),m=p[u],v=a[m],e.replacer&&(v=e.replacer.call(a,m,v)),et(e,i,m,!1,!1)&&(e.dump.length>1024&&(w+="? "),w+=e.dump+(e.condenseFlow?'"':"")+":"+(e.condenseFlow?"":" "),et(e,i,v,!1,!1)&&(w+=e.dump,l+=w));e.tag=c,e.dump="{"+l+"}"}function js(e,i,a,l){var c="",p=e.tag,u=Object.keys(a),g,m,v,w,_,E;if(e.sortKeys===!0)u.sort();else if(typeof e.sortKeys=="function")u.sort(e.sortKeys);else if(e.sortKeys)throw new Ie("sortKeys must be a boolean or a function");for(g=0,m=u.length;g<m;g+=1)E="",(!l||c!=="")&&(E+=Pn(e,i)),v=u[g],w=a[v],e.replacer&&(w=e.replacer.call(a,v,w)),et(e,i+1,v,!0,!0,!0)&&(_=e.tag!==null&&e.tag!=="?"||e.dump&&e.dump.length>1024,_&&(e.dump&&Yt===e.dump.charCodeAt(0)?E+="?":E+="? "),E+=e.dump,_&&(E+=Pn(e,i)),et(e,i+1,w,!0,_)&&(e.dump&&Yt===e.dump.charCodeAt(0)?E+=":":E+=": ",E+=e.dump,c+=E));e.tag=p,e.dump=c||"{}"}function Fi(e,i,a){var l,c,p,u,g,m;for(c=a?e.explicitTypes:e.implicitTypes,p=0,u=c.length;p<u;p+=1)if(g=c[p],(g.instanceOf||g.predicate)&&(!g.instanceOf||typeof i=="object"&&i instanceof g.instanceOf)&&(!g.predicate||g.predicate(i))){if(a?g.multi&&g.representName?e.tag=g.representName(i):e.tag=g.tag:e.tag="?",g.represent){if(m=e.styleMap[g.tag]||g.defaultStyle,dr.call(g.represent)==="[object Function]")l=g.represent(i,m);else if(ur.call(g.represent,m))l=g.represent[m](i,m);else throw new Ie("!<"+g.tag+'> tag resolver accepts not "'+m+'" style');e.dump=l}return!0}return!1}function et(e,i,a,l,c,p,u){e.tag=null,e.dump=a,Fi(e,a,!1)||Fi(e,a,!0);var g=dr.call(e.dump),m=l,v;l&&(l=e.flowLevel<0||e.flowLevel>i);var w=g==="[object Object]"||g==="[object Array]",_,E;if(w&&(_=e.duplicates.indexOf(a),E=_!==-1),(e.tag!==null&&e.tag!=="?"||E||e.indent!==2&&i>0)&&(c=!1),E&&e.usedDuplicates[_])e.dump="*ref_"+_;else{if(w&&E&&!e.usedDuplicates[_]&&(e.usedDuplicates[_]=!0),g==="[object Object]")l&&Object.keys(e.dump).length!==0?(js(e,i,e.dump,c),E&&(e.dump="&ref_"+_+e.dump)):(Bs(e,i,e.dump),E&&(e.dump="&ref_"+_+" "+e.dump));else if(g==="[object Array]")l&&e.dump.length!==0?(e.noArrayIndent&&!u&&i>0?Ii(e,i-1,e.dump,c):Ii(e,i,e.dump,c),E&&(e.dump="&ref_"+_+e.dump)):(Rs(e,i,e.dump),E&&(e.dump="&ref_"+_+" "+e.dump));else if(g==="[object String]")e.tag!=="?"&&Ls(e,e.dump,i,p,m);else{if(g==="[object Undefined]")return!1;if(e.skipInvalid)return!1;throw new Ie("unacceptable kind of an object to dump "+g)}e.tag!==null&&e.tag!=="?"&&(v=encodeURI(e.tag[0]==="!"?e.tag.slice(1):e.tag).replace(/!/g,"%21"),e.tag[0]==="!"?v="!"+v:v.slice(0,18)==="tag:yaml.org,2002:"?v="!!"+v.slice(18):v="!<"+v+">",e.dump=v+" "+e.dump)}return!0}function Ns(e,i){var a=[],l=[],c,p;for(Fn(e,a,l),c=0,p=l.length;c<p;c+=1)i.duplicates.push(a[l[c]]);i.usedDuplicates=new Array(p)}function Fn(e,i,a){var l,c,p;if(e!==null&&typeof e=="object")if(c=i.indexOf(e),c!==-1)a.indexOf(c)===-1&&a.push(c);else if(i.push(e),Array.isArray(e))for(c=0,p=e.length;c<p;c+=1)Fn(e[c],i,a);else for(l=Object.keys(e),c=0,p=l.length;c<p;c+=1)Fn(e[l[c]],i,a)}function qs(e,i){i=i||{};var a=new Os(i);a.noRefs||Ns(e,a);var l=e;return a.replacer&&(l=a.replacer.call({"":l},"",l)),et(a,0,l,!0,!0)?a.dump+`
-`:""}var Hs=qs,Ys={dump:Hs};function jn(e,i){return function(){throw new Error("Function yaml."+e+" is removed in js-yaml 4. Use yaml."+i+" instead, which is now safe by default.")}}var $s=ke,Ks=Di,Us=Ni,Ws=Ki,Xs=Ui,Vs=zn,Gs=cr.load,Js=cr.loadAll,Qs=Ys.dump,Zs=Ie,el={binary:Ji,float:$i,map:ji,null:qi,pairs:Zi,set:er,timestamp:Vi,bool:Hi,int:Yi,merge:Gi,omap:Qi,seq:Bi,str:Ri},tl=jn("safeLoad","load"),nl=jn("safeLoadAll","loadAll"),il=jn("safeDump","dump"),rl={Type:$s,Schema:Ks,FAILSAFE_SCHEMA:Us,JSON_SCHEMA:Ws,CORE_SCHEMA:Xs,DEFAULT_SCHEMA:Vs,load:Gs,loadAll:Js,dump:Qs,YAMLException:Zs,types:el,safeLoad:tl,safeLoadAll:nl,safeDump:il},_r=rl;window.interact||(window.interact=Sr.default);window.jsyaml||(window.jsyaml=_r);var ol="0.1.62";console.info(`%c drag-and-drop-card %c v${ol} `,"color:#fff;background:#03a9f4;font-weight:700;padding:2px 6px;border-radius:3px 0 0 3px","color:#03303a;background:#bdeaff;padding:2px 6px;border-radius:0 3px 3px 0");var al=(e,...i)=>console.debug(`[drag-and-drop-card] ${e}`,...i);console.info("%c drag-and-drop-card loaded","color:#03a9f4;font-weight:700;");var wr=()=>new Promise(e=>requestAnimationFrame(()=>e())),sl=()=>new Promise(e=>window.requestIdleCallback?requestIdleCallback(()=>e()):setTimeout(e,0)),Nn=class e extends HTMLElement{_deepQueryAll(i,a=document){let l=[],c=p=>{if(!p)return;if(p.querySelectorAll)try{p.querySelectorAll(i).forEach(m=>l.push(m))}catch{}let u=document.createTreeWalker(p,NodeFilter.SHOW_ELEMENT,null),g=p;for(;g;){let m=g.shadowRoot;m&&c(m),g=u.nextNode()}};return c(a),l}_syncEditorsStorageKey(){try{let i=this.storageKey||"";this._deepQueryAll("#storage_key").forEach(l=>{try{l&&l.tagName==="INPUT"&&l.value!==i&&(l.value=i,l.dispatchEvent(new Event("input",{bubbles:!0})),l.dispatchEvent(new Event("change",{bubbles:!0})))}catch{}})}catch{}}static getConfigElement(){let i=document.createElement("div");i.innerHTML=`
+`:""}var Hs=qs,Ys={dump:Hs};function jn(e,i){return function(){throw new Error("Function yaml."+e+" is removed in js-yaml 4. Use yaml."+i+" instead, which is now safe by default.")}}var $s=ke,Ks=Di,Us=Ni,Ws=Ki,Xs=Ui,Vs=zn,Gs=cr.load,Js=cr.loadAll,Qs=Ys.dump,Zs=Ie,el={binary:Ji,float:$i,map:ji,null:qi,pairs:Zi,set:er,timestamp:Vi,bool:Hi,int:Yi,merge:Gi,omap:Qi,seq:Bi,str:Ri},tl=jn("safeLoad","load"),nl=jn("safeLoadAll","loadAll"),il=jn("safeDump","dump"),rl={Type:$s,Schema:Ks,FAILSAFE_SCHEMA:Us,JSON_SCHEMA:Ws,CORE_SCHEMA:Xs,DEFAULT_SCHEMA:Vs,load:Gs,loadAll:Js,dump:Qs,YAMLException:Zs,types:el,safeLoad:tl,safeLoadAll:nl,safeDump:il},_r=rl;window.interact||(window.interact=Sr.default);window.jsyaml||(window.jsyaml=_r);var ol="0.1.63";console.info(`%c drag-and-drop-card %c v${ol} `,"color:#fff;background:#03a9f4;font-weight:700;padding:2px 6px;border-radius:3px 0 0 3px","color:#03303a;background:#bdeaff;padding:2px 6px;border-radius:0 3px 3px 0");var al=(e,...i)=>console.debug(`[drag-and-drop-card] ${e}`,...i);console.info("%c drag-and-drop-card loaded","color:#03a9f4;font-weight:700;");var wr=()=>new Promise(e=>requestAnimationFrame(()=>e())),sl=()=>new Promise(e=>window.requestIdleCallback?requestIdleCallback(()=>e()):setTimeout(e,0)),Nn=class e extends HTMLElement{_deepQueryAll(i,a=document){let l=[],c=p=>{if(!p)return;if(p.querySelectorAll)try{p.querySelectorAll(i).forEach(m=>l.push(m))}catch{}let u=document.createTreeWalker(p,NodeFilter.SHOW_ELEMENT,null),g=p;for(;g;){let m=g.shadowRoot;m&&c(m),g=u.nextNode()}};return c(a),l}_syncEditorsStorageKey(){try{let i=this.storageKey||"";this._deepQueryAll("#storage_key").forEach(l=>{try{l&&l.tagName==="INPUT"&&l.value!==i&&(l.value=i,l.dispatchEvent(new Event("input",{bubbles:!0})),l.dispatchEvent(new Event("change",{bubbles:!0})))}catch{}})}catch{}}static getConfigElement(){let i=document.createElement("div");i.innerHTML=`
       <style>
         .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
         input[type="text"],input[type="number"],select{
@@ -119,6 +119,13 @@ var Po=Object.create;var vi=Object.defineProperty;var Io=Object.getOwnPropertyDe
             /* Good contrast on light/dark themes */
             --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
           }
+          ha-card.ddc-card{
+            background: var(--ddc-bg, var(--card-background-color));
+            border-radius: var(--ha-card-border-radius, 12px);
+            box-shadow: var(--ha-card-box-shadow, var(--mdc-elevation-z2));
+            overflow: hidden;
+            padding: 0;
+          }            
           .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
           .btn{
             background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
@@ -139,12 +146,15 @@ var Po=Object.create;var vi=Object.defineProperty;var Io=Object.getOwnPropertyDe
           .card-container{
             position: relative;
             padding: 10px;
-            border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);
-            width: auto; height: auto; border-radius: 12px; overflow: hidden;
+            /* moved visuals to ha-card; keep container clean */
+            border: none;
+            background: transparent;
+            width: auto; height: auto;
+            border-radius: 0; overflow: visible;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
           }
+
           /* make the grid only on the background, aligned to the same origin as cards */
           .card-container::before{
             content:'';
@@ -460,40 +470,42 @@ var Po=Object.create;var vi=Object.defineProperty;var Io=Object.getOwnPropertyDe
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
         </style>
-        <div class="ddc-root">
-          <div class="toolbar">
-            <button class="btn" id="addCardBtn" style="display:none">
-              <ha-icon icon="mdi:plus"></ha-icon>
-              <span style="margin-left:6px">Add Card</span>
-            </button>
-            <button class="btn secondary" id="reloadBtn" style="display:none">
-              <ha-icon icon="mdi:refresh"></ha-icon>
-              <span style="margin-left:6px">Reload</span>
-            </button>
-            <button class="btn secondary" id="diagBtn" style="display:none">
-              <ha-icon icon="mdi:play-circle-outline"></ha-icon>
-              <span style="margin-left:6px">Diagnostics</span>
-            </button>
-            <button class="btn secondary" id="exportBtn" style="display:none">
-              <ha-icon icon="mdi:download"></ha-icon>
-              <span style="margin-left:6px">Export Design</span>
-            </button>
-            <button class="btn secondary" id="importBtn" style="display:none">
-              <ha-icon icon="mdi:upload"></ha-icon>
-              <span style="margin-left:6px">Import Design</span>
-            </button>
-            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
-              <ha-icon icon="mdi:storefront-outline"></ha-icon>
-              <span>Open HADS</span>
-            </button>
-            <button class="btn warning" id="exitEditBtn" style="display:none">
-              <ha-icon icon="mdi:exit-run"></ha-icon>
-              <span>Exit edit mode</span>
-            </button>
-            <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
+        <ha-card class="ddc-card">
+          <div class="ddc-root">
+            <div class="toolbar">
+              <button class="btn" id="addCardBtn" style="display:none">
+                <ha-icon icon="mdi:plus"></ha-icon>
+                <span style="margin-left:6px">Add Card</span>
+              </button>
+              <button class="btn secondary" id="reloadBtn" style="display:none">
+                <ha-icon icon="mdi:refresh"></ha-icon>
+                <span style="margin-left:6px">Reload</span>
+              </button>
+              <button class="btn secondary" id="diagBtn" style="display:none">
+                <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+                <span style="margin-left:6px">Diagnostics</span>
+              </button>
+              <button class="btn secondary" id="exportBtn" style="display:none">
+                <ha-icon icon="mdi:download"></ha-icon>
+                <span style="margin-left:6px">Export Design</span>
+              </button>
+              <button class="btn secondary" id="importBtn" style="display:none">
+                <ha-icon icon="mdi:upload"></ha-icon>
+                <span style="margin-left:6px">Import Design</span>
+              </button>
+              <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
+                <ha-icon icon="mdi:storefront-outline"></ha-icon>
+                <span>Open HADS</span>
+              </button>
+              <button class="btn warning" id="exitEditBtn" style="display:none">
+                <ha-icon icon="mdi:exit-run"></ha-icon>
+                <span>Exit edit mode</span>
+              </button>
+              <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
+            </div>
+            <div class="card-container" id="cardContainer"></div>
           </div>
-          <div class="card-container" id="cardContainer"></div>
-        </div>
+        </ha-card>          
       `,this.cardContainer=this.querySelector("#cardContainer"),this.addButton=this.querySelector("#addCardBtn"),this.reloadBtn=this.querySelector("#reloadBtn"),this.diagBtn=this.querySelector("#diagBtn"),this.exitEditBtn=this.querySelector("#exitEditBtn"),this.storeBadge=this.querySelector("#storeBadge"),this.exportBtn=this.querySelector("#exportBtn"),this.importBtn=this.querySelector("#importBtn"),this.exploreBtn=this.querySelector("#exploreBtn"),this._applyGridVars(),this.addButton.addEventListener("click",()=>{this.editMode||this._toggleEditMode(!0),this._openCardManager()}),this.reloadBtn.addEventListener("click",()=>this._initialLoad(!0)),this.diagBtn.addEventListener("click",()=>this._openDiagnostics()),this.exitEditBtn.addEventListener("click",()=>this._toggleEditMode(!1)),this.exportBtn.addEventListener("click",()=>this._exportDesign()),this.importBtn.addEventListener("click",()=>this._importDesign()),this.exploreBtn.addEventListener("click",()=>window.open("https://cardstore.smarti.dev/","_blank","noopener,noreferrer")),this._applyContainerSizingFromConfig(!0),this._installLongPressToEnterEdit(),window.addEventListener("keydown",v=>{v.key==="Escape"&&this.editMode&&this._toggleEditMode(!1)}),this._installSelectionMarquee(),this.cardContainer.addEventListener("mousedown",v=>{this.editMode&&(v.target.closest(".card-wrapper")||!v.shiftKey&&!v.ctrlKey&&!v.metaKey&&this._clearSelection())}));try{this._isInHaEditorPreview()||this._queueSave("config-change")}catch{}this._updateStoreBadge(),this.cardContainer&&this._toggleEditMode(!1),!this.__booted||a!==this.storageKey?(this.__booted=!0,this._initialLoad()):(this._applyContainerSizingFromConfig(!0),this._resizeContainer())}connectedCallback(){this.__boundExitEdit||(this.__boundExitEdit=()=>this._toggleEditMode(!1)),window.addEventListener("pagehide",this.__boundExitEdit),window.addEventListener("beforeunload",this.__boundExitEdit),this.__onVis=()=>{document.visibilityState==="hidden"&&this._toggleEditMode(!1)},document.addEventListener("visibilitychange",this.__onVis),this._toggleEditMode(!1)}disconnectedCallback(){if(window.removeEventListener("pagehide",this.__boundExitEdit),window.removeEventListener("beforeunload",this.__boundExitEdit),document.removeEventListener("visibilitychange",this.__onVis),this.__lpInstalled&&this.__lpHandlers){let i=this.cardContainer;i==null||i.removeEventListener("mousedown",this.__lpHandlers.mouseDown),window.removeEventListener("mousemove",this.__lpHandlers.mouseMove),window.removeEventListener("mouseup",this.__lpHandlers.mouseUp),window.removeEventListener("contextmenu",this.__lpHandlers.contextMenu),i==null||i.removeEventListener("touchstart",this.__lpHandlers.touchStart),window.removeEventListener("touchmove",this.__lpHandlers.touchMove),window.removeEventListener("touchend",this.__lpHandlers.touchEnd),window.removeEventListener("touchcancel",this.__lpHandlers.touchCancel),this.__lpInstalled=!1,this.__lpHandlers=null}}set hass(i){var l;this._hass=i,al("set hass"),!this.__probed&&i&&(this.__probed=!0,this._probeBackend().then(()=>this._initialLoad(!0)));let a=((l=this.cardContainer)==null?void 0:l.children)||[];for(let c of a){let p=c.firstElementChild;p&&p.hass!==i&&(p.hass=i)}}get hass(){return this._hass}async _initialLoad(i=!1){var g,m,v,w,_,E,T,P,F,L,z;this._loading=!0,i&&this.cardContainer&&(this.cardContainer.innerHTML=""),this._dbgPush("boot","Initial load start",{force:i});let a=null;if(this._backendOK&&this.storageKey&&(a=await this._loadLayoutFromBackend(this.storageKey)),!a&&this.storageKey){let A=null;try{A=JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`)||"null")}catch{}if(A&&this._dbgPush("boot","Found local snapshot",{bytes:JSON.stringify(A).length}),A&&this._backendOK)try{await this._saveLayoutToBackend(this.storageKey,A),this._dbgPush("boot","Migrated local -> backend"),a=A}catch(W){this._dbgPush("boot","Migration failed, staying local",{error:String(W)}),a=A}else A&&(a=A)}!a&&((m=(g=this._config)==null?void 0:g.cards)!=null&&m.length)&&(this._dbgPush("boot","Using embedded config"),a={cards:this._config.cards});let l={...this._config||{}};a!=null&&a.options?this._applyImportedOptions(a.options,!0):typeof(a==null?void 0:a.grid)=="number"&&this._applyImportedOptions({grid:a.grid},!0);let c=["storage_key","grid","drag_live_snap","auto_save","auto_save_debounce","container_background","card_background","debug","disable_overlap","container_size_mode","container_fixed_width","container_fixed_height","container_preset","container_preset_orientation"],p={};for(let A of c)l[A]!==void 0&&(p[A]=l[A]);Object.keys(p).length&&this._applyImportedOptions(p,!0);let u=!1;if((v=a==null?void 0:a.cards)!=null&&v.length){for(let A of a.cards){if(!(A!=null&&A.card)||typeof A.card=="object"&&Object.keys(A.card).length===0){let k=this._makePlaceholderAt(((w=A.position)==null?void 0:w.x)||0,((_=A.position)==null?void 0:_.y)||0,((E=A.size)==null?void 0:E.width)||100,((T=A.size)==null?void 0:T.height)||100);this.cardContainer.appendChild(k),u=!0;continue}let W=await this._createCard(A.card),R=this._makeWrapper(W);this.editMode&&R.classList.add("editing"),this._setCardPosition(R,((P=A.position)==null?void 0:P.x)||0,((F=A.position)==null?void 0:F.y)||0),R.style.width=`${((L=A.size)==null?void 0:L.width)||14*this.gridSize}px`,R.style.height=`${((z=A.size)==null?void 0:z.height)||10*this.gridSize}px`,A.z!=null&&(R.style.zIndex=String(A.z)),this.cardContainer.appendChild(R),this._initCardInteract(R),u=!0}this._resizeContainer(),this._dbgPush("boot","Layout applied",{count:a.cards.length})}u||(this._showEmptyPlaceholder(),this._dbgPush("boot","No saved layout found; showing placeholder")),this._updateStoreBadge(),this._syncEmptyStateUI(),this._loading=!1}_toggleEditMode(i=null){var p,u,g,m;try{(p=this.__clearPressTimer)==null||p.call(this)}catch{}let a=i===null?!this.editMode:!!i,l=!this.editMode&&a;if(this.editMode=a,this.editMode=a,this.addButton.style.display=this.editMode?"inline-block":"none",this.reloadBtn.style.display=this.editMode?"inline-block":"none",this.diagBtn.style.display=this.editMode?"inline-block":"none",this.exitEditBtn.style.display=this.editMode?"inline-block":"none",this.exportBtn.style.display=this.editMode?"inline-block":"none",this.importBtn.style.display=this.editMode?"inline-block":"none",this.exploreBtn.style.display=this.editMode?"inline-block":"none",this.storeBadge.style.display=this.editMode?"inline-block":"none",this._syncEmptyStateUI(),this.cardContainer.classList.toggle("grid-on",this.editMode),this.cardContainer.querySelectorAll(".card-wrapper").forEach(v=>{v.classList.toggle("editing",this.editMode);let w=v.querySelector(".resize-handle");w&&(w.style.display=this.editMode?"flex":"none"),!v.dataset.placeholder&&window.interact&&window.interact(v).draggable(this.editMode).resizable(this.editMode),v.style.touchAction=this.editMode?"none":"auto"}),this.editMode||this._clearSelection(),this.editMode||(u=this.cardContainer)==null||u.querySelectorAll(".card-wrapper.dragging").forEach(v=>v.classList.remove("dragging")),l){let v=(g=this.__lastHoldX)!=null?g:null,w=(m=this.__lastHoldY)!=null?m:null;this._playEditRipple(v,w)}}_isInHaEditorPreview(){let i=this;for(;i;){let a=i.nodeType===1&&i.localName?i.localName.toLowerCase():"";if(a==="hui-card-editor"||a==="hui-dialog-edit-card"||a==="hui-card-preview"||a==="ha-dialog"||a==="mwc-dialog")return!0;let l=i.getRootNode&&i.getRootNode();i=i.parentElement||l&&l.host||null}return!1}_installLongPressToEnterEdit(){if(this.__lpInstalled)return;this.__lpInstalled=!0;let i=this.cardContainer;if(!i)return;let a=800,l=18,c=R=>!!R&&typeof R=="object"&&R.nodeType===1,p=(R,k)=>{try{return!!(R&&k&&typeof R.contains=="function"&&c(k)&&R.contains(k))}catch{return!1}},u=R=>p(this.cardContainer,R),g=R=>{var re,V,me;let k=(V=(re=R.target)==null?void 0:re.closest)==null?void 0:V.call(re,".card-wrapper");if(c(k)&&u(k)&&!k.classList.contains("ddc-placeholder"))return!0;let ee=typeof R.composedPath=="function"?R.composedPath():[];for(let ae of ee)if(c(ae)&&u(ae)&&(me=ae.classList)!=null&&me.contains("card-wrapper")&&!ae.classList.contains("ddc-placeholder"))return!0;return!1},m=(R,k)=>{let ee=document.createElement("div");ee.className="ddc-press-ring",document.body.appendChild(ee),Object.assign(ee.style,{position:"fixed",left:`${R}px`,top:`${k}px`,zIndex:"100000",width:"44px",height:"44px",pointerEvents:"none",marginLeft:"-22px",marginTop:"-22px",filter:"drop-shadow(0 2px 6px rgba(0,0,0,.35))"}),ee.innerHTML=`
       <svg viewBox="0 0 44 44" aria-hidden="true" style="width:44px;height:44px">
         <circle cx="22" cy="22" r="18" style="stroke:rgba(255,255,255,.45);stroke-width:4;fill:none"></circle>
