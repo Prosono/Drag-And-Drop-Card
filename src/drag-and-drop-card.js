@@ -975,13 +975,16 @@ _applyGridVars() {
       if (c && c.hass !== hass) {
         c.hass = hass;
         
-        // Trigger card_mod update when hass changes
-        if (c._config?.card_mod) {
+        // Get the config
+        const config = c._config || c.config;
+        
+        // Special handling for mod-card and card_mod
+        if (config && (config.type === 'custom:mod-card' || config.card_mod)) {
           setTimeout(() => {
-            // Re-apply config to trigger card_mod
             if (c.setConfig && typeof c.setConfig === 'function') {
               try {
-                c.setConfig(c._config);
+                // Re-apply the full config
+                c.setConfig(JSON.parse(JSON.stringify(config)));
               } catch {}
             }
           }, 10);
@@ -1600,6 +1603,21 @@ _syncEmptyStateUI() {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
     el.hass = this.hass;
+    
+    // Special handling for mod-card
+    if (cfg.type === 'custom:mod-card') {
+      // mod-card needs to be fully initialized before we can work with it
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Force mod-card to apply its styles
+      if (el.setConfig && typeof el.setConfig === 'function') {
+        try {
+          // Re-apply config to ensure mod-card processes it
+          el.setConfig(cfg);
+        } catch {}
+      }
+    }
+    
     return el;
   }
 
@@ -1678,15 +1696,6 @@ _syncEmptyStateUI() {
       }
     });
 
-    const shield = document.createElement('div');
-    shield.className = 'shield';
-
-    const handle = document.createElement('div');
-    handle.classList.add('resize-handle');
-    handle.title = 'Resize';
-    handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
-
-    // cache the card config on the wrapper
     try {
       const cfg = cardEl._config || cardEl.config;
       if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
@@ -1694,39 +1703,74 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    // CARD_MOD FIX: Ensure card_mod can process the card
-    // We need to trigger card_mod after the card is in the DOM
+    // CARD_MOD FIX: Enhanced handling for both card_mod and mod-card
     const applyCardMod = () => {
-      if (!cardEl._config?.card_mod) return;
+      const config = cardEl._config || cardEl.config;
+      if (!config) return;
       
-      // Method 1: Force a config update to trigger card_mod
-      setTimeout(() => {
-        if (cardEl.setConfig && typeof cardEl.setConfig === 'function') {
-          try {
-            const currentConfig = cardEl._config || cardEl.config;
-            if (currentConfig) {
-              // Clone and re-apply to trigger card_mod processing
-              cardEl.setConfig(JSON.parse(JSON.stringify(currentConfig)));
-            }
-          } catch (e) {
-            console.debug('[ddc] card_mod reapply error:', e);
-          }
-        }
+      // Check if this is a mod-card or has card_mod
+      const isModCard = config.type === 'custom:mod-card';
+      const hasCardMod = !!config.card_mod;
+      
+      if (isModCard || hasCardMod) {
+        // Multiple attempts with increasing delays to handle timing issues
+        const attempts = [0, 50, 100, 250, 500];
         
-        // Method 2: Manually dispatch card-mod event
-        if (window.customElements.get('card-mod')) {
-          cardEl.dispatchEvent(new CustomEvent('card-mod-update', { 
-            bubbles: false, // Don't bubble to prevent loops
-            composed: true 
-          }));
-        }
-      }, 50);
+        attempts.forEach(delay => {
+          setTimeout(() => {
+            if (cardEl.setConfig && typeof cardEl.setConfig === 'function') {
+              try {
+                // Clone and re-apply config
+                const freshConfig = JSON.parse(JSON.stringify(config));
+                cardEl.setConfig(freshConfig);
+                
+                // For mod-card, also try to update its inner card
+                if (isModCard && cardEl.shadowRoot) {
+                  const innerCard = cardEl.shadowRoot.querySelector('*');
+                  if (innerCard && innerCard.setConfig) {
+                    try {
+                      innerCard.setConfig(freshConfig.card);
+                    } catch {}
+                  }
+                }
+              } catch (e) {
+                console.debug('[ddc] card_mod reapply error:', e);
+              }
+            }
+            
+            // Also dispatch update event
+            if (window.customElements.get('card-mod')) {
+              cardEl.dispatchEvent(new CustomEvent('card-mod-update', { 
+                bubbles: false,
+                composed: true,
+                detail: { config }
+              }));
+            }
+          }, delay);
+        });
+      }
     };
 
     wrap.append(cardEl, shield, chip, handle);
     
     // Schedule card_mod application after DOM insertion
     requestAnimationFrame(() => applyCardMod());
+    
+    // Also apply when the card becomes visible
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              applyCardMod();
+              observer.disconnect();
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      observer.observe(wrap);
+    }
     
     return wrap;
   }
