@@ -2450,7 +2450,7 @@ _syncEmptyStateUI() {
           </button>
         </div>
       </div>`;
-    document.body.appendChild(modal);
+    this.appendChild(modal);
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -3364,7 +3364,7 @@ async _getStubConfigForType(type) {
 
     const close = () => modal.remove();
     modal.querySelector('#closeDiag').addEventListener('click', close);
-    document.body.appendChild(modal);
+    this.appendChild(modal);
 
     const refreshLogs = () => {
       const logArea = modal.querySelector('#logArea');
