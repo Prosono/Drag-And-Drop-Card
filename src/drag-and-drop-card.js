@@ -991,6 +991,8 @@ _applyGridVars() {
     this._loading = true;
     if (force && this.cardContainer) this.cardContainer.innerHTML = '';
     this._dbgPush('boot', 'Initial load start', { force });
+    // collect children to notify card-mod after build
+    const __rebuildAfter = [];
 
     let saved = null;
 
@@ -1052,7 +1054,7 @@ _applyGridVars() {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
+          if (!this._loading) { __rebuildAfter.push(cardEl); }
           builtAny = true;
           continue;
         }
@@ -1073,16 +1075,12 @@ _applyGridVars() {
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
+        if (!this._loading) { __rebuildAfter.push(cardEl); }
         this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
       
-    // Notify card-mod once after full build
-    requestAnimationFrame(() => {
-      try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-    });
 this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
     }
 
@@ -1097,6 +1095,12 @@ this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
 
     // loading complete
     this._loading = false;
+    try {
+      __rebuildAfter.forEach(el => {
+        try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+      });
+    } catch {}
+
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1646,9 +1650,7 @@ _syncEmptyStateUI() {
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
           this._initCardInteract(w2);
-          requestAnimationFrame(() => {
-            try { w2.firstElementChild?.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-          });
+          if (!this._loading) { requestAnimationFrame(() => { try { w2.firstElementChild?.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); }
         }
         this._resizeContainer();
         this._queueSave('duplicate');
@@ -3283,7 +3285,7 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
+    if (!this._loading) { __rebuildAfter.push(cardEl); }
     this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
@@ -3479,7 +3481,7 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
+                if (!this._loading) { __rebuildAfter.push(cardEl); }
                 this._initCardInteract(wrap);
               }
             }
@@ -3653,7 +3655,7 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
+              if (!this._loading) { __rebuildAfter.push(cardEl); }
               this._initCardInteract(wrap);
             }
           }
