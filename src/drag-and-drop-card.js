@@ -461,10 +461,9 @@ setConfig(config = {}) {
       s.onload = () => this._initInteract();
       document.head.appendChild(s);
     }
-    // preload helpers early to avoid lag on first pick
-    this._helpersPromise = (typeof window.loadCardHelpers === 'function')
-      ? window.loadCardHelpers().catch(()=>null)
-      : Promise.resolve(null);
+
+    // Do NOT preload helpers; card-mod needs to patch them first.
+    this._helpersPromise = null;
 
     if (!this._built) {
       this._built = true;
@@ -1631,7 +1630,7 @@ _syncEmptyStateUI() {
         for (const t of targets) {
           const cfg = this._extractCardConfig(t.firstElementChild) || {};
           const dup = await this._createCard(cfg);
-          const w2 = this._makeWrapper(dup);
+          const w2 = this._makeWrapper(dup, cfg);
           w2.style.width  = t.style.width;
           w2.style.height = t.style.height;
           const x = (parseFloat(t.getAttribute('data-x')) || 0) + this.gridSize;
@@ -1671,13 +1670,7 @@ _syncEmptyStateUI() {
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
     // cache the card config on the wrapper so that future saves can recover it
-    try {
-      const cfg = cardEl._config || cardEl.config;
-      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
-        wrap.dataset.cfg = JSON.stringify(cfg);
-      }
-    } catch {}
-
+    try { wrap.dataset.cfg = JSON.stringify(originalCfg || {}); } catch {}
     wrap.append(cardEl, shield, chip, handle);
     return wrap;
   }
@@ -1939,14 +1932,8 @@ _syncEmptyStateUI() {
   }
   _extractCardConfig(cardEl){
     if (!cardEl) return {};
-    // attempt to read the card's own config
-    const cfg = cardEl._config || cardEl.config;
-    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
-      return cfg;
-    }
-    // fallback: if the wrapper cached a config, use it
+    // 1) Prefer the wrapper cache (original config)
     try {
-      // walk up to the wrapper; .closest may not exist on text nodes
       const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
       const raw  = wrap?.dataset?.cfg;
       if (raw) {
@@ -1954,6 +1941,9 @@ _syncEmptyStateUI() {
         if (parsed && typeof parsed === 'object') return parsed;
       }
     } catch {}
+    // 2) Fallback to the live element's config if needed
+    const cfg = cardEl._config || cardEl.config;
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) return cfg;
     return {};
   }
 
@@ -2002,7 +1992,7 @@ _syncEmptyStateUI() {
   async _getEditorElementForType(type, cfg) {
     // Log the start of an editor lookup; this uses console.debug so it is visible
     try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
-    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+    const helpers = await window.loadCardHelpers();
   
     // Warm the module before asking for the class only for built‑in HA cards.
     // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
@@ -2120,7 +2110,7 @@ _syncEmptyStateUI() {
   // This helps custom cards that register their editor tag after the element loads.
   async _ensureCardModuleLoaded(type, cfg) {
     try {
-      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      const helpers = await window.loadCardHelpers();
       // Use stub configuration to warm the module by instantiating the card. This
       // triggers the dynamic import of the card and its editor without causing
       // validation errors (we'll ignore errors silently). After warmup, the
@@ -2907,7 +2897,7 @@ _syncEmptyStateUI() {
         cardHost.innerHTML = '';
         await raf();
         try {
-          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          const helpers = await window.loadCardHelpers();
           if (seq !== pickSeq) return;
           const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
           if (seq !== pickSeq) return;
@@ -2963,7 +2953,7 @@ _syncEmptyStateUI() {
 
         // Try official getStubConfig once (may load modules) to improve defaults
         try {
-          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          const helpers = await window.loadCardHelpers();
           const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
           if (CardClass?.getStubConfig) {
             const all = Object.keys(this.hass?.states || {});
@@ -3141,7 +3131,7 @@ _syncEmptyStateUI() {
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
 async _getStubConfigForType(type) {
-    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+    const helpers = await window.loadCardHelpers();
     let CardClass = null;
 
     // Provide a blank stub when the user selects the "Custom Card" entry.
@@ -3464,7 +3454,7 @@ async _getStubConfigForType(type) {
                 this.cardContainer.appendChild(p);
               } else {
                 const el = await this._createCard(conf.card);
-                const wrap = this._makeWrapper(el);
+                const wrap = this._makeWrapper(el, cfg);
                 this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
@@ -3636,7 +3626,7 @@ async _getStubConfigForType(type) {
               this.cardContainer.appendChild(p);
             } else {
               const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el);
+              const wrap = this._makeWrapper(el, cfg);
               this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
               wrap.style.width  = `${conf.size?.width||140}px`;
               wrap.style.height = `${conf.size?.height||100}px`;
