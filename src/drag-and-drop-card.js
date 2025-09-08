@@ -33,31 +33,6 @@ class DragAndDropCard extends HTMLElement {
   constructor() {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
-    this.__rebuiltCards = new WeakSet();
-  }
-
-  
-  // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
-  _hasCardModDeep(cfg) {
-    try {
-      if (!cfg || typeof cfg !== 'object') return false;
-      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
-      if (cfg.card) return this._hasCardModDeep(cfg.card);
-      if (Array.isArray(cfg.cards)) {
-        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
-      }
-      return false;
-    } catch { return false; }
-  }
-  _rebuildOnce(el) {
-    try {
-      if (!el) return;
-      if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
-      if (this.__rebuiltCards.has(el)) return;
-      this.__rebuiltCards.add(el);
-      // Fire rebuild from the child card so Lovelace/card-mod re-attaches without recreating DDC itself
-      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-    } catch {}
   }
 
 
@@ -1073,9 +1048,7 @@ set hass(hass) {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-builtAny = true;
+          builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1086,9 +1059,7 @@ builtAny = true;
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+        this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1686,7 +1657,6 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
-          try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1705,7 +1675,6 @@ _syncEmptyStateUI() {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
-          try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
       }
@@ -1728,13 +1697,13 @@ _syncEmptyStateUI() {
         wrap.dataset.cfg = JSON.stringify(cfg);
         
         // Mark if this needs card_mod processing
-        if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
+        if (cfg.type === 'custom:mod-card' || cfg.card_mod) {
+          wrap.dataset.needsCardMod = 'true';
+        }
       }
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-    // DDC patch: trigger one-time rebuild so nested card_mod attaches
-    try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
   }
 
@@ -3367,9 +3336,7 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+    this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3564,9 +3531,7 @@ this._initCardInteract(wrap);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+                this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3739,9 +3704,7 @@ this._initCardInteract(wrap);
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+              this._initCardInteract(wrap);
             }
           }
         } else {
@@ -3901,103 +3864,75 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Integrated card-mod compatibility enhancements
-   - Ensures card-mod styles apply to nested cards inside drag-and-drop-card
-   - No extra resource needed; executed as part of this script
-   - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
+   Integrated deep card_mod → custom:mod-card transformer
+   - Recursively wraps any card config that contains `card_mod` with `custom:mod-card`
+   - Ensures nested children (e.g., layout-card/stack) get card-mod applied
+   - No separate resource required
    ========================================================================== */
 (() => {
-  const SEEN = new WeakSet();
+  const definePatch = () => {
+    const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
+    if (!ctor || !ctor.prototype) return false;
+    if (ctor.prototype.__ddcCardModDeepWrapPatched) return true;
+    ctor.prototype.__ddcCardModDeepWrapPatched = true;
 
-  const isLikelyCard = (el) => {
-    try {
-      if (!(el instanceof Element)) return false;
-      const n = el.localName || "";
-      if (!n) return false;
-      if (n === "ha-card") return true;
-      if (n.endsWith("-card")) return true; // hui-*, custom:*, mushroom-*, etc.
-      return false;
-    } catch { return false; }
-  };
+    // Deep clone helper (config objects are small; JSON is fine here)
+    const clone = (o) => {
+      try { return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : o; } catch { return o; }
+    };
 
-  const rebuildOnce = (el) => {
-    try {
-      if (!el || SEEN.has(el)) return;
-      SEEN.add(el);
-      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-    } catch {}
-  };
+    const wrapDeep = (cfg) => {
+      if (!cfg || typeof cfg !== "object") return cfg;
+      const c = clone(cfg);
 
-  const deepScan = (root) => {
-    try {
-      if (!root) return;
-      if (root instanceof Element && isLikelyCard(root)) rebuildOnce(root);
-      const all = (root instanceof ShadowRoot ? root : root).querySelectorAll?.("*");
-      if (!all) return;
-      for (const el of all) {
-        if (isLikelyCard(el)) rebuildOnce(el);
-        const sr = el.shadowRoot;
-        if (sr) { try { deepScan(sr); } catch {} }
+      // First, transform nested structures
+      if (Array.isArray(c.cards)) {
+        c.cards = c.cards.map(wrapDeep);
       }
-    } catch {}
-  };
+      if (c.card) {
+        c.card = wrapDeep(c.card);
+      }
 
-  const installOnInstance = (host) => {
-    try {
-      if (!host || host.__ddcCardModIntegrated) return;
-      host.__ddcCardModIntegrated = true;
-      const root = host.shadowRoot || host;
+      // Already a mod-card -> leave as-is (but ensure its inner card is wrapped)
+      if (String(c.type || "").toLowerCase() === "custom:mod-card") {
+        return c;
+      }
 
-      // Initial scan (covers already rendered children)
-      deepScan(root);
-
-      // Observe newly added content within the card
-      const mo = new MutationObserver((muts) => {
-        for (const m of muts) {
-          if (!m.addedNodes || !m.addedNodes.length) continue;
-          for (const n of m.addedNodes) {
-            if (n instanceof Element || n instanceof ShadowRoot) {
-              deepScan(n);
-            }
-          }
-        }
-      });
-      mo.observe(root, { childList: true, subtree: true });
-      host.__ddcCardModIntegratedObserver = mo;
-
-      // Follow-up scans for lazy renders
-      setTimeout(() => { try { deepScan(root); } catch {} }, 250);
-      setTimeout(() => { try { deepScan(root); } catch {} }, 1000);
-    } catch {}
-  };
-
-  const hookExisting = () => {
-    try {
-      document.querySelectorAll("drag-and-drop-card").forEach(installOnInstance);
-    } catch {}
-  };
-
-  if (window.customElements && window.customElements.whenDefined) {
-    window.customElements.whenDefined("drag-and-drop-card").then(() => {
-      // Install on existing instances
-      hookExisting();
-      // Patch prototype to auto-install on future instances
-      const ctor = window.customElements.get("drag-and-drop-card");
-      if (ctor && ctor.prototype) {
-        const origConnected = ctor.prototype.connectedCallback;
-        ctor.prototype.connectedCallback = function() {
-          try { origConnected && origConnected.call(this); } finally {
-            installOnInstance(this);
-          }
+      // If this card itself has card_mod, wrap it
+      if (c.card_mod) {
+        const { card_mod } = c;
+        delete c.card_mod;
+        return {
+          type: "custom:mod-card",
+          card_mod,
+          card: c
         };
       }
-      // As a fallback, watch the DOM for new instances
-      const docObserver = new MutationObserver(() => hookExisting());
-      docObserver.observe(document.documentElement, { childList: true, subtree: true });
-    });
-  } else {
-    // Very old environment: periodic best-effort scan
-    const iv = setInterval(hookExisting, 1000);
-    setTimeout(() => clearInterval(iv), 10000);
+
+      return c;
+    };
+
+    const origCreate = ctor.prototype._createCard;
+    if (typeof origCreate !== "function") return false;
+
+    ctor.prototype._createCard = async function (cfg) {
+      try {
+        cfg = wrapDeep(cfg);
+      } catch {}
+      // Proceed with original creator
+      return await origCreate.call(this, cfg);
+    };
+
+    return true;
+  };
+
+  if (!definePatch()) {
+    if (window.customElements && window.customElements.whenDefined) {
+      window.customElements.whenDefined("drag-and-drop-card").then(definePatch);
+    } else {
+      // Very old env; best effort retry
+      const iv = setInterval(() => { if (definePatch()) clearInterval(iv); }, 200);
+      setTimeout(() => clearInterval(iv), 5000);
+    }
   }
 })();
