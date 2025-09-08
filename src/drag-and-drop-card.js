@@ -874,16 +874,17 @@ _applyGridVars() {
           </div>
           <div class="card-container" id="cardContainer"></div>
         </div>
-      `;
-      this.cardContainer = this.querySelector('#cardContainer');
-      this.addButton     = this.querySelector('#addCardBtn');
-      this.reloadBtn     = this.querySelector('#reloadBtn');
-      this.diagBtn       = this.querySelector('#diagBtn');
-      this.exitEditBtn   = this.querySelector('#exitEditBtn');
-      this.storeBadge    = this.querySelector('#storeBadge');
-      this.exportBtn     = this.querySelector('#exportBtn');
-      this.importBtn     = this.querySelector('#importBtn');
-      this.exploreBtn    = this.querySelector('#exploreBtn');      
+      `;      
+      const $ = (sel) => this.shadowRoot.querySelector(sel);
+      this.cardContainer = $('#cardContainer');
+      this.addButton     = $('#addCardBtn');
+      this.reloadBtn     = $('#reloadBtn');
+      this.diagBtn       = $('#diagBtn');
+      this.exitEditBtn   = $('#exitEditBtn');
+      this.exportBtn     = $('#exportBtn');
+      this.importBtn     = $('#importBtn');
+      this.exploreBtn    = $('#exploreBtn');
+      this.storeBadge    = $('#storeBadge');
 
       this._applyGridVars();
       
