@@ -955,30 +955,30 @@ _applyGridVars() {
   }
   
 
-  set hass(hass) {
-    this._hass = hass;
-    LOG('set hass');
-    if (!this.__probed && hass) {
-      this.__probed = true;
-      this._probeBackend().then(() => { 
-        this.__probed = true; 
-        if (!this.__booted && this.__cfgReady) { 
-          this.__booted = true; 
-          this._initialLoad(true); 
-        } 
-      });
-    }
-    
-    const wraps = this.cardContainer?.children || [];
-    for (const wrap of wraps) {
-      const c = wrap.firstElementChild;
-      if (c && c.hass !== hass) {
-        c.hass = hass;
-        // Don't reprocess card_mod here - it will be handled by _processCardModOnce
-      }
+set hass(hass) {
+  this._hass = hass;
+  LOG('set hass');
+  if (!this.__probed && hass) {
+    this.__probed = true;
+    this._probeBackend().then(() => { 
+      this.__probed = true; 
+      if (!this.__booted && this.__cfgReady) { 
+        this.__booted = true; 
+        this._initialLoad(true); 
+      } 
+    });
+  }
+  
+  const wraps = this.cardContainer?.children || [];
+  for (const wrap of wraps) {
+    const c = wrap.firstElementChild;
+    if (c && c.hass !== hass) {
+      c.hass = hass;
+      // Don't reprocess card_mod here - it will be handled by _processCardModOnce
     }
   }
-    
+}
+  
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
@@ -1630,7 +1630,7 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
-  
+
     chip.addEventListener('click', async (e) => {
       e.stopPropagation();
       const act = e.target?.closest('button')?.dataset?.act; if (!act) return;
@@ -1680,28 +1680,30 @@ _syncEmptyStateUI() {
       }
     });
 
+    // ADD THE MISSING SHIELD ELEMENT
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+
+    // ADD THE MISSING HANDLE ELEMENT
+    const handle = document.createElement('div');
+    handle.classList.add('resize-handle');
+    handle.title = 'Resize';
+    handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
+
+    // cache the card config on the wrapper
+    try {
+      const cfg = cardEl._config || cardEl.config;
+      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+        wrap.dataset.cfg = JSON.stringify(cfg);
+        
+        // Mark if this needs card_mod processing
+        if (cfg.type === 'custom:mod-card' || cfg.card_mod) {
+          wrap.dataset.needsCardMod = 'true';
+        }
+      }
+    } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-    
-    // Schedule card_mod application after DOM insertion
-    requestAnimationFrame(() => applyCardMod());
-    
-    // Also apply when the card becomes visible
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              applyCardMod();
-              observer.disconnect();
-            }
-          });
-        },
-        { threshold: 0.1 }
-      );
-      observer.observe(wrap);
-    }
-    
     return wrap;
   }
 
