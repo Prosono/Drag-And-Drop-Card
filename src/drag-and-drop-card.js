@@ -992,6 +992,7 @@ _applyGridVars() {
       }
     }
   }
+  
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
@@ -1696,6 +1697,16 @@ _syncEmptyStateUI() {
       }
     });
 
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+
+    const handle = document.createElement('div');
+    handle.classList.add('resize-handle');
+    handle.title = 'Resize';
+    handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
+
+    // cache the card config on the wrapper
+    // cache the card config on the wrapper
     try {
       const cfg = cardEl._config || cardEl.config;
       if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
