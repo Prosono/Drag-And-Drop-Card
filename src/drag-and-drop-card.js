@@ -59,6 +59,20 @@ class DragAndDropCard extends HTMLElement {
     return results;
   }
 
+  // Deep check if a config or any nested child uses card_mod or is a mod-card
+  _hasCardModDeep(cfg) {
+    try {
+      if (!cfg || typeof cfg !== 'object') return false;
+      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
+      if (cfg.card) return this._hasCardModDeep(cfg.card);
+      if (Array.isArray(cfg.cards)) {
+        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
+      }
+      return false;
+    } catch { return false; }
+  }
+
+
 
   // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
   _syncEditorsStorageKey() {
@@ -1048,6 +1062,7 @@ set hass(hass) {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
+      try { (wrap.firstElementChild || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
           builtAny = true;
           continue;
         }
@@ -1059,6 +1074,7 @@ set hass(hass) {
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
+      try { (wrap.firstElementChild || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
         this._initCardInteract(wrap);
         builtAny = true;
       }
@@ -1657,6 +1673,7 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
+          try { (w2.firstElementChild || w2).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1675,6 +1692,7 @@ _syncEmptyStateUI() {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
+          try { requestAnimationFrame(() => { try { (newEl || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); } catch {}
           this._queueSave('edit');
         });
       }
@@ -1697,13 +1715,14 @@ _syncEmptyStateUI() {
         wrap.dataset.cfg = JSON.stringify(cfg);
         
         // Mark if this needs card_mod processing
-        if (cfg.type === 'custom:mod-card' || cfg.card_mod) {
+        if (this._hasCardModDeep(cfg)) {
           wrap.dataset.needsCardMod = 'true';
         }
       }
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
+    try { requestAnimationFrame(() => { try { (cardEl || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); } catch {}
     return wrap;
   }
 
@@ -1763,6 +1782,7 @@ _syncEmptyStateUI() {
           card.setConfig({...config});
         } catch {}
       }
+      try { card.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
     });
   }
 
@@ -3336,6 +3356,7 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
+      try { (wrap.firstElementChild || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
     this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
@@ -3531,6 +3552,7 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
+      try { (wrap.firstElementChild || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
                 this._initCardInteract(wrap);
               }
             }
@@ -3704,6 +3726,7 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
+      try { (wrap.firstElementChild || wrap).dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
               this._initCardInteract(wrap);
             }
           }
