@@ -975,7 +975,7 @@ _applyGridVars() {
     LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
-      this._probeBackend().then(() => this._initialLoad(true));
+      this._probeBackend().then(() => { if (!this.__booted) { this.__booted = true; this._initialLoad(true); } });
     }
     const wraps = this.cardContainer?.children || [];
     for (const wrap of wraps) {
@@ -1052,9 +1052,7 @@ _applyGridVars() {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          requestAnimationFrame(() => {
-            try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-          });
+          if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
           builtAny = true;
           continue;
         }
@@ -1075,14 +1073,17 @@ _applyGridVars() {
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        requestAnimationFrame(() => {
-          try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-        });
+        if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
         this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
-      this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
+      
+    // Notify card-mod once after full build
+    requestAnimationFrame(() => {
+      try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+    });
+this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
     }
 
     
@@ -3282,9 +3283,7 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    requestAnimationFrame(() => {
-      try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-    });
+    if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
     this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
@@ -3480,9 +3479,7 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                requestAnimationFrame(() => {
-                  try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-                });
+                if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
                 this._initCardInteract(wrap);
               }
             }
@@ -3656,9 +3653,7 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              requestAnimationFrame(() => {
-                try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-              });
+              if (!this._loading) { requestAnimationFrame(() => { try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));  } catch {} }); }
               this._initCardInteract(wrap);
             }
           }
