@@ -1574,25 +1574,17 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------ Card creation & wrapper ------------------------ */
-  async _createCard(cfg) {
-    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-
-    let finalCfg = cfg;
-    try {
-      const t = String(cfg?.type || "").toLowerCase();
-      // only wrap when user provided styles and it's not already a mod-card
-      if (this._childCardStyle && t !== "custom:mod-card") {
-        finalCfg = {
-          type: "custom:mod-card",
-          style: this._childCardStyle,   // NOTE: mod-card expects `style`, not `card_mod`
-          card: cfg,
-        };
-      }
-    } catch { /* ignore */ }
-
-    const el = helpers.createCardElement(finalCfg);
-    el.hass = this.hass;
-    return el;
+  async _createCard(config) {
+    let childMod = this._childCardStyle;
+    if (childMod) {
+      config = { ...config };  // Shallow copy; deep copy if needed for nested objects
+      if (!config.card_mod) config.card_mod = {};
+      config.card_mod.style = (config.card_mod.style || '') + '\n' + childMod;
+    }
+    const helpers = await this._helpersPromise;
+    const card = await helpers.createCardElement(config);
+    card.hass = this.hass;
+    return card;
   }
 
 
