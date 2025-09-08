@@ -31,6 +31,11 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
+    constructor() {
+    super();
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+  }
+
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -388,6 +393,18 @@ _applyGridVars() {
   _dbgDump() { return [...this._dbgBuffer]; }
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+  _deepMerge(a, b) {
+    if (!b) return a;
+    if (Array.isArray(a) || Array.isArray(b)) return (b ?? a);
+    const out = { ...(a || {}) };
+    for (const [k, v] of Object.entries(b)) {
+      out[k] = (v && typeof v === 'object' && !Array.isArray(v))
+        ? this._deepMerge(out[k] || {}, v)
+        : v;
+    }
+    return out;
+  }
+
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
@@ -406,6 +423,11 @@ _applyGridVars() {
     this._config = config;
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
+
+    // Expose a per-instance marker for card-mod scoping if needed
+    this._instanceKey = this.storageKey || `ddc_${Date.now().toString(36)}`;
+    this.setAttribute('data-ddc-key', this._instanceKey);
+
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -468,7 +490,7 @@ _applyGridVars() {
 
     if (!this._built) {
       this._built = true;
-      this.innerHTML = `
+      this.shadowRoot.innerHTML = `
         <style>
           .ddc-root{
             position:relative;
@@ -1029,17 +1051,32 @@ _applyGridVars() {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
+          requestAnimationFrame(() => {
+            try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+          });
           builtAny = true;
           continue;
         }
-        const cardEl = await this._createCard(conf.card);
+        // Forward a default card_mod into every child (so card-mod hooks attach inside)
+        let childCfg = JSON.parse(JSON.stringify(conf.card || {}));
+        const defaultChildMod =
+          this._config?.child_card_mod?.card_mod ?? this._config?.child_card_mod;
+        if (defaultChildMod) {
+          childCfg = this._deepMerge(childCfg, { card_mod: defaultChildMod });
+        }
+        const cardEl = await this._createCard(childCfg);
         const wrap = this._makeWrapper(cardEl);
+
+
         if (this.editMode) wrap.classList.add('editing');
         this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
         wrap.style.width  = `${conf.size?.width  || 14*this.gridSize}px`;
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
+        requestAnimationFrame(() => {
+          try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+        });
         this._initCardInteract(wrap);
         builtAny = true;
       }
@@ -1607,6 +1644,9 @@ _syncEmptyStateUI() {
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
           this._initCardInteract(w2);
+          requestAnimationFrame(() => {
+            try { w2.firstElementChild?.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+          });
         }
         this._resizeContainer();
         this._queueSave('duplicate');
@@ -3241,6 +3281,9 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
+    requestAnimationFrame(() => {
+      try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+    });
     this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
@@ -3436,6 +3479,9 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
+                requestAnimationFrame(() => {
+                  try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+                });
                 this._initCardInteract(wrap);
               }
             }
@@ -3609,6 +3655,9 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
+              requestAnimationFrame(() => {
+                try { cardEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+              });
               this._initCardInteract(wrap);
             }
           }
