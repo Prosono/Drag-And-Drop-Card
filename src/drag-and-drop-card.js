@@ -974,25 +974,11 @@ _applyGridVars() {
       const c = wrap.firstElementChild;
       if (c && c.hass !== hass) {
         c.hass = hass;
-        
-        // Get the config
-        const config = c._config || c.config;
-        
-        // Special handling for mod-card and card_mod
-        if (config && (config.type === 'custom:mod-card' || config.card_mod)) {
-          setTimeout(() => {
-            if (c.setConfig && typeof c.setConfig === 'function') {
-              try {
-                // Re-apply the full config
-                c.setConfig(JSON.parse(JSON.stringify(config)));
-              } catch {}
-            }
-          }, 10);
-        }
+        // Don't reprocess card_mod here - it will be handled by _processCardModOnce
       }
     }
   }
-  
+    
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
@@ -1091,25 +1077,22 @@ _applyGridVars() {
 
     // loading complete
     this._loading = false;
-    try { __rebuildAfter.forEach(el => { try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); } catch {}
 
-    // Trigger card-mod to reprocess all cards
-    /*
+    if (force) {
+      this._cardModProcessed = false;
+    }
+
     setTimeout(() => {
-      if (window.customElements.get('card-mod')) {
-        // Notify card-mod that cards have been added
-        this.cardContainer.querySelectorAll('.card-wrapper').forEach(wrapper => {
-          const card = wrapper.firstElementChild;
-          if (card) {
-            card.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-          }
-        });
-        
-        // Global card-mod update event
-        window.dispatchEvent(new Event('card-mod-update'));
-      }
-    }, 200);
-    */
+      this._processCardModOnce();
+    }, 100);
+    
+    try { 
+      __rebuildAfter.forEach(el => { 
+        try { 
+          el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); 
+        } catch {} 
+      }); 
+    } catch {}
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1697,70 +1680,6 @@ _syncEmptyStateUI() {
       }
     });
 
-    const shield = document.createElement('div');
-    shield.className = 'shield';
-
-    const handle = document.createElement('div');
-    handle.classList.add('resize-handle');
-    handle.title = 'Resize';
-    handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
-
-    // cache the card config on the wrapper
-    // cache the card config on the wrapper
-    try {
-      const cfg = cardEl._config || cardEl.config;
-      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
-        wrap.dataset.cfg = JSON.stringify(cfg);
-      }
-    } catch {}
-
-    // CARD_MOD FIX: Enhanced handling for both card_mod and mod-card
-    const applyCardMod = () => {
-      const config = cardEl._config || cardEl.config;
-      if (!config) return;
-      
-      // Check if this is a mod-card or has card_mod
-      const isModCard = config.type === 'custom:mod-card';
-      const hasCardMod = !!config.card_mod;
-      
-      if (isModCard || hasCardMod) {
-        // Multiple attempts with increasing delays to handle timing issues
-        const attempts = [0, 50, 100, 250, 500];
-        
-        attempts.forEach(delay => {
-          setTimeout(() => {
-            if (cardEl.setConfig && typeof cardEl.setConfig === 'function') {
-              try {
-                // Clone and re-apply config
-                const freshConfig = JSON.parse(JSON.stringify(config));
-                cardEl.setConfig(freshConfig);
-                
-                // For mod-card, also try to update its inner card
-                if (isModCard && cardEl.shadowRoot) {
-                  const innerCard = cardEl.shadowRoot.querySelector('*');
-                  if (innerCard && innerCard.setConfig) {
-                    try {
-                      innerCard.setConfig(freshConfig.card);
-                    } catch {}
-                  }
-                }
-              } catch (e) {
-                console.debug('[ddc] card_mod reapply error:', e);
-              }
-            }
-            
-            // Also dispatch update event
-            if (window.customElements.get('card-mod')) {
-              cardEl.dispatchEvent(new CustomEvent('card-mod-update', { 
-                bubbles: false,
-                composed: true,
-                detail: { config }
-              }));
-            }
-          }, delay);
-        });
-      }
-    };
 
     wrap.append(cardEl, shield, chip, handle);
     
@@ -1806,6 +1725,43 @@ _syncEmptyStateUI() {
   
     wrap.append(inner, shield);
     return wrap;
+  }
+
+    _processCardModOnce() {
+    // Only run once per load
+    if (this._cardModProcessed) return;
+    this._cardModProcessed = true;
+    
+    const wraps = this.cardContainer?.querySelectorAll('[data-needs-card-mod="true"]') || [];
+    
+    wraps.forEach(wrap => {
+      const card = wrap.firstElementChild;
+      if (!card) return;
+      
+      const config = card._config || card.config;
+      if (!config) return;
+      
+      // For mod-card specifically, we need to wait for it to be fully initialized
+      if (config.type === 'custom:mod-card') {
+        // mod-card needs its inner card to be ready
+        setTimeout(() => {
+          if (card.updateComplete) {
+            card.updateComplete.then(() => {
+              card.requestUpdate();
+            });
+          } else if (card.setConfig) {
+            try {
+              card.setConfig({...config});
+            } catch {}
+          }
+        }, 100);
+      } else if (config.card_mod && card.setConfig) {
+        // Regular card_mod
+        try {
+          card.setConfig({...config});
+        } catch {}
+      }
+    });
   }
 
   _showEmptyPlaceholder() {
