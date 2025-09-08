@@ -31,11 +31,6 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
-    constructor() {
-    super();
-    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
-  }
-
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -393,18 +388,6 @@ _applyGridVars() {
   _dbgDump() { return [...this._dbgBuffer]; }
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  _deepMerge(a, b) {
-    if (!b) return a;
-    if (Array.isArray(a) || Array.isArray(b)) return (b ?? a);
-    const out = { ...(a || {}) };
-    for (const [k, v] of Object.entries(b)) {
-      out[k] = (v && typeof v === 'object' && !Array.isArray(v))
-        ? this._deepMerge(out[k] || {}, v)
-        : v;
-    }
-    return out;
-  }
-
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
@@ -423,11 +406,6 @@ _applyGridVars() {
     this._config = config;
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
-
-    // Expose a per-instance marker for card-mod scoping if needed
-    this._instanceKey = this.storageKey || `ddc_${Date.now().toString(36)}`;
-    this.setAttribute('data-ddc-key', this._instanceKey);
-
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -490,7 +468,7 @@ _applyGridVars() {
 
     if (!this._built) {
       this._built = true;
-      this.shadowRoot.innerHTML = `
+      this.innerHTML = `
         <style>
           .ddc-root{
             position:relative;
@@ -874,17 +852,16 @@ _applyGridVars() {
           </div>
           <div class="card-container" id="cardContainer"></div>
         </div>
-      `;      
-      const $ = (sel) => this.shadowRoot.querySelector(sel);
-      this.cardContainer = $('#cardContainer');
-      this.addButton     = $('#addCardBtn');
-      this.reloadBtn     = $('#reloadBtn');
-      this.diagBtn       = $('#diagBtn');
-      this.exitEditBtn   = $('#exitEditBtn');
-      this.exportBtn     = $('#exportBtn');
-      this.importBtn     = $('#importBtn');
-      this.exploreBtn    = $('#exploreBtn');
-      this.storeBadge    = $('#storeBadge');
+      `;
+      this.cardContainer = this.querySelector('#cardContainer');
+      this.addButton     = this.querySelector('#addCardBtn');
+      this.reloadBtn     = this.querySelector('#reloadBtn');
+      this.diagBtn       = this.querySelector('#diagBtn');
+      this.exitEditBtn   = this.querySelector('#exitEditBtn');
+      this.storeBadge    = this.querySelector('#storeBadge');
+      this.exportBtn     = this.querySelector('#exportBtn');
+      this.importBtn     = this.querySelector('#importBtn');
+      this.exploreBtn    = this.querySelector('#exploreBtn');      
 
       this._applyGridVars();
       
@@ -925,13 +902,20 @@ _applyGridVars() {
 
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
-    if (!this.__booted || prevKey !== this.storageKey) {
+    this.__cfgReady = true;
+    // Defer initial build until both config is set and backend probe (if any) finished.
+    if (prevKey !== this.storageKey && this.__booted) {
+      // storage_key changed after boot: rebuild from storage
+      this._initialLoad(true);
+    } else if (!this.__booted && this.__probed) {
       this.__booted = true;
       this._initialLoad();
     } else {
+      // no rebuild now; sizing adjustments ok for visual changes
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
+
   }
 
   connectedCallback() {
@@ -975,7 +959,7 @@ _applyGridVars() {
     LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
-      this._probeBackend().then(() => { if (!this.__booted) { this.__booted = true; this._initialLoad(true); } });
+      this._probeBackend().then(() => { if (!this.__booted && this.__cfgReady) { this.__booted = true; this._initialLoad(true); } });
     }
     const wraps = this.cardContainer?.children || [];
     for (const wrap of wraps) {
@@ -991,8 +975,6 @@ _applyGridVars() {
     this._loading = true;
     if (force && this.cardContainer) this.cardContainer.innerHTML = '';
     this._dbgPush('boot', 'Initial load start', { force });
-    // collect children to notify card-mod after build
-    const __rebuildAfter = [];
 
     let saved = null;
 
@@ -1054,34 +1036,22 @@ _applyGridVars() {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          if (!this._loading) { __rebuildAfter.push(cardEl); }
           builtAny = true;
           continue;
         }
-        // Forward a default card_mod into every child (so card-mod hooks attach inside)
-        let childCfg = JSON.parse(JSON.stringify(conf.card || {}));
-        const defaultChildMod =
-          this._config?.child_card_mod?.card_mod ?? this._config?.child_card_mod;
-        if (defaultChildMod) {
-          childCfg = this._deepMerge(childCfg, { card_mod: defaultChildMod });
-        }
-        const cardEl = await this._createCard(childCfg);
+        const cardEl = await this._createCard(conf.card);
         const wrap = this._makeWrapper(cardEl);
-
-
         if (this.editMode) wrap.classList.add('editing');
         this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
         wrap.style.width  = `${conf.size?.width  || 14*this.gridSize}px`;
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        if (!this._loading) { __rebuildAfter.push(cardEl); }
         this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
-      
-this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
+      this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
     }
 
     
@@ -1095,12 +1065,6 @@ this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
 
     // loading complete
     this._loading = false;
-    try {
-      __rebuildAfter.forEach(el => {
-        try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-      });
-    } catch {}
-
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1650,7 +1614,6 @@ _syncEmptyStateUI() {
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
           this._initCardInteract(w2);
-          if (!this._loading) { requestAnimationFrame(() => { try { w2.firstElementChild?.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); }
         }
         this._resizeContainer();
         this._queueSave('duplicate');
@@ -3285,7 +3248,6 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    if (!this._loading) { __rebuildAfter.push(cardEl); }
     this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
@@ -3481,7 +3443,6 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                if (!this._loading) { __rebuildAfter.push(cardEl); }
                 this._initCardInteract(wrap);
               }
             }
@@ -3655,7 +3616,6 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              if (!this._loading) { __rebuildAfter.push(cardEl); }
               this._initCardInteract(wrap);
             }
           }
