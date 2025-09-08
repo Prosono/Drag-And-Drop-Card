@@ -3864,19 +3864,83 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Integrated deep card_mod → custom:mod-card transformer
-   - Recursively wraps any card config that contains `card_mod` with `custom:mod-card`
-   - Ensures nested children (e.g., layout-card/stack) get card-mod applied
-   - No separate resource required
+   Drag & Drop Card — integrated card-mod compatibility suite (v3)
+   - Deeply wraps any config with `card_mod` into `custom:mod-card` (recursively)
+   - Dispatches a guarded `ll-rebuild` to card elements created/moved under DDC
+   - No external shim/resource; minimizes loops via WeakSet guards
    ========================================================================== */
 (() => {
+  const SEEN = new WeakSet();
+
+  const isCardEl = (el) => {
+    try {
+      if (!(el instanceof Element)) return false;
+      const n = el.localName || "";
+      if (!n) return false;
+      if (n === "ha-card") return true;
+      if (n.endsWith("-card")) return true; // hui-*, custom:*, mushroom-*, etc.
+      return false;
+    } catch { return false; }
+  };
+
+  const rebuildOnce = (el) => {
+    try {
+      if (!el || SEEN.has(el)) return;
+      SEEN.add(el);
+      // Use microtask to ensure it's in DOM
+      Promise.resolve().then(() => {
+        try {
+          el.dispatchEvent(new Event("ll-rebuild", { bubbles: true, composed: true }));
+        } catch {}
+      });
+    } catch {}
+  };
+
+  const deepScan = (root) => {
+    try {
+      if (!root) return;
+      if (root instanceof Element && isCardEl(root)) rebuildOnce(root);
+      const all = (root instanceof ShadowRoot ? root : root).querySelectorAll?.("*");
+      if (!all) return;
+      for (const el of all) {
+        if (isCardEl(el)) rebuildOnce(el);
+        const sr = el.shadowRoot;
+        if (sr) { try { deepScan(sr); } catch {} }
+      }
+    } catch {}
+  };
+
+  const installWrapObserver = (wrap) => {
+    try {
+      if (!wrap || wrap.__ddcCardModObsInstalled) return;
+      wrap.__ddcCardModObsInstalled = true;
+      // initial pass: child card (firstElementChild) + descendants
+      deepScan(wrap);
+
+      const mo = new MutationObserver((muts) => {
+        for (const m of muts) {
+          if (m.addedNodes && m.addedNodes.length) {
+            for (const n of m.addedNodes) {
+              if (n instanceof Element || n instanceof ShadowRoot) deepScan(n);
+            }
+          }
+        }
+      });
+      mo.observe(wrap, { childList: true, subtree: true });
+      wrap.__ddcCardModObserver = mo;
+      // follow-up scans for lazy renders
+      setTimeout(() => { try { deepScan(wrap); } catch {} }, 250);
+      setTimeout(() => { try { deepScan(wrap); } catch {} }, 1000);
+    } catch {}
+  };
+
   const definePatch = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcCardModDeepWrapPatched) return true;
-    ctor.prototype.__ddcCardModDeepWrapPatched = true;
+    if (ctor.prototype.__ddcCardModSuitePatched) return true;
+    ctor.prototype.__ddcCardModSuitePatched = true;
 
-    // Deep clone helper (config objects are small; JSON is fine here)
+    // Deep clone simple (config objects)
     const clone = (o) => {
       try { return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : o; } catch { return o; }
     };
@@ -3885,7 +3949,6 @@ if (!customElements.get('drag-and-drop-card')) {
       if (!cfg || typeof cfg !== "object") return cfg;
       const c = clone(cfg);
 
-      // First, transform nested structures
       if (Array.isArray(c.cards)) {
         c.cards = c.cards.map(wrapDeep);
       }
@@ -3893,35 +3956,54 @@ if (!customElements.get('drag-and-drop-card')) {
         c.card = wrapDeep(c.card);
       }
 
-      // Already a mod-card -> leave as-is (but ensure its inner card is wrapped)
       if (String(c.type || "").toLowerCase() === "custom:mod-card") {
+        // ensure its inner card got transformed
+        if (c.card) c.card = wrapDeep(c.card);
         return c;
       }
 
-      // If this card itself has card_mod, wrap it
       if (c.card_mod) {
         const { card_mod } = c;
         delete c.card_mod;
-        return {
-          type: "custom:mod-card",
-          card_mod,
-          card: c
-        };
+        return { type: "custom:mod-card", card_mod, card: c };
       }
 
       return c;
     };
 
+    // Patch _createCard to transform configs
     const origCreate = ctor.prototype._createCard;
-    if (typeof origCreate !== "function") return false;
+    if (typeof origCreate === "function") {
+      ctor.prototype._createCard = async function (cfg) {
+        try { cfg = wrapDeep(cfg); } catch {}
+        const el = await origCreate.call(this, cfg);
+        return el;
+      };
+    }
 
-    ctor.prototype._createCard = async function (cfg) {
-      try {
-        cfg = wrapDeep(cfg);
-      } catch {}
-      // Proceed with original creator
-      return await origCreate.call(this, cfg);
-    };
+    // Patch _makeWrapper to install the observer and trigger initial rebuilds
+    const origMakeWrapper = ctor.prototype._makeWrapper;
+    if (typeof origMakeWrapper === "function") {
+      ctor.prototype._makeWrapper = function(cardEl) {
+        const wrap = origMakeWrapper.call(this, cardEl);
+        try { installWrapObserver(wrap); } catch {}
+        // also rebuild the child once right away
+        try { rebuildOnce(cardEl); } catch {}
+        return wrap;
+      };
+    }
+
+    // Also install on existing wrappers when toggling edit/initial load:
+    const origInitialLoad = ctor.prototype._initialLoad;
+    if (typeof origInitialLoad === "function") {
+      ctor.prototype._initialLoad = async function(force=false) {
+        const res = await origInitialLoad.call(this, force);
+        try {
+          this.cardContainer?.querySelectorAll?.(".card-wrapper").forEach((w)=>installWrapObserver(w));
+        } catch {}
+        return res;
+      };
+    }
 
     return true;
   };
@@ -3929,10 +4011,6 @@ if (!customElements.get('drag-and-drop-card')) {
   if (!definePatch()) {
     if (window.customElements && window.customElements.whenDefined) {
       window.customElements.whenDefined("drag-and-drop-card").then(definePatch);
-    } else {
-      // Very old env; best effort retry
-      const iv = setInterval(() => { if (definePatch()) clearInterval(iv); }, 200);
-      setTimeout(() => clearInterval(iv), 5000);
     }
   }
 })();
