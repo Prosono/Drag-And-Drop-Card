@@ -31,6 +31,39 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
+  // --- Robust helpers loader (waits until HA exposes patched helpers) ---
+  async _getHelpers() {
+    if (this.__helpersPromise) return this.__helpersPromise;
+    const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+    this.__helpersPromise = (async () => {
+      for (let i = 0; i < 60; i++) { // ~6s total
+        try {
+          if (typeof window.loadCardHelpers === "function") {
+            const helpers = await this._getHelpers();
+            if (h && typeof h.createCardElement === "function") return h;
+          }
+        } catch {}
+        await delay(100);
+      }
+      return null;
+    })();
+    return this.__helpersPromise;
+  }
+
+  // --- Fallback element creator when helpers are not ready ---
+  _createCardDirect(cfg) {
+    const type = (cfg?.type || "").toString();
+    let el;
+    if (type.startsWith("custom:")) {
+      el = document.createElement(type.substring(7));
+    } else {
+      const tag = `hui-${type.replace(/_/g, "-")}-card`;
+      el = document.createElement(tag);
+    }
+    try { el.setConfig?.(cfg); } catch (e) { console.error("setConfig failed", e, cfg); }
+    return el;
+  }
+
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -1992,7 +2025,7 @@ _syncEmptyStateUI() {
   async _getEditorElementForType(type, cfg) {
     // Log the start of an editor lookup; this uses console.debug so it is visible
     try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
-    const helpers = await window.loadCardHelpers();
+    const helpers = await this._getHelpers();
   
     // Warm the module before asking for the class only for built‑in HA cards.
     // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
@@ -2110,7 +2143,7 @@ _syncEmptyStateUI() {
   // This helps custom cards that register their editor tag after the element loads.
   async _ensureCardModuleLoaded(type, cfg) {
     try {
-      const helpers = await window.loadCardHelpers();
+      const helpers = await this._getHelpers();
       // Use stub configuration to warm the module by instantiating the card. This
       // triggers the dynamic import of the card and its editor without causing
       // validation errors (we'll ignore errors silently). After warmup, the
@@ -2897,7 +2930,7 @@ _syncEmptyStateUI() {
         cardHost.innerHTML = '';
         await raf();
         try {
-          const helpers = await window.loadCardHelpers();
+          const helpers = await this._getHelpers();
           if (seq !== pickSeq) return;
           const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
           if (seq !== pickSeq) return;
@@ -2953,7 +2986,7 @@ _syncEmptyStateUI() {
 
         // Try official getStubConfig once (may load modules) to improve defaults
         try {
-          const helpers = await window.loadCardHelpers();
+          const helpers = await this._getHelpers();
           const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
           if (CardClass?.getStubConfig) {
             const all = Object.keys(this.hass?.states || {});
@@ -3131,7 +3164,7 @@ _syncEmptyStateUI() {
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
 async _getStubConfigForType(type) {
-    const helpers = await window.loadCardHelpers();
+    const helpers = await this._getHelpers();
     let CardClass = null;
 
     // Provide a blank stub when the user selects the "Custom Card" entry.
