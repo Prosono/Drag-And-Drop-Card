@@ -960,12 +960,33 @@ _applyGridVars() {
     LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
-      this._probeBackend().then(() => { this.__probed = true; if (!this.__booted && this.__cfgReady) { this.__booted = true; this._initialLoad(true); } });
+      this._probeBackend().then(() => { 
+        this.__probed = true; 
+        if (!this.__booted && this.__cfgReady) { 
+          this.__booted = true; 
+          this._initialLoad(true); 
+        } 
+      });
     }
+    
     const wraps = this.cardContainer?.children || [];
     for (const wrap of wraps) {
       const c = wrap.firstElementChild;
-      if (c && c.hass !== hass) c.hass = hass;
+      if (c && c.hass !== hass) {
+        c.hass = hass;
+        
+        // Trigger card_mod update when hass changes
+        if (c._config?.card_mod) {
+          setTimeout(() => {
+            // Re-apply config to trigger card_mod
+            if (c.setConfig && typeof c.setConfig === 'function') {
+              try {
+                c.setConfig(c._config);
+              } catch {}
+            }
+          }, 10);
+        }
+      }
     }
   }
   get hass() { return this._hass; }
@@ -977,7 +998,7 @@ _applyGridVars() {
     if (force && this.cardContainer) this.cardContainer.innerHTML = '';
     this._dbgPush('boot', 'Initial load start', { force });
     const __rebuildAfter = [];
-let saved = null;
+    let saved = null;
 
     if (this._backendOK && this.storageKey) {
       saved = await this._loadLayoutFromBackend(this.storageKey);
@@ -1069,6 +1090,7 @@ let saved = null;
     try { __rebuildAfter.forEach(el => { try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); } catch {}
 
     // Trigger card-mod to reprocess all cards
+    /*
     setTimeout(() => {
       if (window.customElements.get('card-mod')) {
         // Notify card-mod that cards have been added
@@ -1083,6 +1105,7 @@ let saved = null;
         window.dispatchEvent(new Event('card-mod-update'));
       }
     }, 200);
+    */
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1605,6 +1628,7 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
+  
     chip.addEventListener('click', async (e) => {
       e.stopPropagation();
       const act = e.target?.closest('button')?.dataset?.act; if (!act) return;
@@ -1662,7 +1686,7 @@ _syncEmptyStateUI() {
     handle.title = 'Resize';
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
-    // cache the card config on the wrapper so that future saves can recover it
+    // cache the card config on the wrapper
     try {
       const cfg = cardEl._config || cardEl.config;
       if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
@@ -1670,7 +1694,40 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
+    // CARD_MOD FIX: Ensure card_mod can process the card
+    // We need to trigger card_mod after the card is in the DOM
+    const applyCardMod = () => {
+      if (!cardEl._config?.card_mod) return;
+      
+      // Method 1: Force a config update to trigger card_mod
+      setTimeout(() => {
+        if (cardEl.setConfig && typeof cardEl.setConfig === 'function') {
+          try {
+            const currentConfig = cardEl._config || cardEl.config;
+            if (currentConfig) {
+              // Clone and re-apply to trigger card_mod processing
+              cardEl.setConfig(JSON.parse(JSON.stringify(currentConfig)));
+            }
+          } catch (e) {
+            console.debug('[ddc] card_mod reapply error:', e);
+          }
+        }
+        
+        // Method 2: Manually dispatch card-mod event
+        if (window.customElements.get('card-mod')) {
+          cardEl.dispatchEvent(new CustomEvent('card-mod-update', { 
+            bubbles: false, // Don't bubble to prevent loops
+            composed: true 
+          }));
+        }
+      }, 50);
+    };
+
     wrap.append(cardEl, shield, chip, handle);
+    
+    // Schedule card_mod application after DOM insertion
+    requestAnimationFrame(() => applyCardMod());
+    
     return wrap;
   }
 
