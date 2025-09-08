@@ -1067,6 +1067,22 @@ let saved = null;
     // loading complete
     this._loading = false;
     try { __rebuildAfter.forEach(el => { try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {} }); } catch {}
+
+    // Trigger card-mod to reprocess all cards
+    setTimeout(() => {
+      if (window.customElements.get('card-mod')) {
+        // Notify card-mod that cards have been added
+        this.cardContainer.querySelectorAll('.card-wrapper').forEach(wrapper => {
+          const card = wrapper.firstElementChild;
+          if (card) {
+            card.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+          }
+        });
+        
+        // Global card-mod update event
+        window.dispatchEvent(new Event('card-mod-update'));
+      }
+    }, 200);
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
