@@ -3901,130 +3901,85 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — integrated card-mod fix (v4, no ll-rebuild)
-   - Avoids global 'll-rebuild' to prevent reload loops
-   - Observes each wrapper; when a *card element* appears, re-applies its config
-     if it uses card-mod (either type 'custom:mod-card' or has 'card_mod')
-   - This triggers card-mod to (re)attach styles without rebuilding the whole view
+   Drag & Drop Card — integrated card-mod fix (v6b, global helpers patch + non-enum marker)
    ========================================================================== */
 (() => {
-  const PROCESSED = new WeakSet();
+  const mark = "__ddcWrapApplied";
 
-  const isCardEl = (el) => {
-    try {
-      if (!(el instanceof Element)) return false;
-      const n = el.localName || "";
-      if (!n) return false;
-      if (n === "ha-card") return true;
-      if (n.endsWith("-card")) return true; // hui-*, custom:*, mushroom-*, custom cards
-      return false;
-    } catch { return false; }
+  const setMark = (obj) => {
+    try { Object.defineProperty(obj, mark, { value: true, enumerable: false, configurable: true }); } catch {}
   };
 
-  const reapplyIfCardMod = (el) => {
-    try {
-      if (!isCardEl(el)) return;
-      if (PROCESSED.has(el)) return;
-      const cfg = el._config || el.config;
-      if (!cfg || typeof el.setConfig !== "function") return;
+  const isMarked = (obj) => !!(obj && typeof obj === "object" && obj[mark]);
 
-      if (String(cfg.type || "").toLowerCase() === "custom:mod-card") {
-        PROCESSED.add(el);
-        // Give mod-card a tick to finish composing
-        setTimeout(() => {
-          try {
-            if (typeof el.requestUpdate === "function") el.requestUpdate();
-            else el.setConfig({ ...cfg });
-          } catch {}
-        }, 0);
-        return;
-      }
+  const deepWrapConfig = (cfg) => {
+    if (!cfg || typeof cfg !== "object") return cfg;
+    if (isMarked(cfg)) return cfg;
 
-      if (cfg.card_mod) {
-        PROCESSED.add(el);
-        setTimeout(() => {
-          try { el.setConfig({ ...cfg }); } catch {}
-        }, 0);
-      }
-    } catch {}
+    // shallow clone
+    const c = Array.isArray(cfg) ? cfg.map(deepWrapConfig) : { ...cfg };
+
+    if (Array.isArray(c.cards)) c.cards = c.cards.map(deepWrapConfig);
+    if (c.card) c.card = deepWrapConfig(c.card);
+
+    if (String(c.type || "").toLowerCase() === "custom:mod-card") {
+      setMark(c);
+      if (c.card) c.card = deepWrapConfig(c.card);
+      return c;
+    }
+
+    if (c.card_mod) {
+      const card_mod = c.card_mod;
+      delete c.card_mod;
+      const wrapped = { type: "custom:mod-card", card_mod, card: c };
+      setMark(wrapped);
+      return wrapped;
+    }
+
+    setMark(c);
+    return c;
   };
 
-  const deepScan = (root) => {
+  const patchHelpers = (helpers) => {
     try {
-      if (!root) return;
-      if (root instanceof Element) reapplyIfCardMod(root);
-      const all = (root instanceof ShadowRoot ? root : root).querySelectorAll?.("*");
-      if (!all) return;
-      for (const el of all) {
-        reapplyIfCardMod(el);
-        // peek into open shadow roots to catch cards rendered inside
-        const sr = el.shadowRoot;
-        if (sr) { try { deepScan(sr); } catch {} }
+      if (!helpers || helpers.__ddcV6bPatched) return helpers;
+      helpers.__ddcV6bPatched = true;
+
+      const origCreate = helpers.createCardElement?.bind(helpers);
+      if (typeof origCreate === "function") {
+        helpers.createCardElement = (cfg) => {
+          try { cfg = deepWrapConfig(cfg); } catch {}
+          return origCreate(cfg);
+        };
+      }
+      const origCreateHui = helpers.createHuiCardElement?.bind(helpers);
+      if (typeof origCreateHui === "function") {
+        helpers.createHuiCardElement = (cfg) => {
+          try { cfg = deepWrapConfig(cfg); } catch {}
+          return origCreateHui(cfg);
+        };
       }
     } catch {}
-  };
-
-  const observeWrapper = (wrap) => {
-    try {
-      if (!wrap || wrap.__ddcCardModFixInstalled) return;
-      wrap.__ddcCardModFixInstalled = true;
-
-      // Initial pass for already-present children
-      deepScan(wrap);
-
-      // Watch for new nodes (e.g., layout-card rendering, stack changes, edits)
-      const mo = new MutationObserver((muts) => {
-        for (const m of muts) {
-          if (m.addedNodes && m.addedNodes.length) {
-            for (const n of m.addedNodes) {
-              if (n instanceof Element || n instanceof ShadowRoot) deepScan(n);
-            }
-          }
-        }
-      });
-      mo.observe(wrap, { childList: true, subtree: true });
-      wrap.__ddcCardModFixObserver = mo;
-
-      // Cover lazy renders
-      setTimeout(() => { try { deepScan(wrap); } catch {} }, 250);
-      setTimeout(() => { try { deepScan(wrap); } catch {} }, 1000);
-    } catch {}
+    return helpers;
   };
 
   const install = () => {
-    const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
-    if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcCardModV4Patched) return true;
-    ctor.prototype.__ddcCardModV4Patched = true;
-
-    // Hook _makeWrapper to install observer per wrapper
-    const origMakeWrapper = ctor.prototype._makeWrapper;
-    if (typeof origMakeWrapper === "function") {
-      ctor.prototype._makeWrapper = function(cardEl) {
-        const wrap = origMakeWrapper.call(this, cardEl);
-        try { observeWrapper(wrap); } catch {}
-        return wrap;
-      };
-    }
-
-    // After initial load, install observers on existing wrappers
-    const origInitialLoad = ctor.prototype._initialLoad;
-    if (typeof origInitialLoad === "function") {
-      ctor.prototype._initialLoad = async function(force=false) {
-        const res = await origInitialLoad.call(this, force);
-        try {
-          this.cardContainer?.querySelectorAll?.(".card-wrapper").forEach((w)=>observeWrapper(w));
-        } catch {}
-        return res;
-      };
-    }
-
+    if (!window.loadCardHelpers) return false;
+    if (window.loadCardHelpers.__ddcV6bPatched) return true;
+    const orig = window.loadCardHelpers.bind(window);
+    window.loadCardHelpers = async function() {
+      const h = await orig();
+      return patchHelpers(h);
+    };
+    window.loadCardHelpers.__ddcV6bPatched = true;
     return true;
   };
 
   if (!install()) {
     if (window.customElements && window.customElements.whenDefined) {
-      window.customElements.whenDefined("drag-and-drop-card").then(install);
+      window.customElements.whenDefined("hui-view").then(install);
     }
+    const iv = setInterval(() => { if (install()) clearInterval(iv); }, 200);
+    setTimeout(() => clearInterval(iv), 5000);
   }
 })();
