@@ -31,39 +31,6 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
-  // --- Robust helpers loader (waits until HA exposes patched helpers) ---
-  async _getHelpers() {
-    if (this.__helpersPromise) return this.__helpersPromise;
-    const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-    this.__helpersPromise = (async () => {
-      for (let i = 0; i < 60; i++) { // ~6s total
-        try {
-          if (typeof window.loadCardHelpers === "function") {
-            const helpers = await this._getHelpers();
-            if (h && typeof h.createCardElement === "function") return h;
-          }
-        } catch {}
-        await delay(100);
-      }
-      return null;
-    })();
-    return this.__helpersPromise;
-  }
-
-  // --- Fallback element creator when helpers are not ready ---
-  _createCardDirect(cfg) {
-    const type = (cfg?.type || "").toString();
-    let el;
-    if (type.startsWith("custom:")) {
-      el = document.createElement(type.substring(7));
-    } else {
-      const tag = `hui-${type.replace(/_/g, "-")}-card`;
-      el = document.createElement(tag);
-    }
-    try { el.setConfig?.(cfg); } catch (e) { console.error("setConfig failed", e, cfg); }
-    return el;
-  }
-
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -422,30 +389,30 @@ _applyGridVars() {
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   /* --------------------------- Card lifecycle --------------------------- */
-setConfig(config = {}) {
-    // Never mutate Home Assistant's frozen config object.
-    const incoming   = config || {};
+  setConfig(config = {}) {
+    // Track old key so we only rebuild when storage_key actually changes
+    // Auto‑assign a storage key if none provided
+    if (!config.storage_key) {
+      const unique = `layout_${Date.now().toString(36)}`;
+      config.storage_key = unique;
+      // persist the new key into this._config so the editor shows it
+      this._config = { ...config };
+    }
 
-  // storage_key handling
+    // Capture previous storageKey before updating it so we can detect changes
     const prevKey = this.storageKey;
-    const genKey = incoming.storage_key || `layout_${Date.now().toString(36)}`;
-    this._config    = { ...incoming, storage_key: genKey };
-    this.storageKey = genKey;
-    this._syncEditorsStorageKey?.();
 
-      // child styling: accept string or {style} or {card_mod:{style}}
-    const cm = incoming.child_card_mod;
-    this._childCardStyle =
-      typeof cm === "string" ? cm :
-      (cm?.style ?? cm?.card_mod?.style ?? "");
-
-    this.gridSize                 = Number(incoming.grid ?? 10);
-    this.dragLiveSnap             = !!incoming.drag_live_snap;
-    this.autoSave                 = incoming.auto_save !== false;
-    this.autoSaveDebounce         = Number(incoming.auto_save_debounce ?? 800);
-    this.containerBackground      = incoming.container_background ?? 'transparent';
-    this.cardBackground           = incoming.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
-    this.debug                    = !!incoming.debug;
+    // Store incoming config and update properties
+    this._config = config;
+    this.storageKey = config.storage_key || undefined;
+    this._syncEditorsStorageKey();
+    this.gridSize                 = Number(config.grid ?? 10);
+    this.dragLiveSnap             = !!config.drag_live_snap;
+    this.autoSave                 = config.auto_save !== false;
+    this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
+    this.containerBackground      = config.container_background ?? 'transparent';
+    this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    this.debug                    = !!config.debug;
     this.editMode                 = false;
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
@@ -494,24 +461,15 @@ setConfig(config = {}) {
       s.onload = () => this._initInteract();
       document.head.appendChild(s);
     }
-
-    // Do NOT preload helpers; card-mod needs to patch them first.
-    this._helpersPromise = null;
+    // preload helpers early to avoid lag on first pick
+    this._helpersPromise = (typeof window.loadCardHelpers === 'function')
+      ? window.loadCardHelpers().catch(()=>null)
+      : Promise.resolve(null);
 
     if (!this._built) {
       this._built = true;
       this.innerHTML = `
         <style>
-
-          :host{
-            display:block;
-
-            /* Defaults that card-mod can override from :host {} */
-            --ddc-bg: var(--card-background-color);
-            --ha-card-border-radius: 12px;
-            --ha-card-box-shadow: var(--mdc-elevation-z2, 0 2px 12px rgba(0,0,0,.18));
-          }
-
           .ddc-root{
             position:relative;
             /* JS will keep this in sync with your “Grid (px)” */
@@ -519,13 +477,6 @@ setConfig(config = {}) {
             /* Good contrast on light/dark themes */
             --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
           }
-          ha-card{
-            background: var(--ddc-bg, var(--card-background-color));
-            border-radius: var(--ha-card-border-radius, 12px);
-            box-shadow: var(--ha-card-box-shadow, var(--mdc-elevation-z2));
-            overflow: hidden;
-            padding: 0;
-          }          
           .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
           .btn{
             background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
@@ -546,19 +497,12 @@ setConfig(config = {}) {
           .card-container{
             position: relative;
             padding: 10px;
-
-            /* All visuals now flow through variables that card-mod can set on :host */
-            background: var(--ddc-bg, var(--card-background-color));
-            border-radius: var(--ha-card-border-radius, 12px);
-            box-shadow: var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,.18));
-            border: var(--ddc-border, 1px solid var(--divider-color));
-
-            width: auto; height: auto; overflow: hidden;
+            border: 1px solid var(--divider-color);
+            background: var(--ddc-bg, transparent);
+            width: auto; height: auto; border-radius: 12px; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
           }
-
-
           /* make the grid only on the background, aligned to the same origin as cards */
           .card-container::before{
             content:'';
@@ -874,42 +818,40 @@ setConfig(config = {}) {
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
         </style>
-        <ha-card class="ddc-card">
-          <div class="ddc-root">
-            <div class="toolbar">
-              <button class="btn" id="addCardBtn" style="display:none">
-                <ha-icon icon="mdi:plus"></ha-icon>
-                <span style="margin-left:6px">Add Card</span>
-              </button>
-              <button class="btn secondary" id="reloadBtn" style="display:none">
-                <ha-icon icon="mdi:refresh"></ha-icon>
-                <span style="margin-left:6px">Reload</span>
-              </button>
-              <button class="btn secondary" id="diagBtn" style="display:none">
-                <ha-icon icon="mdi:play-circle-outline"></ha-icon>
-                <span style="margin-left:6px">Diagnostics</span>
-              </button>
-              <button class="btn secondary" id="exportBtn" style="display:none">
-                <ha-icon icon="mdi:download"></ha-icon>
-                <span style="margin-left:6px">Export Design</span>
-              </button>
-              <button class="btn secondary" id="importBtn" style="display:none">
-                <ha-icon icon="mdi:upload"></ha-icon>
-                <span style="margin-left:6px">Import Design</span>
-              </button>
-              <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
-                <ha-icon icon="mdi:storefront-outline"></ha-icon>
-                <span>Open HADS</span>
-              </button>
-              <button class="btn warning" id="exitEditBtn" style="display:none">
-                <ha-icon icon="mdi:exit-run"></ha-icon>
-                <span>Exit edit mode</span>
-              </button>
-              <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
-            </div>
-            <div class="card-container" id="cardContainer"></div>
+        <div class="ddc-root">
+          <div class="toolbar">
+            <button class="btn" id="addCardBtn" style="display:none">
+              <ha-icon icon="mdi:plus"></ha-icon>
+              <span style="margin-left:6px">Add Card</span>
+            </button>
+            <button class="btn secondary" id="reloadBtn" style="display:none">
+              <ha-icon icon="mdi:refresh"></ha-icon>
+              <span style="margin-left:6px">Reload</span>
+            </button>
+            <button class="btn secondary" id="diagBtn" style="display:none">
+              <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+              <span style="margin-left:6px">Diagnostics</span>
+            </button>
+            <button class="btn secondary" id="exportBtn" style="display:none">
+              <ha-icon icon="mdi:download"></ha-icon>
+              <span style="margin-left:6px">Export Design</span>
+            </button>
+            <button class="btn secondary" id="importBtn" style="display:none">
+              <ha-icon icon="mdi:upload"></ha-icon>
+              <span style="margin-left:6px">Import Design</span>
+            </button>
+            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
+              <ha-icon icon="mdi:storefront-outline"></ha-icon>
+              <span>Open HADS</span>
+            </button>
+            <button class="btn warning" id="exitEditBtn" style="display:none">
+              <ha-icon icon="mdi:exit-run"></ha-icon>
+              <span>Exit edit mode</span>
+            </button>
+            <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
           </div>
-        </ha-card>          
+          <div class="card-container" id="cardContainer"></div>
+        </div>
       `;
       this.cardContainer = this.querySelector('#cardContainer');
       this.addButton     = this.querySelector('#addCardBtn');
@@ -1606,19 +1548,12 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------ Card creation & wrapper ------------------------ */
-  async _createCard(config) {
-    let childMod = this._childCardStyle;
-    if (childMod) {
-      config = { ...config };  // Shallow copy; deep copy if needed for nested objects
-      if (!config.card_mod) config.card_mod = {};
-      config.card_mod.style = (config.card_mod.style || '') + '\n' + childMod;
-    }
-    const helpers = await this._helpersPromise;
-    const card = await helpers.createCardElement(config);
-    card.hass = this.hass;
-    return card;
+  async _createCard(cfg) {
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+    const el = helpers.createCardElement(cfg);
+    el.hass = this.hass;
+    return el;
   }
-
 
   _makeWrapper(cardEl) {
     const wrap = document.createElement('div');
@@ -1663,7 +1598,7 @@ _syncEmptyStateUI() {
         for (const t of targets) {
           const cfg = this._extractCardConfig(t.firstElementChild) || {};
           const dup = await this._createCard(cfg);
-          const w2 = this._makeWrapper(dup, cfg);
+          const w2 = this._makeWrapper(dup);
           w2.style.width  = t.style.width;
           w2.style.height = t.style.height;
           const x = (parseFloat(t.getAttribute('data-x')) || 0) + this.gridSize;
@@ -1703,7 +1638,13 @@ _syncEmptyStateUI() {
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
     // cache the card config on the wrapper so that future saves can recover it
-    try { wrap.dataset.cfg = JSON.stringify(originalCfg || {}); } catch {}
+    try {
+      const cfg = cardEl._config || cardEl.config;
+      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+        wrap.dataset.cfg = JSON.stringify(cfg);
+      }
+    } catch {}
+
     wrap.append(cardEl, shield, chip, handle);
     return wrap;
   }
@@ -1965,8 +1906,14 @@ _syncEmptyStateUI() {
   }
   _extractCardConfig(cardEl){
     if (!cardEl) return {};
-    // 1) Prefer the wrapper cache (original config)
+    // attempt to read the card's own config
+    const cfg = cardEl._config || cardEl.config;
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+      return cfg;
+    }
+    // fallback: if the wrapper cached a config, use it
     try {
+      // walk up to the wrapper; .closest may not exist on text nodes
       const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
       const raw  = wrap?.dataset?.cfg;
       if (raw) {
@@ -1974,9 +1921,6 @@ _syncEmptyStateUI() {
         if (parsed && typeof parsed === 'object') return parsed;
       }
     } catch {}
-    // 2) Fallback to the live element's config if needed
-    const cfg = cardEl._config || cardEl.config;
-    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) return cfg;
     return {};
   }
 
@@ -2025,7 +1969,7 @@ _syncEmptyStateUI() {
   async _getEditorElementForType(type, cfg) {
     // Log the start of an editor lookup; this uses console.debug so it is visible
     try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
-    const helpers = await this._getHelpers();
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
   
     // Warm the module before asking for the class only for built‑in HA cards.
     // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
@@ -2143,7 +2087,7 @@ _syncEmptyStateUI() {
   // This helps custom cards that register their editor tag after the element loads.
   async _ensureCardModuleLoaded(type, cfg) {
     try {
-      const helpers = await this._getHelpers();
+      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
       // Use stub configuration to warm the module by instantiating the card. This
       // triggers the dynamic import of the card and its editor without causing
       // validation errors (we'll ignore errors silently). After warmup, the
@@ -2930,7 +2874,7 @@ _syncEmptyStateUI() {
         cardHost.innerHTML = '';
         await raf();
         try {
-          const helpers = await this._getHelpers();
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
           if (seq !== pickSeq) return;
           const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
           if (seq !== pickSeq) return;
@@ -2986,7 +2930,7 @@ _syncEmptyStateUI() {
 
         // Try official getStubConfig once (may load modules) to improve defaults
         try {
-          const helpers = await this._getHelpers();
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
           const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
           if (CardClass?.getStubConfig) {
             const all = Object.keys(this.hass?.states || {});
@@ -3164,7 +3108,7 @@ _syncEmptyStateUI() {
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
 async _getStubConfigForType(type) {
-    const helpers = await this._getHelpers();
+    const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     let CardClass = null;
 
     // Provide a blank stub when the user selects the "Custom Card" entry.
@@ -3487,7 +3431,7 @@ async _getStubConfigForType(type) {
                 this.cardContainer.appendChild(p);
               } else {
                 const el = await this._createCard(conf.card);
-                const wrap = this._makeWrapper(el, cfg);
+                const wrap = this._makeWrapper(el);
                 this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
@@ -3659,7 +3603,7 @@ async _getStubConfigForType(type) {
               this.cardContainer.appendChild(p);
             } else {
               const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el, cfg);
+              const wrap = this._makeWrapper(el);
               this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
               wrap.style.width  = `${conf.size?.width||140}px`;
               wrap.style.height = `${conf.size?.height||100}px`;
