@@ -30,6 +30,11 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+  constructor() {
+    super();
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+  }
+
 
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
@@ -405,6 +410,9 @@ _applyGridVars() {
     // Store incoming config and update properties
     this._config = config;
     this.storageKey = config.storage_key || undefined;
+    this._instanceKey = this.storageKey || `ddc_${Date.now().toString(36)}`;
+    this.setAttribute('data-ddc-key', this._instanceKey);
+
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
@@ -468,7 +476,7 @@ _applyGridVars() {
 
     if (!this._built) {
       this._built = true;
-      this.innerHTML = `
+      this.shadowRoot.innerHTML = `
         <style>
           .ddc-root{
             position:relative;
@@ -853,15 +861,15 @@ _applyGridVars() {
           <div class="card-container" id="cardContainer"></div>
         </div>
       `;
-      this.cardContainer = this.querySelector('#cardContainer');
-      this.addButton     = this.querySelector('#addCardBtn');
-      this.reloadBtn     = this.querySelector('#reloadBtn');
-      this.diagBtn       = this.querySelector('#diagBtn');
-      this.exitEditBtn   = this.querySelector('#exitEditBtn');
-      this.storeBadge    = this.querySelector('#storeBadge');
-      this.exportBtn     = this.querySelector('#exportBtn');
-      this.importBtn     = this.querySelector('#importBtn');
-      this.exploreBtn    = this.querySelector('#exploreBtn');      
+      this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+      this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
+      this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
+      this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
+      this.exitEditBtn   = this.shadowRoot.querySelector('#exitEditBtn');
+      this.storeBadge    = this.shadowRoot.querySelector('#storeBadge');
+      this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
+      this.importBtn     = this.shadowRoot.querySelector('#importBtn');
+      this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn');      
 
       this._applyGridVars();
       
@@ -903,19 +911,16 @@ _applyGridVars() {
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
     this.__cfgReady = true;
-    // Defer initial build until both config is set and backend probe (if any) finished.
+    // Build only when backend probe (if any) finished; otherwise wait.
     if (prevKey !== this.storageKey && this.__booted) {
-      // storage_key changed after boot: rebuild from storage
       this._initialLoad(true);
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
       this._initialLoad();
     } else {
-      // no rebuild now; sizing adjustments ok for visual changes
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
-
   }
 
   connectedCallback() {
@@ -959,7 +964,7 @@ _applyGridVars() {
     LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
-      this._probeBackend().then(() => { if (!this.__booted && this.__cfgReady) { this.__booted = true; this._initialLoad(true); } });
+      this._probeBackend().then(() => { this.__probed = true; if (!this.__booted && this.__cfgReady) { this.__booted = true; this._initialLoad(true); } });
     }
     const wraps = this.cardContainer?.children || [];
     for (const wrap of wraps) {
