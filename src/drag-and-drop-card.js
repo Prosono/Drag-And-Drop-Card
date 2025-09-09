@@ -567,8 +567,11 @@ _applyGridVars() {
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
           }
-          /* When content overflows (view mode), we toggle this class */
-          .card-wrapper.ddc-scrollable{ scrollbar-gutter: stable; }
+
+/* When content overflows in view mode, we add .ddc-scrollable to enable scrolling */
+.card-wrapper.ddc-scrollable { scrollbar-gutter: stable; overflow:auto; }
+.card-wrapper.editing.ddc-scrollable { overflow: visible; }
+
           .card-wrapper.dragging{
             cursor:grabbing;
             touch-action: none;
@@ -1105,7 +1108,7 @@ this._initCardInteract(wrap);
     }
     this._updateStoreBadge();
     this._syncEmptyStateUI();
-
+    this._updateAllScrollabilities();
     // loading complete
     this._loading = false;
 
@@ -1141,8 +1144,6 @@ this._initCardInteract(wrap);
     this.diagBtn.style.display     = this.editMode ? 'inline-block' : 'none';
     this.exitEditBtn.style.display = this.editMode ? 'inline-block' : 'none';
     this.exportBtn.style.display   = this.editMode ? 'inline-block' : 'none';
-    // Refresh wrapper scrollbars based on mode/content
-    this._updateAllScrollabilities();
     this.importBtn.style.display   = this.editMode ? 'inline-block' : 'none';
     this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
     this.storeBadge.style.display  = this.editMode ? 'inline-block' : 'none';
@@ -1175,7 +1176,11 @@ this._initCardInteract(wrap);
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
+  
+    // Re-evaluate scrollbars when mode changes
+    this._updateAllScrollabilities();
   }
+
 
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
@@ -1519,7 +1524,6 @@ _syncEmptyStateUI() {
           for (const m of this.__groupDrag.members) m.classList.remove('dragging');
           this._resizeContainer();
           if (this._isContainerFixed()) this._clampAllCardsInside();
-          this._updateScrollability(wrap);
           this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
           this.__groupDrag = null;
           this.__collisionOriginals = null;
@@ -1595,8 +1599,8 @@ _syncEmptyStateUI() {
         
           this._resizeContainer();
           if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
-          this._updateScrollability(wrap);
           this._queueSave('resize-end');
+          this._updateScrollability(wrap);
         }
       }
     });
@@ -1617,39 +1621,38 @@ _syncEmptyStateUI() {
     });
   }
 
-  
-  /* ------------------------ Scrollability helpers ------------------------ */
+  /* ------------------------ Card creation & wrapper ------------------------ */
+  /* ------------------------ Scrollability helpers (auto-applied in view mode) ------------------------ */
   _updateScrollability(wrap) {
     try {
       if (!wrap || wrap.dataset?.placeholder) return;
-      // When editing, keep overflow visible so resize handle and chip are accessible
-      if (wrap.classList?.contains('editing')) {
-        wrap.style.overflow = 'visible';
-        wrap.classList.remove('ddc-scrollable');
-        return;
-      }
       const card = wrap.firstElementChild;
       if (!card) return;
-      // Compute if content needs scrollbars
-      const needsScroll = (card.scrollHeight > wrap.clientHeight + 1) ||
-                          (card.scrollWidth  > wrap.clientWidth  + 1);
-      if (needsScroll) {
-        wrap.style.overflow = 'auto';
-        wrap.classList.add('ddc-scrollable');
-      } else {
-        wrap.style.overflow = 'visible';
+      // In edit mode we keep overflow visible so handles/chips are usable
+      if (this.editMode) {
         wrap.classList.remove('ddc-scrollable');
+        wrap.style.overflow = 'visible';
+        return;
       }
-    } catch {}
+      const needsV = card.scrollHeight > wrap.clientHeight + 1;
+      const needsH = card.scrollWidth  > wrap.clientWidth  + 1;
+      if (needsV || needsH) {
+        wrap.classList.add('ddc-scrollable');
+        wrap.style.overflow = 'auto';
+      } else {
+        wrap.classList.remove('ddc-scrollable');
+        wrap.style.overflow = 'visible';
+      }
+    } catch (e) { /* no-op */ }
   }
 
   _updateAllScrollabilities() {
     try {
       const wraps = this.cardContainer?.querySelectorAll('.card-wrapper') || [];
-      wraps.forEach(w => this._updateScrollability(w));
-    } catch {}
+      wraps.forEach((w) => this._updateScrollability(w));
+    } catch (e) { /* no-op */ }
   }
-/* ------------------------ Card creation & wrapper ------------------------ */
+
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
@@ -1771,11 +1774,11 @@ _syncEmptyStateUI() {
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-// DDC patch: trigger one-time rebuild so nested card_mod attaches
-try { this._rebuildOnce(cardEl); } catch {}
-// Check scrollability after initial render (2x rAF to allow layout)
+// After first render, reassess scrollability (wait for layout)
 requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
-return wrap;
+    // DDC patch: trigger one-time rebuild so nested card_mod attaches
+    try { this._rebuildOnce(cardEl); } catch {}
+    return wrap;
   }
 
   _makePlaceholderAt(x=0,y=0,w=100,h=100) {
