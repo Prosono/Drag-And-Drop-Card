@@ -420,6 +420,16 @@ _applyGridVars() {
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+    // Prefer a stable storage_key: reuse last known if YAML omitted it
+    if (!config.storage_key) {
+      let remembered = null;
+      try { remembered = localStorage.getItem('ddc_last_key'); } catch {}
+      const key = remembered || this.storageKey || `layout_${Date.now().toString(36)}`;
+      config.storage_key = key;
+      // keep it reflected in the live config for HA editors
+      this._config = { ...config };
+    }
+
     // Track old key so we only rebuild when storage_key actually changes
     // Auto‑assign a storage key if none provided
     if (!config.storage_key) {
@@ -435,6 +445,7 @@ _applyGridVars() {
     // Store incoming config and update properties
     this._config = config;
     this.storageKey = config.storage_key || undefined;
+    try { if (this.storageKey) localStorage.setItem('ddc_last_key', this.storageKey); } catch {}
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
@@ -4024,6 +4035,7 @@ if (!customElements.get('drag-and-drop-card')) {
         const importedKey = importedOpts.storage_key;
         const currentKey  = this.storageKey;
         const targetKey   = importedKey || currentKey || `layout_${Date.now().toString(36)}`;
+        try { localStorage.setItem('ddc_last_key', targetKey); } catch {}
 
         // Persist the FULL imported JSON exactly as-is to storage
         let savedOK = false;
@@ -4046,7 +4058,19 @@ if (!customElements.get('drag-and-drop-card')) {
           this._dbgPush?.('import', 'Persist failed', { error: String(e) });
         }
 
-        // Apply options + cards to the live UI
+        
+        // Update HA editor (visual + YAML) if available so storage_key persists in config
+        try {
+          const hui = findHuiEditor && findHuiEditor();
+          const mergedForEditor = { type:'custom:drag-and-drop-card', ...(this._config||{}), ...(json.options||{}), storage_key: targetKey };
+          if (hui) {
+            try { pushToVisualInputs && pushToVisualInputs(hui, mergedForEditor); } catch {}
+            try { pushYaml && pushYaml(hui, mergedForEditor); } catch {}
+            // Notify config-changed for live editor
+            try { hui.dispatchEvent(new CustomEvent('config-changed', { detail: { config: mergedForEditor }, bubbles: true, composed: true })); } catch {}
+          }
+        } catch {}
+// Apply options + cards to the live UI
         try {
           // Switch runtime to the imported (or chosen) storage key
           this.storageKey = targetKey;
