@@ -3901,17 +3901,18 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite + deep editor field sync (v13)
-   - Sets ALL fields exactly like storage_key/grid by updating the actual inputs
-     inside hui-card-editor's shadow DOM (deep traversal).
-   - Also updates YAML pane.
+   Drag & Drop Card — Import overwrite with editor host-chain sync (v14)
+   - Works in native HA editor by locating the *owning* hui-card-editor via
+     shadow-root host chain; calls editor.setConfig(newConfig) and fires
+     'config-changed' on the editor itself. Also updates YAML editor content.
+   - Works in DnD mode (no HA editor) by applying options, rebuilding, saving.
    ========================================================================== */
 (() => {
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV13Patched) return true;
-    ctor.prototype.__ddcImportV13Patched = true;
+    if (ctor.prototype.__ddcImportV14Patched) return true;
+    ctor.prototype.__ddcImportV14Patched = true;
 
     const DEFAULTS = {
       storage_key: undefined,
@@ -3930,80 +3931,36 @@ if (!customElements.get('drag-and-drop-card')) {
       container_preset_orientation: 'auto'
     };
 
-    const deepWalk = function*(root) {
-      if (!root) return;
-      yield root;
-      const kids = root.children || root.childNodes || [];
-      for (const k of kids) {
-        if (k) {
-          yield* deepWalk(k);
-          if (k.shadowRoot) yield* deepWalk(k.shadowRoot);
+    // Ascend composed tree to find the owning hui-card-editor (if any)
+    function getOwningEditor(node) {
+      let n = node;
+      const seen = new Set();
+      while (n && !seen.has(n)) {
+        seen.add(n);
+        if (n.localName === 'hui-card-editor') return n;
+        const root = (n.getRootNode && n.getRootNode()) || null;
+        if (root && root.host) {
+          n = root.host;
+          continue;
         }
+        // try parentNode/host fallbacks
+        n = n.parentNode || n.host || null;
       }
-    };
+      return null;
+    }
 
-    const findHuiEditor = () => {
-      const roots = [document];
-      document.querySelectorAll('ha-dialog, mwc-dialog, ha-more-info-dialog').forEach(d => {
-        roots.push(d);
-        if (d.shadowRoot) roots.push(d.shadowRoot);
-      });
-      for (const r of roots) {
-        try {
-          const el = (r.shadowRoot || r).querySelector?.('hui-card-editor') || r.querySelector?.('hui-card-editor');
-          if (el) return el;
-        } catch {}
-      }
-      return document.querySelector('hui-card-editor') || null;
-    };
-
-    const pushToVisualInputs = (hui, cfg) => {
-      if (!hui) return;
-      const setInput = (node, val) => { node.value = val; node.dispatchEvent(new Event('input', {bubbles:true, composed:true})); };
-      const setCheck = (node, val) => { node.checked = !!val; node.dispatchEvent(new Event('change', {bubbles:true, composed:true})); };
-      const setSelect = (node, val) => { node.value = val; node.dispatchEvent(new Event('change', {bubbles:true, composed:true})); };
-      const want = {
-        '#storage_key':            (n)=>setInput(n, cfg.storage_key ?? ''),
-        '#grid':                   (n)=>setInput(n, String(cfg.grid ?? 10)),
-        '#liveSnap':               (n)=>setCheck(n, !!cfg.drag_live_snap),
-        '#autoSave':               (n)=>setCheck(n, cfg.auto_save !== false),
-        '#autoSaveDebounce':       (n)=>setInput(n, String(cfg.auto_save_debounce ?? 800)),
-        '#containerBg':            (n)=>setInput(n, cfg.container_background ?? 'transparent'),
-        '#cardBg':                 (n)=>setInput(n, cfg.card_background ?? 'var(--ha-card-background, var(--card-background-color))'),
-        '#debug':                  (n)=>setCheck(n, !!cfg.debug),
-        '#noOverlap':              (n)=>setCheck(n, !!cfg.disable_overlap),
-        '#sizeMode':               (n)=>setSelect(n, cfg.container_size_mode || 'dynamic'),
-        '#sizeW':                  (n)=>setInput(n, cfg.container_fixed_width ?? ''),
-        '#sizeH':                  (n)=>setInput(n, cfg.container_fixed_height ?? ''),
-        '#sizePreset':             (n)=>setSelect(n, cfg.container_preset || 'fullhd'),
-        '#sizeOrientation':        (n)=>setSelect(n, cfg.container_preset_orientation || 'auto'),
-      };
-      const root = hui.shadowRoot || hui;
-      for (const node of deepWalk(root)) {
-        if (!(node instanceof Element)) continue;
-        for (const sel in want) {
-          if (node.matches && node.matches(sel)) {
-            try { want[sel](node); } catch {}
-          }
-        }
-      }
-    };
-
-    const pushYaml = (hui, cfg) => {
+    function updateYamlInEditor(editor, fullCfg) {
       try {
-        const full = { type: 'custom:drag-and-drop-card', ...cfg };
-        const y = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(full) : null;
-        if (!y) return;
-        const root = hui.shadowRoot || hui;
-        for (const node of deepWalk(root)) {
-          if (node.tagName && node.tagName.toLowerCase() === 'ha-code-editor') {
-            node.value = y;
-            node.dispatchEvent(new Event('input', {bubbles:true,composed:true}));
-            break;
-          }
+        const yaml = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(fullCfg) : null;
+        if (!yaml) return;
+        const sr = editor.shadowRoot || editor;
+        const ed = sr.querySelector('ha-code-editor');
+        if (ed) {
+          ed.value = yaml;
+          ed.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         }
       } catch {}
-    };
+    }
 
     const origImport = ctor.prototype._importDesign;
     ctor.prototype._importDesign = function() {
@@ -4020,31 +3977,39 @@ if (!customElements.get('drag-and-drop-card')) {
 
         const imported = json?.options || {};
         const merged = { ...DEFAULTS, ...imported };
-        const hui = findHuiEditor();
 
-        // Key policy
-        merged.storage_key = (hui ? (imported.storage_key || this.storageKey) : (this.storageKey || imported.storage_key)) || `layout_${Date.now().toString(36)}`;
+        // Determine editor context
+        const editor = getOwningEditor(this);
+
+        // Storage key strategy
+        if (editor) {
+          merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
+        } else {
+          merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
+        }
 
         // Apply to runtime
         this._applyImportedOptions(merged, true);
         this.storageKey = merged.storage_key;
         this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
 
-        // If HA editor open, push to both visual inputs and YAML
-        if (hui) {
-          pushToVisualInputs(hui, merged);
-          pushYaml(hui, merged);
-          // also tell the editor
+        // If in native editor, tell the editor itself (more reliable than querying document)
+        if (editor && typeof editor.setConfig === 'function') {
           try {
-            hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+            editor.setConfig(this._config);
+          } catch (e) { console.warn("hui-card-editor.setConfig failed", e); }
+          try {
+            editor.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config }, bubbles: true, composed: true }));
           } catch {}
+          // keep YAML in sync for code editor panel
+          updateYamlInEditor(editor, this._config);
         }
 
-        // Rebuild cards
+        // Rebuild all cards
         if (this.cardContainer) this.cardContainer.innerHTML = "";
         if (Array.isArray(json.cards) && json.cards.length) {
           for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
+            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
               const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
               if (conf.z != null) p.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(p);
