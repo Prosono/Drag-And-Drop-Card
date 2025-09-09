@@ -33,6 +33,31 @@ class DragAndDropCard extends HTMLElement {
   constructor() {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this.__rebuiltCards = new WeakSet();
+  }
+
+  
+  // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
+  _hasCardModDeep(cfg) {
+    try {
+      if (!cfg || typeof cfg !== 'object') return false;
+      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
+      if (cfg.card) return this._hasCardModDeep(cfg.card);
+      if (Array.isArray(cfg.cards)) {
+        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
+      }
+      return false;
+    } catch { return false; }
+  }
+  _rebuildOnce(el) {
+    try {
+      if (!el) return;
+      if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
+      if (this.__rebuiltCards.has(el)) return;
+      this.__rebuiltCards.add(el);
+      // Fire rebuild from the child card so Lovelace/card-mod re-attaches without recreating DDC itself
+      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+    } catch {}
   }
 
 
@@ -1048,7 +1073,9 @@ set hass(hass) {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          builtAny = true;
+          
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1059,7 +1086,9 @@ set hass(hass) {
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        this._initCardInteract(wrap);
+        
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1657,6 +1686,7 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
+          try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1675,6 +1705,7 @@ _syncEmptyStateUI() {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
+          try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
       }
@@ -1697,13 +1728,13 @@ _syncEmptyStateUI() {
         wrap.dataset.cfg = JSON.stringify(cfg);
         
         // Mark if this needs card_mod processing
-        if (cfg.type === 'custom:mod-card' || cfg.card_mod) {
-          wrap.dataset.needsCardMod = 'true';
-        }
+        if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
       }
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
+    // DDC patch: trigger one-time rebuild so nested card_mod attaches
+    try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
   }
 
@@ -3336,7 +3367,9 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    this._initCardInteract(wrap);
+    
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3531,7 +3564,9 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                this._initCardInteract(wrap);
+                
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3704,7 +3739,9 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              this._initCardInteract(wrap);
+              
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
             }
           }
         } else {
@@ -3864,20 +3901,19 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite & UI sync (v10)
-   - Works in DnD mode and HA editor
-   - Fully overwrites options, ensures storage_key policy, rebuilds, saves
-   - Updates *visible* editor fields if an editor is open (IDs: storage_key, grid,
-     liveSnap, autoSave, autoSaveDebounce, containerBg, cardBg, debug, noOverlap,
-     sizeMode, sizeW, sizeH, sizePreset, sizeOrientation)
-   - Fires config-changed so HA persists in native editor
+   Drag & Drop Card — Import overwrite & strong HA editor sync (v11)
+   - Overwrites all options on import
+   - Ensures storage_key policy (keep current in DnD mode; adopt in HA editor)
+   - Rebuilds cards & saves
+   - In native HA editor: pushes full config to BOTH the visual form and YAML editor
+     (updates form inputs, updates ha-code-editor text, sets editor's config)
    ========================================================================== */
 (() => {
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV10Patched) return true;
-    ctor.prototype.__ddcImportV10Patched = true;
+    if (ctor.prototype.__ddcImportV11Patched) return true;
+    ctor.prototype.__ddcImportV11Patched = true;
 
     const DEFAULTS = {
       storage_key: undefined,
@@ -3896,33 +3932,58 @@ if (!customElements.get('drag-and-drop-card')) {
       container_preset_orientation: 'auto'
     };
 
-    // Detect native HA editor context (very best-effort)
-    function isEditorOpen() {
+    const isEditorOpen = () => {
       try {
-        return !!document.querySelector("ha-dialog hui-card-editor, hui-card-editor, ha-dialog hui-edit-card");
+        return !!document.querySelector("ha-dialog hui-card-editor, hui-card-editor");
       } catch { return false; }
-    }
+    };
 
-    function syncVisibleEditorFields(cfg) {
-      // Sync any visible inputs by ID (our editor uses these IDs)
+    const pushToVisualForm = (cfg) => {
       const set = (sel, doIt) => {
         document.querySelectorAll(sel).forEach(el => { try { doIt(el); } catch {} });
       };
-      set("#storage_key", el => { el.value = cfg.storage_key ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#grid", el => { el.value = String(cfg.grid ?? 10); el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#liveSnap", el => { if (el.type==="checkbox") { el.checked = !!cfg.drag_live_snap; el.dispatchEvent(new Event("change", {bubbles:true})); } });
-      set("#autoSave", el => { if (el.type==="checkbox") { el.checked = cfg.auto_save !== false; el.dispatchEvent(new Event("change", {bubbles:true})); } });
-      set("#autoSaveDebounce", el => { el.value = String(cfg.auto_save_debounce ?? 800); el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#containerBg", el => { el.value = cfg.container_background ?? "transparent"; el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#cardBg", el => { el.value = cfg.card_background ?? "var(--ha-card-background, var(--card-background-color))"; el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#debug", el => { if (el.type==="checkbox") { el.checked = !!cfg.debug; el.dispatchEvent(new Event("change", {bubbles:true})); } });
-      set("#noOverlap", el => { if (el.type==="checkbox") { el.checked = !!cfg.disable_overlap; el.dispatchEvent(new Event("change", {bubbles:true})); } });
-      set("#sizeMode", el => { el.value = cfg.container_size_mode || "dynamic"; el.dispatchEvent(new Event("change", {bubbles:true})); });
-      set("#sizeW", el => { el.value = cfg.container_fixed_width ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#sizeH", el => { el.value = cfg.container_fixed_height ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
-      set("#sizePreset", el => { el.value = cfg.container_preset || "fullhd"; el.dispatchEvent(new Event("change", {bubbles:true})); });
-      set("#sizeOrientation", el => { el.value = cfg.container_preset_orientation || "auto"; el.dispatchEvent(new Event("change", {bubbles:true})); });
-    }
+      set("#storage_key", el => { el.value = cfg.storage_key ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#grid", el => { el.value = String(cfg.grid ?? 10); el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#liveSnap", el => { if (el.type==="checkbox") { el.checked = !!cfg.drag_live_snap; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
+      set("#autoSave", el => { if (el.type==="checkbox") { el.checked = cfg.auto_save !== false; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
+      set("#autoSaveDebounce", el => { el.value = String(cfg.auto_save_debounce ?? 800); el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#containerBg", el => { el.value = cfg.container_background ?? "transparent"; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#cardBg", el => { el.value = cfg.card_background ?? "var(--ha-card-background, var(--card-background-color))"; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#debug", el => { if (el.type==="checkbox") { el.checked = !!cfg.debug; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
+      set("#noOverlap", el => { if (el.type==="checkbox") { el.checked = !!cfg.disable_overlap; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
+      set("#sizeMode", el => { el.value = cfg.container_size_mode || "dynamic"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
+      set("#sizeW", el => { el.value = cfg.container_fixed_width ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#sizeH", el => { el.value = cfg.container_fixed_height ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
+      set("#sizePreset", el => { el.value = cfg.container_preset || "fullhd"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
+      set("#sizeOrientation", el => { el.value = cfg.container_preset_orientation || "auto"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
+    };
+
+    const pushToYamlEditor = (cfg) => {
+      try {
+        const y = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(cfg) : null;
+        const code = document.querySelector("ha-dialog ha-code-editor, hui-card-editor ha-code-editor");
+        if (y && code) {
+          // ha-code-editor wraps a <paper-textarea> or codemirror-like component;
+          // set 'value' and dispatch input to notify HA
+          code.value = y;
+          code.dispatchEvent(new Event("input", {bubbles:true, composed:true}));
+        }
+      } catch {}
+    };
+
+    const notifyHA = (fullConfig) => {
+      try {
+        // 1) fire on the editor if present
+        const editor = document.querySelector("ha-dialog hui-card-editor, hui-card-editor");
+        if (editor) {
+          // Some builds keep config on editor._config; update it
+          try { editor._config = fullConfig; editor.requestUpdate?.(); } catch {}
+          editor.dispatchEvent(new CustomEvent("config-changed", { detail: { config: fullConfig }, bubbles: true, composed: true }));
+        }
+        // 2) also fire on document as a last resort
+        document.dispatchEvent(new CustomEvent("config-changed", { detail: { config: fullConfig }, bubbles: true, composed: true }));
+      } catch {}
+    };
 
     const origImport = ctor.prototype._importDesign;
     ctor.prototype._importDesign = function() {
@@ -3940,32 +4001,27 @@ if (!customElements.get('drag-and-drop-card')) {
         const imported = json?.options || {};
         const merged = { ...DEFAULTS, ...imported };
 
-        // Decide key policy
-        const editor = isEditorOpen();
-        if (editor) {
+        // Pick storage_key strategy
+        const editorOpen = isEditorOpen();
+        if (editorOpen) {
           merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
         } else {
           merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
         }
 
-        // Apply options and persist in the in-memory config
+        // Apply options to runtime & config
         this._applyImportedOptions(merged, true);
         this.storageKey = merged.storage_key;
         this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
 
-        // If an editor is open (either HA or our editor dialog), sync visible inputs
-        if (editor) {
-          try { syncVisibleEditorFields(merged); } catch {}
-          // Notify HA so it persists the changes in YAML
-          try {
-            this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
-          } catch {}
-        } else {
-          // Our own in-card config dialog (if open) uses the same IDs; sync as well
-          try { syncVisibleEditorFields(merged); } catch {}
+        // If HA editor is open, push to both the form and YAML editor, and notify HA
+        if (editorOpen) {
+          pushToVisualForm(merged);
+          pushToYamlEditor(this._config);
+          notifyHA(this._config);
         }
 
-        // Rebuild all cards
+        // Rebuild cards
         if (this.cardContainer) this.cardContainer.innerHTML = "";
         if (Array.isArray(json.cards) && json.cards.length) {
           for (const conf of json.cards) {
@@ -3989,7 +4045,7 @@ if (!customElements.get('drag-and-drop-card')) {
         }
         this._resizeContainer?.();
 
-        // Save under the chosen key
+        // Save and update store badge
         await this._saveLayout(false);
         try { this._updateStoreBadge?.(); } catch {}
         try { this._probeBackend?.(); } catch {}
