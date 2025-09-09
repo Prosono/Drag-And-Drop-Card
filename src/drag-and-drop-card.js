@@ -4011,68 +4011,86 @@ if (!customElements.get('drag-and-drop-card')) {
       inp.onchange = async () => {
         const file = inp.files?.[0]; if (!file) return;
         let json;
-        try { json = JSON.parse(await file.text()); } catch (e) {
+        try {
+          json = JSON.parse(await file.text());
+        } catch (e) {
           console.error("Import failed — invalid file", e);
           this._toast?.("Import failed — invalid file.");
           return;
         }
 
-        const imported = json?.options || {};
-        const merged = { ...DEFAULTS, ...imported };
-        const hui = findHuiEditor();
+        // Determine target storage key from the imported design (fallbacks to current or a new one)
+        const importedOpts = json?.options || {};
+        const importedKey = importedOpts.storage_key;
+        const currentKey  = this.storageKey;
+        const targetKey   = importedKey || currentKey || `layout_${Date.now().toString(36)}`;
 
-        // Key policy
-        merged.storage_key = (hui ? (imported.storage_key || this.storageKey) : (this.storageKey || imported.storage_key)) || `layout_${Date.now().toString(36)}`;
-
-        // Apply to runtime
-        this._applyImportedOptions(merged, true);
-        this.storageKey = merged.storage_key;
-        this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
-
-        // If HA editor open, push to both visual inputs and YAML
-        if (hui) {
-          pushToVisualInputs(hui, merged);
-          pushYaml(hui, merged);
-          // also tell the editor
-          try {
-            hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
-          } catch {}
-        }
-
-        // Rebuild cards
-        if (this.cardContainer) this.cardContainer.innerHTML = "";
-        if (Array.isArray(json.cards) && json.cards.length) {
-          for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
-              if (conf.z != null) p.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(p);
-            } else {
-              const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-              wrap.style.width  = `${conf.size?.width  || 100}px`;
-              wrap.style.height = `${conf.size?.height || 100}px`;
-              if (conf.z != null) wrap.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(wrap);
-              this._initCardInteract(wrap);
+        // Persist the FULL imported JSON exactly as-is to storage
+        let savedOK = false;
+        try {
+          if (this._backendOK) {
+            await this._saveLayoutToBackend(targetKey, json);
+            // Mirror to current key too if YAML still points there (helps survive refresh before user saves YAML)
+            if (currentKey && currentKey !== targetKey) {
+              try { await this._saveLayoutToBackend(currentKey, json); } catch {}
+            }
+          } else {
+            try { localStorage.setItem(`ddc_local_${targetKey}`, JSON.stringify(json)); } catch {}
+            if (currentKey && currentKey !== targetKey) {
+              try { localStorage.setItem(`ddc_local_${currentKey}`, JSON.stringify(json)); } catch {}
             }
           }
-        } else {
-          this._showEmptyPlaceholder?.();
+          savedOK = true;
+        } catch (e) {
+          console.error('Failed to persist imported design', e);
+          this._dbgPush?.('import', 'Persist failed', { error: String(e) });
         }
-        this._resizeContainer?.();
 
-        await this._saveLayout(false);
+        // Apply options + cards to the live UI
+        try {
+          // Switch runtime to the imported (or chosen) storage key
+          this.storageKey = targetKey;
+          // Apply options without waiting for a rebuild
+          if (importedOpts) this._applyImportedOptions(importedOpts, true);
+
+          // Rebuild cards from file
+          if (this.cardContainer) this.cardContainer.innerHTML = '';
+          if (Array.isArray(json.cards) && json.cards.length) {
+            for (const conf of json.cards) {
+              if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                if (conf.z != null) p.style.zIndex = String(conf.z);
+                this.cardContainer.appendChild(p);
+              } else {
+                const el = await this._createCard(conf.card);
+                const wrap = this._makeWrapper(el);
+                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+                wrap.style.width  = `${conf.size?.width  || 100}px`;
+                wrap.style.height = `${conf.size?.height || 100}px`;
+                if (conf.z != null) wrap.style.zIndex = String(conf.z);
+                this.cardContainer.appendChild(wrap);
+                this._initCardInteract(wrap);
+              }
+            }
+          } else {
+            this._showEmptyPlaceholder?.();
+          }
+          this._resizeContainer?.();
+        } catch (e) {
+          this._dbgPush?.('import', 'Apply failed', { error: String(e) });
+        }
+
         try { this._updateStoreBadge?.(); } catch {}
         try { this._probeBackend?.(); } catch {}
-        this._toast?.("Design imported.");
+
+        this._toast?.(savedOK ? "Design imported and saved." : "Design imported (save failed).");
       };
       inp.click();
     };
 
     return true;
   };
+
 
   if (!install()) {
     if (window.customElements && window.customElements.whenDefined) {
