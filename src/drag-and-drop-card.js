@@ -3901,19 +3901,18 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite & strong HA editor sync (v11)
-   - Overwrites all options on import
-   - Ensures storage_key policy (keep current in DnD mode; adopt in HA editor)
-   - Rebuilds cards & saves
-   - In native HA editor: pushes full config to BOTH the visual form and YAML editor
-     (updates form inputs, updates ha-code-editor text, sets editor's config)
+   Drag & Drop Card — Import overwrite & hard HA editor update (v12)
+   - Fully overwrites options on import
+   - In native editor: directly calls hui-card-editor.setConfig(newConfig)
+     so both Visual and YAML editors refresh to the imported values.
+   - Also dispatches config-changed from the hui-card-editor node.
    ========================================================================== */
 (() => {
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV11Patched) return true;
-    ctor.prototype.__ddcImportV11Patched = true;
+    if (ctor.prototype.__ddcImportV12Patched) return true;
+    ctor.prototype.__ddcImportV12Patched = true;
 
     const DEFAULTS = {
       storage_key: undefined,
@@ -3932,57 +3931,20 @@ if (!customElements.get('drag-and-drop-card')) {
       container_preset_orientation: 'auto'
     };
 
-    const isEditorOpen = () => {
-      try {
-        return !!document.querySelector("ha-dialog hui-card-editor, hui-card-editor");
-      } catch { return false; }
-    };
-
-    const pushToVisualForm = (cfg) => {
-      const set = (sel, doIt) => {
-        document.querySelectorAll(sel).forEach(el => { try { doIt(el); } catch {} });
-      };
-      set("#storage_key", el => { el.value = cfg.storage_key ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#grid", el => { el.value = String(cfg.grid ?? 10); el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#liveSnap", el => { if (el.type==="checkbox") { el.checked = !!cfg.drag_live_snap; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
-      set("#autoSave", el => { if (el.type==="checkbox") { el.checked = cfg.auto_save !== false; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
-      set("#autoSaveDebounce", el => { el.value = String(cfg.auto_save_debounce ?? 800); el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#containerBg", el => { el.value = cfg.container_background ?? "transparent"; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#cardBg", el => { el.value = cfg.card_background ?? "var(--ha-card-background, var(--card-background-color))"; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#debug", el => { if (el.type==="checkbox") { el.checked = !!cfg.debug; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
-      set("#noOverlap", el => { if (el.type==="checkbox") { el.checked = !!cfg.disable_overlap; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); } });
-      set("#sizeMode", el => { el.value = cfg.container_size_mode || "dynamic"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
-      set("#sizeW", el => { el.value = cfg.container_fixed_width ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#sizeH", el => { el.value = cfg.container_fixed_height ?? ""; el.dispatchEvent(new Event("input", {bubbles:true, composed:true})); });
-      set("#sizePreset", el => { el.value = cfg.container_preset || "fullhd"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
-      set("#sizeOrientation", el => { el.value = cfg.container_preset_orientation || "auto"; el.dispatchEvent(new Event("change", {bubbles:true, composed:true})); });
-    };
-
-    const pushToYamlEditor = (cfg) => {
-      try {
-        const y = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(cfg) : null;
-        const code = document.querySelector("ha-dialog ha-code-editor, hui-card-editor ha-code-editor");
-        if (y && code) {
-          // ha-code-editor wraps a <paper-textarea> or codemirror-like component;
-          // set 'value' and dispatch input to notify HA
-          code.value = y;
-          code.dispatchEvent(new Event("input", {bubbles:true, composed:true}));
-        }
-      } catch {}
-    };
-
-    const notifyHA = (fullConfig) => {
-      try {
-        // 1) fire on the editor if present
-        const editor = document.querySelector("ha-dialog hui-card-editor, hui-card-editor");
-        if (editor) {
-          // Some builds keep config on editor._config; update it
-          try { editor._config = fullConfig; editor.requestUpdate?.(); } catch {}
-          editor.dispatchEvent(new CustomEvent("config-changed", { detail: { config: fullConfig }, bubbles: true, composed: true }));
-        }
-        // 2) also fire on document as a last resort
-        document.dispatchEvent(new CustomEvent("config-changed", { detail: { config: fullConfig }, bubbles: true, composed: true }));
-      } catch {}
+    const findHuiEditor = () => {
+      // Try common places (dialogs / global)
+      const tryRoots = [document];
+      document.querySelectorAll('ha-dialog, mwc-dialog, ha-more-info-dialog').forEach(d => {
+        tryRoots.push(d);
+        if (d.shadowRoot) tryRoots.push(d.shadowRoot);
+      });
+      for (const r of tryRoots) {
+        try {
+          const el = (r.shadowRoot || r).querySelector?.('hui-card-editor') || r.querySelector?.('hui-card-editor');
+          if (el) return el;
+        } catch {}
+      }
+      return document.querySelector('hui-card-editor') || null;
     };
 
     const origImport = ctor.prototype._importDesign;
@@ -4001,24 +3963,32 @@ if (!customElements.get('drag-and-drop-card')) {
         const imported = json?.options || {};
         const merged = { ...DEFAULTS, ...imported };
 
-        // Pick storage_key strategy
-        const editorOpen = isEditorOpen();
-        if (editorOpen) {
+        // Determine key: if editor exists, adopt the imported key when present
+        const hui = findHuiEditor();
+        if (hui) {
           merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
         } else {
           merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
         }
 
-        // Apply options to runtime & config
+        // Apply to runtime & config
         this._applyImportedOptions(merged, true);
         this.storageKey = merged.storage_key;
         this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
 
-        // If HA editor is open, push to both the form and YAML editor, and notify HA
-        if (editorOpen) {
-          pushToVisualForm(merged);
-          pushToYamlEditor(this._config);
-          notifyHA(this._config);
+        // If the native editor is open, **force** it to adopt the new config
+        if (hui && typeof hui.setConfig === 'function') {
+          try {
+            hui.setConfig(this._config);
+            // Let the dialog settle, then nudge the YAML editor if present
+            setTimeout(() => {
+              try {
+                hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+              } catch {}
+            }, 0);
+          } catch (e) {
+            console.warn("Could not push config to hui-card-editor:", e);
+          }
         }
 
         // Rebuild cards
