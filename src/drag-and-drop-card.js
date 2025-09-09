@@ -3864,19 +3864,20 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite & storage_key fix (v9)
-   - Works in DnD edit mode and in HA editor
-   - Resets to defaults, applies imported options, and ensures a storage_key
-   - In DnD mode, IGNORE imported storage_key (keeps current) to persist across reloads
-   - In HA editor, ADOPT imported storage_key and push full config to the editor
-   - Dispatches `config-changed` with {bubbles:true,composed:true} so HA persists it
+   Drag & Drop Card — Import overwrite & UI sync (v10)
+   - Works in DnD mode and HA editor
+   - Fully overwrites options, ensures storage_key policy, rebuilds, saves
+   - Updates *visible* editor fields if an editor is open (IDs: storage_key, grid,
+     liveSnap, autoSave, autoSaveDebounce, containerBg, cardBg, debug, noOverlap,
+     sizeMode, sizeW, sizeH, sizePreset, sizeOrientation)
+   - Fires config-changed so HA persists in native editor
    ========================================================================== */
 (() => {
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV9Patched) return true;
-    ctor.prototype.__ddcImportV9Patched = true;
+    if (ctor.prototype.__ddcImportV10Patched) return true;
+    ctor.prototype.__ddcImportV10Patched = true;
 
     const DEFAULTS = {
       storage_key: undefined,
@@ -3895,43 +3896,34 @@ if (!customElements.get('drag-and-drop-card')) {
       container_preset_orientation: 'auto'
     };
 
-    // Helper: detect if HA card editor is open for this card
-    function isHAEditorOpen(host) {
+    // Detect native HA editor context (very best-effort)
+    function isEditorOpen() {
       try {
-        // If any ancestor or global dialog contains a hui-card-editor, we assume editor
-        const root = host.getRootNode();
-        if (root && root.host && (root.host.localName?.includes('hui-'))) return true;
-        // Global dialogs
-        if (document.querySelector('hui-card-editor, ha-dialog hui-card-editor')) return true;
-      } catch {}
-      return false;
+        return !!document.querySelector("ha-dialog hui-card-editor, hui-card-editor, ha-dialog hui-edit-card");
+      } catch { return false; }
     }
 
-    // Helper: update the visible editor controls to reflect config
-    function syncEditorsFromConfig(host, cfg) {
-      try {
-        const set = (sel, fn) => {
-          const list = host._deepQueryAll ? host._deepQueryAll(sel) : [];
-          list.forEach((el) => { try { fn(el); } catch {} });
-        };
-        set('#storage_key', el => { if (el.tagName === 'INPUT') { el.value = cfg.storage_key ?? ''; el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#grid', el => { if (el.tagName === 'INPUT') { el.value = String(cfg.grid ?? 10); el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#drag_live_snap', el => { if (el.type === 'checkbox') { el.checked = !!cfg.drag_live_snap; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#auto_save', el => { if (el.type === 'checkbox') { el.checked = cfg.auto_save !== false; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#auto_save_debounce', el => { if (el.tagName === 'INPUT') { el.value = String(cfg.auto_save_debounce ?? 800); el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#container_background', el => { if (el.tagName === 'INPUT') { el.value = cfg.container_background ?? 'transparent'; el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#card_background', el => { if (el.tagName === 'INPUT') { el.value = cfg.card_background ?? 'var(--ha-card-background, var(--card-background-color))'; el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#debug', el => { if (el.type === 'checkbox') { el.checked = !!cfg.debug; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#disable_overlap', el => { if (el.type === 'checkbox') { el.checked = !!cfg.disable_overlap; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#container_size_mode', el => { if (el.tagName === 'SELECT') { el.value = cfg.container_size_mode || 'dynamic'; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#container_fixed_width', el => { if (el.tagName === 'INPUT') { el.value = cfg.container_fixed_width ?? ''; el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#container_fixed_height', el => { if (el.tagName === 'INPUT') { el.value = cfg.container_fixed_height ?? ''; el.dispatchEvent(new Event('input', { bubbles: true })); } });
-        set('#container_preset', el => { if (el.tagName === 'SELECT') { el.value = cfg.container_preset || 'fullhd'; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-        set('#container_preset_orientation', el => { if (el.tagName === 'SELECT') { el.value = cfg.container_preset_orientation || 'auto'; el.dispatchEvent(new Event('change', { bubbles: true })); } });
-      } catch {}
+    function syncVisibleEditorFields(cfg) {
+      // Sync any visible inputs by ID (our editor uses these IDs)
+      const set = (sel, doIt) => {
+        document.querySelectorAll(sel).forEach(el => { try { doIt(el); } catch {} });
+      };
+      set("#storage_key", el => { el.value = cfg.storage_key ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#grid", el => { el.value = String(cfg.grid ?? 10); el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#liveSnap", el => { if (el.type==="checkbox") { el.checked = !!cfg.drag_live_snap; el.dispatchEvent(new Event("change", {bubbles:true})); } });
+      set("#autoSave", el => { if (el.type==="checkbox") { el.checked = cfg.auto_save !== false; el.dispatchEvent(new Event("change", {bubbles:true})); } });
+      set("#autoSaveDebounce", el => { el.value = String(cfg.auto_save_debounce ?? 800); el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#containerBg", el => { el.value = cfg.container_background ?? "transparent"; el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#cardBg", el => { el.value = cfg.card_background ?? "var(--ha-card-background, var(--card-background-color))"; el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#debug", el => { if (el.type==="checkbox") { el.checked = !!cfg.debug; el.dispatchEvent(new Event("change", {bubbles:true})); } });
+      set("#noOverlap", el => { if (el.type==="checkbox") { el.checked = !!cfg.disable_overlap; el.dispatchEvent(new Event("change", {bubbles:true})); } });
+      set("#sizeMode", el => { el.value = cfg.container_size_mode || "dynamic"; el.dispatchEvent(new Event("change", {bubbles:true})); });
+      set("#sizeW", el => { el.value = cfg.container_fixed_width ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#sizeH", el => { el.value = cfg.container_fixed_height ?? ""; el.dispatchEvent(new Event("input", {bubbles:true})); });
+      set("#sizePreset", el => { el.value = cfg.container_preset || "fullhd"; el.dispatchEvent(new Event("change", {bubbles:true})); });
+      set("#sizeOrientation", el => { el.value = cfg.container_preset_orientation || "auto"; el.dispatchEvent(new Event("change", {bubbles:true})); });
     }
 
-    // Override import
     const origImport = ctor.prototype._importDesign;
     ctor.prototype._importDesign = function() {
       const inp = document.createElement('input');
@@ -3940,44 +3932,44 @@ if (!customElements.get('drag-and-drop-card')) {
         const file = inp.files?.[0]; if (!file) return;
         let json;
         try { json = JSON.parse(await file.text()); } catch (e) {
-          console.error('Import failed — invalid file', e);
-          this._toast?.('Import failed — invalid file.');
+          console.error("Import failed — invalid file", e);
+          this._toast?.("Import failed — invalid file.");
           return;
         }
 
-        const inEditor = isHAEditorOpen(this);
         const imported = json?.options || {};
-        // Full overwrite baseline
         const merged = { ...DEFAULTS, ...imported };
 
-        // Decide the storage key policy
-        if (inEditor) {
-          // adopt imported key if present; else keep current; else generate
+        // Decide key policy
+        const editor = isEditorOpen();
+        if (editor) {
           merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
         } else {
-          // ignore imported key; keep current (so refresh uses the same key)
-          merged.storage_key = this.storageKey || `layout_${Date.now().toString(36)}`;
+          merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
         }
 
-        // Apply options (reflected to CSS, grid, etc.)
+        // Apply options and persist in the in-memory config
         this._applyImportedOptions(merged, true);
         this.storageKey = merged.storage_key;
-        // Update in-memory config used by HA
-        this._config = { type: 'custom:drag-and-drop-card', ...(this._config || {}), ...merged };
+        this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
 
-        // If editor is open, push values into its controls and notify HA of config change
-        if (inEditor) {
-          try { syncEditorsFromConfig(this, merged); } catch {}
+        // If an editor is open (either HA or our editor dialog), sync visible inputs
+        if (editor) {
+          try { syncVisibleEditorFields(merged); } catch {}
+          // Notify HA so it persists the changes in YAML
           try {
-            this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config }, bubbles: true, composed: true }));
+            this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
           } catch {}
+        } else {
+          // Our own in-card config dialog (if open) uses the same IDs; sync as well
+          try { syncVisibleEditorFields(merged); } catch {}
         }
 
-        // Replace card content
-        if (this.cardContainer) this.cardContainer.innerHTML = '';
+        // Rebuild all cards
+        if (this.cardContainer) this.cardContainer.innerHTML = "";
         if (Array.isArray(json.cards) && json.cards.length) {
           for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
               const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
               if (conf.z != null) p.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(p);
@@ -4001,7 +3993,7 @@ if (!customElements.get('drag-and-drop-card')) {
         await this._saveLayout(false);
         try { this._updateStoreBadge?.(); } catch {}
         try { this._probeBackend?.(); } catch {}
-        this._toast?.('Design imported.');
+        this._toast?.("Design imported.");
       };
       inp.click();
     };
