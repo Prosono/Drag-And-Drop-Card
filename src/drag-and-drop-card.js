@@ -33,31 +33,6 @@ class DragAndDropCard extends HTMLElement {
   constructor() {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
-    this.__rebuiltCards = new WeakSet();
-  }
-
-  
-  // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
-  _hasCardModDeep(cfg) {
-    try {
-      if (!cfg || typeof cfg !== 'object') return false;
-      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
-      if (cfg.card) return this._hasCardModDeep(cfg.card);
-      if (Array.isArray(cfg.cards)) {
-        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
-      }
-      return false;
-    } catch { return false; }
-  }
-  _rebuildOnce(el) {
-    try {
-      if (!el) return;
-      if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
-      if (this.__rebuiltCards.has(el)) return;
-      this.__rebuiltCards.add(el);
-      // Fire rebuild from the child card so Lovelace/card-mod re-attaches without recreating DDC itself
-      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-    } catch {}
   }
 
 
@@ -1073,9 +1048,7 @@ set hass(hass) {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-builtAny = true;
+          builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1086,9 +1059,7 @@ builtAny = true;
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+        this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1686,7 +1657,6 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
-          try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1705,7 +1675,6 @@ _syncEmptyStateUI() {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
-          try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
       }
@@ -1728,13 +1697,13 @@ _syncEmptyStateUI() {
         wrap.dataset.cfg = JSON.stringify(cfg);
         
         // Mark if this needs card_mod processing
-        if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
+        if (cfg.type === 'custom:mod-card' || cfg.card_mod) {
+          wrap.dataset.needsCardMod = 'true';
+        }
       }
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-    // DDC patch: trigger one-time rebuild so nested card_mod attaches
-    try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
   }
 
@@ -3367,9 +3336,7 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+    this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3564,9 +3531,7 @@ this._initCardInteract(wrap);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+                this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3739,9 +3704,7 @@ this._initCardInteract(wrap);
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+              this._initCardInteract(wrap);
             }
           }
         } else {
@@ -3901,85 +3864,108 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — integrated card-mod fix (v6b, global helpers patch + non-enum marker)
+   Drag & Drop Card — Import overwrite patch (v7)
+   Goal: When importing a design, overwrite ALL card config fields (key, styling,
+   backgrounds, grid, etc.) with the imported options, not a merge.
+   Implementation: call original _applyImportedOptions() twice — first with
+   known defaults to reset everything, then with the imported options.
    ========================================================================== */
 (() => {
-  const mark = "__ddcWrapApplied";
-
-  const setMark = (obj) => {
-    try { Object.defineProperty(obj, mark, { value: true, enumerable: false, configurable: true }); } catch {}
-  };
-
-  const isMarked = (obj) => !!(obj && typeof obj === "object" && obj[mark]);
-
-  const deepWrapConfig = (cfg) => {
-    if (!cfg || typeof cfg !== "object") return cfg;
-    if (isMarked(cfg)) return cfg;
-
-    // shallow clone
-    const c = Array.isArray(cfg) ? cfg.map(deepWrapConfig) : { ...cfg };
-
-    if (Array.isArray(c.cards)) c.cards = c.cards.map(deepWrapConfig);
-    if (c.card) c.card = deepWrapConfig(c.card);
-
-    if (String(c.type || "").toLowerCase() === "custom:mod-card") {
-      setMark(c);
-      if (c.card) c.card = deepWrapConfig(c.card);
-      return c;
-    }
-
-    if (c.card_mod) {
-      const card_mod = c.card_mod;
-      delete c.card_mod;
-      const wrapped = { type: "custom:mod-card", card_mod, card: c };
-      setMark(wrapped);
-      return wrapped;
-    }
-
-    setMark(c);
-    return c;
-  };
-
-  const patchHelpers = (helpers) => {
-    try {
-      if (!helpers || helpers.__ddcV6bPatched) return helpers;
-      helpers.__ddcV6bPatched = true;
-
-      const origCreate = helpers.createCardElement?.bind(helpers);
-      if (typeof origCreate === "function") {
-        helpers.createCardElement = (cfg) => {
-          try { cfg = deepWrapConfig(cfg); } catch {}
-          return origCreate(cfg);
-        };
-      }
-      const origCreateHui = helpers.createHuiCardElement?.bind(helpers);
-      if (typeof origCreateHui === "function") {
-        helpers.createHuiCardElement = (cfg) => {
-          try { cfg = deepWrapConfig(cfg); } catch {}
-          return origCreateHui(cfg);
-        };
-      }
-    } catch {}
-    return helpers;
-  };
+  const defaults = () => ({
+    // keep storage_key as-is unless provided by import
+    grid: 10,
+    drag_live_snap: false,
+    auto_save: true,
+    auto_save_debounce: 800,
+    container_background: 'transparent',
+    card_background: 'var(--ha-card-background, var(--card-background-color))',
+    debug: false,
+    disable_overlap: false,
+    container_size_mode: 'dynamic',
+    container_fixed_width: null,
+    container_fixed_height: null,
+    container_preset: 'fullhd',
+    container_preset_orientation: 'auto'
+  });
 
   const install = () => {
-    if (!window.loadCardHelpers) return false;
-    if (window.loadCardHelpers.__ddcV6bPatched) return true;
-    const orig = window.loadCardHelpers.bind(window);
-    window.loadCardHelpers = async function() {
-      const h = await orig();
-      return patchHelpers(h);
+    const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
+    if (!ctor || !ctor.prototype) return false;
+    if (ctor.prototype.__ddcImportOverwritePatched) return true;
+    ctor.prototype.__ddcImportOverwritePatched = true;
+
+    const origApply = ctor.prototype._applyImportedOptions;
+    const origImport = ctor.prototype._importDesign;
+
+    // Replace _importDesign to do a full overwrite semantics
+    ctor.prototype._importDesign = function() {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json';
+      inp.onchange = async () => {
+        const file = inp.files?.[0]; if (!file) return;
+        const txt = await file.text();
+        try {
+          const json = JSON.parse(txt);
+
+          // Build options to apply
+          let opts = json.options || {};
+          // v1 fallback (only grid existed)
+          if (!json.options && typeof json.grid === 'number') opts = { grid: json.grid };
+
+          // 1) Reset all known fields to defaults
+          try { origApply.call(this, defaults(), false); } catch {}
+
+          // 2) If import provides storage_key, include it
+          if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
+            // Also update the HA editor immediately
+            try {
+              const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}), storage_key: opts.storage_key };
+              this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updatedCfg } }));
+            } catch {}
+          }
+
+          // 3) Apply imported options (over the defaults we just set)
+          try { origApply.call(this, opts || {}, true); } catch {}
+
+          // 4) Rebuild the layout from imported cards (full replace)
+          this.cardContainer.innerHTML = '';
+          if (Array.isArray(json.cards) && json.cards.length) {
+            for (const conf of json.cards) {
+              if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                this.cardContainer.appendChild(p);
+              } else {
+                const el = await this._createCard(conf.card);
+                const wrap = this._makeWrapper(el);
+                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+                wrap.style.width  = `${conf.size?.width||140}px`;
+                wrap.style.height = `${conf.size?.height||100}px`;
+                if (conf.z != null) wrap.style.zIndex = String(conf.z);
+                this.cardContainer.appendChild(wrap);
+                this._initCardInteract(wrap);
+              }
+            }
+          } else {
+            this._showEmptyPlaceholder();
+          }
+
+          this._resizeContainer();
+          await this._saveLayout(false);
+          this._toast('Design imported (all options overwritten).');
+        } catch (e) {
+          console.error('Import failed', e);
+          this._toast('Import failed — invalid file.');
+        }
+      };
+      inp.click();
     };
-    window.loadCardHelpers.__ddcV6bPatched = true;
+
     return true;
   };
 
   if (!install()) {
     if (window.customElements && window.customElements.whenDefined) {
-      window.customElements.whenDefined("hui-view").then(install);
+      window.customElements.whenDefined("drag-and-drop-card").then(install);
     }
-    const iv = setInterval(() => { if (install()) clearInterval(iv); }, 200);
-    setTimeout(() => clearInterval(iv), 5000);
   }
 })();
