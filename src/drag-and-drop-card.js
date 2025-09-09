@@ -14,7 +14,7 @@ if (!window.interact) window.interact = interact;
 if (!window.jsyaml) window.jsyaml = jsyaml;
 
 // pretty console banner + version
-const VERSION = (typeof __VERSION__ !== 'undefined') ? __VERSION__ : 'dev';
+const VERSION = __VERSION__;
 console.info(
   `%c drag-and-drop-card %c v${VERSION} `,
   'color:#fff;background:#03a9f4;font-weight:700;padding:2px 6px;border-radius:3px 0 0 3px',
@@ -420,16 +420,6 @@ _applyGridVars() {
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
-    // Prefer a stable storage_key: reuse last known if YAML omitted it
-    if (!config.storage_key) {
-      let remembered = null;
-      try { remembered = localStorage.getItem('ddc_last_key'); } catch {}
-      const key = remembered || this.storageKey || `layout_${Date.now().toString(36)}`;
-      config.storage_key = key;
-      // keep it reflected in the live config for HA editors
-      this._config = { ...config };
-    }
-
     // Track old key so we only rebuild when storage_key actually changes
     // Auto‑assign a storage key if none provided
     if (!config.storage_key) {
@@ -445,7 +435,6 @@ _applyGridVars() {
     // Store incoming config and update properties
     this._config = config;
     this.storageKey = config.storage_key || undefined;
-    try { if (this.storageKey) localStorage.setItem('ddc_last_key', this.storageKey); } catch {}
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
@@ -976,14 +965,15 @@ _applyGridVars() {
   
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
-      const { onPointerDown, onPointerMove, onPointerUpOrCancel, onContextMenu, onDblClick } = this.__lpHandlers;
       const cont = this.cardContainer;
-      cont?.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUpOrCancel);
-      window.removeEventListener('pointercancel', onPointerUpOrCancel);
-      window.removeEventListener('contextmenu', onContextMenu);
-      cont?.removeEventListener('dblclick', onDblClick);
+      cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
+      window.removeEventListener('mousemove', this.__lpHandlers.mouseMove);
+      window.removeEventListener('mouseup', this.__lpHandlers.mouseUp);
+      window.removeEventListener('contextmenu', this.__lpHandlers.contextMenu);
+      cont?.removeEventListener('touchstart', this.__lpHandlers.touchStart);
+      window.removeEventListener('touchmove', this.__lpHandlers.touchMove);
+      window.removeEventListener('touchend', this.__lpHandlers.touchEnd);
+      window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
@@ -3911,17 +3901,18 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite + deep editor field sync (v13)
-   - Sets ALL fields exactly like storage_key/grid by updating the actual inputs
-     inside hui-card-editor's shadow DOM (deep traversal).
-   - Also updates YAML pane.
+   Drag & Drop Card — Import overwrite & hard HA editor update (v12)
+   - Fully overwrites options on import
+   - In native editor: directly calls hui-card-editor.setConfig(newConfig)
+     so both Visual and YAML editors refresh to the imported values.
+   - Also dispatches config-changed from the hui-card-editor node.
    ========================================================================== */
 (() => {
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV13Patched) return true;
-    ctor.prototype.__ddcImportV13Patched = true;
+    if (ctor.prototype.__ddcImportV12Patched) return true;
+    ctor.prototype.__ddcImportV12Patched = true;
 
     const DEFAULTS = {
       storage_key: undefined,
@@ -3940,79 +3931,20 @@ if (!customElements.get('drag-and-drop-card')) {
       container_preset_orientation: 'auto'
     };
 
-    const deepWalk = function*(root) {
-      if (!root) return;
-      yield root;
-      const kids = root.children || root.childNodes || [];
-      for (const k of kids) {
-        if (k) {
-          yield* deepWalk(k);
-          if (k.shadowRoot) yield* deepWalk(k.shadowRoot);
-        }
-      }
-    };
-
     const findHuiEditor = () => {
-      const roots = [document];
+      // Try common places (dialogs / global)
+      const tryRoots = [document];
       document.querySelectorAll('ha-dialog, mwc-dialog, ha-more-info-dialog').forEach(d => {
-        roots.push(d);
-        if (d.shadowRoot) roots.push(d.shadowRoot);
+        tryRoots.push(d);
+        if (d.shadowRoot) tryRoots.push(d.shadowRoot);
       });
-      for (const r of roots) {
+      for (const r of tryRoots) {
         try {
           const el = (r.shadowRoot || r).querySelector?.('hui-card-editor') || r.querySelector?.('hui-card-editor');
           if (el) return el;
         } catch {}
       }
       return document.querySelector('hui-card-editor') || null;
-    };
-
-    const pushToVisualInputs = (hui, cfg) => {
-      if (!hui) return;
-      const setInput = (node, val) => { node.value = val; node.dispatchEvent(new Event('input', {bubbles:true, composed:true})); };
-      const setCheck = (node, val) => { node.checked = !!val; node.dispatchEvent(new Event('change', {bubbles:true, composed:true})); };
-      const setSelect = (node, val) => { node.value = val; node.dispatchEvent(new Event('change', {bubbles:true, composed:true})); };
-      const want = {
-        '#storage_key':            (n)=>setInput(n, cfg.storage_key ?? ''),
-        '#grid':                   (n)=>setInput(n, String(cfg.grid ?? 10)),
-        '#liveSnap':               (n)=>setCheck(n, !!cfg.drag_live_snap),
-        '#autoSave':               (n)=>setCheck(n, cfg.auto_save !== false),
-        '#autoSaveDebounce':       (n)=>setInput(n, String(cfg.auto_save_debounce ?? 800)),
-        '#containerBg':            (n)=>setInput(n, cfg.container_background ?? 'transparent'),
-        '#cardBg':                 (n)=>setInput(n, cfg.card_background ?? 'var(--ha-card-background, var(--card-background-color))'),
-        '#debug':                  (n)=>setCheck(n, !!cfg.debug),
-        '#noOverlap':              (n)=>setCheck(n, !!cfg.disable_overlap),
-        '#sizeMode':               (n)=>setSelect(n, cfg.container_size_mode || 'dynamic'),
-        '#sizeW':                  (n)=>setInput(n, cfg.container_fixed_width ?? ''),
-        '#sizeH':                  (n)=>setInput(n, cfg.container_fixed_height ?? ''),
-        '#sizePreset':             (n)=>setSelect(n, cfg.container_preset || 'fullhd'),
-        '#sizeOrientation':        (n)=>setSelect(n, cfg.container_preset_orientation || 'auto'),
-      };
-      const root = hui.shadowRoot || hui;
-      for (const node of deepWalk(root)) {
-        if (!(node instanceof Element)) continue;
-        for (const sel in want) {
-          if (node.matches && node.matches(sel)) {
-            try { want[sel](node); } catch {}
-          }
-        }
-      }
-    };
-
-    const pushYaml = (hui, cfg) => {
-      try {
-        const full = { type: 'custom:drag-and-drop-card', ...cfg };
-        const y = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(full) : null;
-        if (!y) return;
-        const root = hui.shadowRoot || hui;
-        for (const node of deepWalk(root)) {
-          if (node.tagName && node.tagName.toLowerCase() === 'ha-code-editor') {
-            node.value = y;
-            node.dispatchEvent(new Event('input', {bubbles:true,composed:true}));
-            break;
-          }
-        }
-      } catch {}
     };
 
     const origImport = ctor.prototype._importDesign;
@@ -4022,47 +3954,78 @@ if (!customElements.get('drag-and-drop-card')) {
       inp.onchange = async () => {
         const file = inp.files?.[0]; if (!file) return;
         let json;
-        try { json = JSON.parse(await file.text()); }
-        catch (e) { console.error("Import failed — invalid file", e); this._toast?.("Import failed — invalid file."); return; }
+        try { json = JSON.parse(await file.text()); } catch (e) {
+          console.error("Import failed — invalid file", e);
+          this._toast?.("Import failed — invalid file.");
+          return;
+        }
 
-        const importedOpts = json?.options || {};
-        const importedKey  = importedOpts.storage_key;
-        const currentKey   = this.storageKey;
-        const targetKey    = currentKey || importedKey || `layout_${Date.now().toString(36)}`;
-        try { localStorage.setItem('ddc_last_key', targetKey); } catch {}
+        const imported = json?.options || {};
+        const merged = { ...DEFAULTS, ...imported };
 
-        // Persist exactly what we imported under the key we will load at startup
-        try {
-          if (this._backendOK) {
-            await this._saveLayoutToBackend(targetKey, json);
-          } else {
-            try { localStorage.setItem(`ddc_local_${targetKey}`, JSON.stringify(json)); } catch {}
+        // Determine key: if editor exists, adopt the imported key when present
+        const hui = findHuiEditor();
+        if (hui) {
+          merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
+        } else {
+          merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
+        }
+
+        // Apply to runtime & config
+        this._applyImportedOptions(merged, true);
+        this.storageKey = merged.storage_key;
+        this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
+
+        // If the native editor is open, **force** it to adopt the new config
+        if (hui && typeof hui.setConfig === 'function') {
+          try {
+            hui.setConfig(this._config);
+            // Let the dialog settle, then nudge the YAML editor if present
+            setTimeout(() => {
+              try {
+                hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+              } catch {}
+            }, 0);
+          } catch (e) {
+            console.warn("Could not push config to hui-card-editor:", e);
           }
-        } catch (e) {
-          console.error('Failed to persist imported design', e);
-          this._dbgPush?.('import', 'Persist failed', { error: String(e) });
         }
 
-        // Keep using the YAML's storage_key if it exists (stability across reloads).
-        // Only switch runtime key if we didn't have one.
-        if (!currentKey) this.storageKey = targetKey;
-
-        // Rebuild the whole card through the normal boot path so all listeners/state are correct
-        try {
-          await this._initialLoad(true);
-          this._toast?.("Design imported and saved.");
-        } catch (e) {
-          console.error('Rebuild after import failed', e);
-          this._toast?.("Imported, but failed to rebuild — try reload.");
+        // Rebuild cards
+        if (this.cardContainer) this.cardContainer.innerHTML = "";
+        if (Array.isArray(json.cards) && json.cards.length) {
+          for (const conf of json.cards) {
+            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
+              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+              if (conf.z != null) p.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(p);
+            } else {
+              const el = await this._createCard(conf.card);
+              const wrap = this._makeWrapper(el);
+              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+              wrap.style.width  = `${conf.size?.width  || 100}px`;
+              wrap.style.height = `${conf.size?.height || 100}px`;
+              if (conf.z != null) wrap.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(wrap);
+              this._initCardInteract(wrap);
+            }
+          }
+        } else {
+          this._showEmptyPlaceholder?.();
         }
+        this._resizeContainer?.();
+
+        // Save and update store badge
+        await this._saveLayout(false);
+        try { this._updateStoreBadge?.(); } catch {}
+        try { this._probeBackend?.(); } catch {}
+        this._toast?.("Design imported.");
       };
       inp.click();
     };
 
     return true;
   };
-
-
 
   if (!install()) {
     if (window.customElements && window.customElements.whenDefined) {
