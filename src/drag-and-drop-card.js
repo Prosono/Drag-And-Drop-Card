@@ -4022,98 +4022,46 @@ if (!customElements.get('drag-and-drop-card')) {
       inp.onchange = async () => {
         const file = inp.files?.[0]; if (!file) return;
         let json;
-        try {
-          json = JSON.parse(await file.text());
-        } catch (e) {
-          console.error("Import failed — invalid file", e);
-          this._toast?.("Import failed — invalid file.");
-          return;
-        }
+        try { json = JSON.parse(await file.text()); }
+        catch (e) { console.error("Import failed — invalid file", e); this._toast?.("Import failed — invalid file."); return; }
 
-        // Determine target storage key from the imported design (fallbacks to current or a new one)
         const importedOpts = json?.options || {};
-        const importedKey = importedOpts.storage_key;
-        const currentKey  = this.storageKey;
-        const targetKey   = importedKey || currentKey || `layout_${Date.now().toString(36)}`;
+        const importedKey  = importedOpts.storage_key;
+        const currentKey   = this.storageKey;
+        const targetKey    = currentKey || importedKey || `layout_${Date.now().toString(36)}`;
         try { localStorage.setItem('ddc_last_key', targetKey); } catch {}
 
-        // Persist the FULL imported JSON exactly as-is to storage
-        let savedOK = false;
+        // Persist exactly what we imported under the key we will load at startup
         try {
           if (this._backendOK) {
             await this._saveLayoutToBackend(targetKey, json);
-            // Mirror to current key too if YAML still points there (helps survive refresh before user saves YAML)
-            if (currentKey && currentKey !== targetKey) {
-              try { await this._saveLayoutToBackend(currentKey, json); } catch {}
-            }
           } else {
             try { localStorage.setItem(`ddc_local_${targetKey}`, JSON.stringify(json)); } catch {}
-            if (currentKey && currentKey !== targetKey) {
-              try { localStorage.setItem(`ddc_local_${currentKey}`, JSON.stringify(json)); } catch {}
-            }
           }
-          savedOK = true;
         } catch (e) {
           console.error('Failed to persist imported design', e);
           this._dbgPush?.('import', 'Persist failed', { error: String(e) });
         }
 
-        
-        // Update HA editor (visual + YAML) if available so storage_key persists in config
-        try {
-          const hui = findHuiEditor && findHuiEditor();
-          const mergedForEditor = { type:'custom:drag-and-drop-card', ...(this._config||{}), ...(json.options||{}), storage_key: targetKey };
-          if (hui) {
-            try { pushToVisualInputs && pushToVisualInputs(hui, mergedForEditor); } catch {}
-            try { pushYaml && pushYaml(hui, mergedForEditor); } catch {}
-            // Notify config-changed for live editor
-            try { hui.dispatchEvent(new CustomEvent('config-changed', { detail: { config: mergedForEditor }, bubbles: true, composed: true })); } catch {}
-          }
-        } catch {}
-// Apply options + cards to the live UI
-        try {
-          // Switch runtime to the imported (or chosen) storage key
-          this.storageKey = targetKey;
-          // Apply options without waiting for a rebuild
-          if (importedOpts) this._applyImportedOptions(importedOpts, true);
+        // Keep using the YAML's storage_key if it exists (stability across reloads).
+        // Only switch runtime key if we didn't have one.
+        if (!currentKey) this.storageKey = targetKey;
 
-          // Rebuild cards from file
-          if (this.cardContainer) this.cardContainer.innerHTML = '';
-          if (Array.isArray(json.cards) && json.cards.length) {
-            for (const conf of json.cards) {
-              if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
-                if (conf.z != null) p.style.zIndex = String(conf.z);
-                this.cardContainer.appendChild(p);
-              } else {
-                const el = await this._createCard(conf.card);
-                const wrap = this._makeWrapper(el);
-                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-                wrap.style.width  = `${conf.size?.width  || 100}px`;
-                wrap.style.height = `${conf.size?.height || 100}px`;
-                if (conf.z != null) wrap.style.zIndex = String(conf.z);
-                this.cardContainer.appendChild(wrap);
-                this._initCardInteract(wrap);
-              }
-            }
-          } else {
-            this._showEmptyPlaceholder?.();
-          }
-          this._resizeContainer?.();
+        // Rebuild the whole card through the normal boot path so all listeners/state are correct
+        try {
+          await this._initialLoad(true);
+          this._toast?.("Design imported and saved.");
         } catch (e) {
-          this._dbgPush?.('import', 'Apply failed', { error: String(e) });
+          console.error('Rebuild after import failed', e);
+          this._toast?.("Imported, but failed to rebuild — try reload.");
         }
-
-        try { this._updateStoreBadge?.(); } catch {}
-        try { this._probeBackend?.(); } catch {}
-
-        this._toast?.(savedOK ? "Design imported and saved." : "Design imported (save failed).");
       };
       inp.click();
     };
 
     return true;
   };
+
 
 
   if (!install()) {
