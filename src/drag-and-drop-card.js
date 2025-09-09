@@ -3864,102 +3864,108 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite patch (v7)
-   Goal: When importing a design, overwrite ALL card config fields (key, styling,
-   backgrounds, grid, etc.) with the imported options, not a merge.
-   Implementation: call original _applyImportedOptions() twice — first with
-   known defaults to reset everything, then with the imported options.
+   Drag & Drop Card — Import overwrite & storage_key fix (v8)
+   - Works in DnD edit mode (no native HA editor required)
+   - On import: fully overwrite options and set storage_key before building
+   - Guarantees a storage_key (uses provided one or auto-generates)
+   - Saves under the new key immediately
    ========================================================================== */
 (() => {
-  const defaults = () => ({
-    // keep storage_key as-is unless provided by import
-    grid: 10,
-    drag_live_snap: false,
-    auto_save: true,
-    auto_save_debounce: 800,
-    container_background: 'transparent',
-    card_background: 'var(--ha-card-background, var(--card-background-color))',
-    debug: false,
-    disable_overlap: false,
-    container_size_mode: 'dynamic',
-    container_fixed_width: null,
-    container_fixed_height: null,
-    container_preset: 'fullhd',
-    container_preset_orientation: 'auto'
-  });
-
   const install = () => {
     const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
     if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportOverwritePatched) return true;
-    ctor.prototype.__ddcImportOverwritePatched = true;
+    if (ctor.prototype.__ddcImportV8Patched) return true;
+    ctor.prototype.__ddcImportV8Patched = true;
 
-    const origApply = ctor.prototype._applyImportedOptions;
-    const origImport = ctor.prototype._importDesign;
+    // Helper: option defaults for a clean overwrite
+    const DEFAULTS = {
+      grid: 10,
+      drag_live_snap: false,
+      auto_save: true,
+      auto_save_debounce: 800,
+      container_background: 'transparent',
+      card_background: 'var(--ha-card-background, var(--card-background-color))',
+      debug: false,
+      disable_overlap: false,
+      container_size_mode: 'dynamic',
+      container_fixed_width: null,
+      container_fixed_height: null,
+      container_preset: 'fullhd',
+      container_preset_orientation: 'auto'
+    };
 
-    // Replace _importDesign to do a full overwrite semantics
     ctor.prototype._importDesign = function() {
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = 'application/json';
       inp.onchange = async () => {
         const file = inp.files?.[0]; if (!file) return;
         const txt = await file.text();
+        let json;
+        try { json = JSON.parse(txt); } catch (e) {
+          console.error("Import failed (JSON parse)", e);
+          this._toast?.('Import failed — invalid file.');
+          return;
+        }
+
+        this.__importing = true;
         try {
-          const json = JSON.parse(txt);
-
-          // Build options to apply
-          let opts = json.options || {};
-          // v1 fallback (only grid existed)
-          if (!json.options && typeof json.grid === 'number') opts = { grid: json.grid };
-
-          // 1) Reset all known fields to defaults
-          try { origApply.call(this, defaults(), false); } catch {}
-
-          // 2) If import provides storage_key, include it
-          if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
-            // Also update the HA editor immediately
-            try {
-              const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}), storage_key: opts.storage_key };
-              this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updatedCfg } }));
-            } catch {}
+          const options = json.options || {};
+          // 1) Determine the target storage_key
+          let newKey = options.storage_key;
+          if (!newKey || typeof newKey !== "string") {
+            // If not provided, keep current; else auto-generate
+            newKey = this.storageKey || `layout_${Date.now().toString(36)}`;
           }
 
-          // 3) Apply imported options (over the defaults we just set)
-          try { origApply.call(this, opts || {}, true); } catch {}
+          // 2) Full overwrite: reset to defaults, then apply imported options, then force the newKey
+          const merged = { ...DEFAULTS, ...options, storage_key: newKey };
+          this._applyImportedOptions(merged, true);
+          this.storageKey = newKey;
+          // Persist on the in-memory config object
+          this._config = { ...(this._config || {}), ...merged };
+          // Update any open editor fields (if present)
+          try { this._syncEditorsStorageKey?.(); } catch {}
 
-          // 4) Rebuild the layout from imported cards (full replace)
-          this.cardContainer.innerHTML = '';
+          // 3) Replace all cards with the imported layout
+          if (this.cardContainer) this.cardContainer.innerHTML = '';
           if (Array.isArray(json.cards) && json.cards.length) {
             for (const conf of json.cards) {
               if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
                 const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                if (conf.z != null) p.style.zIndex = String(conf.z);
                 this.cardContainer.appendChild(p);
               } else {
                 const el = await this._createCard(conf.card);
                 const wrap = this._makeWrapper(el);
                 this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-                wrap.style.width  = `${conf.size?.width||140}px`;
-                wrap.style.height = `${conf.size?.height||100}px`;
+                wrap.style.width  = `${conf.size?.width  || 100}px`;
+                wrap.style.height = `${conf.size?.height || 100}px`;
                 if (conf.z != null) wrap.style.zIndex = String(conf.z);
                 this.cardContainer.appendChild(wrap);
                 this._initCardInteract(wrap);
               }
             }
           } else {
-            this._showEmptyPlaceholder();
+            this._showEmptyPlaceholder?.();
           }
+          this._resizeContainer?.();
 
-          this._resizeContainer();
+          // 4) Save immediately under the new key (local + backend if available)
           await this._saveLayout(false);
-          this._toast('Design imported (all options overwritten).');
+          // Update badge & probe backend for the new key
+          try { this._updateStoreBadge?.(); } catch {}
+          try { this._probeBackend?.(); } catch {}
+
+          this._toast?.('Design imported.');
         } catch (e) {
-          console.error('Import failed', e);
-          this._toast('Import failed — invalid file.');
+          console.error("Import failed", e);
+          this._toast?.('Import failed — invalid file.');
+        } finally {
+          this.__importing = false;
         }
       };
       inp.click();
     };
-
     return true;
   };
 
