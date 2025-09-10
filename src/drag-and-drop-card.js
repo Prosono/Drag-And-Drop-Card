@@ -30,6 +30,36 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+  constructor() {
+    super();
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this.__rebuiltCards = new WeakSet();
+  }
+
+  
+  // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
+  _hasCardModDeep(cfg) {
+    try {
+      if (!cfg || typeof cfg !== 'object') return false;
+      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
+      if (cfg.card) return this._hasCardModDeep(cfg.card);
+      if (Array.isArray(cfg.cards)) {
+        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
+      }
+      return false;
+    } catch { return false; }
+  }
+  _rebuildOnce(el) {
+    try {
+      if (!el) return;
+      if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
+      if (this.__rebuiltCards.has(el)) return;
+      this.__rebuiltCards.add(el);
+      // Fire rebuild from the child card so Lovelace/card-mod re-attaches without recreating DDC itself
+      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+    } catch {}
+  }
+
 
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
@@ -468,7 +498,7 @@ _applyGridVars() {
 
     if (!this._built) {
       this._built = true;
-      this.innerHTML = `
+      this.shadowRoot.innerHTML = `
         <style>
           .ddc-root{
             position:relative;
@@ -537,6 +567,11 @@ _applyGridVars() {
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
           }
+
+          /* When content overflows in view mode, we add .ddc-scrollable to enable scrolling */
+          .card-wrapper.ddc-scrollable { scrollbar-gutter: stable; overflow:auto; }
+          .card-wrapper.editing.ddc-scrollable { overflow: visible; }
+
           .card-wrapper.dragging{
             cursor:grabbing;
             touch-action: none;
@@ -853,15 +888,15 @@ _applyGridVars() {
           <div class="card-container" id="cardContainer"></div>
         </div>
       `;
-      this.cardContainer = this.querySelector('#cardContainer');
-      this.addButton     = this.querySelector('#addCardBtn');
-      this.reloadBtn     = this.querySelector('#reloadBtn');
-      this.diagBtn       = this.querySelector('#diagBtn');
-      this.exitEditBtn   = this.querySelector('#exitEditBtn');
-      this.storeBadge    = this.querySelector('#storeBadge');
-      this.exportBtn     = this.querySelector('#exportBtn');
-      this.importBtn     = this.querySelector('#importBtn');
-      this.exploreBtn    = this.querySelector('#exploreBtn');      
+      this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+      this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
+      this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
+      this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
+      this.exitEditBtn   = this.shadowRoot.querySelector('#exitEditBtn');
+      this.storeBadge    = this.shadowRoot.querySelector('#storeBadge');
+      this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
+      this.importBtn     = this.shadowRoot.querySelector('#importBtn');
+      this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn');      
 
       this._applyGridVars();
       
@@ -902,7 +937,10 @@ _applyGridVars() {
 
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
-    if (!this.__booted || prevKey !== this.storageKey) {
+    this.__cfgReady = true;
+    if (prevKey !== this.storageKey && this.__booted) {
+      this._initialLoad(true);
+    } else if (!this.__booted && this.__probed) {
       this.__booted = true;
       this._initialLoad();
     } else {
@@ -947,19 +985,30 @@ _applyGridVars() {
   }
   
 
-  set hass(hass) {
-    this._hass = hass;
-    LOG('set hass');
-    if (!this.__probed && hass) {
-      this.__probed = true;
-      this._probeBackend().then(() => this._initialLoad(true));
-    }
-    const wraps = this.cardContainer?.children || [];
-    for (const wrap of wraps) {
-      const c = wrap.firstElementChild;
-      if (c && c.hass !== hass) c.hass = hass;
+set hass(hass) {
+  this._hass = hass;
+  LOG('set hass');
+  if (!this.__probed && hass) {
+    this.__probed = true;
+    this._probeBackend().then(() => { 
+      this.__probed = true; 
+      if (!this.__booted && this.__cfgReady) { 
+        this.__booted = true; 
+        this._initialLoad(true); 
+      } 
+    });
+  }
+  
+  const wraps = this.cardContainer?.children || [];
+  for (const wrap of wraps) {
+    const c = wrap.firstElementChild;
+    if (c && c.hass !== hass) {
+      c.hass = hass;
+      // Don't reprocess card_mod here - it will be handled by _processCardModOnce
     }
   }
+}
+  
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
@@ -968,7 +1017,7 @@ _applyGridVars() {
     this._loading = true;
     if (force && this.cardContainer) this.cardContainer.innerHTML = '';
     this._dbgPush('boot', 'Initial load start', { force });
-
+    const __rebuildAfter = [];
     let saved = null;
 
     if (this._backendOK && this.storageKey) {
@@ -1029,7 +1078,9 @@ _applyGridVars() {
             conf.size?.height || 100
           );
           this.cardContainer.appendChild(wrap);
-          builtAny = true;
+          
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1040,7 +1091,9 @@ _applyGridVars() {
         wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
-        this._initCardInteract(wrap);
+        
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1055,9 +1108,25 @@ _applyGridVars() {
     }
     this._updateStoreBadge();
     this._syncEmptyStateUI();
-
+    this._updateAllScrollabilities();
     // loading complete
     this._loading = false;
+
+    if (force) {
+      this._cardModProcessed = false;
+    }
+
+    setTimeout(() => {
+      this._processCardModOnce();
+    }, 100);
+    
+    try { 
+      __rebuildAfter.forEach(el => { 
+        try { 
+          el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); 
+        } catch {} 
+      }); 
+    } catch {}
   }
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1107,7 +1176,11 @@ _applyGridVars() {
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
+  
+    // Re-evaluate scrollbars when mode changes
+    this._updateAllScrollabilities();
   }
+
 
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
@@ -1527,6 +1600,7 @@ _syncEmptyStateUI() {
           this._resizeContainer();
           if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
           this._queueSave('resize-end');
+          this._updateScrollability(wrap);
         }
       }
     });
@@ -1548,10 +1622,56 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------ Card creation & wrapper ------------------------ */
+  /* ------------------------ Scrollability helpers (auto-applied in view mode) ------------------------ */
+  _updateScrollability(wrap) {
+    try {
+      if (!wrap || wrap.dataset?.placeholder) return;
+      const card = wrap.firstElementChild;
+      if (!card) return;
+      // In edit mode we keep overflow visible so handles/chips are usable
+      if (this.editMode) {
+        wrap.classList.remove('ddc-scrollable');
+        wrap.style.overflow = 'visible';
+        return;
+      }
+      const needsV = card.scrollHeight > wrap.clientHeight + 1;
+      const needsH = card.scrollWidth  > wrap.clientWidth  + 1;
+      if (needsV || needsH) {
+        wrap.classList.add('ddc-scrollable');
+        wrap.style.overflow = 'auto';
+      } else {
+        wrap.classList.remove('ddc-scrollable');
+        wrap.style.overflow = 'visible';
+      }
+    } catch (e) { /* no-op */ }
+  }
+
+  _updateAllScrollabilities() {
+    try {
+      const wraps = this.cardContainer?.querySelectorAll('.card-wrapper') || [];
+      wraps.forEach((w) => this._updateScrollability(w));
+    } catch (e) { /* no-op */ }
+  }
+
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
     el.hass = this.hass;
+    
+    // Special handling for mod-card
+    if (cfg.type === 'custom:mod-card') {
+      // mod-card needs to be fully initialized before we can work with it
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Force mod-card to apply its styles
+      if (el.setConfig && typeof el.setConfig === 'function') {
+        try {
+          // Re-apply config to ensure mod-card processes it
+          el.setConfig(cfg);
+        } catch {}
+      }
+    }
+    
     return el;
   }
 
@@ -1580,6 +1700,7 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
+
     chip.addEventListener('click', async (e) => {
       e.stopPropagation();
       const act = e.target?.closest('button')?.dataset?.act; if (!act) return;
@@ -1606,6 +1727,7 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
+          try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1624,28 +1746,38 @@ _syncEmptyStateUI() {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
+          try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
       }
     });
 
+    // ADD THE MISSING SHIELD ELEMENT
     const shield = document.createElement('div');
     shield.className = 'shield';
 
+    // ADD THE MISSING HANDLE ELEMENT
     const handle = document.createElement('div');
     handle.classList.add('resize-handle');
     handle.title = 'Resize';
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
-    // cache the card config on the wrapper so that future saves can recover it
+    // cache the card config on the wrapper
     try {
       const cfg = cardEl._config || cardEl.config;
       if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
         wrap.dataset.cfg = JSON.stringify(cfg);
+        
+        // Mark if this needs card_mod processing
+        if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
       }
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
+// After first render, reassess scrollability (wait for layout)
+requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
+    // DDC patch: trigger one-time rebuild so nested card_mod attaches
+    try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
   }
 
@@ -1669,6 +1801,43 @@ _syncEmptyStateUI() {
   
     wrap.append(inner, shield);
     return wrap;
+  }
+
+    _processCardModOnce() {
+    // Only run once per load
+    if (this._cardModProcessed) return;
+    this._cardModProcessed = true;
+    
+    const wraps = this.cardContainer?.querySelectorAll('[data-needs-card-mod="true"]') || [];
+    
+    wraps.forEach(wrap => {
+      const card = wrap.firstElementChild;
+      if (!card) return;
+      
+      const config = card._config || card.config;
+      if (!config) return;
+      
+      // For mod-card specifically, we need to wait for it to be fully initialized
+      if (config.type === 'custom:mod-card') {
+        // mod-card needs its inner card to be ready
+        setTimeout(() => {
+          if (card.updateComplete) {
+            card.updateComplete.then(() => {
+              card.requestUpdate();
+            });
+          } else if (card.setConfig) {
+            try {
+              card.setConfig({...config});
+            } catch {}
+          }
+        }, 100);
+      } else if (config.card_mod && card.setConfig) {
+        // Regular card_mod
+        try {
+          card.setConfig({...config});
+        } catch {}
+      }
+    });
   }
 
   _showEmptyPlaceholder() {
@@ -2450,7 +2619,7 @@ _syncEmptyStateUI() {
           </button>
         </div>
       </div>`;
-    this.appendChild(modal);
+    this.shadowRoot.appendChild(modal);
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -3241,7 +3410,9 @@ async _getStubConfigForType(type) {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    this._initCardInteract(wrap);
+    
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3364,7 +3535,7 @@ async _getStubConfigForType(type) {
 
     const close = () => modal.remove();
     modal.querySelector('#closeDiag').addEventListener('click', close);
-    this.appendChild(modal);
+    this.shadowRoot.appendChild(modal);
 
     const refreshLogs = () => {
       const logArea = modal.querySelector('#logArea');
@@ -3436,7 +3607,9 @@ async _getStubConfigForType(type) {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                this._initCardInteract(wrap);
+                
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3609,7 +3782,9 @@ async _getStubConfigForType(type) {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              this._initCardInteract(wrap);
+              
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
             }
           }
         } else {
@@ -3765,4 +3940,139 @@ if (!customElements.get('drag-and-drop-card')) {
       });
     }
   } catch (e) { /* no-op */ }
+})();
+
+
+/* ==========================================================================
+   Drag & Drop Card — Import overwrite & hard HA editor update (v12)
+   - Fully overwrites options on import
+   - In native editor: directly calls hui-card-editor.setConfig(newConfig)
+     so both Visual and YAML editors refresh to the imported values.
+   - Also dispatches config-changed from the hui-card-editor node.
+   ========================================================================== */
+(() => {
+  const install = () => {
+    const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
+    if (!ctor || !ctor.prototype) return false;
+    if (ctor.prototype.__ddcImportV12Patched) return true;
+    ctor.prototype.__ddcImportV12Patched = true;
+
+    const DEFAULTS = {
+      storage_key: undefined,
+      grid: 10,
+      drag_live_snap: false,
+      auto_save: true,
+      auto_save_debounce: 800,
+      container_background: 'transparent',
+      card_background: 'var(--ha-card-background, var(--card-background-color))',
+      debug: false,
+      disable_overlap: false,
+      container_size_mode: 'dynamic',
+      container_fixed_width: null,
+      container_fixed_height: null,
+      container_preset: 'fullhd',
+      container_preset_orientation: 'auto'
+    };
+
+    const findHuiEditor = () => {
+      // Try common places (dialogs / global)
+      const tryRoots = [document];
+      document.querySelectorAll('ha-dialog, mwc-dialog, ha-more-info-dialog').forEach(d => {
+        tryRoots.push(d);
+        if (d.shadowRoot) tryRoots.push(d.shadowRoot);
+      });
+      for (const r of tryRoots) {
+        try {
+          const el = (r.shadowRoot || r).querySelector?.('hui-card-editor') || r.querySelector?.('hui-card-editor');
+          if (el) return el;
+        } catch {}
+      }
+      return document.querySelector('hui-card-editor') || null;
+    };
+
+    const origImport = ctor.prototype._importDesign;
+    ctor.prototype._importDesign = function() {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json';
+      inp.onchange = async () => {
+        const file = inp.files?.[0]; if (!file) return;
+        let json;
+        try { json = JSON.parse(await file.text()); } catch (e) {
+          console.error("Import failed — invalid file", e);
+          this._toast?.("Import failed — invalid file.");
+          return;
+        }
+
+        const imported = json?.options || {};
+        const merged = { ...DEFAULTS, ...imported };
+
+        // Determine key: if editor exists, adopt the imported key when present
+        const hui = findHuiEditor();
+        if (hui) {
+          merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
+        } else {
+          merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
+        }
+
+        // Apply to runtime & config
+        this._applyImportedOptions(merged, true);
+        this.storageKey = merged.storage_key;
+        this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
+
+        // If the native editor is open, **force** it to adopt the new config
+        if (hui && typeof hui.setConfig === 'function') {
+          try {
+            hui.setConfig(this._config);
+            // Let the dialog settle, then nudge the YAML editor if present
+            setTimeout(() => {
+              try {
+                hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+              } catch {}
+            }, 0);
+          } catch (e) {
+            console.warn("Could not push config to hui-card-editor:", e);
+          }
+        }
+
+        // Rebuild cards
+        if (this.cardContainer) this.cardContainer.innerHTML = "";
+        if (Array.isArray(json.cards) && json.cards.length) {
+          for (const conf of json.cards) {
+            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
+              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+              if (conf.z != null) p.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(p);
+            } else {
+              const el = await this._createCard(conf.card);
+              const wrap = this._makeWrapper(el);
+              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+              wrap.style.width  = `${conf.size?.width  || 100}px`;
+              wrap.style.height = `${conf.size?.height || 100}px`;
+              if (conf.z != null) wrap.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(wrap);
+              this._initCardInteract(wrap);
+            }
+          }
+        } else {
+          this._showEmptyPlaceholder?.();
+        }
+        this._resizeContainer?.();
+
+        // Save and update store badge
+        await this._saveLayout(false);
+        try { this._updateStoreBadge?.(); } catch {}
+        try { this._probeBackend?.(); } catch {}
+        this._toast?.("Design imported.");
+      };
+      inp.click();
+    };
+
+    return true;
+  };
+
+  if (!install()) {
+    if (window.customElements && window.customElements.whenDefined) {
+      window.customElements.whenDefined("drag-and-drop-card").then(install);
+    }
+  }
 })();
