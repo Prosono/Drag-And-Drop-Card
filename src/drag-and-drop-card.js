@@ -568,9 +568,17 @@ _applyGridVars() {
             z-index:1;
           }
 
-/* When content overflows in view mode, we add .ddc-scrollable to enable scrolling */
-.card-wrapper.ddc-scrollable { scrollbar-gutter: stable; overflow:auto; }
-.card-wrapper.editing.ddc-scrollable { overflow: visible; }
+          /* Wrapper scroll when needed (wins over generic .card-wrapper overflow) */
+          .card-wrapper.ddc-scrollable {
+            overflow: auto !important;           /* ensure we override accidental inline/other rules */
+            scrollbar-gutter: stable;
+            -webkit-overflow-scrolling: touch;   /* smooth touch scrolling on iOS */
+          }
+
+          /* Keep edit mode tools usable */
+          .card-wrapper.editing.ddc-scrollable {
+            overflow: visible !important;
+          }
 
           .card-wrapper.dragging{
             cursor:grabbing;
@@ -967,6 +975,12 @@ _applyGridVars() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
+
+    // Clean MutationObservers
+    if (this.__moMap) {
+      for (const [w, mo] of this.__moMap) { try { mo.disconnect(); } catch {} }
+      this.__moMap = new WeakMap();
+}
   
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
@@ -987,6 +1001,7 @@ _applyGridVars() {
 
 set hass(hass) {
   this._hass = hass;
+  requestAnimationFrame(() => this._updateAllScrollabilities());
   LOG('set hass');
   if (!this.__probed && hass) {
     this.__probed = true;
@@ -1634,8 +1649,13 @@ _syncEmptyStateUI() {
         wrap.style.overflow = 'visible';
         return;
       }
-      const needsV = card.scrollHeight > wrap.clientHeight + 1;
-      const needsH = card.scrollWidth  > wrap.clientWidth  + 1;
+      const wrapRect  = wrap.getBoundingClientRect();
+      const wrapH = Math.max(wrap.clientHeight, Math.round(wrapRect.height));
+      const wrapW = Math.max(wrap.clientWidth,  Math.round(wrapRect.width));
+
+      const needsV = card.scrollHeight > wrapH + 1;
+      const needsH = card.scrollWidth  > wrapW + 1;
+      
       if (needsV || needsH) {
         wrap.classList.add('ddc-scrollable');
         wrap.style.overflow = 'auto';
@@ -1774,8 +1794,17 @@ _syncEmptyStateUI() {
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-// After first render, reassess scrollability (wait for layout)
-requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
+
+    // Reassess scrollability after layout paint
+    requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
+
+    // Observe DOM mutations (e.g., card loads data, toggles sections, etc.)
+    if (!this.__moMap) this.__moMap = new WeakMap();
+    if (!this.__moMap.has(wrap)) {
+      const mo = new MutationObserver(() => this._updateScrollability(wrap));
+      mo.observe(cardEl, { childList: true, subtree: true, attributes: true });
+      this.__moMap.set(wrap, mo);
+    }
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
