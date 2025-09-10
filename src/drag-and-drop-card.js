@@ -561,35 +561,12 @@ _applyGridVars() {
             background:var(--ddc-card-bg, var(--card-background-color));
             cursor:grab;
             /* ensure buttons and resize handles remain visible on very small cards */
-            overflow:clip;
+            overflow:scroll;
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
           }
-
-          /* Wrapper scroll when needed (wins over generic .card-wrapper overflow) */
-          .card-wrapper.ddc-scrollable {
-            overflow: auto !important;           /* ensure we override accidental inline/other rules */
-            scrollbar-gutter: stable;
-            -webkit-overflow-scrolling: touch;   /* smooth touch scrolling on iOS */
-          }
-
-          /* The actual scroll container (absolute, so wrapper size stays stable) */
-          .card-wrapper > .ddc-content{
-            position: absolute;
-            inset: var(--ddc-pad);
-            border-radius: calc(var(--ddc-radius) - 4px);
-            overflow: auto;
-            -webkit-overflow-scrolling: touch; /* iOS momentum */
-            background: var(--ddc-surface, transparent);
-          }
-
-          /* Keep edit mode tools usable */
-          .card-wrapper.editing.ddc-scrollable {
-            overflow: visible !important;
-          }
-
           .card-wrapper.dragging{
             cursor:grabbing;
             touch-action: none;
@@ -985,12 +962,6 @@ _applyGridVars() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
-
-    // Clean MutationObservers
-    if (this.__moMap) {
-      for (const [w, mo] of this.__moMap) { try { mo.disconnect(); } catch {} }
-      this.__moMap = new WeakMap();
-}
   
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
@@ -1011,7 +982,6 @@ _applyGridVars() {
 
 set hass(hass) {
   this._hass = hass;
-  requestAnimationFrame(() => this._updateAllScrollabilities());
   LOG('set hass');
   if (!this.__probed && hass) {
     this.__probed = true;
@@ -1026,9 +996,10 @@ set hass(hass) {
   
   const wraps = this.cardContainer?.children || [];
   for (const wrap of wraps) {
-    const c = this._getCardElement(wrap);
+    const c = wrap.firstElementChild;
     if (c && c.hass !== hass) {
       c.hass = hass;
+      // Don't reprocess card_mod here - it will be handled by _processCardModOnce
     }
   }
 }
@@ -1103,8 +1074,8 @@ set hass(hass) {
           );
           this.cardContainer.appendChild(wrap);
           
-        try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
-        builtAny = true;
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1116,8 +1087,8 @@ set hass(hass) {
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
         
-        try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
-      this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1132,7 +1103,7 @@ set hass(hass) {
     }
     this._updateStoreBadge();
     this._syncEmptyStateUI();
-    this._updateAllScrollabilities();
+
     // loading complete
     this._loading = false;
 
@@ -1200,11 +1171,7 @@ set hass(hass) {
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
-  
-    // Re-evaluate scrollbars when mode changes
-    this._updateAllScrollabilities();
   }
-
 
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
@@ -1363,13 +1330,6 @@ _installLongPressToEnterEdit() {
   this.__lpHandlers = { onPointerDown, onPointerMove, onPointerUpOrCancel, onContextMenu, onDblClick };
 }
 
-_getContentElement(wrap) {
-  return wrap.querySelector(':scope > .ddc-content') || wrap;
-}
-_getCardElement(wrap) {
-  const content = this._getContentElement(wrap);
-  return content.firstElementChild || wrap.firstElementChild;
-}
 
 _isLayoutEmpty() {
   const c = this.cardContainer;
@@ -1631,7 +1591,6 @@ _syncEmptyStateUI() {
           this._resizeContainer();
           if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
           this._queueSave('resize-end');
-          this._updateScrollability(wrap);
         }
       }
     });
@@ -1653,49 +1612,6 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------ Card creation & wrapper ------------------------ */
-  /* ------------------------ Scrollability helpers (auto-applied in view mode) ------------------------ */
-  _updateScrollability(wrap) {
-    try {
-      if (!wrap || wrap.dataset?.placeholder) return;
-
-      const card = this._getCardElement(wrap);
-      const box  = this._getContentElement(wrap);
-      if (!card || !box) return;
-
-      // In edit mode we keep overlays usable; content can still scroll if needed
-      if (this.editMode) {
-        wrap.classList.remove('ddc-scrollable');
-        box.style.overflow = 'auto';
-        return;
-      }
-
-      // Measure against the content box (the scrollbox)
-      const rect = box.getBoundingClientRect();
-      const boxH = Math.max(box.clientHeight, Math.round(rect.height));
-      const boxW = Math.max(box.clientWidth,  Math.round(rect.width));
-
-      const needsV = card.scrollHeight > boxH + 1;
-      const needsH = card.scrollWidth  > boxW + 1;
-
-      // Content is always overflow:auto (scrollbars appear only if needed)
-      box.style.overflow = 'auto';
-
-      if (needsV || needsH) {
-        wrap.classList.add('ddc-scrollable');
-      } else {
-        wrap.classList.remove('ddc-scrollable');
-      }
-    } catch (e) { /* no-op */ }
-  }
-
-
-  _updateAllScrollabilities() {
-    try {
-      const wraps = this.cardContainer?.querySelectorAll('.card-wrapper') || [];
-      wraps.forEach((w) => this._updateScrollability(w));
-    } catch (e) { /* no-op */ }
-  }
-
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
@@ -1780,7 +1696,7 @@ _syncEmptyStateUI() {
       } else if (act === 'back')  {
         this._adjustZ(wrap, -1);
       } else if (act === 'edit') {
-        const cfg = this._extractCardConfig(this._getCardElement(wrap)) || {};
+        const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
@@ -1788,8 +1704,7 @@ _syncEmptyStateUI() {
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
-          const oldCard = this._getCardElement(wrap);
-          this._getContentElement(wrap).replaceChild(newEl, oldCard)
+          wrap.replaceChild(newEl, wrap.firstElementChild);
           try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
@@ -1817,25 +1732,7 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    // Create a scrolling content layer and move the card inside it
-    const content = document.createElement('div');
-    content.className = 'ddc-content';
-    content.appendChild(cardEl);
-
-    // Keep overlays (shield/chip/handle) as siblings so they aren't affected by scroll
-    wrap.append(content, shield, chip, handle);
-
-    // After first render, reassess scrollability (wait for layout)
-    requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
-
-
-    // Observe DOM mutations (e.g., card loads data, toggles sections, etc.)
-    if (!this.__moMap) this.__moMap = new WeakMap();
-    if (!this.__moMap.has(wrap)) {
-      const mo = new MutationObserver(() => this._updateScrollability(wrap));
-      mo.observe(cardEl, { childList: true, subtree: true, attributes: true });
-      this.__moMap.set(wrap, mo);
-    }
+    wrap.append(cardEl, shield, chip, handle);
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
@@ -1871,7 +1768,7 @@ _syncEmptyStateUI() {
     const wraps = this.cardContainer?.querySelectorAll('[data-needs-card-mod="true"]') || [];
     
     wraps.forEach(wrap => {
-      const card = this._getCardElement(wrap);
+      const card = wrap.firstElementChild;
       if (!card) return;
       
       const config = card._config || card.config;
@@ -3471,8 +3368,8 @@ async _getStubConfigForType(type) {
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
     
-    try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
-    this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3668,8 +3565,8 @@ async _getStubConfigForType(type) {
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-                try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
-                this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3843,8 +3740,8 @@ async _getStubConfigForType(type) {
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
               
-              try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
-              this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
             }
           }
         } else {
