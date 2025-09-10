@@ -561,17 +561,12 @@ _applyGridVars() {
             background:var(--ddc-card-bg, var(--card-background-color));
             cursor:grab;
             /* ensure buttons and resize handles remain visible on very small cards */
-            overflow:scroll;
+            overflow:visible;
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
           }
-
-          /* When content overflows in view mode, we add .ddc-scrollable to enable scrolling */
-          .card-wrapper.ddc-scrollable { scrollbar-gutter: stable; overflow:auto; }
-          .card-wrapper.editing.ddc-scrollable { overflow: visible; }
-
           .card-wrapper.dragging{
             cursor:grabbing;
             touch-action: none;
@@ -1108,7 +1103,7 @@ this._initCardInteract(wrap);
     }
     this._updateStoreBadge();
     this._syncEmptyStateUI();
-    this._updateAllScrollabilities();
+
     // loading complete
     this._loading = false;
 
@@ -1176,11 +1171,7 @@ this._initCardInteract(wrap);
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
-  
-    // Re-evaluate scrollbars when mode changes
-    this._updateAllScrollabilities();
   }
-
 
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
@@ -1600,7 +1591,6 @@ _syncEmptyStateUI() {
           this._resizeContainer();
           if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
           this._queueSave('resize-end');
-          this._updateScrollability(wrap);
         }
       }
     });
@@ -1622,37 +1612,6 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------ Card creation & wrapper ------------------------ */
-  /* ------------------------ Scrollability helpers (auto-applied in view mode) ------------------------ */
-  _updateScrollability(wrap) {
-    try {
-      if (!wrap || wrap.dataset?.placeholder) return;
-      const card = wrap.firstElementChild;
-      if (!card) return;
-      // In edit mode we keep overflow visible so handles/chips are usable
-      if (this.editMode) {
-        wrap.classList.remove('ddc-scrollable');
-        wrap.style.overflow = 'visible';
-        return;
-      }
-      const needsV = card.scrollHeight > wrap.clientHeight + 1;
-      const needsH = card.scrollWidth  > wrap.clientWidth  + 1;
-      if (needsV || needsH) {
-        wrap.classList.add('ddc-scrollable');
-        wrap.style.overflow = 'auto';
-      } else {
-        wrap.classList.remove('ddc-scrollable');
-        wrap.style.overflow = 'visible';
-      }
-    } catch (e) { /* no-op */ }
-  }
-
-  _updateAllScrollabilities() {
-    try {
-      const wraps = this.cardContainer?.querySelectorAll('.card-wrapper') || [];
-      wraps.forEach((w) => this._updateScrollability(w));
-    } catch (e) { /* no-op */ }
-  }
-
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
@@ -1774,8 +1733,6 @@ _syncEmptyStateUI() {
     } catch {}
 
     wrap.append(cardEl, shield, chip, handle);
-// After first render, reassess scrollability (wait for layout)
-requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
@@ -3944,135 +3901,103 @@ if (!customElements.get('drag-and-drop-card')) {
 
 
 /* ==========================================================================
-   Drag & Drop Card — Import overwrite & hard HA editor update (v12)
-   - Fully overwrites options on import
-   - In native editor: directly calls hui-card-editor.setConfig(newConfig)
-     so both Visual and YAML editors refresh to the imported values.
-   - Also dispatches config-changed from the hui-card-editor node.
+   Integrated card-mod compatibility enhancements
+   - Ensures card-mod styles apply to nested cards inside drag-and-drop-card
+   - No extra resource needed; executed as part of this script
+   - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
    ========================================================================== */
 (() => {
-  const install = () => {
-    const ctor = window.customElements && window.customElements.get("drag-and-drop-card");
-    if (!ctor || !ctor.prototype) return false;
-    if (ctor.prototype.__ddcImportV12Patched) return true;
-    ctor.prototype.__ddcImportV12Patched = true;
+  const SEEN = new WeakSet();
 
-    const DEFAULTS = {
-      storage_key: undefined,
-      grid: 10,
-      drag_live_snap: false,
-      auto_save: true,
-      auto_save_debounce: 800,
-      container_background: 'transparent',
-      card_background: 'var(--ha-card-background, var(--card-background-color))',
-      debug: false,
-      disable_overlap: false,
-      container_size_mode: 'dynamic',
-      container_fixed_width: null,
-      container_fixed_height: null,
-      container_preset: 'fullhd',
-      container_preset_orientation: 'auto'
-    };
-
-    const findHuiEditor = () => {
-      // Try common places (dialogs / global)
-      const tryRoots = [document];
-      document.querySelectorAll('ha-dialog, mwc-dialog, ha-more-info-dialog').forEach(d => {
-        tryRoots.push(d);
-        if (d.shadowRoot) tryRoots.push(d.shadowRoot);
-      });
-      for (const r of tryRoots) {
-        try {
-          const el = (r.shadowRoot || r).querySelector?.('hui-card-editor') || r.querySelector?.('hui-card-editor');
-          if (el) return el;
-        } catch {}
-      }
-      return document.querySelector('hui-card-editor') || null;
-    };
-
-    const origImport = ctor.prototype._importDesign;
-    ctor.prototype._importDesign = function() {
-      const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'application/json';
-      inp.onchange = async () => {
-        const file = inp.files?.[0]; if (!file) return;
-        let json;
-        try { json = JSON.parse(await file.text()); } catch (e) {
-          console.error("Import failed — invalid file", e);
-          this._toast?.("Import failed — invalid file.");
-          return;
-        }
-
-        const imported = json?.options || {};
-        const merged = { ...DEFAULTS, ...imported };
-
-        // Determine key: if editor exists, adopt the imported key when present
-        const hui = findHuiEditor();
-        if (hui) {
-          merged.storage_key = imported.storage_key || this.storageKey || `layout_${Date.now().toString(36)}`;
-        } else {
-          merged.storage_key = this.storageKey || imported.storage_key || `layout_${Date.now().toString(36)}`;
-        }
-
-        // Apply to runtime & config
-        this._applyImportedOptions(merged, true);
-        this.storageKey = merged.storage_key;
-        this._config = { type: "custom:drag-and-drop-card", ...(this._config||{}), ...merged };
-
-        // If the native editor is open, **force** it to adopt the new config
-        if (hui && typeof hui.setConfig === 'function') {
-          try {
-            hui.setConfig(this._config);
-            // Let the dialog settle, then nudge the YAML editor if present
-            setTimeout(() => {
-              try {
-                hui.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
-              } catch {}
-            }, 0);
-          } catch (e) {
-            console.warn("Could not push config to hui-card-editor:", e);
-          }
-        }
-
-        // Rebuild cards
-        if (this.cardContainer) this.cardContainer.innerHTML = "";
-        if (Array.isArray(json.cards) && json.cards.length) {
-          for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === "object" && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
-              if (conf.z != null) p.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(p);
-            } else {
-              const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-              wrap.style.width  = `${conf.size?.width  || 100}px`;
-              wrap.style.height = `${conf.size?.height || 100}px`;
-              if (conf.z != null) wrap.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(wrap);
-              this._initCardInteract(wrap);
-            }
-          }
-        } else {
-          this._showEmptyPlaceholder?.();
-        }
-        this._resizeContainer?.();
-
-        // Save and update store badge
-        await this._saveLayout(false);
-        try { this._updateStoreBadge?.(); } catch {}
-        try { this._probeBackend?.(); } catch {}
-        this._toast?.("Design imported.");
-      };
-      inp.click();
-    };
-
-    return true;
+  const isLikelyCard = (el) => {
+    try {
+      if (!(el instanceof Element)) return false;
+      const n = el.localName || "";
+      if (!n) return false;
+      if (n === "ha-card") return true;
+      if (n.endsWith("-card")) return true; // hui-*, custom:*, mushroom-*, etc.
+      return false;
+    } catch { return false; }
   };
 
-  if (!install()) {
-    if (window.customElements && window.customElements.whenDefined) {
-      window.customElements.whenDefined("drag-and-drop-card").then(install);
-    }
+  const rebuildOnce = (el) => {
+    try {
+      if (!el || SEEN.has(el)) return;
+      SEEN.add(el);
+      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+    } catch {}
+  };
+
+  const deepScan = (root) => {
+    try {
+      if (!root) return;
+      if (root instanceof Element && isLikelyCard(root)) rebuildOnce(root);
+      const all = (root instanceof ShadowRoot ? root : root).querySelectorAll?.("*");
+      if (!all) return;
+      for (const el of all) {
+        if (isLikelyCard(el)) rebuildOnce(el);
+        const sr = el.shadowRoot;
+        if (sr) { try { deepScan(sr); } catch {} }
+      }
+    } catch {}
+  };
+
+  const installOnInstance = (host) => {
+    try {
+      if (!host || host.__ddcCardModIntegrated) return;
+      host.__ddcCardModIntegrated = true;
+      const root = host.shadowRoot || host;
+
+      // Initial scan (covers already rendered children)
+      deepScan(root);
+
+      // Observe newly added content within the card
+      const mo = new MutationObserver((muts) => {
+        for (const m of muts) {
+          if (!m.addedNodes || !m.addedNodes.length) continue;
+          for (const n of m.addedNodes) {
+            if (n instanceof Element || n instanceof ShadowRoot) {
+              deepScan(n);
+            }
+          }
+        }
+      });
+      mo.observe(root, { childList: true, subtree: true });
+      host.__ddcCardModIntegratedObserver = mo;
+
+      // Follow-up scans for lazy renders
+      setTimeout(() => { try { deepScan(root); } catch {} }, 250);
+      setTimeout(() => { try { deepScan(root); } catch {} }, 1000);
+    } catch {}
+  };
+
+  const hookExisting = () => {
+    try {
+      document.querySelectorAll("drag-and-drop-card").forEach(installOnInstance);
+    } catch {}
+  };
+
+  if (window.customElements && window.customElements.whenDefined) {
+    window.customElements.whenDefined("drag-and-drop-card").then(() => {
+      // Install on existing instances
+      hookExisting();
+      // Patch prototype to auto-install on future instances
+      const ctor = window.customElements.get("drag-and-drop-card");
+      if (ctor && ctor.prototype) {
+        const origConnected = ctor.prototype.connectedCallback;
+        ctor.prototype.connectedCallback = function() {
+          try { origConnected && origConnected.call(this); } finally {
+            installOnInstance(this);
+          }
+        };
+      }
+      // As a fallback, watch the DOM for new instances
+      const docObserver = new MutationObserver(() => hookExisting());
+      docObserver.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  } else {
+    // Very old environment: periodic best-effort scan
+    const iv = setInterval(hookExisting, 1000);
+    setTimeout(() => clearInterval(iv), 10000);
   }
 })();
