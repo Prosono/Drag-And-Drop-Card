@@ -561,7 +561,7 @@ _applyGridVars() {
             background:var(--ddc-card-bg, var(--card-background-color));
             cursor:grab;
             /* ensure buttons and resize handles remain visible on very small cards */
-            overflow:visible;
+            overflow:clip;
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
@@ -573,6 +573,16 @@ _applyGridVars() {
             overflow: auto !important;           /* ensure we override accidental inline/other rules */
             scrollbar-gutter: stable;
             -webkit-overflow-scrolling: touch;   /* smooth touch scrolling on iOS */
+          }
+
+          /* The actual scroll container (absolute, so wrapper size stays stable) */
+          .card-wrapper > .ddc-content{
+            position: absolute;
+            inset: var(--ddc-pad);
+            border-radius: calc(var(--ddc-radius) - 4px);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch; /* iOS momentum */
+            background: var(--ddc-surface, transparent);
           }
 
           /* Keep edit mode tools usable */
@@ -1016,10 +1026,9 @@ set hass(hass) {
   
   const wraps = this.cardContainer?.children || [];
   for (const wrap of wraps) {
-    const c = wrap.firstElementChild;
+    const c = this._getCardElement(wrap);
     if (c && c.hass !== hass) {
       c.hass = hass;
-      // Don't reprocess card_mod here - it will be handled by _processCardModOnce
     }
   }
 }
@@ -1094,8 +1103,8 @@ set hass(hass) {
           );
           this.cardContainer.appendChild(wrap);
           
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-builtAny = true;
+        try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
+        builtAny = true;
           continue;
         }
         const cardEl = await this._createCard(conf.card);
@@ -1107,8 +1116,8 @@ builtAny = true;
         if (conf.z != null) wrap.style.zIndex = String(conf.z);
         this.cardContainer.appendChild(wrap);
         
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+        try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
+      this._initCardInteract(wrap);
         builtAny = true;
       }
       this._resizeContainer();
@@ -1354,6 +1363,13 @@ _installLongPressToEnterEdit() {
   this.__lpHandlers = { onPointerDown, onPointerMove, onPointerUpOrCancel, onContextMenu, onDblClick };
 }
 
+_getContentElement(wrap) {
+  return wrap.querySelector(':scope > .ddc-content') || wrap;
+}
+_getCardElement(wrap) {
+  const content = this._getContentElement(wrap);
+  return content.firstElementChild || wrap.firstElementChild;
+}
 
 _isLayoutEmpty() {
   const c = this.cardContainer;
@@ -1641,30 +1657,37 @@ _syncEmptyStateUI() {
   _updateScrollability(wrap) {
     try {
       if (!wrap || wrap.dataset?.placeholder) return;
-      const card = wrap.firstElementChild;
-      if (!card) return;
-      // In edit mode we keep overflow visible so handles/chips are usable
+
+      const card = this._getCardElement(wrap);
+      const box  = this._getContentElement(wrap);
+      if (!card || !box) return;
+
+      // In edit mode we keep overlays usable; content can still scroll if needed
       if (this.editMode) {
         wrap.classList.remove('ddc-scrollable');
-        wrap.style.overflow = 'visible';
+        box.style.overflow = 'auto';
         return;
       }
-      const wrapRect  = wrap.getBoundingClientRect();
-      const wrapH = Math.max(wrap.clientHeight, Math.round(wrapRect.height));
-      const wrapW = Math.max(wrap.clientWidth,  Math.round(wrapRect.width));
 
-      const needsV = card.scrollHeight > wrapH + 1;
-      const needsH = card.scrollWidth  > wrapW + 1;
-      
+      // Measure against the content box (the scrollbox)
+      const rect = box.getBoundingClientRect();
+      const boxH = Math.max(box.clientHeight, Math.round(rect.height));
+      const boxW = Math.max(box.clientWidth,  Math.round(rect.width));
+
+      const needsV = card.scrollHeight > boxH + 1;
+      const needsH = card.scrollWidth  > boxW + 1;
+
+      // Content is always overflow:auto (scrollbars appear only if needed)
+      box.style.overflow = 'auto';
+
       if (needsV || needsH) {
         wrap.classList.add('ddc-scrollable');
-        wrap.style.overflow = 'auto';
       } else {
         wrap.classList.remove('ddc-scrollable');
-        wrap.style.overflow = 'visible';
       }
     } catch (e) { /* no-op */ }
   }
+
 
   _updateAllScrollabilities() {
     try {
@@ -1757,7 +1780,7 @@ _syncEmptyStateUI() {
       } else if (act === 'back')  {
         this._adjustZ(wrap, -1);
       } else if (act === 'edit') {
-        const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+        const cfg = this._extractCardConfig(this._getCardElement(wrap)) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
@@ -1765,7 +1788,8 @@ _syncEmptyStateUI() {
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
-          wrap.replaceChild(newEl, wrap.firstElementChild);
+          const oldCard = this._getCardElement(wrap);
+          this._getContentElement(wrap).replaceChild(newEl, oldCard)
           try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
@@ -1793,10 +1817,17 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    wrap.append(cardEl, shield, chip, handle);
+    // Create a scrolling content layer and move the card inside it
+    const content = document.createElement('div');
+    content.className = 'ddc-content';
+    content.appendChild(cardEl);
 
-    // Reassess scrollability after layout paint
+    // Keep overlays (shield/chip/handle) as siblings so they aren't affected by scroll
+    wrap.append(content, shield, chip, handle);
+
+    // After first render, reassess scrollability (wait for layout)
     requestAnimationFrame(() => requestAnimationFrame(() => this._updateScrollability(wrap)));
+
 
     // Observe DOM mutations (e.g., card loads data, toggles sections, etc.)
     if (!this.__moMap) this.__moMap = new WeakMap();
@@ -1840,7 +1871,7 @@ _syncEmptyStateUI() {
     const wraps = this.cardContainer?.querySelectorAll('[data-needs-card-mod="true"]') || [];
     
     wraps.forEach(wrap => {
-      const card = wrap.firstElementChild;
+      const card = this._getCardElement(wrap);
       if (!card) return;
       
       const config = card._config || card.config;
@@ -3440,8 +3471,8 @@ async _getStubConfigForType(type) {
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
     
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+    try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
+    this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -3637,8 +3668,8 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+                try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
+                this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3812,8 +3843,8 @@ this._initCardInteract(wrap);
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
               
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+              try { this._rebuildOnce(this._getCardElement(wrap)); } catch {}
+              this._initCardInteract(wrap);
             }
           }
         } else {
