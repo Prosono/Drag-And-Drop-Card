@@ -55,6 +55,7 @@ class DragAndDropCard extends HTMLElement {
       return false;
     } catch { return false; }
   }
+
   _rebuildOnce(el) {
     try {
       if (!el) return;
@@ -113,7 +114,6 @@ class DragAndDropCard extends HTMLElement {
     } catch {}
   }
 
-  /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
@@ -3915,59 +3915,96 @@ this._initCardInteract(wrap);
     inp.type = 'file'; inp.accept = 'application/json';
     inp.onchange = async () => {
       const file = inp.files?.[0]; if (!file) return;
-        const txt = await file.text();
+      const txt = await file.text();
       try {
         const json = JSON.parse(txt);
-        // Apply options (if present) before building cards
-        if (json.options) this._applyImportedOptions(json.options, true);
-        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-        // If a storage_key is present in options, make it the live config key AND inform HA editor
-        if (json?.options?.storage_key) {
-          const newKey = json.options.storage_key;
-          this._config = { ...(this._config || {}), storage_key: newKey };
-          this.storageKey = newKey;
-          this._syncEditorsStorageKey();
-          try {
-            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
-            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-            this.dispatchEvent(new CustomEvent('config-changed', {
-              detail: { config: updated },
-              bubbles: true,
-              composed: true,
-            }));
-          } catch {}
+        const inHaEditor = this._isInHaEditorPreview?.() === true;
+        const importedKey = json?.options?.storage_key || null;
+        const prevKey = this.storageKey || this._config?.storage_key || null;
+
+        // 1) Apply imported options (grid, etc.) before building cards
+        if (json.options) this._applyImportedOptions(json.options, true);
+        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
+
+        // 2) Storage key strategy:
+        //    - In HA editor preview: adopt imported key and push it into the editor's draft so Save will persist it.
+        //    - Outside HA editor (DDC edit mode): DO NOT switch keys; overwrite the current key so it sticks.
+        if (importedKey && inHaEditor) {
+          this._config = { ...(this._config || {}), storage_key: importedKey };
+          this.storageKey = importedKey;
+          this._syncEditorsStorageKey?.();
+          // Push into the editor's draft so HA's Save persists the new key
+          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          try { this._syncIntoHaEditor?.(updated); } catch {}
         }
- // v1 fallback     
+
+        // 3) Rebuild the layout from the imported cards
         this.cardContainer.innerHTML = '';
-        if (json.cards?.length) {
+        if (Array.isArray(json.cards) && json.cards.length) {
           for (const conf of json.cards) {
             if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+              const p = this._makePlaceholderAt(
+                conf.position?.x || 0,
+                conf.position?.y || 0,
+                conf.size?.width  || 100,
+                conf.size?.height || 100
+              );
               this.cardContainer.appendChild(p);
             } else {
               const el = await this._createCard(conf.card);
               const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-              wrap.style.width  = `${conf.size?.width||140}px`;
-              wrap.style.height = `${conf.size?.height||100}px`;
+              this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
+              wrap.style.width  = `${conf.size?.width  || 140}px`;
+              wrap.style.height = `${conf.size?.height || 100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              
-            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-            this._initCardInteract(wrap);
+              try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+              this._initCardInteract(wrap);
             }
           }
         } else {
           this._showEmptyPlaceholder();
         }
+
+        // 4) Persist under the *current* (effective) key
         this._resizeContainer();
         await this._saveLayout(false);
+
+        // 4b) Safety net: if we adopted a new key in HA editor, also save a copy under the previous key
+        if (inHaEditor && importedKey && prevKey && prevKey !== this.storageKey) {
+          try {
+            const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
+            const saved = wraps.map((w) => {
+              const x = parseFloat(w.getAttribute('data-x')) || 0;
+              const y = parseFloat(w.getAttribute('data-y')) || 0;
+              const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+              const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+              const z = parseInt(w.style.zIndex || '1', 10);
+              const cardCfg = this._extractCardConfig(w.firstElementChild);
+              return { card: cardCfg, position: { x, y }, size: { width, height }, z };
+            });
+            const payload = { version: 2, options: this._exportableOptions(), cards: saved };
+            localStorage.setItem(`ddc_local_${prevKey}`, JSON.stringify(payload));
+          } catch {}
+        }
+
+        // 5) UX: notify & badge + broadcast to other instances
         this._toast('Design imported.');
-        this._showImportBadge('Imported');
+        this._showImportBadge?.('Imported');
         window.dispatchEvent(new CustomEvent('ddc-import-applied', {
           detail: { storage_key: this.storageKey }
         }));
+
+        // 6) If we're in the editor but couldn't reach the custom editor (YAML mode), hint the user
+        if (inHaEditor && importedKey) {
+          const couldSync = (() => {
+            try { return !!this._deepQueryAll?.('drag-and-drop-card-editor')?.length; } catch { return false; }
+          })();
+          if (!couldSync) {
+            this._toast?.('Imported — update storage_key in the editor and Save to persist.');
+          }
+        }
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
