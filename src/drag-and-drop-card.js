@@ -29,6 +29,9 @@ console.info('%c drag-and-drop-card loaded', 'color:#03a9f4;font-weight:700;');
 const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
+// Turn off the global rebuilder shim by default (prevents ll-rebuild loops)
+const DDC_ENABLE_GLOBAL_REBUILDER = false;
+
 class DragAndDropCard extends HTMLElement {
 
   __booting = false;  
@@ -1038,13 +1041,12 @@ _applyGridVars() {
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
+  /* ------------------------ Initial load / rebuild ------------------------ */
   async _initialLoad(force = false) {
-    // prevent multiple parallel boots
     if (this.__booting) return;
     this.__booting = true;
 
     try {
-      // mark loading in progress to prevent autosave during rebuild
       this._loading = true;
 
       if (force && this.cardContainer) {
@@ -1056,24 +1058,18 @@ _applyGridVars() {
       const __rebuildAfter = [];
       let saved = null;
 
-      // Try backend first if available
+      // Backend load first
       if (this._backendOK && this.storageKey) {
-        try {
-          saved = await this._loadLayoutFromBackend(this.storageKey);
-        } catch (e) {
-          this._dbgPush('boot', 'Backend load failed', { error: String(e) });
-        }
+        try { saved = await this._loadLayoutFromBackend(this.storageKey); }
+        catch (e) { this._dbgPush('boot', 'Backend load failed', { error: String(e) }); }
       }
 
-      // Fallback: localStorage (and migrate to backend if possible)
+      // Fallback to localStorage (+ optional migrate)
       if (!saved && this.storageKey) {
         let local = null;
-        try {
-          local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null');
-        } catch {}
+        try { local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'); } catch {}
         if (local) {
           this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
-
           if (this._backendOK) {
             try {
               await this._saveLayoutToBackend(this.storageKey, local);
@@ -1089,23 +1085,23 @@ _applyGridVars() {
         }
       }
 
-      // Fallback: embedded YAML config
+      // Fallback to embedded YAML
       if (!saved && this._config?.cards?.length) {
         this._dbgPush('boot', 'Using embedded config');
         saved = { cards: this._config.cards };
       }
 
-      // Snapshot of YAML before we overlay anything
+      // Snapshot YAML before overlay
       const yamlCfg = { ...(this._config || {}) };
 
-      // 1) Apply persisted options as baseline
+      // 1) Baseline from persisted options
       if (saved?.options) {
         this._applyImportedOptions(saved.options, true);
       } else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
       }
 
-      // 2) Overlay explicit YAML options (take precedence)
+      // 2) YAML overrides
       const overrideKeys = [
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','debug','disable_overlap',
@@ -1113,20 +1109,15 @@ _applyGridVars() {
         'container_preset','container_preset_orientation'
       ];
       const cfgOpts = {};
-      for (const k of overrideKeys) {
-        if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
-      }
-      if (Object.keys(cfgOpts).length) {
-        this._applyImportedOptions(cfgOpts, true);
-      }
+      for (const k of overrideKeys) if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
+      if (Object.keys(cfgOpts).length) this._applyImportedOptions(cfgOpts, true);
 
-      // Build cards
+      // Build
       let builtAny = false;
 
       if (saved?.cards?.length) {
         for (const conf of saved.cards) {
           if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            // empty/placeholder
             const wrap = this._makePlaceholderAt(
               conf.position?.x || 0,
               conf.position?.y || 0,
@@ -1149,7 +1140,6 @@ _applyGridVars() {
           if (conf.z != null) wrap.style.zIndex = String(conf.z);
 
           this.cardContainer.appendChild(wrap);
-
           try { this._rebuildOnce(wrap.firstElementChild); } catch {}
           this._initCardInteract(wrap);
           builtAny = true;
@@ -1169,23 +1159,29 @@ _applyGridVars() {
 
       // Ensure card-mod runs once after first paint
       if (force) this._cardModProcessed = false;
+
+      // 🔇 NEW: wait for quiet period so autosave can’t catch an in-between state
+      try { await this._waitForQuiescence(400, 2000); } catch {}
+
       setTimeout(() => {
         this._processCardModOnce();
       }, 100);
 
-      // Rebuild signals for nested cards
+      // Rebuild notifications for nested cards (if you still need them)
       try {
         __rebuildAfter.forEach((el) => {
-          try {
-            el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-          } catch {}
+          try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
         });
       } catch {}
-    } finally {
+
+      // Done loading (after quiescence)
       this._loading = false;
+    } finally {
+      // Always clear booting flag
       this.__booting = false;
     }
   }
+
 
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -2395,6 +2391,29 @@ _syncEmptyStateUI() {
       }
     }
     return out;
+  }
+
+  // Wait until we have a quiet period with no ll-rebuilds before allowing autosave
+  async _waitForQuiescence(quietMs = 400, maxWaitMs = 2000) {
+    const container = this.cardContainer || this.shadowRoot || this;
+    if (!container) return;
+
+    const bump = () => { this.__quiesceUntil = performance.now() + quietMs; };
+    this.__quiesceUntil = performance.now() + quietMs;
+
+    // Listen in capture phase so we catch bubbled ll-rebuild
+    container.addEventListener('ll-rebuild', bump, true);
+
+    const deadline = performance.now() + maxWaitMs;
+    try {
+      // Busy-wait with small sleeps until no ll-rebuild has happened for quietMs
+      while (performance.now() < (this.__quiesceUntil || 0)) {
+        if (performance.now() > deadline) break;
+        await new Promise(r => setTimeout(r, 50));
+      }
+    } finally {
+      try { container.removeEventListener('ll-rebuild', bump, true); } catch {}
+    }
   }
 
   _statesList(domains) {
@@ -3978,7 +3997,9 @@ if (!customElements.get('drag-and-drop-card')) {
    - No extra resource needed; executed as part of this script
    - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
    ========================================================================== */
-(() => {
+if (DDC_ENABLE_GLOBAL_REBUILDER) {
+   (() => {
+  
   const SEEN = new WeakSet();
 
   const isLikelyCard = (el) => {
@@ -4073,3 +4094,4 @@ if (!customElements.get('drag-and-drop-card')) {
     setTimeout(() => clearInterval(iv), 10000);
   }
 })();
+}
