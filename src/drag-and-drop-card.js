@@ -1284,20 +1284,32 @@ _applyGridVars() {
     }
   }
 
+    // Robustly get the Lovelace object, even across shadow roots
     _getLovelace() {
-    // Try local context first
-    const llLocal = this.closest?.('hui-root')?.lovelace;
-    if (llLocal) return llLocal;
+      // Walk up through shadow roots from THIS element
+      let hop = 0, host = this;
+      while (host && hop++ < 15) {
+        const root = host.getRootNode?.();
+        const rHost = root?.host;
+        if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
+        host = rHost || host.parentElement;
+      }
 
-    // Fallback traversal (works across HA versions)
-    const root = document
-      .querySelector('home-assistant')?.shadowRoot
-      ?.querySelector('home-assistant-main')?.shadowRoot
-      ?.querySelector('app-drawer-layout partial-panel-resolver ha-panel-lovelace')?.shadowRoot
-      ?.querySelector('hui-root');
-
-    return root?.lovelace;
-  }
+      // Fallback: breadth-first search for <hui-root> in the document (handles HA layout changes)
+      const q = (n) => Array.from(n.querySelectorAll?.('*') || []);
+      const enqueue = (arr, n) => { if (n) arr.push(n); if (n?.shadowRoot) arr.push(n.shadowRoot); };
+      const seen = new Set(); const queue = [document];
+      while (queue.length) {
+        const n = queue.shift();
+        if (!n || seen.has(n)) continue;
+        seen.add(n);
+        if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
+        if (n.tagName === 'HUI-ROOT') return n.lovelace;
+        if (n.shadowRoot) enqueue(queue, n.shadowRoot);
+        for (const c of (n.children || q(n))) enqueue(queue, c);
+      }
+      return undefined;
+    }
 
   // Recursively patch THIS card’s YAML (by storage_key if provided)
   async _persistOptionsToYaml(opts) {
@@ -1307,53 +1319,34 @@ _applyGridVars() {
     const mode = ll.mode || (typeof ll.saveConfig === 'function' ? 'storage' : 'yaml');
     if (typeof ll.saveConfig !== 'function') {
       console.debug(`[ddc:import] YAML persist skipped (dashboard mode: ${mode})`);
-      return false; // YAML mode or read-only dashboard
-    }
-
-    const patch = {
-      type: 'custom:drag-and-drop-card',
-      ...opts,
-    };
-    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
-
-    const matches = (c) =>
-      c && c.type === 'custom:drag-and-drop-card' &&
-      (patch.storage_key ? c.storage_key === patch.storage_key : true);
-
-    // Deep clone to avoid mutating ll.config directly
-    const newLL = JSON.parse(JSON.stringify(ll.config));
-    let patchedCount = 0;
-
-    const visit = (node) => {
-      if (!node) return;
-      if (Array.isArray(node)) { node.forEach(visit); return; }
-      if (typeof node !== 'object') return;
-
-      // Patch card itself
-      if (node.type && matches(node)) {
-        Object.assign(node, patch);
-        patchedCount++;
-      }
-
-      // Recurse into any array/object children (covers stacks, sections, etc.)
-      for (const v of Object.values(node)) {
-        if (!v) continue;
-        if (Array.isArray(v)) visit(v);
-        else if (typeof v === 'object') visit(v);
-      }
-    };
-
-    visit(newLL.views);
-
-    if (!patchedCount) {
-      console.debug('[ddc:import] YAML persist: no matching drag-and-drop-card found (check storage_key)');
       return false;
     }
 
-    console.debug('[ddc:import] YAML persist → saving', { mode, patchedCount, patch });
+    const patch = { type: 'custom:drag-and-drop-card', ...opts };
+    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
+
+    const matches = (c) => c?.type === 'custom:drag-and-drop-card' &&
+      (!patch.storage_key || c.storage_key === patch.storage_key);
+
+    const newLL = JSON.parse(JSON.stringify(ll.config));
+    let patched = 0;
+
+    const visit = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (typeof node !== 'object') return;
+      if (node.type && matches(node)) { Object.assign(node, patch); patched++; }
+      for (const v of Object.values(node)) if (v && (typeof v === 'object' || Array.isArray(v))) visit(v);
+    };
+    visit(newLL.views);
+
+    if (!patched) { console.debug('[ddc:import] YAML persist: no matching card (check storage_key)'); return false; }
+
+    console.debug('[ddc:import] YAML persist → saving', { mode, patched, patch });
     await ll.saveConfig(newLL);
     return true;
   }
+
 
 
 
