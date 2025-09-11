@@ -3699,14 +3699,17 @@ this._initCardInteract(wrap);
   _applyImportedOptions(opts = {}, recalc = true) {
     // If storage_key changed, push it into HA editor immediately
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
-      try {
-        const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+   // Only tell the HA editor while the editor is actually open.
+      if (this._isInHaEditorPreview()) {
+        try {
+          const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
           this.dispatchEvent(new CustomEvent('config-changed', {
-            detail: { config: updated },
+            detail: { config: updatedCfg },
             bubbles: true,
             composed: true,
           }));
-      } catch {}
+        } catch {}
+      }
     }
 
     // keep the original config around, but merge options into live props
@@ -3812,8 +3815,8 @@ this._initCardInteract(wrap);
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
               
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+            this._initCardInteract(wrap);
             }
           }
         } else {
