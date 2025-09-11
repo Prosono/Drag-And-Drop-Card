@@ -439,18 +439,24 @@ _applyGridVars() {
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
     // Auto‑assign a storage key if none provided
+    // Keep previous to detect real key changes
+    const prevKey = this.storageKey;
     // Use existing instance key if present
+
+    // STABLE storage_key: reuse instance key if none provided
     if (!config.storage_key) {
-      if (!this.storageKey) {
-        this.storageKey = `layout_${crypto?.randomUUID?.() || Date.now().toString(36)}`;
+      if (this.storageKey) {
+        config = { ...config, storage_key: this.storageKey };
+      } else {
+        this.storageKey = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
+        config = { ...config, storage_key: this.storageKey };
       }
-      // reflect into config so the rest of the method sees a value
-      config = { ...config, storage_key: this.storageKey };
     }
 
-    const prevKey = this.storageKey; 
+    // Store & reflect
     this._config = config;
     this.storageKey = config.storage_key;
+    this._syncEditorsStorageKey();
 
 
     // Store incoming config and update properties
@@ -475,6 +481,12 @@ _applyGridVars() {
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
+    const keyChanged = prevKey !== this.storageKey;
+
+      // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
+    if (this.editMode && !this.__booting && !keyChanged) {
+      try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
+    }
     // Grid-related
     this._applyGridVars();
 
@@ -950,8 +962,9 @@ _applyGridVars() {
 
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
+   // Boot/rebuild logic
     this.__cfgReady = true;
-    if (prevKey !== this.storageKey && this.__booted) {
+    if (keyChanged && this.__booted) {
       this._initialLoad(true);
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
@@ -3688,7 +3701,11 @@ this._initCardInteract(wrap);
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
       try {
         const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-        this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updatedCfg } }));
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: updated },
+            bubbles: true,
+            composed: true,
+          }));
       } catch {}
     }
 
@@ -3772,7 +3789,11 @@ this._initCardInteract(wrap);
           try {
             // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
             const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-            this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: updated } }));
+            this.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: updated },
+              bubbles: true,
+              composed: true,
+            }));
           } catch {}
         }
  // v1 fallback     
