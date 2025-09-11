@@ -438,6 +438,21 @@ _applyContainerSizingFromConfig(initial=false) {
   }
 }
 
+  _showImportBadge(text = 'Imported') {
+    const b = this.importBadge;
+    if (!b) return;
+    const lbl = b.querySelector('.label');
+    if (lbl) lbl.textContent = text;
+    b.style.display = 'inline-flex';
+
+    clearTimeout(this.__importBadgeTimer);
+    // auto-hide after 12s; tweak as you like
+    this.__importBadgeTimer = setTimeout(() => this._hideImportBadge(), 12000);
+  }
+  _hideImportBadge() {
+    if (this.importBadge) this.importBadge.style.display = 'none';
+  }
+
 _getContainerSize() {
   const c = this.cardContainer; if (!c) return { w:0, h:0 };
   const w = parseFloat(getComputedStyle(c).width) || c.getBoundingClientRect().width;
@@ -894,7 +909,18 @@ _applyGridVars() {
             display:flex;align-items:center;justify-content:center;width:100%;height:100%;
             background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
           }
-
+          .import-badge {
+            margin-left: 8px;
+            border: 1px solid var(--divider-color);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: .85rem;
+            display: none;               /* shown programmatically */
+            align-items: center;
+            gap: 6px;
+            background: rgba(76,175,80,.15); /* subtle green */
+            color: var(--primary-text-color);
+          }
           /* --- hold-to-edit ring (cursor progress) --- */
           .ddc-press-ring{
             position:fixed; z-index:100000; width:44px; height:44px; pointer-events:none;
@@ -965,6 +991,16 @@ _applyGridVars() {
               <ha-icon icon="mdi:storefront-outline"></ha-icon>
               <span>Open HADS</span>
             </button>
+            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
+              <ha-icon icon="mdi:storefront-outline"></ha-icon>
+              <span>Open HADS</span>
+            </button>
+
+            <!-- NEW: Import-applied badge -->
+            <span class="import-badge" id="importBadge" style="display:none" title="Imported design has been applied">
+              <ha-icon icon="mdi:check-circle-outline"></ha-icon>
+              <span class="label">Imported</span>
+            </span>
             <button class="btn warning" id="exitEditBtn" style="display:none">
               <ha-icon icon="mdi:exit-run"></ha-icon>
               <span>Exit edit mode</span>
@@ -1046,14 +1082,25 @@ _applyGridVars() {
     this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); };
     document.addEventListener('visibilitychange', this.__onVis);
   
+    this.importBadge  = this.shadowRoot.querySelector('#importBadge');
+    // Listen for global “import applied” events (from this card, or the editor)
+    this.__onImportApplied = (ev) => {
+      // If payload includes a storage_key, only show on matching card; otherwise show for all
+      const key = ev?.detail?.storage_key;
+      if (!key || key === this.storageKey) this._showImportBadge('Imported');
+    };
+    window.addEventListener('ddc-import-applied', this.__onImportApplied);
+
     // NEW: ensure we never boot in edit mode
     this._toggleEditMode(false);
+
   }
   
   disconnectedCallback() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
+    window.removeEventListener('ddc-import-applied', this.__onImportApplied);
   
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
@@ -3907,8 +3954,8 @@ this._initCardInteract(wrap);
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
               
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+            this._initCardInteract(wrap);
             }
           }
         } else {
@@ -3917,6 +3964,10 @@ this._initCardInteract(wrap);
         this._resizeContainer();
         await this._saveLayout(false);
         this._toast('Design imported.');
+        this._showImportBadge('Imported');
+        window.dispatchEvent(new CustomEvent('ddc-import-applied', {
+          detail: { storage_key: this.storageKey }
+        }));
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
