@@ -37,6 +37,7 @@ class DragAndDropCard extends HTMLElement {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this.__rebuiltCards = new WeakSet();
+    this._dbgInit(); // ensure debug buffer exists immediately
   }
 
   
@@ -448,17 +449,24 @@ _applyGridVars() {
 
   /* ---------------------------- debug helpers ---------------------------- */
   _dbgInit() {
-    if (this.__dbgReady) return;
-    this.__dbgReady = true;
-    this._dbgBuffer = [];
-    this._dbgMax = 400;
-    try { window.DDC = this; } catch {}
+     // idempotent
+     this.__dbgReady = true;
+     if (!Array.isArray(this._dbgBuffer)) this._dbgBuffer = [];
+     if (typeof this._dbgMax !== 'number') this._dbgMax = 400;
+     try { window.DDC = this; } catch {}
   }
   _dbgPush(kind, msg, extra = null) {
-    const line = { t: new Date().toISOString(), kind, msg, extra };
-    this._dbgBuffer.push(line);
-    if (this._dbgBuffer.length > this._dbgMax) this._dbgBuffer.shift();
-    if (this.debug) console.debug(`%c[ddc:${kind}]%c ${msg}`, 'color:#03a9f4', 'color:unset', extra ?? '');
+     try {
+       if (!this.__dbgReady || !Array.isArray(this._dbgBuffer)) this._dbgInit();
+       const line = { t: new Date().toISOString(), kind, msg, extra };
+       this._dbgBuffer.push(line);
+       const max = this._dbgMax || 400;
+       if (this._dbgBuffer.length > max) this._dbgBuffer.splice(0, this._dbgBuffer.length - max);
+       if (this.debug) console.debug(`%c[ddc:${kind}]%c ${msg}`, 'color:#03a9f4', 'color:unset', extra ?? '');
+     } catch (e) {
+       // never let logging break the card
+       try { console.debug(`[ddc:${kind}] ${msg}`, extra ?? '', e); } catch {}
+     }
   }
   _dbgDump() { return [...this._dbgBuffer]; }
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -3898,7 +3906,7 @@ this._initCardInteract(wrap);
             // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
             const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
             this.dispatchEvent(new CustomEvent('config-changed', {
-              detail: { config: updated },
+              detail: { config: updatedCfg },
               bubbles: true,
               composed: true,
             }));
