@@ -899,6 +899,10 @@ _applyGridVars() {
               <ha-icon icon="mdi:upload"></ha-icon>
               <span style="margin-left:6px">Import Design</span>
             </button>
+            <button class="btn" id="applyLayoutBtn" style="display:none">
+              <ha-icon icon="mdi:content-save"></ha-icon>
+              <span style="margin-left:6px">Apply</span>
+            </button>
             <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
               <ha-icon icon="mdi:storefront-outline"></ha-icon>
               <span>Open HADS</span>
@@ -920,7 +924,8 @@ _applyGridVars() {
       this.storeBadge    = this.shadowRoot.querySelector('#storeBadge');
       this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
-      this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn');      
+      this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
+      this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');     
 
       this._applyGridVars();
       
@@ -933,6 +938,16 @@ _applyGridVars() {
       this.exitEditBtn.addEventListener('click', () => this._toggleEditMode(false));
       this.exportBtn.addEventListener('click', () => this._exportDesign());
       this.importBtn.addEventListener('click', () => this._importDesign());
+      this.applyLayoutBtn.addEventListener('click', () => this._saveLayout(false));
+       // Ctrl/Cmd + S to Apply while in DDC edit mode
+       window.addEventListener('keydown', (e) => {
+         if (!this.editMode) return;
+         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+           e.preventDefault();
+           this._saveLayout(false);
+         }
+       });
+
       this.exploreBtn.addEventListener('click', () =>
         window.open('https://cardstore.smarti.dev/', '_blank', 'noopener,noreferrer')
       );
@@ -1184,6 +1199,8 @@ _applyGridVars() {
     } finally {
       this._loading = false;
       this.__booting = false;
+      this.__dirty = false;
+      this._updateApplyBtn?.();
     }
   }
 
@@ -1206,6 +1223,7 @@ _applyGridVars() {
     this.importBtn.style.display   = this.editMode ? 'inline-block' : 'none';
     this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
     this.storeBadge.style.display  = this.editMode ? 'inline-block' : 'none';
+    this.applyLayoutBtn.style.display = this.editMode ? 'inline-block' : 'none';
     this._syncEmptyStateUI();
     
     this.cardContainer.classList.toggle('grid-on', this.editMode);
@@ -1419,8 +1437,17 @@ _syncEmptyStateUI() {
   toggle(this.importBtn);
   toggle(this.exploreBtn);
   toggle(this.storeBadge);
-}
-  
+  toggle(this.applyLayoutBtn);
+  }
+
+    _updateApplyBtn() {
+    if (this.applyLayoutBtn) this.applyLayoutBtn.disabled = !this.__dirty;
+  }
+  _markDirty(reason='') {
+    this.__dirty = true;
+    this._updateApplyBtn();
+    this._dbgPush?.('dirty', 'Marked dirty', { reason });
+  }
 
   _playEditRipple(clientX=null, clientY=null) {
     const cont = this.cardContainer;
@@ -3825,8 +3852,8 @@ this._initCardInteract(wrap);
           this._showEmptyPlaceholder();
         }
         this._resizeContainer();
-        await this._saveLayout(false);
-        this._toast('Design imported.');
+        this._markDirty('import');
+        this._toast('Design imported — click Apply to save.');
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -3838,6 +3865,8 @@ this._initCardInteract(wrap);
 
   /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
+    // Always mark dirty so Apply becomes enabled
+    this._markDirty(reason);
     // only queue save when autosave is enabled, not loading, and in edit mode
     if (!this.autoSave) return;
     // skip saving while the layout is still loading
@@ -3868,11 +3897,14 @@ this._initCardInteract(wrap);
 
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
 
-    if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).'); return; }
+    if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).');
+      this.__dirty = false; this._updateApplyBtn();
+      return; }
 
     try {
       await this._saveLayoutToBackend(this.storageKey, payload);
       if (!silent) this._toast('Layout saved.');
+      this.__dirty = false; this._updateApplyBtn();
     } catch (e) {
       console.error('Backend save failed', e);
       this._dbgPush('save', 'Backend save failed', { error: String(e) });
