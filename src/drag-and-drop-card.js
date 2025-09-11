@@ -1099,9 +1099,10 @@ _applyGridVars() {
       const yamlCfg = { ...(this._config || {}) };
 
       // 1) Apply persisted options as baseline
-      if (saved?.options) {
-        this._applyImportedOptions(saved.options, true);
-      } else if (typeof saved?.grid === 'number') {
+        if (saved?.options) {
+          const { storage_key, ...optsNoKey } = saved.options;
+          this._applyImportedOptions(optsNoKey, true);
+        } else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
       }
 
@@ -3697,19 +3698,18 @@ this._initCardInteract(wrap);
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
-    // If storage_key changed, push it into HA editor immediately
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
-   // Only tell the HA editor while the editor is actually open.
-      if (this._isInHaEditorPreview()) {
-        try {
-          const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-          this.dispatchEvent(new CustomEvent('config-changed', {
-            detail: { config: updatedCfg },
-            bubbles: true,
-            composed: true,
-          }));
-        } catch {}
-      }
+    // If storage_key changed, push it into HA editor immediately
+     if (this._isInHaEditorPreview()) {
+       try {
+         const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+         this.dispatchEvent(new CustomEvent('config-changed', {
+           detail: { config: updatedCfg },
+           bubbles: true,
+           composed: true,
+         }));
+       } catch {}
+     }
     }
 
     // keep the original config around, but merge options into live props
@@ -3780,7 +3780,10 @@ this._initCardInteract(wrap);
       try {
         const json = JSON.parse(txt);
         // Apply options (if present) before building cards
-        if (json.options) this._applyImportedOptions(json.options, true);
+          if (json.options) {
+            const { storage_key, ...optsNoKey } = json.options;
+            this._applyImportedOptions(optsNoKey, true);
+          }
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
         // If a storage_key is present in options, make it the live config key AND inform HA editor
