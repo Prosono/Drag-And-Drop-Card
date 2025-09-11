@@ -37,7 +37,6 @@ class DragAndDropCard extends HTMLElement {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this.__rebuiltCards = new WeakSet();
-    this._dbgInit(); // ensure debug buffer exists immediately
   }
 
   
@@ -109,34 +108,6 @@ class DragAndDropCard extends HTMLElement {
         } catch {}
       });
     } catch {}
-  }
-
-  _setStorageKey(newKey, reason = '') {
-  const oldKey = this.storageKey ?? null;
-  this.storageKey = newKey ?? undefined;
-  this._dbgPush('key', 'storage_key changed', { oldKey, newKey: this.storageKey ?? null, reason });
-  }
-
-  __opSeq = 0;
-  _newOp(tag) { return `${Date.now()}-${(++this.__opSeq)}-${tag}`; }
-
-  _keySnapshot(extra = {}) {
-    this._dbgPush('key', 'Snapshot', {
-      live_storageKey: this.storageKey ?? null,
-      config_storage_key: this._config?.storage_key ?? null,
-      backendOK: !!this._backendOK,
-      editMode: !!this.editMode,
-      autoSave: !!this.autoSave,
-      ...extra
-    });
-  }
-
-  _logDecision(stage, extra = {}) {
-    this._dbgPush('import', stage, {
-      live_storageKey: this.storageKey ?? null,
-      config_storage_key: this._config?.storage_key ?? null,
-      ...extra
-    });
   }
 
   /* ------------------------- Mini config editor (HA) ------------------------- */
@@ -449,24 +420,17 @@ _applyGridVars() {
 
   /* ---------------------------- debug helpers ---------------------------- */
   _dbgInit() {
-     // idempotent
-     this.__dbgReady = true;
-     if (!Array.isArray(this._dbgBuffer)) this._dbgBuffer = [];
-     if (typeof this._dbgMax !== 'number') this._dbgMax = 400;
-     try { window.DDC = this; } catch {}
+    if (this.__dbgReady) return;
+    this.__dbgReady = true;
+    this._dbgBuffer = [];
+    this._dbgMax = 400;
+    try { window.DDC = this; } catch {}
   }
   _dbgPush(kind, msg, extra = null) {
-     try {
-       if (!this.__dbgReady || !Array.isArray(this._dbgBuffer)) this._dbgInit();
-       const line = { t: new Date().toISOString(), kind, msg, extra };
-       this._dbgBuffer.push(line);
-       const max = this._dbgMax || 400;
-       if (this._dbgBuffer.length > max) this._dbgBuffer.splice(0, this._dbgBuffer.length - max);
-       if (this.debug) console.debug(`%c[ddc:${kind}]%c ${msg}`, 'color:#03a9f4', 'color:unset', extra ?? '');
-     } catch (e) {
-       // never let logging break the card
-       try { console.debug(`[ddc:${kind}] ${msg}`, extra ?? '', e); } catch {}
-     }
+    const line = { t: new Date().toISOString(), kind, msg, extra };
+    this._dbgBuffer.push(line);
+    if (this._dbgBuffer.length > this._dbgMax) this._dbgBuffer.shift();
+    if (this.debug) console.debug(`%c[ddc:${kind}]%c ${msg}`, 'color:#03a9f4', 'color:unset', extra ?? '');
   }
   _dbgDump() { return [...this._dbgBuffer]; }
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -498,13 +462,6 @@ _applyGridVars() {
     // Store incoming config and update properties
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
-
-    // Logging
-    this._dbgPush('boot', 'setConfig applied', {
-      storageKey_live: this.storageKey ?? null,
-      storageKey_in_config: config.storage_key ?? null
-    });
-
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -1151,27 +1108,16 @@ _applyGridVars() {
         this._dbgPush('boot', 'Using embedded config');
         saved = { cards: this._config.cards };
       }
-        this._dbgPush('boot', 'load-source', {
-          used_backend: !!(this._backendOK && this.storageKey),
-          had_local_snapshot: !!saved, // true when local or config provided something
-          live_storageKey: this.storageKey ?? null
-       });
+
       // Snapshot of YAML before we overlay anything
       const yamlCfg = { ...(this._config || {}) };
 
       // 1) Apply persisted options as baseline
         if (saved?.options) {
-          const hadKey = Object.prototype.hasOwnProperty.call(saved.options, 'storage_key');
-          this._dbgPush('boot', 'saved.options detected', {
-            had_storage_key: hadKey,
-            saved_storage_key: hadKey ? saved.options.storage_key : null
-          });
-          // Apply visual/options but do not let a saved file flip our live key
           const { storage_key, ...optsNoKey } = saved.options;
           this._applyImportedOptions(optsNoKey, true);
-      } else if (typeof saved?.grid === 'number') {
+        } else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
-      
       }
 
       // 2) Overlay explicit YAML options (take precedence)
@@ -3660,9 +3606,6 @@ this._initCardInteract(wrap);
 
     modal.querySelector('#forceSave').addEventListener('click', async () => {
       await this._saveLayout(false);
-      this._logDecision('import:ready', { source: 'diagnostics' });
-      await this._saveLayout(false);
-
       refreshLogs();
     });
 
@@ -3713,21 +3656,15 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-          this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
             this._showEmptyPlaceholder();
           }
           this._resizeContainer();
-          this._logDecision('import:ready', { source: 'toolbar' });
-          // choose one:
-          // 1) immediate persist:
           await this._saveLayout(false);
-          // 2) or mark dirty and let user click Apply:
-          // this._markDirty('import');
-          this._toast('Design imported.');
         } catch (e) {
           this._dbgPush('import', 'Parse failed', { error: String(e) });
         }
@@ -3787,13 +3724,6 @@ this._initCardInteract(wrap);
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
-
-    // Trace incoming options and whether they contain a key
-    this._dbgPush('opts', 'applyImportedOptions called', {
-      has_storage_key: Object.prototype.hasOwnProperty.call(opts, 'storage_key'),
-      opts_preview: Object.keys(opts || {}).slice(0, 10)
-    });
-
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
     // If storage_key changed, push it into HA editor immediately
      if (this._isInHaEditorPreview()) {
@@ -3811,11 +3741,7 @@ this._initCardInteract(wrap);
     // keep the original config around, but merge options into live props
     this._config = { ...(this._config || {}), ...opts };
 
-    //if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
-    if ('storage_key' in opts) {
-      this._dbgPush('opts', 'storage_key present in opts (IGNORED here)');
-      // intentionally ignore; live key is authoritative
-    }
+    if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
     this._syncEditorsStorageKey();
     if ('grid' in opts)               this.gridSize = Number(opts.grid) || 10;
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
@@ -3878,23 +3804,13 @@ this._initCardInteract(wrap);
       const file = inp.files?.[0]; if (!file) return;
         const txt = await file.text();
       try {
-        const fileKey = json?.options?.storage_key ?? null;
-        this._logDecision('import:file-read', {
-          source: 'diagnostics',
-          file_has_options: !!json?.options,
-          file_storage_key: fileKey,
-          cards_in_file: json?.cards?.length ?? 0
-        });
-        // Apply options except key (so we don’t flip live key)
-        if (json.options) {
-          const { storage_key, ...optsNoKey } = json.options;
-          this._applyImportedOptions(optsNoKey, true);
-        } else if (typeof json.grid === 'number') {
-          this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
-        }
-        this.cardContainer.innerHTML = '';
-        this._keySnapshot({ stage: 'import:build-start', source: 'diagnostics' });
-   
+        const json = JSON.parse(txt);
+        // Apply options (if present) before building cards
+          if (json.options) {
+            const { storage_key, ...optsNoKey } = json.options;
+            this._applyImportedOptions(optsNoKey, true);
+          }
+        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
         // If a storage_key is present in options, make it the live config key AND inform HA editor
         if (json?.options?.storage_key) {
@@ -3906,7 +3822,7 @@ this._initCardInteract(wrap);
             // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
             const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
             this.dispatchEvent(new CustomEvent('config-changed', {
-              detail: { config: updatedCfg },
+              detail: { config: updated },
               bubbles: true,
               composed: true,
             }));
@@ -3914,7 +3830,6 @@ this._initCardInteract(wrap);
         }
  // v1 fallback     
         this.cardContainer.innerHTML = '';
-        this._keySnapshot({ stage: 'import:build-start', source: 'toolbar' });
         if (json.cards?.length) {
           for (const conf of json.cards) {
             if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
@@ -3964,11 +3879,6 @@ this._initCardInteract(wrap);
   }
 
   async _saveLayout(silent = true) {
-       this._dbgPush('save', 'begin', {
-       target_storageKey: this.storageKey ?? '(no-key -> local only)',
-       cards: this.cardContainer?.querySelectorAll('.card-wrapper:not(.ddc-placeholder)').length ?? 0
-     });
-
     const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
     const saved = wraps.map((w)=>{
       const x = parseFloat(w.getAttribute('data-x')) || 0;
@@ -3986,7 +3896,6 @@ this._initCardInteract(wrap);
      };
 
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
-    this._dbgPush('save', 'localSnapshot:OK', { bytes: JSON.stringify(payload).length }); 
 
     if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).');
       this.__dirty = false; this._updateApplyBtn();
@@ -3994,13 +3903,11 @@ this._initCardInteract(wrap);
 
     try {
       await this._saveLayoutToBackend(this.storageKey, payload);
-      this._dbgPush('save', 'backend:OK', { target_storageKey: this.storageKey });
       if (!silent) this._toast('Layout saved.');
       this.__dirty = false; this._updateApplyBtn();
     } catch (e) {
       console.error('Backend save failed', e);
       this._dbgPush('save', 'Backend save failed', { error: String(e) });
-      this._dbgPush('save', 'fallback:kept-local', { target_storageKey: this.storageKey });
       if (!silent) this._toast('Backend save failed — kept local copy.');
     }
   }
