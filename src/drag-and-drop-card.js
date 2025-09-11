@@ -1284,6 +1284,78 @@ _applyGridVars() {
     }
   }
 
+    _getLovelace() {
+    // Try local context first
+    const llLocal = this.closest?.('hui-root')?.lovelace;
+    if (llLocal) return llLocal;
+
+    // Fallback traversal (works across HA versions)
+    const root = document
+      .querySelector('home-assistant')?.shadowRoot
+      ?.querySelector('home-assistant-main')?.shadowRoot
+      ?.querySelector('app-drawer-layout partial-panel-resolver ha-panel-lovelace')?.shadowRoot
+      ?.querySelector('hui-root');
+
+    return root?.lovelace;
+  }
+
+  // Recursively patch THIS card’s YAML (by storage_key if provided)
+  async _persistOptionsToYaml(opts) {
+    const ll = this._getLovelace();
+    if (!ll) { console.debug('[ddc:import] YAML persist skipped (no lovelace root)'); return false; }
+
+    const mode = ll.mode || (typeof ll.saveConfig === 'function' ? 'storage' : 'yaml');
+    if (typeof ll.saveConfig !== 'function') {
+      console.debug(`[ddc:import] YAML persist skipped (dashboard mode: ${mode})`);
+      return false; // YAML mode or read-only dashboard
+    }
+
+    const patch = {
+      type: 'custom:drag-and-drop-card',
+      ...opts,
+    };
+    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
+
+    const matches = (c) =>
+      c && c.type === 'custom:drag-and-drop-card' &&
+      (patch.storage_key ? c.storage_key === patch.storage_key : true);
+
+    // Deep clone to avoid mutating ll.config directly
+    const newLL = JSON.parse(JSON.stringify(ll.config));
+    let patchedCount = 0;
+
+    const visit = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) { node.forEach(visit); return; }
+      if (typeof node !== 'object') return;
+
+      // Patch card itself
+      if (node.type && matches(node)) {
+        Object.assign(node, patch);
+        patchedCount++;
+      }
+
+      // Recurse into any array/object children (covers stacks, sections, etc.)
+      for (const v of Object.values(node)) {
+        if (!v) continue;
+        if (Array.isArray(v)) visit(v);
+        else if (typeof v === 'object') visit(v);
+      }
+    };
+
+    visit(newLL.views);
+
+    if (!patchedCount) {
+      console.debug('[ddc:import] YAML persist: no matching drag-and-drop-card found (check storage_key)');
+      return false;
+    }
+
+    console.debug('[ddc:import] YAML persist → saving', { mode, patchedCount, patch });
+    await ll.saveConfig(newLL);
+    return true;
+  }
+
+
 
   /* ------------------------------ Edit mode ------------------------------ */
   _toggleEditMode(force=null) {
@@ -3947,18 +4019,19 @@ this._initCardInteract(wrap);
         } catch {}
       }
 
-      // >>> NEW: persist imported options to Lovelace YAML so the editor shows them
+      // Persist imported options to Lovelace YAML (Storage mode only)
       try {
         const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
         if (toPersist) {
           const ok = await this._persistOptionsToYaml(toPersist);
           console.debug('[ddc:import] YAML persist result:', ok);
+          if (!ok) {
+            console.debug('[ddc:import] Note: If you want the import to stick, use a Storage-mode dashboard (HA UI → Dashboards → ••• → Take control).');
+          }
         }
       } catch (e) {
         console.warn('[ddc:import] YAML persist failed:', e);
       }
-// <<<
- // v1 fallback     
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
