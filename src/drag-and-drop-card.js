@@ -111,6 +111,7 @@ class DragAndDropCard extends HTMLElement {
   }
 
   /* ------------------------- Mini config editor (HA) ------------------------- */
+  /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
     el.innerHTML = `
@@ -124,114 +125,99 @@ class DragAndDropCard extends HTMLElement {
         .inline{display:inline-flex;gap:8px;align-items:center}
         .hint{opacity:.65;font-size:.85rem}
       </style>
-  
+
       <div class="cfg-row">
         <label>Storage key</label>
-        <input type="text" id="storage_key" placeholder="e.g. livingroom_layout">
+        <input id="storage_key" type="text" placeholder="my_unique_layout_key" />
       </div>
-  
+
       <div class="cfg-row">
-        <label>Grid (px)</label>
-        <input type="number" id="grid" min="5" step="1" value="10">
+        <label>Grid size</label>
+        <input id="grid" type="number" min="4" max="32" step="1" value="10" style="width:90px" />
+        <span class="hint">Grid cell in px; affects snap & default card size</span>
       </div>
-  
+
       <div class="cfg-row">
         <label><input type="checkbox" id="liveSnap"> Snap while dragging (live)</label>
       </div>
-  
+
       <div class="cfg-row">
         <label>Auto-save</label>
         <input type="checkbox" id="autoSave" checked>
         <span style="margin-left:auto">Debounce (ms)</span>
         <input type="number" id="autoSaveDebounce" min="0" step="50" value="800" style="width:90px">
       </div>
-  
+
       <div class="cfg-row">
-        <label>Container Baxckground</label>
+        <label>Container Background</label>
         <input type="text" id="containerBg"
           placeholder="transparent or css e.g. linear-gradient(...)"
-          title="Try: transparent, #232f3e, linear-gradient(to right, #1a2a6c, #b21f1f, #fdbb2d), radial-gradient(circle, #4e54c8, #8f94fb)" />
+          title="Try: transparent, #232f3e, linear-gradient(...), radial-gradient(...)" />
       </div>
-  
+
       <div class="cfg-row">
         <label>Card Background</label>
         <input type="text" id="cardBg"
           placeholder="var(--ha-card-background) or css e.g. #ffffffcc"
-          title="Try: transparent, #151515aa, linear-gradient(135deg, #667eea 0%, #764ba2 100%)" />
+          title="Try: transparent, #151515aa, linear-gradient(...)" />
       </div>
-  
+
       <div class="cfg-row">
         <label><input type="checkbox" id="debug"> Debug logs</label>
       </div>
-  
+
       <div class="cfg-row">
-        <label><input type="checkbox" id="noOverlap">
-          Disable overlapping <small style="opacity:.6">(Experimental)</small>
-        </label>
+        <label><input type="checkbox" id="noOverlap"> Disable overlap</label>
       </div>
-  
-      <!-- NEW: container sizing -->
+
+      <!-- Size controls -->
       <div class="cfg-row">
         <label>Container size</label>
         <select id="sizeMode">
           <option value="dynamic">Dynamic (auto)</option>
-          <option value="fixed_custom">User preference (px)</option>
+          <option value="fixed_custom">Fixed (custom)</option>
           <option value="preset">Preset</option>
         </select>
-  
+
         <span id="sizeCustom" class="inline" style="display:none">
-          W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
-          H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
+          <span>W</span><input id="sizeW" type="number" min="100" step="10" style="width:90px">
+          <span>H</span><input id="sizeH" type="number" min="100" step="10" style="width:90px">
         </span>
-  
+
         <span id="sizePresetWrap" class="inline" style="display:none">
-          <select id="sizePreset" style="min-width:240px"></select>
+          <select id="sizePreset"></select>
           <select id="sizeOrientation">
             <option value="auto">Auto</option>
-            <option value="portrait">Portrait</option>
             <option value="landscape">Landscape</option>
+            <option value="portrait">Portrait</option>
           </select>
         </span>
-        <span class="hint">In fixed mode, cards cannot leave the box.</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="cfg-row" style="justify-content:flex-end">
+        <mwc-button id="revertBtn" outlined>Revert</mwc-button>
+        <mwc-button id="applyBtn" raised disabled>Apply</mwc-button>
       </div>
     `;
-  
-    // ----- helpers to populate presets -----
-    const PRESETS = DragAndDropCard._sizePresets(); // static helper below
-    const presetSel = el.querySelector('#sizePreset');
-    const addGroup = (label, items) => {
-      const og = document.createElement('optgroup'); og.label = label;
-      items.forEach(p => {
-        const o = document.createElement('option');
-        o.value = p.key;
-        o.textContent = `${p.label} (${p.w}×${p.h})`;
-        presetSel.appendChild(o);
-      });
-      presetSel.appendChild(og);
-    };
-    // build grouped list
-    [
-      ['Phones',   PRESETS.filter(p => p.group==='phone')],
-      ['Tablets',  PRESETS.filter(p => p.group==='tablet')],
-      ['Desktop',  PRESETS.filter(p => p.group==='desktop')],
-    ].forEach(([g,items])=>{
-      if (!items.length) return;
-      const og = document.createElement('optgroup'); og.label = g;
-      items.forEach(p => {
-        const o = document.createElement('option');
-        o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
-        og.appendChild(o);
-      });
-      presetSel.appendChild(og);
+
+    // Presets into #sizePreset
+    const og = document.createElement('optgroup');
+    og.label = 'Presets';
+    (DragAndDropCard._sizePresets?.() || []).forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
+      og.appendChild(o);
     });
-  
+    el.querySelector('#sizePreset')?.appendChild(og);
+
     const toggleSizeControls = () => {
       const mode = el.querySelector('#sizeMode').value;
       el.querySelector('#sizeCustom').style.display = mode==='fixed_custom' ? 'inline-flex' : 'none';
       el.querySelector('#sizePresetWrap').style.display = mode==='preset' ? 'inline-flex' : 'none';
     };
-  
-    // set incoming values (keep type + unknown keys)
+
+    // Set incoming values (keep type + unknown keys)
     el.setConfig = (config = {}) => {
       el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
       el.querySelector('#storage_key').value = config.storage_key || '';
@@ -243,21 +229,27 @@ class DragAndDropCard extends HTMLElement {
       el.querySelector('#cardBg').value = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
       el.querySelector('#debug').checked = !!config.debug;
       el.querySelector('#noOverlap').checked = !!config.disable_overlap;
-  
+
       // NEW
       el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
       el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
       el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
-      el.querySelector('#sizePreset').value = config.container_preset || 'fullhd';
+      const presetSel = el.querySelector('#sizePreset');
+      const presets = DragAndDropCard._sizePresets?.() || [];
+      if (presetSel && ![...presetSel.options].some(o => o.value === (config.container_preset || ''))) {
+        // already appended above; nothing else needed
+      }
+      presetSel.value = config.container_preset || (presets[0]?.key || 'fhd');
       el.querySelector('#sizeOrientation').value = config.container_preset_orientation || 'auto';
+
       toggleSizeControls();
+      updateButtons();
     };
-  
-    // read current values (merge back into previous config, keep type)
+
+    // Collect current values
     el.getConfig = () => {
-      const base = { ...(el._config || { type: 'custom:drag-and-drop-card' }) };
-      base.type = base.type || 'custom:drag-and-drop-card';
-      base.storage_key = el.querySelector('#storage_key').value || undefined;
+      const base = { ...(el._config || {}) };
+      base.storage_key = el.querySelector('#storage_key').value || '';
       base.grid = Number(el.querySelector('#grid').value || 10);
       base.drag_live_snap = !!el.querySelector('#liveSnap').checked;
       base.auto_save = !!el.querySelector('#autoSave').checked;
@@ -266,7 +258,7 @@ class DragAndDropCard extends HTMLElement {
       base.card_background = el.querySelector('#cardBg').value || 'var(--ha-card-background, var(--card-background-color))';
       base.debug = !!el.querySelector('#debug').checked;
       base.disable_overlap = !!el.querySelector('#noOverlap').checked;
-  
+
       // NEW
       base.container_size_mode = el.querySelector('#sizeMode').value;
       base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
@@ -275,24 +267,46 @@ class DragAndDropCard extends HTMLElement {
       base.container_preset_orientation = el.querySelector('#sizeOrientation').value || 'auto';
       return base;
     };
-  
-    // notify HA when anything changes
+
+    // Dirty / Apply handling
+    const applyBtn = el.querySelector('#applyBtn');
+    const revertBtn = el.querySelector('#revertBtn');
+
+    const isDirty = () => {
+      try { return JSON.stringify(el.getConfig()) !== JSON.stringify(el._config); }
+      catch { return true; }
+    };
+    const updateButtons = () => {
+      if (applyBtn) applyBtn.disabled = !isDirty();
+    };
+
     const fire = () => {
       el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
+      // Baseline becomes the new config after Apply
+      el._config = el.getConfig();
+      updateButtons();
     };
-    const on = (sel, ev = 'input') => el.querySelector(sel)?.addEventListener(ev, () => { if (sel==='#sizeMode') toggleSizeControls(); fire(); });
-  
+
+    const on = (sel, ev = 'input') =>
+      el.querySelector(sel)?.addEventListener(ev, () => {
+        if (sel === '#sizeMode') toggleSizeControls();
+        updateButtons(); // <- no immediate fire while typing
+      });
+
+    // Listeners (no per-keystroke fire)
     on('#storage_key'); on('#grid');
     on('#liveSnap','change'); on('#autoSave','change'); on('#autoSaveDebounce');
     on('#containerBg'); on('#cardBg');
     on('#debug','change'); on('#noOverlap','change');
-  
-    // NEW listeners
     on('#sizeMode','change'); on('#sizeW'); on('#sizeH');
     on('#sizePreset','change'); on('#sizeOrientation','change');
-  
+
+    applyBtn?.addEventListener('click', fire);
+    revertBtn?.addEventListener('click', () => el.setConfig(el._config));
+
     return el;
   }
+
   
     /* ---------------------------- Size helpers ---------------------------- */
   // ---- size presets (CSS pixels) ----
