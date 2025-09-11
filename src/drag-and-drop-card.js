@@ -3810,7 +3810,33 @@ this._initCardInteract(wrap);
             const { storage_key, ...optsNoKey } = json.options;
             this._applyImportedOptions(optsNoKey, true);
           }
-        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
+        
+        // ALSO persist imported options into the card's YAML config so HA stores them
+        if (json?.options) {
+          try {
+            const { storage_key, ...optsNoKey } = json.options;
+            this._config = { ...(this._config || {}), ...optsNoKey };
+            if (storage_key) {
+              this._config.storage_key = storage_key;
+              this.storageKey = storage_key;
+              this._syncEditorsStorageKey();
+            }
+          } catch {}
+        } else if (typeof json.grid === 'number') {
+          // v1 fallback shape: { grid: <n>, cards: [...] }
+          this._config = { ...(this._config || {}), grid: json.grid };
+        }
+
+        // Tell the Lovelace editor that our YAML changed so it writes these presets
+        try {
+          const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: updatedCfg },
+            bubbles: true,
+            composed: true,
+          }));
+        } catch {}
+
 
         // If a storage_key is present in options, make it the live config key AND inform HA editor
         if (json?.options?.storage_key) {
