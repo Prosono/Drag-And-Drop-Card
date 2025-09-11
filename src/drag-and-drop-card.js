@@ -29,9 +29,6 @@ console.info('%c drag-and-drop-card loaded', 'color:#03a9f4;font-weight:700;');
 const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
-// Turn off the global rebuilder shim by default (prevents ll-rebuild loops)
-const DDC_ENABLE_GLOBAL_REBUILDER = false;
-
 class DragAndDropCard extends HTMLElement {
 
   __booting = false;  
@@ -55,7 +52,6 @@ class DragAndDropCard extends HTMLElement {
       return false;
     } catch { return false; }
   }
-
   _rebuildOnce(el) {
     try {
       if (!el) return;
@@ -114,6 +110,7 @@ class DragAndDropCard extends HTMLElement {
     } catch {}
   }
 
+  /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
@@ -198,51 +195,11 @@ class DragAndDropCard extends HTMLElement {
       </div>
 
       <!-- Actions -->
-      <div class="apply-bar hidden" id="applyBar">
-        <div class="apply-hint" id="applyHint">
-          <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-          <span>Changes pending — click <b>Apply</b> to update this card</span>
-        </div>
+      <div class="cfg-row" style="justify-content:flex-end">
         <mwc-button id="revertBtn" outlined>Revert</mwc-button>
-        <mwc-button id="applyBtn" class="apply-emphasis" raised>Apply</mwc-button>
+        <mwc-button id="applyBtn" raised disabled>Apply</mwc-button>
       </div>
-
-      <style>
-        .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
-        input[type="text"],input[type="number"],select{
-          padding:6px;border-radius:8px;border:1px solid var(--divider-color);
-          background:var(--primary-background-color);color:var(--primary-text-color)
-        }
-        label{font-weight:600;min-width:130px}
-        .inline{display:inline-flex;gap:8px;align-items:center}
-        .hint{opacity:.65;font-size:.85rem}
-
-        /* NEW: sticky apply bar */
-        .apply-bar{
-          position: sticky; bottom: 0;
-          display:flex; gap:8px; align-items:center; justify-content:flex-end;
-          padding:10px; margin-top:12px;
-          background: var(--card-background-color);
-          border-top: 1px solid var(--divider-color);
-          box-shadow: 0 -2px 6px rgba(0,0,0,.06);
-          z-index: 2;
-        }
-        .hidden{ display:none }
-        .apply-hint{
-          margin-right:auto; display:flex; align-items:center; gap:8px;
-          color: var(--warning-color, #b15d00);
-          background: color-mix(in oklab, var(--warning-color) 12%, transparent);
-          border: 1px solid color-mix(in oklab, var(--warning-color) 35%, transparent);
-          border-radius:10px; padding:8px 10px; font-size:.92rem;
-        }
-        .apply-hint ha-icon{ --mdc-icon-size:20px; }
-        /* Gentle pulse to draw attention */
-        .apply-emphasis { animation: ddc-apply-pulse 1.4s ease-in-out infinite; }
-        @keyframes ddc-apply-pulse { 0%{transform:scale(1)} 50%{transform:scale(1.03)} 100%{transform:scale(1)} }
-      </style>
-      
     `;
-
 
     // Presets into #sizePreset
     const og = document.createElement('optgroup');
@@ -312,40 +269,16 @@ class DragAndDropCard extends HTMLElement {
     };
 
     // Dirty / Apply handling
-    const applyBar  = el.querySelector('#applyBar');
-    const applyBtn  = el.querySelector('#applyBtn');
+    const applyBtn = el.querySelector('#applyBtn');
     const revertBtn = el.querySelector('#revertBtn');
 
     const isDirty = () => {
       try { return JSON.stringify(el.getConfig()) !== JSON.stringify(el._config); }
       catch { return true; }
     };
-
     const updateButtons = () => {
-      const dirty = isDirty();
-      applyBtn.disabled = !dirty;
-      applyBar.classList.toggle('hidden', !dirty);
+      if (applyBtn) applyBtn.disabled = !isDirty();
     };
-
-    // Keep your on(...) wiring, but DO NOT dispatch config-changed on input.
-    // Just call updateButtons() on any input/change:
-    const on = (sel, ev = 'input') =>
-      el.querySelector(sel)?.addEventListener(ev, () => {
-        if (sel === '#sizeMode') toggleSizeControls();
-        updateButtons();
-      });
-
-    // Apply / Revert behavior (make sure events bubble+compose):
-    applyBtn?.addEventListener('click', () => {
-      el.dispatchEvent(new CustomEvent('config-changed', {
-        detail: { config: el.getConfig() }, bubbles: true, composed: true
-      }));
-      el._config = el.getConfig(); // baseline now matches
-      updateButtons();
-    });
-
-    revertBtn?.addEventListener('click', () => el.setConfig(el._config));
-
 
     const fire = () => {
       el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
@@ -353,6 +286,12 @@ class DragAndDropCard extends HTMLElement {
       el._config = el.getConfig();
       updateButtons();
     };
+
+    const on = (sel, ev = 'input') =>
+      el.querySelector(sel)?.addEventListener(ev, () => {
+        if (sel === '#sizeMode') toggleSizeControls();
+        updateButtons(); // <- no immediate fire while typing
+      });
 
     // Listeners (no per-keystroke fire)
     on('#storage_key'); on('#grid');
@@ -437,21 +376,6 @@ _applyContainerSizingFromConfig(initial=false) {
     this._resizeContainer();
   }
 }
-
-  _showImportBadge(text = 'Imported') {
-    const b = this.importBadge;
-    if (!b) return;
-    const lbl = b.querySelector('.label');
-    if (lbl) lbl.textContent = text;
-    b.style.display = 'inline-flex';
-
-    clearTimeout(this.__importBadgeTimer);
-    // auto-hide after 12s; tweak as you like
-    this.__importBadgeTimer = setTimeout(() => this._hideImportBadge(), 12000);
-  }
-  _hideImportBadge() {
-    if (this.importBadge) this.importBadge.style.display = 'none';
-  }
 
 _getContainerSize() {
   const c = this.cardContainer; if (!c) return { w:0, h:0 };
@@ -909,18 +833,7 @@ _applyGridVars() {
             display:flex;align-items:center;justify-content:center;width:100%;height:100%;
             background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
           }
-          .import-badge {
-            margin-left: 8px;
-            border: 1px solid var(--divider-color);
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: .85rem;
-            display: none;               /* shown programmatically */
-            align-items: center;
-            gap: 6px;
-            background: rgba(76,175,80,.15); /* subtle green */
-            color: var(--primary-text-color);
-          }
+
           /* --- hold-to-edit ring (cursor progress) --- */
           .ddc-press-ring{
             position:fixed; z-index:100000; width:44px; height:44px; pointer-events:none;
@@ -991,16 +904,6 @@ _applyGridVars() {
               <ha-icon icon="mdi:storefront-outline"></ha-icon>
               <span>Open HADS</span>
             </button>
-            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
-              <ha-icon icon="mdi:storefront-outline"></ha-icon>
-              <span>Open HADS</span>
-            </button>
-
-            <!-- NEW: Import-applied badge -->
-            <span class="import-badge" id="importBadge" style="display:none" title="Imported design has been applied">
-              <ha-icon icon="mdi:check-circle-outline"></ha-icon>
-              <span class="label">Imported</span>
-            </span>
             <button class="btn warning" id="exitEditBtn" style="display:none">
               <ha-icon icon="mdi:exit-run"></ha-icon>
               <span>Exit edit mode</span>
@@ -1082,25 +985,14 @@ _applyGridVars() {
     this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); };
     document.addEventListener('visibilitychange', this.__onVis);
   
-    this.importBadge  = this.shadowRoot.querySelector('#importBadge');
-    // Listen for global “import applied” events (from this card, or the editor)
-    this.__onImportApplied = (ev) => {
-      // If payload includes a storage_key, only show on matching card; otherwise show for all
-      const key = ev?.detail?.storage_key;
-      if (!key || key === this.storageKey) this._showImportBadge('Imported');
-    };
-    window.addEventListener('ddc-import-applied', this.__onImportApplied);
-
     // NEW: ensure we never boot in edit mode
     this._toggleEditMode(false);
-
   }
   
   disconnectedCallback() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
-    window.removeEventListener('ddc-import-applied', this.__onImportApplied);
   
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
@@ -1146,12 +1038,13 @@ _applyGridVars() {
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
-  /* ------------------------ Initial load / rebuild ------------------------ */
   async _initialLoad(force = false) {
+    // prevent multiple parallel boots
     if (this.__booting) return;
     this.__booting = true;
 
     try {
+      // mark loading in progress to prevent autosave during rebuild
       this._loading = true;
 
       if (force && this.cardContainer) {
@@ -1163,18 +1056,24 @@ _applyGridVars() {
       const __rebuildAfter = [];
       let saved = null;
 
-      // Backend load first
+      // Try backend first if available
       if (this._backendOK && this.storageKey) {
-        try { saved = await this._loadLayoutFromBackend(this.storageKey); }
-        catch (e) { this._dbgPush('boot', 'Backend load failed', { error: String(e) }); }
+        try {
+          saved = await this._loadLayoutFromBackend(this.storageKey);
+        } catch (e) {
+          this._dbgPush('boot', 'Backend load failed', { error: String(e) });
+        }
       }
 
-      // Fallback to localStorage (+ optional migrate)
+      // Fallback: localStorage (and migrate to backend if possible)
       if (!saved && this.storageKey) {
         let local = null;
-        try { local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'); } catch {}
+        try {
+          local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null');
+        } catch {}
         if (local) {
           this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+
           if (this._backendOK) {
             try {
               await this._saveLayoutToBackend(this.storageKey, local);
@@ -1190,23 +1089,23 @@ _applyGridVars() {
         }
       }
 
-      // Fallback to embedded YAML
+      // Fallback: embedded YAML config
       if (!saved && this._config?.cards?.length) {
         this._dbgPush('boot', 'Using embedded config');
         saved = { cards: this._config.cards };
       }
 
-      // Snapshot YAML before overlay
+      // Snapshot of YAML before we overlay anything
       const yamlCfg = { ...(this._config || {}) };
 
-      // 1) Baseline from persisted options
+      // 1) Apply persisted options as baseline
       if (saved?.options) {
         this._applyImportedOptions(saved.options, true);
       } else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
       }
 
-      // 2) YAML overrides
+      // 2) Overlay explicit YAML options (take precedence)
       const overrideKeys = [
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','debug','disable_overlap',
@@ -1214,15 +1113,20 @@ _applyGridVars() {
         'container_preset','container_preset_orientation'
       ];
       const cfgOpts = {};
-      for (const k of overrideKeys) if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
-      if (Object.keys(cfgOpts).length) this._applyImportedOptions(cfgOpts, true);
+      for (const k of overrideKeys) {
+        if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
+      }
+      if (Object.keys(cfgOpts).length) {
+        this._applyImportedOptions(cfgOpts, true);
+      }
 
-      // Build
+      // Build cards
       let builtAny = false;
 
       if (saved?.cards?.length) {
         for (const conf of saved.cards) {
           if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+            // empty/placeholder
             const wrap = this._makePlaceholderAt(
               conf.position?.x || 0,
               conf.position?.y || 0,
@@ -1245,6 +1149,7 @@ _applyGridVars() {
           if (conf.z != null) wrap.style.zIndex = String(conf.z);
 
           this.cardContainer.appendChild(wrap);
+
           try { this._rebuildOnce(wrap.firstElementChild); } catch {}
           this._initCardInteract(wrap);
           builtAny = true;
@@ -1264,29 +1169,23 @@ _applyGridVars() {
 
       // Ensure card-mod runs once after first paint
       if (force) this._cardModProcessed = false;
-
-      // 🔇 NEW: wait for quiet period so autosave can’t catch an in-between state
-      try { await this._waitForQuiescence(400, 2000); } catch {}
-
       setTimeout(() => {
         this._processCardModOnce();
       }, 100);
 
-      // Rebuild notifications for nested cards (if you still need them)
+      // Rebuild signals for nested cards
       try {
         __rebuildAfter.forEach((el) => {
-          try { el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+          try {
+            el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+          } catch {}
         });
       } catch {}
-
-      // Done loading (after quiescence)
-      this._loading = false;
     } finally {
-      // Always clear booting flag
+      this._loading = false;
       this.__booting = false;
     }
   }
-
 
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -1314,31 +1213,13 @@ _applyGridVars() {
     const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
     wraps.forEach((w) => {
       w.classList.toggle('editing', this.editMode);
-
-      // Always enforce handle visibility explicitly
       const handle = w.querySelector('.resize-handle');
       if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
-
-      // Proper InteractJS enable/disable
       if (!w.dataset.placeholder && window.interact) {
-        const it = window.interact(w);
-        it.draggable({ enabled: this.editMode });
-        it.resizable({
-          enabled: this.editMode,
-          // edges already configured in _initCardInteract; re-state for safety
-          edges: { right: '.resize-handle', bottom: '.resize-handle' }
-        });
+        window.interact(w).draggable(this.editMode).resizable(this.editMode);
       }
-
       w.style.touchAction = this.editMode ? 'none' : 'auto';
     });
-
-    // Fallback: hide any stray handles (e.g., wrappers added late)
-    try {
-      (this.shadowRoot || this).querySelectorAll('.resize-handle')
-        .forEach(h => h.style.display = this.editMode ? 'flex' : 'none');
-    } catch {}
-    
     if (!this.editMode) this._clearSelection();
 
     if (!this.editMode) {
@@ -2514,29 +2395,6 @@ _syncEmptyStateUI() {
       }
     }
     return out;
-  }
-
-  // Wait until we have a quiet period with no ll-rebuilds before allowing autosave
-  async _waitForQuiescence(quietMs = 400, maxWaitMs = 2000) {
-    const container = this.cardContainer || this.shadowRoot || this;
-    if (!container) return;
-
-    const bump = () => { this.__quiesceUntil = performance.now() + quietMs; };
-    this.__quiesceUntil = performance.now() + quietMs;
-
-    // Listen in capture phase so we catch bubbled ll-rebuild
-    container.addEventListener('ll-rebuild', bump, true);
-
-    const deadline = performance.now() + maxWaitMs;
-    try {
-      // Busy-wait with small sleeps until no ll-rebuild has happened for quietMs
-      while (performance.now() < (this.__quiesceUntil || 0)) {
-        if (performance.now() > deadline) break;
-        await new Promise(r => setTimeout(r, 50));
-      }
-    } finally {
-      try { container.removeEventListener('ll-rebuild', bump, true); } catch {}
-    }
   }
 
   _statesList(domains) {
@@ -3771,8 +3629,8 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-                try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-                this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3915,60 +3773,55 @@ this._initCardInteract(wrap);
     inp.type = 'file'; inp.accept = 'application/json';
     inp.onchange = async () => {
       const file = inp.files?.[0]; if (!file) return;
-      const txt = await file.text();
+        const txt = await file.text();
       try {
         const json = JSON.parse(txt);
+        // Apply options (if present) before building cards
+        if (json.options) this._applyImportedOptions(json.options, true);
+        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-        // IMPORTANT: Do NOT adopt storage_key from the file.
-        // We keep this.storageKey as-is and overwrite that key’s layout.
-        // Apply only safe visual/options (grid, etc.), but skip storage_key.
-        if (json.options) {
-          const { storage_key, ...safeOpts } = json.options || {};
-          this._applyImportedOptions(safeOpts, true);
-        } else if (typeof json.grid === 'number') {
-          // v1 fallback
-          this._applyImportedOptions({ grid: json.grid }, true);
+        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        if (json?.options?.storage_key) {
+          const newKey = json.options.storage_key;
+          this._config = { ...(this._config || {}), storage_key: newKey };
+          this.storageKey = newKey;
+          this._syncEditorsStorageKey();
+          try {
+            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            this.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: updated },
+              bubbles: true,
+              composed: true,
+            }));
+          } catch {}
         }
-
-        // Rebuild the canvas from imported cards
+ // v1 fallback     
         this.cardContainer.innerHTML = '';
-        if (Array.isArray(json.cards) && json.cards.length) {
+        if (json.cards?.length) {
           for (const conf of json.cards) {
             if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(
-                conf.position?.x || 0,
-                conf.position?.y || 0,
-                conf.size?.width  || 100,
-                conf.size?.height || 100
-              );
+              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
               this.cardContainer.appendChild(p);
-              try { this._rebuildOnce(p.firstElementChild); } catch {}
             } else {
               const el = await this._createCard(conf.card);
               const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
-              wrap.style.width  = `${conf.size?.width  || 140}px`;
-              wrap.style.height = `${conf.size?.height || 100}px`;
+              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+              wrap.style.width  = `${conf.size?.width||140}px`;
+              wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-              this._initCardInteract(wrap);
+              
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
             }
           }
         } else {
           this._showEmptyPlaceholder();
         }
-
-        // Persist OVER the existing storage key
         this._resizeContainer();
         await this._saveLayout(false);
-
-        // UX sugar
         this._toast('Design imported.');
-        this._showImportBadge?.('Imported');
-        window.dispatchEvent(new CustomEvent('ddc-import-applied', {
-          detail: { storage_key: this.storageKey }
-        }));
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -3976,7 +3829,6 @@ this._initCardInteract(wrap);
     };
     inp.click();
   }
-
   
 
   /* ----------------------------- Save / load ----------------------------- */
@@ -4126,9 +3978,7 @@ if (!customElements.get('drag-and-drop-card')) {
    - No extra resource needed; executed as part of this script
    - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
    ========================================================================== */
-if (DDC_ENABLE_GLOBAL_REBUILDER) {
-   (() => {
-  
+(() => {
   const SEEN = new WeakSet();
 
   const isLikelyCard = (el) => {
@@ -4223,4 +4073,3 @@ if (DDC_ENABLE_GLOBAL_REBUILDER) {
     setTimeout(() => clearInterval(iv), 10000);
   }
 })();
-}
