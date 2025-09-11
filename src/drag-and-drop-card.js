@@ -355,6 +355,86 @@ _resolveFixedSize() {
   return null;
 }
 
+  // Persist the imported options into Lovelace's stored YAML for THIS card
+  async _persistOptionsToYaml(opts) {
+    const keys = [
+      'storage_key','grid','container_background','card_background',
+      'disable_overlap','drag_live_snap','auto_save','auto_save_debounce',
+      'debug','container_size_mode','container_preset_orientation',
+      'container_fixed_width','container_fixed_height','container_preset'
+    ];
+
+    // Grab Lovelace object
+    const root = document
+      .querySelector('home-assistant')?.shadowRoot
+      ?.querySelector('home-assistant-main')?.shadowRoot
+      ?.querySelector('app-drawer-layout partial-panel-resolver ha-panel-lovelace')?.shadowRoot
+      ?.querySelector('hui-root');
+    const ll = root?.lovelace;
+
+    if (!ll?.config || !ll.saveConfig) {
+      console.debug('[ddc:import] YAML persist skipped (no Lovelace save API)');
+      return false;
+    }
+
+    const viewIndex = ll.current_view ?? 0;
+    const view = ll.config.views?.[viewIndex];
+    if (!view) return false;
+
+    const patch = {};
+    for (const k of keys) if (k in opts) patch[k] = opts[k];
+    patch.type = 'custom:drag-and-drop-card';
+    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
+
+    // Try to find this card in the current view (top-level first)
+    const isMe = (c) =>
+      c?.type === 'custom:drag-and-drop-card' &&
+      (!patch.storage_key || c.storage_key === patch.storage_key);
+
+    let idx = (view.cards || []).findIndex(isMe);
+
+    // Fallback: shallow search inside stack cards (common containers)
+    if (idx === -1 && Array.isArray(view.cards)) {
+      for (let i = 0; i < view.cards.length; i++) {
+        const c = view.cards[i];
+        for (const bucket of ['cards', 'elements', 'sections']) {
+          if (Array.isArray(c?.[bucket])) {
+            const j = c[bucket].findIndex(isMe);
+            if (j !== -1) {
+              // clone config immutably and save inside the stack
+              const newLL = { ...ll.config };
+              newLL.views = [...newLL.views];
+              const newView = { ...view, cards: [...view.cards] };
+              const stack = { ...newView.cards[i], [bucket]: [...c[bucket]] };
+              stack[bucket][j] = { ...stack[bucket][j], ...patch };
+              newView.cards[i] = stack;
+              newLL.views[viewIndex] = newView;
+              console.debug('[ddc:import] YAML persist (stack) → saving', { viewIndex, i, j, patch });
+              await ll.saveConfig(newLL);
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    if (idx === -1) {
+      console.debug('[ddc:import] YAML persist: card not found in current view');
+      return false;
+    }
+
+    // Persist at top level
+    const newLL = { ...ll.config };
+    newLL.views = [...newLL.views];
+    const newView = { ...view, cards: [...(view.cards || [])] };
+    newView.cards[idx] = { ...newView.cards[idx], ...patch };
+    newLL.views[viewIndex] = newView;
+
+    console.debug('[ddc:import] YAML persist → saving', { viewIndex, idx, patch });
+    await ll.saveConfig(newLL);
+    return true;
+  }
+
 _applyContainerSizingFromConfig(initial=false) {
   // set container size according to mode
   const c = this.cardContainer; if (!c) return;
@@ -3852,21 +3932,32 @@ this._initCardInteract(wrap);
           }
         } catch (__e) { console.warn('[ddc] import logging block failed', __e); }
 // If a storage_key is present in options, make it the live config key AND inform HA editor
-        if (json?.options?.storage_key) {
-          const newKey = json.options.storage_key;
-          this._config = { ...(this._config || {}), storage_key: newKey };
-          this.storageKey = newKey;
-          this._syncEditorsStorageKey();
-          try {
-            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
-            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-            this.dispatchEvent(new CustomEvent('config-changed', {
-              detail: { config: updated },
-              bubbles: true,
-              composed: true,
-            }));
-          } catch {}
+      if (json?.options?.storage_key) {
+        const newKey = json.options.storage_key;
+        this._config = { ...(this._config || {}), storage_key: newKey };
+        this.storageKey = newKey;
+        this._syncEditorsStorageKey();
+        try {
+          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: updated },
+            bubbles: true,
+            composed: true,
+          }));
+        } catch {}
+      }
+
+      // >>> NEW: persist imported options to Lovelace YAML so the editor shows them
+      try {
+        const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
+        if (toPersist) {
+          const ok = await this._persistOptionsToYaml(toPersist);
+          console.debug('[ddc:import] YAML persist result:', ok);
         }
+      } catch (e) {
+        console.warn('[ddc:import] YAML persist failed:', e);
+      }
+// <<<
  // v1 fallback     
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
