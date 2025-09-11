@@ -30,6 +30,9 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+
+  __booting = false;  
+
   constructor() {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
@@ -422,15 +425,19 @@ _applyGridVars() {
   setConfig(config = {}) {
     // Track old key so we only rebuild when storage_key actually changes
     // Auto‑assign a storage key if none provided
+    // Use existing instance key if present
     if (!config.storage_key) {
-      const unique = `layout_${Date.now().toString(36)}`;
-      config.storage_key = unique;
-      // persist the new key into this._config so the editor shows it
-      this._config = { ...config };
+      if (!this.storageKey) {
+        this.storageKey = `layout_${crypto?.randomUUID?.() || Date.now().toString(36)}`;
+      }
+      // reflect into config so the rest of the method sees a value
+      config = { ...config, storage_key: this.storageKey };
     }
 
-    // Capture previous storageKey before updating it so we can detect changes
-    const prevKey = this.storageKey;
+    const prevKey = this.storageKey; 
+    this._config = config;
+    this.storageKey = config.storage_key;
+
 
     // Store incoming config and update properties
     this._config = config;
@@ -977,149 +984,182 @@ _applyGridVars() {
   }
   
 
-set hass(hass) {
-  this._hass = hass;
-  LOG('set hass');
-  if (!this.__probed && hass) {
-    this.__probed = true;
-    this._probeBackend().then(() => { 
-      this.__probed = true; 
-      if (!this.__booted && this.__cfgReady) { 
-        this.__booted = true; 
-        this._initialLoad(true); 
-      } 
-    });
-  }
-  
-  const wraps = this.cardContainer?.children || [];
-  for (const wrap of wraps) {
-    const c = wrap.firstElementChild;
-    if (c && c.hass !== hass) {
-      c.hass = hass;
-      // Don't reprocess card_mod here - it will be handled by _processCardModOnce
+  set hass(hass) {
+    this._hass = hass;
+    LOG('set hass');
+    if (!this.__probed && hass) {
+      this.__probed = true;
+      this._probeBackend().then(() => { 
+        this.__probed = true; 
+        if (!this.__booted && this.__cfgReady) { 
+          this.__booted = true; 
+          this._initialLoad(true); 
+        } 
+      });
+    }
+    
+    const wraps = this.cardContainer?.children || [];
+    for (const wrap of wraps) {
+      const c = wrap.firstElementChild;
+      if (c && c.hass !== hass) {
+        c.hass = hass;
+        // Don't reprocess card_mod here - it will be handled by _processCardModOnce
+      }
     }
   }
-}
   
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
-  async _initialLoad(force=false) {
-    // mark loading in progress to prevent autosave during rebuild
-    this._loading = true;
-    if (force && this.cardContainer) this.cardContainer.innerHTML = '';
-    this._dbgPush('boot', 'Initial load start', { force });
-    const __rebuildAfter = [];
-    let saved = null;
+  async _initialLoad(force = false) {
+    // prevent multiple parallel boots
+    if (this.__booting) return;
+    this.__booting = true;
 
-    if (this._backendOK && this.storageKey) {
-      saved = await this._loadLayoutFromBackend(this.storageKey);
-    }
+    try {
+      // mark loading in progress to prevent autosave during rebuild
+      this._loading = true;
 
-    if (!saved && this.storageKey) {
-      let local = null;
-      try { local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'); } catch {}
-      if (local) this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+      if (force && this.cardContainer) {
+        this.cardContainer.innerHTML = '';
+      }
 
-      if (local && this._backendOK) {
+      this._dbgPush('boot', 'Initial load start', { force });
+
+      const __rebuildAfter = [];
+      let saved = null;
+
+      // Try backend first if available
+      if (this._backendOK && this.storageKey) {
         try {
-          await this._saveLayoutToBackend(this.storageKey, local);
-          this._dbgPush('boot', 'Migrated local -> backend');
-          saved = local;
+          saved = await this._loadLayoutFromBackend(this.storageKey);
         } catch (e) {
-          this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
-          saved = local;
+          this._dbgPush('boot', 'Backend load failed', { error: String(e) });
         }
-      } else if (local) {
-        saved = local;
       }
-    }
 
-    if (!saved && this._config?.cards?.length) {
-    this._dbgPush('boot', 'Using embedded config');
-    saved = { cards: this._config.cards };
+      // Fallback: localStorage (and migrate to backend if possible)
+      if (!saved && this.storageKey) {
+        let local = null;
+        try {
+          local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null');
+        } catch {}
+        if (local) {
+          this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+
+          if (this._backendOK) {
+            try {
+              await this._saveLayoutToBackend(this.storageKey, local);
+              this._dbgPush('boot', 'Migrated local -> backend');
+              saved = local;
+            } catch (e) {
+              this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
+              saved = local;
+            }
+          } else {
+            saved = local;
+          }
+        }
       }
-    // 1) Apply persisted options (if any) as baseline
-    // Snapshot current YAML/visual config BEFORE touching live props
-    const yamlCfg = { ...(this._config || {}) };
 
-    // 1) Apply persisted options (if any) as baseline
-    if (saved?.options) this._applyImportedOptions(saved.options, true);
-    else if (typeof saved?.grid === 'number') this._applyImportedOptions({ grid: saved.grid }, true);
+      // Fallback: embedded YAML config
+      if (!saved && this._config?.cards?.length) {
+        this._dbgPush('boot', 'Using embedded config');
+        saved = { cards: this._config.cards };
+      }
 
-    // 2) Overlay explicit options from YAML (take precedence over saved snapshot)
-    const overrideKeys = [
-      'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
-      'container_background','card_background','debug','disable_overlap',
-      'container_size_mode','container_fixed_width','container_fixed_height',
-      'container_preset','container_preset_orientation'
-    ];
-    const cfgOpts = {};
-    for (const k of overrideKeys) if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
-    if (Object.keys(cfgOpts).length) this._applyImportedOptions(cfgOpts, true);
+      // Snapshot of YAML before we overlay anything
+      const yamlCfg = { ...(this._config || {}) };
 
+      // 1) Apply persisted options as baseline
+      if (saved?.options) {
+        this._applyImportedOptions(saved.options, true);
+      } else if (typeof saved?.grid === 'number') {
+        this._applyImportedOptions({ grid: saved.grid }, true);
+      }
 
-    let builtAny = false;
-    if (saved?.cards?.length) {
-      for (const conf of saved.cards) {
-        if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-          const wrap = this._makePlaceholderAt(
-            conf.position?.x || 0,
-            conf.position?.y || 0,
-            conf.size?.width || 100,
-            conf.size?.height || 100
-          );
+      // 2) Overlay explicit YAML options (take precedence)
+      const overrideKeys = [
+        'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
+        'container_background','card_background','debug','disable_overlap',
+        'container_size_mode','container_fixed_width','container_fixed_height',
+        'container_preset','container_preset_orientation'
+      ];
+      const cfgOpts = {};
+      for (const k of overrideKeys) {
+        if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
+      }
+      if (Object.keys(cfgOpts).length) {
+        this._applyImportedOptions(cfgOpts, true);
+      }
+
+      // Build cards
+      let builtAny = false;
+
+      if (saved?.cards?.length) {
+        for (const conf of saved.cards) {
+          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+            // empty/placeholder
+            const wrap = this._makePlaceholderAt(
+              conf.position?.x || 0,
+              conf.position?.y || 0,
+              conf.size?.width  || 100,
+              conf.size?.height || 100
+            );
+            this.cardContainer.appendChild(wrap);
+            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+            builtAny = true;
+            continue;
+          }
+
+          const cardEl = await this._createCard(conf.card);
+          const wrap = this._makeWrapper(cardEl);
+          if (this.editMode) wrap.classList.add('editing');
+
+          this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
+          wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
+          wrap.style.height = `${conf.size?.height ?? 10 * this.gridSize}px`;
+          if (conf.z != null) wrap.style.zIndex = String(conf.z);
+
           this.cardContainer.appendChild(wrap);
-          
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-builtAny = true;
-          continue;
+
+          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+          this._initCardInteract(wrap);
+          builtAny = true;
         }
-        const cardEl = await this._createCard(conf.card);
-        const wrap = this._makeWrapper(cardEl);
-        if (this.editMode) wrap.classList.add('editing');
-        this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
-        wrap.style.width  = `${conf.size?.width  || 14*this.gridSize}px`;
-        wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
-        if (conf.z != null) wrap.style.zIndex = String(conf.z);
-        this.cardContainer.appendChild(wrap);
-        
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
-        builtAny = true;
+
+        this._resizeContainer();
+        this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
       }
-      this._resizeContainer();
-      this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
+
+      if (!builtAny) {
+        this._showEmptyPlaceholder();
+        this._dbgPush('boot', 'No saved layout found; showing placeholder');
+      }
+
+      this._updateStoreBadge();
+      this._syncEmptyStateUI();
+
+      // Ensure card-mod runs once after first paint
+      if (force) this._cardModProcessed = false;
+      setTimeout(() => {
+        this._processCardModOnce();
+      }, 100);
+
+      // Rebuild signals for nested cards
+      try {
+        __rebuildAfter.forEach((el) => {
+          try {
+            el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+          } catch {}
+        });
+      } catch {}
+    } finally {
+      this._loading = false;
+      this.__booting = false;
     }
-
-    
-
-    if (!builtAny) {
-      this._showEmptyPlaceholder();
-      this._dbgPush('boot', 'No saved layout found; showing placeholder');
-    }
-    this._updateStoreBadge();
-    this._syncEmptyStateUI();
-
-    // loading complete
-    this._loading = false;
-
-    if (force) {
-      this._cardModProcessed = false;
-    }
-
-    setTimeout(() => {
-      this._processCardModOnce();
-    }, 100);
-    
-    try { 
-      __rebuildAfter.forEach(el => { 
-        try { 
-          el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); 
-        } catch {} 
-      }); 
-    } catch {}
   }
+
 
   /* ------------------------------ Edit mode ------------------------------ */
   _toggleEditMode(force=null) {
