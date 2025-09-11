@@ -460,7 +460,6 @@ _applyGridVars() {
 
 
     // Store incoming config and update properties
-    this._config = config;
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
