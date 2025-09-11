@@ -30,6 +30,87 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+
+  __booting = false;  
+
+  constructor() {
+    super();
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this.__rebuiltCards = new WeakSet();
+  }
+
+  
+  // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
+  _hasCardModDeep(cfg) {
+    try {
+      if (!cfg || typeof cfg !== 'object') return false;
+      if (cfg.card_mod || cfg.type === 'custom:mod-card') return true;
+      if (cfg.card) return this._hasCardModDeep(cfg.card);
+      if (Array.isArray(cfg.cards)) {
+        for (const c of cfg.cards) { if (this._hasCardModDeep(c)) return true; }
+      }
+      return false;
+    } catch { return false; }
+  }
+  _rebuildOnce(el) {
+    try {
+      if (!el) return;
+      if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
+      if (this.__rebuiltCards.has(el)) return;
+      this.__rebuiltCards.add(el);
+      // Fire rebuild from the child card so Lovelace/card-mod re-attaches without recreating DDC itself
+      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+    } catch {}
+  }
+
+
+  // Deep query across shadow roots
+  _deepQueryAll(selector, root = document) {
+    const results = [];
+    const visit = (node) => {
+      if (!node) return;
+      if (node.querySelectorAll) {
+        try {
+          node.querySelectorAll(selector).forEach(el => results.push(el));
+        } catch {}
+      }
+      // Recurse into shadow roots
+      const treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
+      let el = node;
+      while (el) {
+        const sr = el.shadowRoot;
+        if (sr) visit(sr);
+        el = treeWalker.nextNode();
+      }
+    };
+    visit(root);
+    return results;
+  }
+
+
+  // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
+  _syncEditorsStorageKey() {
+    try {
+      const val = this.storageKey || '';
+      // Update any open editor input fields for this card
+      // We look for our known editor markup within the DOM and set the storage key input.
+      const nodes = this._deepQueryAll('#storage_key');
+      nodes.forEach((inp) => {
+        try {
+          if (inp && inp.tagName === 'INPUT') {
+            if (inp.value !== val) {
+              inp.value = val;
+              // Fire input event so editor UIs update their internal state
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        } catch {}
+      });
+    } catch {}
+  }
+
+  /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
@@ -44,108 +125,99 @@ class DragAndDropCard extends HTMLElement {
         .inline{display:inline-flex;gap:8px;align-items:center}
         .hint{opacity:.65;font-size:.85rem}
       </style>
-  
+
       <div class="cfg-row">
         <label>Storage key</label>
-        <input type="text" id="storage_key" placeholder="e.g. livingroom_layout">
+        <input id="storage_key" type="text" placeholder="my_unique_layout_key" />
       </div>
-  
+
       <div class="cfg-row">
-        <label>Grid (px)</label>
-        <input type="number" id="grid" min="5" step="1" value="10">
+        <label>Grid size</label>
+        <input id="grid" type="number" min="4" max="32" step="1" value="10" style="width:90px" />
+        <span class="hint">Grid cell in px; affects snap & default card size</span>
       </div>
-  
+
       <div class="cfg-row">
         <label><input type="checkbox" id="liveSnap"> Snap while dragging (live)</label>
       </div>
-  
+
       <div class="cfg-row">
         <label>Auto-save</label>
         <input type="checkbox" id="autoSave" checked>
         <span style="margin-left:auto">Debounce (ms)</span>
         <input type="number" id="autoSaveDebounce" min="0" step="50" value="800" style="width:90px">
       </div>
-  
+
       <div class="cfg-row">
-        <label>Container BG</label>
-        <input type="text" id="containerBg" placeholder="transparent">
+        <label>Container Background</label>
+        <input type="text" id="containerBg"
+          placeholder="transparent or css e.g. linear-gradient(...)"
+          title="Try: transparent, #232f3e, linear-gradient(...), radial-gradient(...)" />
       </div>
-  
+
       <div class="cfg-row">
-        <label>Card BG</label>
-        <input type="text" id="cardBg" placeholder="var(--ha-card-background, var(--card-background-color))">
+        <label>Card Background</label>
+        <input type="text" id="cardBg"
+          placeholder="var(--ha-card-background) or css e.g. #ffffffcc"
+          title="Try: transparent, #151515aa, linear-gradient(...)" />
       </div>
-  
+
       <div class="cfg-row">
         <label><input type="checkbox" id="debug"> Debug logs</label>
       </div>
-  
+
       <div class="cfg-row">
-        <label><input type="checkbox" id="noOverlap"> Disable overlapping</label>
+        <label><input type="checkbox" id="noOverlap"> Disable overlap</label>
       </div>
-  
-      <!-- NEW: container sizing -->
+
+      <!-- Size controls -->
       <div class="cfg-row">
         <label>Container size</label>
         <select id="sizeMode">
           <option value="dynamic">Dynamic (auto)</option>
-          <option value="fixed_custom">User preference (px)</option>
+          <option value="fixed_custom">Fixed (custom)</option>
           <option value="preset">Preset</option>
         </select>
-  
+
         <span id="sizeCustom" class="inline" style="display:none">
-          W <input type="number" id="sizeW" min="100" step="10" style="width:110px">
-          H <input type="number" id="sizeH" min="100" step="10" style="width:110px">
+          <span>W</span><input id="sizeW" type="number" min="100" step="10" style="width:90px">
+          <span>H</span><input id="sizeH" type="number" min="100" step="10" style="width:90px">
         </span>
-  
+
         <span id="sizePresetWrap" class="inline" style="display:none">
-          <select id="sizePreset" style="min-width:240px"></select>
+          <select id="sizePreset"></select>
           <select id="sizeOrientation">
             <option value="auto">Auto</option>
-            <option value="portrait">Portrait</option>
             <option value="landscape">Landscape</option>
+            <option value="portrait">Portrait</option>
           </select>
         </span>
-        <span class="hint">In fixed mode, cards cannot leave the box.</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="cfg-row" style="justify-content:flex-end">
+        <mwc-button id="revertBtn" outlined>Revert</mwc-button>
+        <mwc-button id="applyBtn" raised disabled>Apply</mwc-button>
       </div>
     `;
-  
-    // ----- helpers to populate presets -----
-    const PRESETS = DragAndDropCard._sizePresets(); // static helper below
-    const presetSel = el.querySelector('#sizePreset');
-    const addGroup = (label, items) => {
-      const og = document.createElement('optgroup'); og.label = label;
-      items.forEach(p => {
-        const o = document.createElement('option');
-        o.value = p.key;
-        o.textContent = `${p.label} (${p.w}×${p.h})`;
-        presetSel.appendChild(o);
-      });
-      presetSel.appendChild(og);
-    };
-    // build grouped list
-    [
-      ['Phones',   PRESETS.filter(p => p.group==='phone')],
-      ['Tablets',  PRESETS.filter(p => p.group==='tablet')],
-      ['Desktop',  PRESETS.filter(p => p.group==='desktop')],
-    ].forEach(([g,items])=>{
-      if (!items.length) return;
-      const og = document.createElement('optgroup'); og.label = g;
-      items.forEach(p => {
-        const o = document.createElement('option');
-        o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
-        og.appendChild(o);
-      });
-      presetSel.appendChild(og);
+
+    // Presets into #sizePreset
+    const og = document.createElement('optgroup');
+    og.label = 'Presets';
+    (DragAndDropCard._sizePresets?.() || []).forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
+      og.appendChild(o);
     });
-  
+    el.querySelector('#sizePreset')?.appendChild(og);
+
     const toggleSizeControls = () => {
       const mode = el.querySelector('#sizeMode').value;
       el.querySelector('#sizeCustom').style.display = mode==='fixed_custom' ? 'inline-flex' : 'none';
       el.querySelector('#sizePresetWrap').style.display = mode==='preset' ? 'inline-flex' : 'none';
     };
-  
-    // set incoming values (keep type + unknown keys)
+
+    // Set incoming values (keep type + unknown keys)
     el.setConfig = (config = {}) => {
       el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
       el.querySelector('#storage_key').value = config.storage_key || '';
@@ -157,21 +229,27 @@ class DragAndDropCard extends HTMLElement {
       el.querySelector('#cardBg').value = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
       el.querySelector('#debug').checked = !!config.debug;
       el.querySelector('#noOverlap').checked = !!config.disable_overlap;
-  
+
       // NEW
       el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
       el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
       el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
-      el.querySelector('#sizePreset').value = config.container_preset || 'fullhd';
+      const presetSel = el.querySelector('#sizePreset');
+      const presets = DragAndDropCard._sizePresets?.() || [];
+      if (presetSel && ![...presetSel.options].some(o => o.value === (config.container_preset || ''))) {
+        // already appended above; nothing else needed
+      }
+      presetSel.value = config.container_preset || (presets[0]?.key || 'fhd');
       el.querySelector('#sizeOrientation').value = config.container_preset_orientation || 'auto';
+
       toggleSizeControls();
+      updateButtons();
     };
-  
-    // read current values (merge back into previous config, keep type)
+
+    // Collect current values
     el.getConfig = () => {
-      const base = { ...(el._config || { type: 'custom:drag-and-drop-card' }) };
-      base.type = base.type || 'custom:drag-and-drop-card';
-      base.storage_key = el.querySelector('#storage_key').value || undefined;
+      const base = { ...(el._config || {}) };
+      base.storage_key = el.querySelector('#storage_key').value || '';
       base.grid = Number(el.querySelector('#grid').value || 10);
       base.drag_live_snap = !!el.querySelector('#liveSnap').checked;
       base.auto_save = !!el.querySelector('#autoSave').checked;
@@ -180,7 +258,7 @@ class DragAndDropCard extends HTMLElement {
       base.card_background = el.querySelector('#cardBg').value || 'var(--ha-card-background, var(--card-background-color))';
       base.debug = !!el.querySelector('#debug').checked;
       base.disable_overlap = !!el.querySelector('#noOverlap').checked;
-  
+
       // NEW
       base.container_size_mode = el.querySelector('#sizeMode').value;
       base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
@@ -189,24 +267,46 @@ class DragAndDropCard extends HTMLElement {
       base.container_preset_orientation = el.querySelector('#sizeOrientation').value || 'auto';
       return base;
     };
-  
-    // notify HA when anything changes
+
+    // Dirty / Apply handling
+    const applyBtn = el.querySelector('#applyBtn');
+    const revertBtn = el.querySelector('#revertBtn');
+
+    const isDirty = () => {
+      try { return JSON.stringify(el.getConfig()) !== JSON.stringify(el._config); }
+      catch { return true; }
+    };
+    const updateButtons = () => {
+      if (applyBtn) applyBtn.disabled = !isDirty();
+    };
+
     const fire = () => {
       el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
+      // Baseline becomes the new config after Apply
+      el._config = el.getConfig();
+      updateButtons();
     };
-    const on = (sel, ev = 'input') => el.querySelector(sel)?.addEventListener(ev, () => { if (sel==='#sizeMode') toggleSizeControls(); fire(); });
-  
+
+    const on = (sel, ev = 'input') =>
+      el.querySelector(sel)?.addEventListener(ev, () => {
+        if (sel === '#sizeMode') toggleSizeControls();
+        updateButtons(); // <- no immediate fire while typing
+      });
+
+    // Listeners (no per-keystroke fire)
     on('#storage_key'); on('#grid');
     on('#liveSnap','change'); on('#autoSave','change'); on('#autoSaveDebounce');
     on('#containerBg'); on('#cardBg');
     on('#debug','change'); on('#noOverlap','change');
-  
-    // NEW listeners
     on('#sizeMode','change'); on('#sizeW'); on('#sizeH');
     on('#sizePreset','change'); on('#sizeOrientation','change');
-  
+
+    applyBtn?.addEventListener('click', fire);
+    revertBtn?.addEventListener('click', () => el.setConfig(el._config));
+
     return el;
   }
+
   
     /* ---------------------------- Size helpers ---------------------------- */
   // ---- size presets (CSS pixels) ----
@@ -337,8 +437,32 @@ _applyGridVars() {
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
-    this._config                  = config;
-    this.storageKey               = config.storage_key || undefined;
+    // Track old key so we only rebuild when storage_key actually changes
+    // Auto‑assign a storage key if none provided
+    // Keep previous to detect real key changes
+    const prevKey = this.storageKey;
+    // Use existing instance key if present
+
+    // STABLE storage_key: reuse instance key if none provided
+    if (!config.storage_key) {
+      if (this.storageKey) {
+        config = { ...config, storage_key: this.storageKey };
+      } else {
+        this.storageKey = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
+        config = { ...config, storage_key: this.storageKey };
+      }
+    }
+
+    // Store & reflect
+    this._config = config;
+    this.storageKey = config.storage_key;
+    this._syncEditorsStorageKey();
+
+
+    // Store incoming config and update properties
+    this._config = config;
+    this.storageKey = config.storage_key || undefined;
+    this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
@@ -357,10 +481,16 @@ _applyGridVars() {
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
+    const keyChanged = prevKey !== this.storageKey;
+
+      // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
+    if (this.editMode && !this.__booting && !keyChanged) {
+      try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
+    }
     // Grid-related
     this._applyGridVars();
 
-    // Overlya fix for UI based cards
+    // Overlay fix for UI based cards
     this._ensureOverlayZFix();
 
     // selection state
@@ -401,7 +531,7 @@ _applyGridVars() {
 
     if (!this._built) {
       this._built = true;
-      this.innerHTML = `
+      this.shadowRoot.innerHTML = `
         <style>
           .ddc-root{
             position:relative;
@@ -417,15 +547,21 @@ _applyGridVars() {
           }
           .btn.secondary{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}
           .btn.ghost{background:transparent;color:var(--primary-text-color);border:1px dashed var(--divider-color)}
-          .store-badge{
-            margin-left:auto;border:1px solid var(--divider-color);border-radius:999px;padding:4px 10px;font-size:.85rem;
-            background:rgba(255,193,7,.15);
+          .store-badge {
+            margin-left: auto;
+            border: 1px solid var(--divider-color);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: .85rem;
+            background: rgba(255,193,7,.15);
+            display: none; /* hidden by default, shown only in edit mode */
           }
+
           .card-container{
             position: relative;
             padding: 10px;
             border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);s
+            background: var(--ddc-bg, transparent);
             width: auto; height: auto; border-radius: 12px; overflow: hidden;
             isolation: isolate; z-index: 0; -webkit-touch-callout: none;
             user-select: none;
@@ -456,7 +592,10 @@ _applyGridVars() {
             box-sizing: border-box;      /* include the 2px border in the set width/height */
             border:2px solid transparent;
             background:var(--ddc-card-bg, var(--card-background-color));
-            cursor:grab; overflow:hidden; border-radius:14px;
+            cursor:grab;
+            /* ensure buttons and resize handles remain visible on very small cards */
+            overflow:auto;
+            border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
             z-index:1;
@@ -520,10 +659,21 @@ _applyGridVars() {
           .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px }
 
           /* ---- chip ---- */
-          .chip{
-            position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .15s;
+        .chip{
+            position:absolute;
+            top:8px;
+            right:8px;
+            display:flex;
+            gap:6px;
+            flex-wrap:wrap;             /* allow chip buttons to wrap when space is limited */
+            opacity:0;
+            transition:opacity .15s;
             z-index:30;
             pointer-events: none;
+          }
+          .card-wrapper.editing .chip{
+            opacity:1;
+            pointer-events: auto;
           }
           .card-wrapper.editing .chip{
             opacity:1;
@@ -556,10 +706,21 @@ _applyGridVars() {
           .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
 
           .resize-handle{
-            display:none; position:absolute;bottom:6px;right:6px;width:30px;height:30px;border-radius:50%;
-            background:var(--primary-color);color:#fff;border:1px solid rgba(255,255,255,.25);
-            cursor:se-resize;z-index:22;box-shadow:0 3px 8px rgba(0,0,0,.28);
-            align-items:center;justify-content:center;transition:transform .1s, box-shadow .1s, background .12s;
+            display:flex;                 /* shown in edit mode via your existing rule */
+            position:absolute;
+            bottom:8px;                   /* move INSIDE the wrapper bounds */
+            right:8px;                    /* so it can't be clipped by overflow */
+            width:28px;
+            height:28px;
+            border-radius:50%;
+            background:var(--primary-color);
+            color:#fff;
+            border:1px solid rgba(255,255,255,.25);
+            cursor:se-resize;
+            z-index:999;                  /* above the card content */
+            box-shadow:0 3px 8px rgba(0,0,0,.28);
+            align-items:center;
+            justify-content:center;
           }
           .resize-handle:hover{transform:scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.35)}
           .card-wrapper.editing .resize-handle{display:flex}
@@ -583,12 +744,12 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
-          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color)}
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -598,6 +759,48 @@ _applyGridVars() {
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
+          /* --- FIX: YAML editor should scroll and not overflow --- */
+          #yamlSec { min-height: 0; }
+          #yamlSec .bd { 
+            overflow: auto;        /* allow scrolling inside the YAML section */
+            /* allow the YAML editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
+          }
+          /* --- make Visual editor area scrollable, like YAML --- */
+          #optionsSec { min-height: 0; }
+          #optionsSec .bd {
+            overflow: auto;        /* scroll inside the Visual editor section */
+            /* allow the visual editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
+          }
+          #editorHost { display:block; min-height: 0; }
+
+          #quickFillSec { 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 0; 
+          }
+          #quickFillSec .bd { 
+            overflow: auto;          /* scroll inside the card */
+            max-height: 320px;       /* keep it contained; tweak as you wish */
+          }
+
+          /* ha-code-editor / CodeMirror height: fixed and scroll inside */
+          ha-code-editor { 
+            display: block; 
+            height: 260px !important; 
+          }
+          .CodeMirror { 
+            height: 260px !important; 
+          }
+
+          /* host that wraps the editor should also allow scroll if content grows */
+          #yamlHost { 
+            max-height: 260px; 
+            overflow: auto; 
+          }
 
           /* CodeMirror */
           .CodeMirror{
@@ -710,15 +913,15 @@ _applyGridVars() {
           <div class="card-container" id="cardContainer"></div>
         </div>
       `;
-      this.cardContainer = this.querySelector('#cardContainer');
-      this.addButton     = this.querySelector('#addCardBtn');
-      this.reloadBtn     = this.querySelector('#reloadBtn');
-      this.diagBtn       = this.querySelector('#diagBtn');
-      this.exitEditBtn   = this.querySelector('#exitEditBtn');
-      this.storeBadge    = this.querySelector('#storeBadge');
-      this.exportBtn     = this.querySelector('#exportBtn');
-      this.importBtn     = this.querySelector('#importBtn');
-      this.exploreBtn    = this.querySelector('#exploreBtn');      
+      this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+      this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
+      this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
+      this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
+      this.exitEditBtn   = this.shadowRoot.querySelector('#exitEditBtn');
+      this.storeBadge    = this.shadowRoot.querySelector('#storeBadge');
+      this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
+      this.importBtn     = this.shadowRoot.querySelector('#importBtn');
+      this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn');      
 
       this._applyGridVars();
       
@@ -750,9 +953,26 @@ _applyGridVars() {
       });
     }
 
+    // Persist new option knobs into storage so next load matches the config.
+    // Skip while in HA’s editor preview to avoid churn. Only queue save in edit mode (handled in _queueSave)
+    try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
+
     this._updateStoreBadge();
     if (this.cardContainer) this._toggleEditMode(false);
-    this._initialLoad();
+
+    // Only rebuild from storage on first boot or when storage_key changes.
+    // For normal config tweaks, just reflow with the new options.
+   // Boot/rebuild logic
+    this.__cfgReady = true;
+    if (keyChanged && this.__booted) {
+      this._initialLoad(true);
+    } else if (!this.__booted && this.__probed) {
+      this.__booted = true;
+      this._initialLoad();
+    } else {
+      this._applyContainerSizingFromConfig(true);
+      this._resizeContainer();
+    }
   }
 
   connectedCallback() {
@@ -796,93 +1016,177 @@ _applyGridVars() {
     LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
-      this._probeBackend().then(() => this._initialLoad(true));
+      this._probeBackend().then(() => { 
+        this.__probed = true; 
+        if (!this.__booted && this.__cfgReady) { 
+          this.__booted = true; 
+          this._initialLoad(true); 
+        } 
+      });
     }
+    
     const wraps = this.cardContainer?.children || [];
     for (const wrap of wraps) {
       const c = wrap.firstElementChild;
-      if (c && c.hass !== hass) c.hass = hass;
+      if (c && c.hass !== hass) {
+        c.hass = hass;
+        // Don't reprocess card_mod here - it will be handled by _processCardModOnce
+      }
     }
   }
+  
   get hass() { return this._hass; }
 
   /* ------------------------ Initial load / rebuild ------------------------ */
-  async _initialLoad(force=false) {
-    if (force && this.cardContainer) this.cardContainer.innerHTML = '';
-    this._dbgPush('boot', 'Initial load start', { force });
+  async _initialLoad(force = false) {
+    // prevent multiple parallel boots
+    if (this.__booting) return;
+    this.__booting = true;
 
-    let saved = null;
+    try {
+      // mark loading in progress to prevent autosave during rebuild
+      this._loading = true;
 
-    if (this._backendOK && this.storageKey) {
-      saved = await this._loadLayoutFromBackend(this.storageKey);
-    }
+      if (force && this.cardContainer) {
+        this.cardContainer.innerHTML = '';
+      }
 
-    if (!saved && this.storageKey) {
-      let local = null;
-      try { local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'); } catch {}
-      if (local) this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+      this._dbgPush('boot', 'Initial load start', { force });
 
-      if (local && this._backendOK) {
+      const __rebuildAfter = [];
+      let saved = null;
+
+      // Try backend first if available
+      if (this._backendOK && this.storageKey) {
         try {
-          await this._saveLayoutToBackend(this.storageKey, local);
-          this._dbgPush('boot', 'Migrated local -> backend');
-          saved = local;
+          saved = await this._loadLayoutFromBackend(this.storageKey);
         } catch (e) {
-          this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
-          saved = local;
+          this._dbgPush('boot', 'Backend load failed', { error: String(e) });
         }
-      } else if (local) {
-        saved = local;
       }
-    }
 
-    if (!saved && this._config?.cards?.length) {
-    this._dbgPush('boot', 'Using embedded config');
-    saved = { cards: this._config.cards };
+      // Fallback: localStorage (and migrate to backend if possible)
+      if (!saved && this.storageKey) {
+        let local = null;
+        try {
+          local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null');
+        } catch {}
+        if (local) {
+          this._dbgPush('boot', 'Found local snapshot', { bytes: JSON.stringify(local).length });
+
+          if (this._backendOK) {
+            try {
+              await this._saveLayoutToBackend(this.storageKey, local);
+              this._dbgPush('boot', 'Migrated local -> backend');
+              saved = local;
+            } catch (e) {
+              this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
+              saved = local;
+            }
+          } else {
+            saved = local;
+          }
+        }
       }
-    // If persisted options exist, apply them up front
-    if (saved?.options) this._applyImportedOptions(saved.options, true);
-    // v1 fallback: if file had top-level grid, apply it too
-    else if (typeof saved?.grid === 'number') this._applyImportedOptions({ grid: saved.grid }, true);
 
-    let builtAny = false;
-    if (saved?.cards?.length) {
-      for (const conf of saved.cards) {
-        if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-          const wrap = this._makePlaceholderAt(
-            conf.position?.x || 0,
-            conf.position?.y || 0,
-            conf.size?.width || 100,
-            conf.size?.height || 100
-          );
+      // Fallback: embedded YAML config
+      if (!saved && this._config?.cards?.length) {
+        this._dbgPush('boot', 'Using embedded config');
+        saved = { cards: this._config.cards };
+      }
+
+      // Snapshot of YAML before we overlay anything
+      const yamlCfg = { ...(this._config || {}) };
+
+      // 1) Apply persisted options as baseline
+      if (saved?.options) {
+        this._applyImportedOptions(saved.options, true);
+      } else if (typeof saved?.grid === 'number') {
+        this._applyImportedOptions({ grid: saved.grid }, true);
+      }
+
+      // 2) Overlay explicit YAML options (take precedence)
+      const overrideKeys = [
+        'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
+        'container_background','card_background','debug','disable_overlap',
+        'container_size_mode','container_fixed_width','container_fixed_height',
+        'container_preset','container_preset_orientation'
+      ];
+      const cfgOpts = {};
+      for (const k of overrideKeys) {
+        if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
+      }
+      if (Object.keys(cfgOpts).length) {
+        this._applyImportedOptions(cfgOpts, true);
+      }
+
+      // Build cards
+      let builtAny = false;
+
+      if (saved?.cards?.length) {
+        for (const conf of saved.cards) {
+          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+            // empty/placeholder
+            const wrap = this._makePlaceholderAt(
+              conf.position?.x || 0,
+              conf.position?.y || 0,
+              conf.size?.width  || 100,
+              conf.size?.height || 100
+            );
+            this.cardContainer.appendChild(wrap);
+            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+            builtAny = true;
+            continue;
+          }
+
+          const cardEl = await this._createCard(conf.card);
+          const wrap = this._makeWrapper(cardEl);
+          if (this.editMode) wrap.classList.add('editing');
+
+          this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
+          wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
+          wrap.style.height = `${conf.size?.height ?? 10 * this.gridSize}px`;
+          if (conf.z != null) wrap.style.zIndex = String(conf.z);
+
           this.cardContainer.appendChild(wrap);
+
+          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+          this._initCardInteract(wrap);
           builtAny = true;
-          continue;
         }
-        const cardEl = await this._createCard(conf.card);
-        const wrap = this._makeWrapper(cardEl);
-        if (this.editMode) wrap.classList.add('editing');
-        this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
-        wrap.style.width  = `${conf.size?.width  || 14*this.gridSize}px`;
-        wrap.style.height = `${conf.size?.height || 10*this.gridSize}px`;
-        if (conf.z != null) wrap.style.zIndex = String(conf.z);
-        this.cardContainer.appendChild(wrap);
-        this._initCardInteract(wrap);
-        builtAny = true;
+
+        this._resizeContainer();
+        this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
       }
-      this._resizeContainer();
-      this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
-    }
 
-    
+      if (!builtAny) {
+        this._showEmptyPlaceholder();
+        this._dbgPush('boot', 'No saved layout found; showing placeholder');
+      }
 
-    if (!builtAny) {
-      this._showEmptyPlaceholder();
-      this._dbgPush('boot', 'No saved layout found; showing placeholder');
+      this._updateStoreBadge();
+      this._syncEmptyStateUI();
+
+      // Ensure card-mod runs once after first paint
+      if (force) this._cardModProcessed = false;
+      setTimeout(() => {
+        this._processCardModOnce();
+      }, 100);
+
+      // Rebuild signals for nested cards
+      try {
+        __rebuildAfter.forEach((el) => {
+          try {
+            el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+          } catch {}
+        });
+      } catch {}
+    } finally {
+      this._loading = false;
+      this.__booting = false;
     }
-    this._updateStoreBadge();
-    this._syncEmptyStateUI();
   }
+
 
   /* ------------------------------ Edit mode ------------------------------ */
   _toggleEditMode(force=null) {
@@ -901,6 +1205,7 @@ _applyGridVars() {
     this.exportBtn.style.display   = this.editMode ? 'inline-block' : 'none';
     this.importBtn.style.display   = this.editMode ? 'inline-block' : 'none';
     this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
+    this.storeBadge.style.display  = this.editMode ? 'inline-block' : 'none';
     this._syncEmptyStateUI();
     
     this.cardContainer.classList.toggle('grid-on', this.editMode);
@@ -1113,6 +1418,7 @@ _syncEmptyStateUI() {
   toggle(this.exportBtn);
   toggle(this.importBtn);
   toggle(this.exploreBtn);
+  toggle(this.storeBadge);
 }
   
 
@@ -1142,109 +1448,144 @@ _syncEmptyStateUI() {
     if (!window.interact || wrap.dataset.placeholder) return;
     const gs = this.gridSize, live = !!this.dragLiveSnap;
 
-    // DRAG (supports multi-select move)
-    window.interact(wrap)
-      .draggable({
-        enabled: this.editMode,
-        inertia:false,
-        modifiers:[ window.interact.modifiers.restrictRect({ restriction:'parent', endOnly:true }) ],
-        listeners:{
-          start: (ev) => {
-            if (!this._selection.has(wrap)) {
-              if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
-              this._toggleSelection(wrap, true);
-            }
-            const group = Array.from(this._selection);
-            this.__groupDrag = {
-              leader: wrap,
-              members: group,
-              startRaw: new Map(group.map(w => [w, {
-                x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
-                y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
-                w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
-                h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
-              }]))
-            };
-            group.forEach(w => {
-              w.classList.add('dragging');
-              if (w.getAttribute('data-x-raw') === null) w.setAttribute('data-x-raw', w.getAttribute('data-x') || '0');
-              if (w.getAttribute('data-y-raw') === null) w.setAttribute('data-y-raw', w.getAttribute('data-y') || '0');
-            });
-          },
-          move: (ev) => {
-            if (!this.__groupDrag) return;
-            const gs   = this.gridSize;
-            const live = !!this.dragLiveSnap;
-            const lead = this.__groupDrag.leader;
-            const srL  = this.__groupDrag.startRaw.get(lead);
+    // DRAG (supports multi‑select move with optional live snap)
+    const restrictMod = window.interact.modifiers.restrictRect({
+      restriction: 'parent',
+      endOnly: true
+    });
+    const mods = [restrictMod];
 
-            // compute tentative leader raw position (don’t write yet)
-            const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
-            const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
-            let dxLead   = curLeadX - srL.x;
-            let dyLead   = curLeadY - srL.y;
-            
-            // build proposed rects for group
-            const proposed = this.__groupDrag.members.map(m => {
-              const sr = this.__groupDrag.startRaw.get(m);
-              const rx = sr.x + dxLead;
-              const ry = sr.y + dyLead;
-              const px = live ? Math.round(rx/gs)*gs : rx;
-              const py = live ? Math.round(ry/gs)*gs : ry;
-              return this._rectFor(m, px, py, sr.w, sr.h);
-            });
+    // When dragLiveSnap is true, use Interact’s built‑in snap modifier so the pointer
+    // (and therefore the element) is snapped to the grid before your handler runs.
+    if (this.dragLiveSnap) {
+      const gridSnap = window.interact.snappers.grid({ x: this.gridSize, y: this.gridSize });
+      mods.push(window.interact.modifiers.snap({
+        targets: [gridSnap],
+        range: Infinity,
+        offset: 'startCoords'
+      }));
+    }
 
-            // if overlap protection on and collision → abort this move frame
-            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
-              return;
-            }
+    window.interact(wrap).draggable({
+      enabled: this.editMode,
+      inertia: false,
+      modifiers: mods,
+      listeners: {
+        start: (ev) => {
+          // ensure the clicked card is in the selection
+          if (!this._selection.has(wrap)) {
+            if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
+            this._toggleSelection(wrap, true);
+          }
+          const group = Array.from(this._selection);
+          this.__groupDrag = {
+            leader: wrap,
+            members: group,
+            startRaw: new Map(group.map(w => [w, {
+              x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
+              y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
+              w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
+              h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
+            }]))
+          };
 
-            // commit move
-            lead.setAttribute('data-x-raw', String(curLeadX));
-            lead.setAttribute('data-y-raw', String(curLeadY));
-            for (let i = 0; i < this.__groupDrag.members.length; i++) {
-              const m  = this.__groupDrag.members[i];
-              const pr = proposed[i];
-              m.setAttribute('data-x-raw', String(pr.x));
-              m.setAttribute('data-y-raw', String(pr.y));
-              this._setCardPosition(m, pr.x, pr.y);
+          // Capture original raw positions of all cards (non‑placeholders) so we can restore them
+          this.__collisionOriginals = new Map();
+          const allCardsStart = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
+          allCardsStart.forEach(c => {
+            const rawX = parseFloat(c.getAttribute('data-x-raw')) || parseFloat(c.getAttribute('data-x')) || 0;
+            const rawY = parseFloat(c.getAttribute('data-y-raw')) || parseFloat(c.getAttribute('data-y')) || 0;
+            this.__collisionOriginals.set(c, { x: rawX, y: rawY });
+          });
+
+          group.forEach(w => {
+            w.classList.add('dragging');
+            if (w.getAttribute('data-x-raw') === null) {
+              w.setAttribute('data-x-raw', w.getAttribute('data-x') || '0');
             }
-            this._resizeContainer();
-          },
-          end: () => {
-            if (!this.__groupDrag) return;
-            const gs = this.gridSize;
-            // snap + final collision guard
-            const proposed = this.__groupDrag.members.map(m => {
-              const rx = Math.round((parseFloat(m.getAttribute('data-x-raw')) || 0)/gs)*gs;
-              const ry = Math.round((parseFloat(m.getAttribute('data-y-raw')) || 0)/gs)*gs;
-              const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
-              const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
-              return this._rectFor(m, rx, ry, w, h);
-            });
-            if (this.disableOverlap && this._anyCollisionFor(proposed, new Set(this.__groupDrag.members))) {
-              // don’t move; revert to start positions
-              for (const m of this.__groupDrag.members) {
-                const sr = this.__groupDrag.startRaw.get(m);
-                this._setCardPosition(m, sr.x, sr.y);
-                m.setAttribute('data-x-raw', String(sr.x));
-                m.setAttribute('data-y-raw', String(sr.y));
-              }
-            } else {
-              for (const pr of proposed) {
-                this._setCardPosition(pr.el, pr.x, pr.y);
-                pr.el.setAttribute('data-x-raw', String(pr.x));
-                pr.el.setAttribute('data-y-raw', String(pr.y));
-              }
+            if (w.getAttribute('data-y-raw') === null) {
+              w.setAttribute('data-y-raw', w.getAttribute('data-y') || '0');
             }
-            for (const m of this.__groupDrag.members) m.classList.remove('dragging');
-            this._resizeContainer();
-            if (this._isContainerFixed()) this._clampAllCardsInside();
-            this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
-            this.__groupDrag = null;
-          },
+          });
         },
-      });
+
+        move: (ev) => {
+          if (!this.__groupDrag) return;
+          const gs   = this.gridSize;
+          const live = !!this.dragLiveSnap;
+          const lead = this.__groupDrag.leader;
+          const srL  = this.__groupDrag.startRaw.get(lead);
+
+          // Compute new raw leader coordinates using pointer delta
+          const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
+          const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
+          const dxLead   = curLeadX - srL.x;
+          const dyLead   = curLeadY - srL.y;
+
+          // Build proposed positions for all selected cards
+          const proposed = this.__groupDrag.members.map(m => {
+            const sr = this.__groupDrag.startRaw.get(m);
+            const rawX  = sr.x + dxLead;
+            const rawY  = sr.y + dyLead;
+            const snapX = live ? Math.round(rawX / gs) * gs : rawX;
+            const snapY = live ? Math.round(rawY / gs) * gs : rawY;
+            return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
+          });
+
+          // If overlap protection is on, restore other cards and push them out of the way
+          if (this.disableOverlap) {
+            this._pushCardsOutOfTheWay(proposed, dxLead, dyLead, live, gs);
+          }
+
+          // Commit the move: update raw coordinates and apply snapped transform
+          lead.setAttribute('data-x-raw', String(curLeadX));
+          lead.setAttribute('data-y-raw', String(curLeadY));
+          for (const pr of proposed) {
+            pr.el.setAttribute('data-x-raw', String(pr.rawX));
+            pr.el.setAttribute('data-y-raw', String(pr.rawY));
+            this._setCardPosition(pr.el, pr.snapX, pr.snapY);
+          }
+          this._resizeContainer();
+        },
+
+        end: (ev) => {
+          if (!this.__groupDrag) return;
+          const gs = this.gridSize;
+
+          // Gather final positions (unsnapped and snapped) for the dragged group
+          const endRects = this.__groupDrag.members.map(m => {
+            const rawX = parseFloat(m.getAttribute('data-x-raw')) || parseFloat(m.getAttribute('data-x')) || 0;
+            const rawY = parseFloat(m.getAttribute('data-y-raw')) || parseFloat(m.getAttribute('data-y')) || 0;
+            const snapX = Math.round(rawX / gs) * gs;
+            const snapY = Math.round(rawY / gs) * gs;
+            const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
+            const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
+            return { el: m, rawX, rawY, snapX, snapY, w, h };
+          });
+
+          // On end, do a final restore/push to prevent leftover overlaps
+          if (this.disableOverlap) {
+            this._pushCardsOutOfTheWay(endRects, 0, 0, false, gs);
+          }
+
+          // Snap cards to the grid and update raw coordinates
+          for (const pr of endRects) {
+            this._setCardPosition(pr.el, pr.snapX, pr.snapY);
+            pr.el.setAttribute('data-x-raw', String(pr.snapX));
+            pr.el.setAttribute('data-y-raw', String(pr.snapY));
+          }
+
+          // Cleanup
+          for (const m of this.__groupDrag.members) m.classList.remove('dragging');
+          this._resizeContainer();
+          if (this._isContainerFixed()) this._clampAllCardsInside();
+          this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
+          this.__groupDrag = null;
+          this.__collisionOriginals = null;
+        }
+      }
+    });
+
 
 
     // RESIZE — bottom-right handle only (single card)
@@ -1339,6 +1680,21 @@ _syncEmptyStateUI() {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
     el.hass = this.hass;
+    
+    // Special handling for mod-card
+    if (cfg.type === 'custom:mod-card') {
+      // mod-card needs to be fully initialized before we can work with it
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Force mod-card to apply its styles
+      if (el.setConfig && typeof el.setConfig === 'function') {
+        try {
+          // Re-apply config to ensure mod-card processes it
+          el.setConfig(cfg);
+        } catch {}
+      }
+    }
+    
     return el;
   }
 
@@ -1367,6 +1723,7 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
+
     chip.addEventListener('click', async (e) => {
       e.stopPropagation();
       const act = e.target?.closest('button')?.dataset?.act; if (!act) return;
@@ -1393,6 +1750,7 @@ _syncEmptyStateUI() {
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
           this.cardContainer.appendChild(w2);
+          try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
         this._resizeContainer();
@@ -1406,21 +1764,41 @@ _syncEmptyStateUI() {
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
+          // update dataset with the new configuration for persistence
+          try {
+            wrap.dataset.cfg = JSON.stringify(newCfg);
+          } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
+          try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
         });
       }
     });
 
+    // ADD THE MISSING SHIELD ELEMENT
     const shield = document.createElement('div');
     shield.className = 'shield';
 
+    // ADD THE MISSING HANDLE ELEMENT
     const handle = document.createElement('div');
     handle.classList.add('resize-handle');
     handle.title = 'Resize';
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
+    // cache the card config on the wrapper
+    try {
+      const cfg = cardEl._config || cardEl.config;
+      if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+        wrap.dataset.cfg = JSON.stringify(cfg);
+        
+        // Mark if this needs card_mod processing
+        if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
+      }
+    } catch {}
+
     wrap.append(cardEl, shield, chip, handle);
+    // DDC patch: trigger one-time rebuild so nested card_mod attaches
+    try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
   }
 
@@ -1444,6 +1822,43 @@ _syncEmptyStateUI() {
   
     wrap.append(inner, shield);
     return wrap;
+  }
+
+    _processCardModOnce() {
+    // Only run once per load
+    if (this._cardModProcessed) return;
+    this._cardModProcessed = true;
+    
+    const wraps = this.cardContainer?.querySelectorAll('[data-needs-card-mod="true"]') || [];
+    
+    wraps.forEach(wrap => {
+      const card = wrap.firstElementChild;
+      if (!card) return;
+      
+      const config = card._config || card.config;
+      if (!config) return;
+      
+      // For mod-card specifically, we need to wait for it to be fully initialized
+      if (config.type === 'custom:mod-card') {
+        // mod-card needs its inner card to be ready
+        setTimeout(() => {
+          if (card.updateComplete) {
+            card.updateComplete.then(() => {
+              card.requestUpdate();
+            });
+          } else if (card.setConfig) {
+            try {
+              card.setConfig({...config});
+            } catch {}
+          }
+        }, 100);
+      } else if (config.card_mod && card.setConfig) {
+        // Regular card_mod
+        try {
+          card.setConfig({...config});
+        } catch {}
+      }
+    });
   }
 
   _showEmptyPlaceholder() {
@@ -1511,7 +1926,152 @@ _syncEmptyStateUI() {
     c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
   }
   
-  
+  /**
+  /**
+   * Restore original positions for non-selected cards, then push out of the way.
+   * This uses this.__collisionOriginals (captured on drag start) and avoids overlaps.
+   * @param {Array} proposedRects – array of { el, rawX, rawY, snapX, snapY, w, h }
+   * @param {number} dxLead – leader's delta X (to decide horizontal push direction)
+   * @param {number} dyLead – leader's delta Y (to decide vertical push direction)
+   * @param {boolean} liveSnap – true if we should snap positions visually
+   * @param {number} gridSize – current grid size
+   */
+  _pushCardsOutOfTheWay(proposedRects, dxLead, dyLead, liveSnap, gridSize) {
+    if (!this.__collisionOriginals) return;
+
+    const selectedSet = new Set(proposedRects.map(pr => pr.el));
+    const allCards = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
+      .filter(w => !w.dataset.placeholder);
+
+    // Determine container bounds (for fixed modes)
+    const isFixed = this._isContainerFixed();
+    const { w: cw, h: ch } = this._getContainerSize();
+
+    // Restore every non-selected card to its original raw position
+    for (const w of allCards) {
+      if (selectedSet.has(w)) continue;
+      const orig = this.__collisionOriginals.get(w);
+      if (orig) {
+        w.setAttribute('data-x-raw', String(orig.x));
+        w.setAttribute('data-y-raw', String(orig.y));
+        const snX = liveSnap ? Math.round(orig.x / gridSize) * gridSize : orig.x;
+        const snY = liveSnap ? Math.round(orig.y / gridSize) * gridSize : orig.y;
+        this._setCardPosition(w, snX, snY);
+      }
+    }
+
+    // Prepare lists for collision checks
+    const selectedRects = proposedRects.map(pr => ({
+      x: pr.snapX,
+      y: pr.snapY,
+      w: pr.w,
+      h: pr.h,
+    }));
+
+    // Map to store the final pushed positions of non-selected cards
+    const finalPos = new Map();
+
+    // Store original widths and heights
+    const cardSizes = new Map();
+    for (const w of allCards) {
+      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+      cardSizes.set(w, { w: width, h: height });
+    }
+
+    // Decide primary push direction based on leader movement
+    const signX = (dxLead > 0) ? 1 : (dxLead < 0 ? -1 : 0);
+    const signY = (dyLead > 0) ? 1 : (dyLead < 0 ? -1 : 0);
+    const horizontal = Math.abs(dxLead) >= Math.abs(dyLead);
+
+    // For each non-selected card, compute its new position
+    for (const other of allCards) {
+      if (selectedSet.has(other)) continue;
+      const orig = this.__collisionOriginals.get(other);
+      if (!orig) continue;
+
+      let { x: candidateX, y: candidateY } = orig;
+      const { w: ow, h: oh } = cardSizes.get(other);
+
+      // Determine if it overlaps with any selected rectangle
+      let overlaps = false;
+      for (const sr of selectedRects) {
+        if (this._rectsOverlap({ x: sr.x, y: sr.y, w: sr.w, h: sr.h },
+                              { x: candidateX, y: candidateY, w: ow, h: oh })) {
+          overlaps = true;
+          // Choose initial push direction
+          if (horizontal && signX !== 0) {
+            candidateX = signX > 0 ? sr.x + sr.w : sr.x - ow;
+          } else if (!horizontal && signY !== 0) {
+            candidateY = signY > 0 ? sr.y + sr.h : sr.y - oh;
+          } else {
+            // default horizontal push when no obvious direction
+            candidateX = sr.x + sr.w;
+          }
+          break;
+        }
+      }
+
+      // If overlapping, keep shifting until no collision
+      if (overlaps) {
+        let guard = 0;
+        const dx = horizontal ? (signX !== 0 ? signX * gridSize : gridSize) : 0;
+        const dy = !horizontal ? (signY !== 0 ? signY * gridSize : gridSize) : 0;
+        while (guard < 100) {
+          const candidateRect = { x: candidateX, y: candidateY, w: ow, h: oh };
+          let collision = false;
+
+          // Check against selected
+          for (const sr of selectedRects) {
+            if (this._rectsOverlap(candidateRect, sr)) {
+              collision = true;
+              break;
+            }
+          }
+          // Check against cards already assigned new positions
+          if (!collision) {
+            for (const [, fp] of finalPos) {
+              if (this._rectsOverlap(candidateRect, fp)) {
+                collision = true;
+                break;
+              }
+            }
+          }
+          // Check against container bounds (for fixed container)
+          if (!collision && isFixed) {
+            if (candidateX < 0 || candidateY < 0 ||
+                candidateX + ow > cw || candidateY + oh > ch) {
+              collision = true;
+            }
+          }
+
+          if (!collision) break;
+          // Move further along the chosen axis
+          candidateX += dx;
+          candidateY += dy;
+          guard++;
+        }
+
+        // Finally, clamp to container boundaries for fixed containers
+        if (isFixed) {
+          candidateX = Math.max(0, Math.min(candidateX, Math.max(0, cw - ow)));
+          candidateY = Math.max(0, Math.min(candidateY, Math.max(0, ch - oh)));
+        }
+      }
+
+      finalPos.set(other, { x: candidateX, y: candidateY, w: ow, h: oh });
+      selectedRects.push({ x: candidateX, y: candidateY, w: ow, h: oh });
+    }
+
+    // Apply final positions to non-selected cards
+    for (const [card, pos] of finalPos) {
+      card.setAttribute('data-x-raw', String(pos.x));
+      card.setAttribute('data-y-raw', String(pos.y));
+      const snX = liveSnap ? Math.round(pos.x / gridSize) * gridSize : pos.x;
+      const snY = liveSnap ? Math.round(pos.y / gridSize) * gridSize : pos.y;
+      this._setCardPosition(card, snX, snY);
+    }
+  }
 
   _rectFor(el, x = null, y = null, wpx = null, hpx = null) {
     const x0 = x ?? (parseFloat(el.getAttribute('data-x')) || 0);
@@ -1534,7 +2094,25 @@ _syncEmptyStateUI() {
     }
     return false;
   }
-  _extractCardConfig(cardEl){ return cardEl?._config || cardEl?.config || {}; }
+  _extractCardConfig(cardEl){
+    if (!cardEl) return {};
+    // attempt to read the card's own config
+    const cfg = cardEl._config || cardEl.config;
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+      return cfg;
+    }
+    // fallback: if the wrapper cached a config, use it
+    try {
+      // walk up to the wrapper; .closest may not exist on text nodes
+      const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
+      const raw  = wrap?.dataset?.cfg;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {}
+    return {};
+  }
 
   /* ------------------------------- Picker UI ------------------------------- */
   async _openCardManager() { await this._openSmartPicker('add'); }
@@ -1550,7 +2128,10 @@ _syncEmptyStateUI() {
         {type:'button',            name:'Button',            icon:'mdi:gesture-tap-button'},
         {type:'glance',            name:'Glance',            icon:'mdi:eye-outline'},
         {type:'markdown',          name:'Markdown',          icon:'mdi:language-markdown'},
+        // NEW: allow adding an empty custom card that the user can edit manually
+        {type:'custom_card',       name:'Custom Card',       icon:'mdi:puzzle-outline'},
       ]},
+
       { id:'sensors',   name:'Sensors', items:[
         {type:'sensor',            name:'Sensor',            icon:'mdi:antenna'},
         {type:'gauge',             name:'Gauge',             icon:'mdi:gauge'},
@@ -1576,29 +2157,79 @@ _syncEmptyStateUI() {
 
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
+    // Log the start of an editor lookup; this uses console.debug so it is visible
+    try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
   
-    // Ensure the module/class is loaded
-    let CardClass = null;
-    try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
-  
-    // 1) Instance-provided editor
+    // Warm the module before asking for the class only for built‑in HA cards.
+    // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
     try {
-      const inst = helpers.createCardElement({ type, ...cfg });
-      inst.hass = this.hass;
-      if (typeof inst.getConfigElement === 'function') {
-        const el = await inst.getConfigElement();
-        if (el) return el;
+      if (typeof type === 'string' && type && !type.startsWith('custom:') && type !== 'custom_card') {
+        await this._ensureCardModuleLoaded(type, cfg);
       }
     } catch {}
   
-    // 2) Static class-provided editor
+    // We will compute the card class on demand when needed. Avoid keeping a reference
+    // to a potentially undefined variable across different scopes.
+    const getCardClass = async () => {
+      try {
+        if (helpers.getCardElementClass) {
+          // Use the helper if available
+          return await helpers.getCardElementClass(type);
+        }
+        // Fallback: instantiate the card (using a stub) and return its constructor.
+        let baseCfg;
+        if (cfg && typeof cfg === 'object') {
+          // Use the provided config if available to obtain the constructor
+          baseCfg = { type, ...cfg };
+        } else {
+          let stubCfg;
+          try { stubCfg = await this._getStubConfigForType(type); } catch {}
+          baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+        }
+        const inst = helpers.createCardElement(baseCfg);
+        return inst?.constructor || null;
+      } catch {
+        return null;
+      }
+    };
+
+  
+    // 1) Static class-provided editor (preferred)
     try {
+      const CardClass = await getCardClass();
       if (CardClass && typeof CardClass.getConfigElement === 'function') {
         const el = await CardClass.getConfigElement();
-        if (el) return el;
+        if (el) {
+          try { console.info('[ddc:editor] Found static class editor', { type }); } catch {}
+          return el;
+        }
       }
     } catch {}
+
+    // 2) Instance-provided editor. Only try this for custom cards. Most built‑in
+    // cards either expose a static editor or register a `hui-<type>-card-editor`
+    // tag; instantiating them with invalid or empty configs causes errors (e.g.
+    // "Entities must be specified"). For custom cards, we derive a stub config
+    // to satisfy basic validation and then ask the instance for its editor.
+    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card' || type === 'entity')) {
+      try {
+        let stubCfg = undefined;
+        try { stubCfg = await this._getStubConfigForType(type); } catch {}
+        const baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+        const inst = helpers.createCardElement(baseCfg);
+        inst.hass = this.hass;
+        if (typeof inst.getConfigElement === 'function') {
+          const el = await inst.getConfigElement();
+          if (el) {
+            try { console.info('[ddc:editor] Found instance-level editor', { type }); } catch {}
+            return el;
+          }
+        }
+      } catch {}
+    }
+
+
   
     // 3) Known/custom-tag editors (registry hint + common conventions) with retries
     const base = String(type).replace(/^custom:/, '');
@@ -1606,15 +2237,24 @@ _syncEmptyStateUI() {
     const entry = reg.find(c =>
       c?.type === base || c?.type === type || c?.type === `custom:${base}`
     );
+
+    
   
+
     const candidates = [];
     if (entry?.editor) candidates.push(entry.editor);            // from registry, if present
     candidates.push(`${base}-editor`, `${base}-config-editor`);  // common conventions
+
+    // New: add the “hui-<type>-card-editor” convention used by core HA cards
+    if (base && typeof base === 'string') {
+      candidates.push(`hui-${base}-card-editor`);
+    }
+
   
     for (const tag of candidates) {
       if (!tag || typeof tag !== 'string') continue;
-      // Try a few times: 0ms, 100ms, 300ms, 700ms
-      for (const delay of [0, 100, 300, 700]) {
+      // Try multiple times: immediate and with increasing delays up to ~3s
+      for (const delay of [0, 100, 300, 700, 1500, 3000]) {
         try {
           if (!customElements.get(tag)) {
             await Promise.race([
@@ -1623,6 +2263,7 @@ _syncEmptyStateUI() {
             ]);
           }
           if (customElements.get(tag)) {
+            try { console.info('[ddc:editor] Found editor by tag', { type, tag }); } catch {}
             return document.createElement(tag);
           }
         } catch {}
@@ -1631,6 +2272,39 @@ _syncEmptyStateUI() {
   
     // No UI editor available
     return null;
+  }
+
+  // This helps custom cards that register their editor tag after the element loads.
+  async _ensureCardModuleLoaded(type, cfg) {
+    try {
+      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      // Use stub configuration to warm the module by instantiating the card. This
+      // triggers the dynamic import of the card and its editor without causing
+      // validation errors (we'll ignore errors silently). After warmup, the
+      // module should have registered its static methods and editor tags.
+      // Use the provided cfg if present (for existing cards) to ensure valid keys,
+      // otherwise fall back to a stub. Spreading cfg over type ensures the card
+      // receives all its current properties, avoiding validation errors.
+      let baseCfg;
+      if (cfg && typeof cfg === 'object') {
+        baseCfg = { type, ...cfg };
+      } else {
+        let stubCfg = undefined;
+        try { stubCfg = await this._getStubConfigForType(type); } catch {}
+        baseCfg = stubCfg && typeof stubCfg === 'object' ? { ...stubCfg } : { type };
+      }
+      const el = helpers.createCardElement(baseCfg);
+      el.hass = this.hass;
+      const tmp = document.createElement('div');
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
+      tmp.appendChild(el);
+      document.body.appendChild(tmp);
+      await new Promise(r => requestAnimationFrame(r));
+      tmp.remove();
+      try { console.info('[ddc:editor] Warmed card module', { type }); } catch {}
+    } catch {
+      // swallow errors – the module may still register
+    }
   }
   
   _ensureOverlayZFix() {
@@ -1726,7 +2400,18 @@ _syncEmptyStateUI() {
   _statesList(domains) {
     const all = Object.keys(this.hass?.states || {});
     if (!domains || !domains.length) return all;
-    return all.filter(eid => domains.includes(eid.split('.')[0]));
+
+    if (!this.__domainIndex || this.__domainIndex._gen !== all.length) {
+      const map = {};
+      for (const id of all) {
+        const d = id.split('.')[0];
+        (map[d] ||= []).push(id);
+      }
+      this.__domainIndex = { _gen: all.length, map };
+    }
+    const out = [];
+    for (const d of domains) if (this.__domainIndex.map[d]) out.push(...this.__domainIndex.map[d]);
+    return out;
   }
   _isNumericEntity(eid) {
     const st = this.hass?.states?.[eid]; if (!st) return false;
@@ -1833,7 +2518,59 @@ _syncEmptyStateUI() {
   }
 
   /* ----------------------- Picker (fast, cached) ----------------------- */
+  
+    _createVirtualList({ container, items, rowHeight = 36, renderRow }) {
+    container.style.position = 'relative';
+    container.style.overflow = 'auto';
+    const spacer = document.createElement('div');
+    spacer.style.height = `${items.length * rowHeight}px`;
+    container.innerHTML = '';
+    container.appendChild(spacer);
+
+    const mount = new Map(); // index -> element
+    const render = () => {
+      const scrollTop = container.scrollTop;
+      const h = container.clientHeight;
+      const first = Math.max(0, Math.floor(scrollTop / rowHeight) - 6);
+      const last  = Math.min(items.length - 1, Math.ceil((scrollTop + h) / rowHeight) + 6);
+
+      // remove out-of-window rows
+      for (const [i, el] of mount) {
+        if (i < first || i > last) { el.remove(); mount.delete(i); }
+      }
+      // add visible rows
+      for (let i = first; i <= last; i++) {
+        if (mount.has(i)) continue;
+        const el = renderRow(items[i], i);
+        el.style.position = 'absolute';
+        el.style.left = '0';
+        el.style.right = '0';
+        el.style.top = `${i * rowHeight}px`;
+        mount.set(i, el);
+        container.appendChild(el);
+      }
+    };
+
+    container.addEventListener('scroll', render, { passive: true });
+    new ResizeObserver(render).observe(container);
+    render();
+
+    return {
+      refresh(newItems) {
+        if (newItems) {
+          items = newItems;
+          spacer.style.height = `${items.length * rowHeight}px`;
+          for (const [, el] of mount) el.remove();
+          mount.clear();
+        }
+        render();
+      }
+    };
+  }
+  
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
+
+    
     const close = () => modal.remove();
     const modal = document.createElement('div'); modal.className='modal';
     modal.innerHTML = `
@@ -1842,7 +2579,6 @@ _syncEmptyStateUI() {
           <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
           <div style="display:flex;gap:10px;flex:1">
             <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
-            <input id="customType" placeholder="custom:my-card (optional)" style="max-width:260px;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)" aria-label="custom type">
           </div>
           <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
           <button class="btn" id="addBtn" disabled>${mode==='edit'
@@ -1854,7 +2590,7 @@ _syncEmptyStateUI() {
           <div class="pane" id="leftPane"></div>
           <div class="pane" id="rightPane">
             <div class="rightGrid">
-              <div class="sec" style="grid-column:1;grid-row:1">
+              <div class="sec" id="quickFillSec" style="grid-column:1;grid-row:1">
                 <div class="hd">Quick fill <span style="opacity:.7;font-size:.85rem">card-aware</span></div>
                 <div class="bd" id="quickFill"></div>
               </div>
@@ -1867,7 +2603,7 @@ _syncEmptyStateUI() {
                 <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
               </div>
 
-              <div class="sec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
+              <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
                 <div class="hd">
                   <span>Card options (official editor)</span>
                   <div id="optTabs" class="tabs">
@@ -1904,7 +2640,7 @@ _syncEmptyStateUI() {
           </button>
         </div>
       </div>`;
-    this.appendChild(modal);
+    this.shadowRoot.appendChild(modal);
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -1912,7 +2648,6 @@ _syncEmptyStateUI() {
     const cancelTop = modal.querySelector('#cancelBtn');
     const cancelBot = modal.querySelector('#footCancel');
     const search = modal.querySelector('#search');
-    const customType = modal.querySelector('#customType');
     const cardHost = modal.querySelector('#cardHost');
     const editorHost = modal.querySelector('#editorHost');
     const editorSpin = modal.querySelector('#editorSpin');
@@ -1945,6 +2680,93 @@ _syncEmptyStateUI() {
       });
     }
 
+    // ---------------------------------------------------------------------------
+    // UI tweaks: hide quick fill area, add selected-card headline and fave toggle
+    // Hide the quick fill section entirely so the editor can use the full height.
+    const quickFillSecDiv = modal.querySelector('#quickFillSec');
+    if (quickFillSecDiv) quickFillSecDiv.style.display = 'none';
+    // Reposition the options and YAML sections upward now that quick fill is hidden
+    const optionsSecDiv = modal.querySelector('#optionsSec');
+    const yamlSecDiv = modal.querySelector('#yamlSec');
+    if (optionsSecDiv) optionsSecDiv.style.gridRow = '1';
+    if (yamlSecDiv) yamlSecDiv.style.gridRow = '2';
+
+    // Set up a header in the editor for showing the selected card and a star to
+    // favorite the current card.  We create the elements once and update them
+    // whenever a different card is selected.  Favorites are persisted using
+    // existing _getFaves/_setFaves helpers.
+    const optionsHd = modal.querySelector('#optionsSec .hd');
+    // Local references for the header label and star button
+    let selInfo;
+    let favBtn;
+    // Function to update the star icon state based on whether the current card
+    // type is favorited.  Called whenever the favorites set or currentType changes.
+    const updateFavStar = () => {
+      if (!favBtn) return;
+      const on = currentType && faves.has(currentType);
+      const icon = favBtn.querySelector('ha-icon');
+      if (icon) icon.setAttribute('icon', on ? 'mdi:star' : 'mdi:star-outline');
+    };
+    // Function to update the headline text and star icon.  Called from selectType.
+    const updateHeader = (type) => {
+      if (selInfo) {
+        const item = allItems.find(i => i.type === type);
+        const nm = item ? item.name : (type || '');
+        selInfo.textContent = nm;
+      }
+      updateFavStar();
+    };
+    // Only initialize the header once.
+    if (optionsHd && !optionsHd.querySelector('.sel-info')) {
+      // Hide the existing static label if present
+      const titleSpan = optionsHd.querySelector('span');
+      if (titleSpan) {
+        titleSpan.style.display = 'none';
+      }
+      // Create the dynamic selected-card label
+      selInfo = document.createElement('span');
+      selInfo.className = 'sel-info';
+      // Flex so it grows to fill space before the star button
+      selInfo.style.flex = '1';
+      selInfo.style.fontWeight = 'bold';
+      selInfo.style.paddingRight = '8px';
+      optionsHd.insertBefore(selInfo, optionsHd.firstChild);
+      // Create the favorite star button
+      favBtn = document.createElement('button');
+      favBtn.className = 'icon-btn';
+      favBtn.setAttribute('title','Favorite');
+      Object.assign(favBtn.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '6px',
+        border: '1px solid var(--divider-color)',
+        background: 'var(--primary-background-color)',
+        padding: '0',
+        marginLeft: '4px',
+        cursor: 'pointer'
+      });
+      favBtn.innerHTML = '<ha-icon icon="mdi:star-outline"></ha-icon>';
+      optionsHd.appendChild(favBtn);
+      // Clicking the star toggles favorite status for the current card.
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentType) return;
+        if (faves.has(currentType)) {
+          faves.delete(currentType);
+        } else {
+          faves.add(currentType);
+        }
+        this._setFaves(faves);
+        updateFavStar();
+        // Re-render the list so the favorites section reflects the new state
+        renderLeft();
+      });
+    }
+    // End of UI tweaks
+
     let __activeTab = 'visual';
 
     const showTab = (name) => {
@@ -1962,22 +2784,32 @@ _syncEmptyStateUI() {
       __activeTab = wantYaml ? 'yaml' : 'visual';
     };
     
-    tabVisual.addEventListener('click', () => showTab('visual'));
+    tabVisual.addEventListener('click', async () => {
+      showTab('visual');
+      // Mount a new editor the first time; reuse it afterward by updating config.
+      // Because visualEditor is reset in selectType(), this will always mount a fresh editor for a new card type.
+      if (!visualEditor) {
+        await mountVisualEditor(currentConfig);
+      } else {
+        try { visualEditor.setConfig?.(currentConfig); } catch {}
+      }
+    });
+
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
-    showTab('visual');
+    showTab('yaml');
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
-      const custom = customType.value.trim();
-      if (custom) {
-        return [{ id:'custom', name:'Custom', items:[{type:custom, name:'Custom card', icon:'mdi:puzzle-outline'}]}];
-      }
-      return catalog.map(section => ({
-        ...section,
-        items: (section.items||[]).filter(it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q))
-      })).filter(sec => sec.items && sec.items.length || sec.id==='favorites' || sec.id==='recent');
+      return catalog
+        .map(section => ({
+          ...section,
+          items: (section.items || []).filter(
+            it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
+          )
+        }))
+        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent');
     };
 
     const renderLeft = () => {
@@ -2008,9 +2840,19 @@ _syncEmptyStateUI() {
     };
 
     const highlight = (btn) => {
-      left.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn?.classList.add('active');
-      if (btn) btn.style.background='rgba(0,0,0,.06)';
+      // Reset all buttons to default appearance
+      left.querySelectorAll('button').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = '';
+      });
+      // Highlight the selected button so it is obvious which one is active.
+      if (btn) {
+        btn.classList.add('active');
+        // Soft highlight background and primary color text for contrast
+        btn.style.background = 'rgba(3,169,244,.12)';
+        btn.style.color = 'var(--primary-color)';
+      }
     };
 
     let currentConfig = null;
@@ -2018,6 +2860,8 @@ _syncEmptyStateUI() {
     let yamlEditorApi = null;
     let visualEditor = null;
     let pickSeq = 0; // stale-select guard
+    let __previewTimer = null;
+    let __lastPreviewCfgJSON = '';
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -2045,7 +2889,7 @@ _syncEmptyStateUI() {
           div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
           div.querySelector('ha-icon').setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
           currentConfig = this._shapeBySchema(type, {...currentConfig, [keyForMulti]: [...arr]});
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         });
         container.appendChild(div);
@@ -2057,17 +2901,68 @@ _syncEmptyStateUI() {
 
         if (f.type === 'entities') {
           const wrap = document.createElement('div'); wrap.style.flex='1';
-          const filter = document.createElement('input'); Object.assign(filter,{placeholder:'Filter entities…'}); Object.assign(filter.style,{width:'100%',padding:'8px 10px',borderRadius:'10px',border:'1px solid var(--divider-color)',background:'var(--card-background-color)',color:'var(--primary-text-color)'});
-          const list = document.createElement('div'); Object.assign(list.style,{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'8px',maxHeight:'220px',overflow:'auto',marginTop:'8px'});
+          const filter = document.createElement('input');
+          Object.assign(filter, { placeholder:'Filter entities…' });
+          Object.assign(filter.style, {
+            width:'100%', padding:'8px 10px', borderRadius:'10px',
+            border:'1px solid var(--divider-color)',
+            background:'var(--card-background-color)', color:'var(--primary-text-color)'
+          });
+          const list = document.createElement('div');
+          Object.assign(list.style, {
+            maxHeight:'220px', overflow:'auto', marginTop:'8px',
+            border:'1px solid var(--divider-color)', borderRadius:'10px', padding:'6px'
+          });
           const pool = (f.domains && f.domains.length) ? this._statesList(f.domains) : all;
           const selected = Array.isArray(cfg[f.key]) ? [...cfg[f.key]] : (cfg[f.key] ? [cfg[f.key]] : []);
-          const renderList = () => {
-            const q = filter.value.trim().toLowerCase();
-            list.innerHTML = '';
-            pool.filter(eid => !q || eid.toLowerCase().includes(q)).forEach(eid => addEntityItem(eid, selected, list, f.key));
+
+          // virtualized row renderer
+          const renderRow = (eid) => {
+            const div = document.createElement('div');
+            Object.assign(div.style, {
+              padding:'6px 10px', margin:'4px 0',
+              border:'1px solid var(--divider-color)', borderRadius:'10px',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', background:''
+            });
+            const icon = document.createElement('ha-icon');
+            icon.setAttribute('icon','mdi:checkbox-blank-outline');
+            icon.style.setProperty('--mdc-icon-size','18px');
+            const text = document.createElement('span');
+            text.textContent = eid;
+            text.style.whiteSpace = 'nowrap';
+            text.style.overflow = 'hidden';
+            text.style.textOverflow = 'ellipsis';
+            div.append(icon, text);
+
+            const paint = () => {
+              const on = selected.includes(eid);
+              div.style.background = on ? 'rgba(3,169,244,.12)' : '';
+              div.style.borderColor = on ? 'var(--primary-color)' : 'var(--divider-color)';
+              icon.setAttribute('icon', on ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline');
+            };
+            paint();
+
+            div.addEventListener('click', () => {
+              const idx = selected.indexOf(eid);
+              if (idx >= 0) selected.splice(idx, 1); else selected.push(eid);
+              currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: [...selected]});
+              mountPreview(currentConfig);
+              yamlEditorApi?.setValue(currentConfig);
+              paint();
+            });
+
+            return div;
           };
-          filter.addEventListener('input', renderList);
-          renderList();
+
+          let filtered = pool;
+          this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+
+          filter.addEventListener('input', () => {
+            const q = filter.value.trim().toLowerCase();
+            filtered = pool.filter(eid => !q || eid.toLowerCase().includes(q));
+            this._createVirtualList({ container: list, items: filtered, rowHeight: 36, renderRow });
+          });
+
           wrap.append(filter, list);
           row.append(label, wrap);
           currentConfig = this._shapeBySchema(type, {...cfg, [f.key]: selected});
@@ -2086,7 +2981,7 @@ _syncEmptyStateUI() {
           ds.value = Array.isArray(cfg[f.key]) ? (cfg[f.key][0] || '') : (cfg[f.key] || '');
           ds.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ds.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           dsWrap.append(iconLead, ds, dl);
@@ -2102,7 +2997,7 @@ _syncEmptyStateUI() {
           inp.addEventListener('input', async () => {
             const v = inp.value==='' ? undefined : Number(inp.value);
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: isNaN(v)? undefined : v});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(numIcon, inp);
@@ -2117,7 +3012,7 @@ _syncEmptyStateUI() {
           sel.value = cfg[f.key] ?? f.default ?? (f.options?.[0] || '');
           sel.addEventListener('change', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: sel.value});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           selWrap.append(selIcon, sel);
@@ -2132,7 +3027,7 @@ _syncEmptyStateUI() {
           inp.value = cfg[f.key] ?? '';
           inp.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: inp.value || undefined});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           inpWrap.append(tIcon, inp);
@@ -2145,7 +3040,7 @@ _syncEmptyStateUI() {
           ta.value = cfg[f.key] ?? '';
           ta.addEventListener('input', async () => {
             currentConfig = this._shapeBySchema(type, {...currentConfig, [f.key]: ta.value || ''});
-            await mountPreview(currentConfig);
+            mountPreview(currentConfig);
             yamlEditorApi?.setValue(currentConfig);
           });
           row.append(label, ta);
@@ -2158,19 +3053,25 @@ _syncEmptyStateUI() {
       quickFill.appendChild(fieldWrap);
     };
 
-    const mountPreview = async (cfg) => {
-      const seq = ++pickSeq;
-      previewSpin.hidden = false;
-      cardHost.innerHTML = '';
-      await raf();
-      try {
-        const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-        if (seq !== pickSeq) return;
-        const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
-        if (seq !== pickSeq) return;
-        cardHost.appendChild(temp);
-      } catch {}
-      finally { if (seq === pickSeq) previewSpin.hidden = true; }
+    const mountPreview = (cfg) => {
+      const cfgJSON = JSON.stringify(cfg || {});
+      if (cfgJSON === __lastPreviewCfgJSON) return; // same config, skip
+      __lastPreviewCfgJSON = cfgJSON;
+      if (__previewTimer) clearTimeout(__previewTimer);
+      __previewTimer = setTimeout(async () => {
+        const seq = ++pickSeq;
+        previewSpin.hidden = false;
+        cardHost.innerHTML = '';
+        await raf();
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          if (seq !== pickSeq) return;
+          const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+          if (seq !== pickSeq) return;
+          cardHost.appendChild(temp);
+        } catch {}
+        finally { if (seq === pickSeq) previewSpin.hidden = true; }
+      }, 150); // 150–250ms is a sweet spot
     };
 
     const mountVisualEditor = async (cfg) => {
@@ -2181,13 +3082,24 @@ _syncEmptyStateUI() {
       if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
     
       // Try to get a UI editor for *any* card type (core or custom)
-      let editor = await this._getEditorElementForType(cfg.type || currentType, cfg);
-    
+      const wantType = cfg.type || currentType;
+      let editor = await this._getEditorElementForType(wantType, cfg);
+
+      // If not available yet, warm the card module and retry a few times
+      if (!editor) {
+        await this._ensureCardModuleLoaded(wantType, cfg);
+        for (const delay of [0, 120, 250, 500, 900, 2000, 4000]) {
+          if (delay) await new Promise(r => setTimeout(r, delay));
+          editor = await this._getEditorElementForType(wantType, cfg);
+          if (editor) break;
+        }
+      }
+
       if (!editor) {
         // No UI editor → show YAML (unless user explicitly selected Visual)
         const p = document.createElement('div');
         p.style.opacity = '.7'; p.style.fontSize = '.9rem';
-        p.textContent = 'This card has no visual editor. Use the YAML editor tab.';
+        p.textContent = 'This card does not support a visual editor. Please use the YAML tab to configure it.';
         if (seq === pickSeq) {
           editorHost.appendChild(p);
           editorSpin.hidden = true;
@@ -2196,12 +3108,28 @@ _syncEmptyStateUI() {
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
-      }
+}
     
       try {
         editor.hass = this.hass;
         if (!editor.isConnected) editorHost.appendChild(editor);
-    
+
+        // small yield before setConfig to help late-attaching internals
+        await Promise.resolve();
+        try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
+
+        // Try official getStubConfig once (may load modules) to improve defaults
+        try {
+          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+          const CardClass = helpers.getCardElementClass ? await helpers.getCardElementClass(cfg.type || currentType) : null;
+          if (CardClass?.getStubConfig) {
+            const all = Object.keys(this.hass?.states || {});
+            const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+            const better = await CardClass.getStubConfig(this.hass, all, byDomain);
+            if (better) cfg = this._shapeBySchema(cfg.type || currentType, { ...better });
+          }
+        } catch {}
+
         // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
         try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
@@ -2222,7 +3150,7 @@ _syncEmptyStateUI() {
           setError('');
           enableCommit(true);
           buildQuickFill(currentType, currentConfig);
-          await mountPreview(currentConfig);
+          mountPreview(currentConfig);
           yamlEditorApi?.setValue(currentConfig);
         };
     
@@ -2261,12 +3189,16 @@ _syncEmptyStateUI() {
     
             if (typeChanged) {
               buildQuickFill(currentType, currentConfig);
-              const hasUI = await mountVisualEditor(currentConfig);
-              if (hasUI && __activeTab !== 'yaml') showTab('visual');
+              // Only update Visual if it’s already mounted
+              if (visualEditor) {
+                try { visualEditor.setConfig?.(currentConfig); } catch {}
+                if (__activeTab !== 'yaml') showTab('visual');
+              }
             } else {
               try { visualEditor?.setConfig?.(currentConfig); } catch {}
-              await mountPreview(currentConfig);
+              mountPreview(currentConfig);
             }
+
           } catch (e) {
             yamlErr.hidden = false;
             yamlErr.textContent = `Invalid config: ${String(e?.message || e)}`;
@@ -2284,16 +3216,8 @@ _syncEmptyStateUI() {
 
     const getStub = async (type) => {
       if (this.__stubCache.has(type)) return { ...this.__stubCache.get(type) };
-      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-      let CardClass = null;
-      try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
-      let cfg;
-      const all = Object.keys(this.hass?.states || {});
-      const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
-      if (CardClass?.getStubConfig) {
-        try { cfg = await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
-      }
-      if (!cfg) cfg = await this._getStubConfigForType(type);
+      // Fast local stub first (no heavy module loads)
+      let cfg = await this._getStubConfigForType(type);
       this.__stubCache.set(type, { ...cfg });
       return { ...cfg };
     };
@@ -2302,19 +3226,31 @@ _syncEmptyStateUI() {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
+      // Update the selected-card headline and favorite star when a new card is chosen
+      try {
+        if (typeof updateHeader === 'function') updateHeader(type);
+      } catch {
+        // ignore if updateHeader is undefined or throws
+      }
     
       const cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
         ? { ...initialCfg }
         : await getStub(type);
     
       currentConfig = this._shapeBySchema(type, cfg);
+
+      // Reset any previously mounted visual editor so the correct one loads for this card
+      visualEditor = null;
+
       buildQuickFill(type, currentConfig);
       await mountYaml(currentConfig);
       await raf();
-      await mountPreview(currentConfig);
-      const hasUI = await mountVisualEditor(currentConfig);
-      showTab(hasUI ? 'visual' : 'yaml');
+      mountPreview(currentConfig); // debounced version
+
+      // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
+      showTab('yaml');
       enableCommit(true);
+
     };
     const commit = async () => {
       if (!currentConfig) return;
@@ -2334,10 +3270,24 @@ _syncEmptyStateUI() {
     addBottom.addEventListener('click', commit);
     modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !addTop.disabled) commit(); });
 
-    search.addEventListener('input', renderLeft);
-    customType.addEventListener('input', renderLeft);
+    let __searchTimer = null;
+    search.addEventListener('input', () => {
+      if (__searchTimer) clearTimeout(__searchTimer);
+      __searchTimer = setTimeout(renderLeft, 120);
+    });
+
 
     renderLeft();
+    // --- Ensure something is selected so YAML/preview mount immediately ---
+    const pickDefaultType = () => {
+      // Prefer recent if present; otherwise fall back to 'entities'
+      const r = this._getRecent?.() || [];
+      const firstRecent = r.find(Boolean);
+      return firstRecent || 'entities';
+    };
+
+    await selectType(pickDefaultType());
+    enableCommit(true);
 
     // default selection
     if (mode === 'edit' && initialCfg) {
@@ -2347,9 +3297,16 @@ _syncEmptyStateUI() {
   }
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
-  async _getStubConfigForType(type) {
+async _getStubConfigForType(type) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     let CardClass = null;
+
+    // Provide a blank stub when the user selects the "Custom Card" entry.
+    // A blank type lets the YAML editor drive the configuration entirely.
+    if (type === 'custom_card') {
+      return { type: 'custom_card' };
+    }
+
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
     const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
@@ -2360,8 +3317,9 @@ _syncEmptyStateUI() {
     const first = all[0];
     const firstSensor = byDomain('sensor')[0] || first;
 
-    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast'].includes(type)) {
-      base.entity = ({
+    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast','map'].includes(type)) {
+      // Provide sensible defaults for cards that require an `entity` field.
+      const defaultEntity = ({
         'sensor': firstSensor,
         'gauge':  (byDomain('sensor').find(this._isNumericEntity.bind(this)) || firstSensor),
         'media-control': byDomain('media_player')[0] || first,
@@ -2369,16 +3327,79 @@ _syncEmptyStateUI() {
         'thermostat': byDomain('climate')[0] || first,
         'alarm-panel': byDomain('alarm_control_panel')[0] || first,
         'weather-forecast': byDomain('weather')[0] || first,
+        'map': byDomain('device_tracker')[0] || byDomain('person')[0] || first,
       })[type] || firstSensor || first;
+      if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity'].includes(type)) {
+        base.entity = defaultEntity;
+      } else if (type === 'weather-forecast') {
+        base.entity = defaultEntity;
+        base.show_current = true;
+        base.show_forecast = true;
+        base.forecast_type = 'daily';
+      } else if (type === 'map') {
+        base.entities = [defaultEntity].filter(Boolean);
+        base.theme_mode = 'auto';
+      }
     }
-    if (['entities','glance','picture-glance','history-graph','statistics-graph','map'].includes(type)) {
+    if (['entities','glance','picture-glance','history-graph','statistics-graph'].includes(type)) {
       const pick = (domains) => (domains?.length ? all.filter(e => domains.includes(e.split('.')[0])) : all).slice(0,3);
-      if (type === 'map')        base.entities = pick(['device_tracker','person']);
-      else if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
+      if (type === 'statistics-graph') base.entities = pick(['sensor','number','input_number']);
       else base.entities = pick();
     }
-    if (type === 'iframe') base.url = 'https://www.home-assistant.io';
-    if (type === 'markdown') base.content = '## New card';
+    if (type === 'markdown') {
+      // Provide a minimal content so the card does not error
+      base.content = 'Markdown card';
+    }
+    if (type === 'sensor') {
+      base.graph = 'line';
+    }
+    if (type === 'button') {
+      base.show_name = true;
+      base.show_icon = true;
+    }
+    if (type === 'tile') {
+      base.features_position = 'bottom';
+      base.vertical = false;
+    }
+    if (type === 'picture-glance') {
+      base.title = base.title || 'Glance';
+      // Provide placeholder image if none available
+      base.image = base.image || 'https://demo.home-assistant.io/stub_config/kitchen.png';
+    }
+    if (type === 'picture-entity') {
+      base.image = base.image || 'https://demo.home-assistant.io/stub_config/bedroom.png';
+    }
+    if (type === 'iframe') {
+      base.url = base.url || 'https://www.home-assistant.io';
+      base.aspect_ratio = base.aspect_ratio || '50%';
+    }
+    if (type === 'history-graph') {
+      // Entities already set; nothing extra
+    }
+    if (type === 'statistics-graph') {
+      // Entities already set; nothing extra
+    }
+    if (type === 'alarm-panel') {
+      base.states = base.states || ['arm_home','arm_away'];
+    }
+    if (type === 'area') {
+      // pick first area from hass.areas if available; else use the first area name from states (area). This is a guess.
+      try {
+        const areas = (this.hass && this.hass.areas) ? Object.values(this.hass.areas) : [];
+        if (areas.length) {
+          base.area = areas[0].area_id || areas[0].name || areas[0].id;
+        } else {
+          // fallback: pick the domain of the first entity as area name
+          base.area = first ? first.split('.')[0] : 'default_area';
+        }
+        // Add optional defaults similar to built-in card example
+        base.display_type = 'picture';
+        base.alert_classes = base.alert_classes || ['moisture','motion'];
+        base.sensor_classes = base.sensor_classes || ['temperature','humidity'];
+        base.features_position = 'bottom';
+      } catch {}
+    }
+    // Note: area card and other complex cards are not given defaults here
     return base;
   }
 
@@ -2410,7 +3431,9 @@ _syncEmptyStateUI() {
     wrap.style.height = `${10*this.gridSize}px`;
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
-    this._initCardInteract(wrap);
+    
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
@@ -2533,7 +3556,7 @@ _syncEmptyStateUI() {
 
     const close = () => modal.remove();
     modal.querySelector('#closeDiag').addEventListener('click', close);
-    this.appendChild(modal);
+    this.shadowRoot.appendChild(modal);
 
     const refreshLogs = () => {
       const logArea = modal.querySelector('#logArea');
@@ -2605,7 +3628,9 @@ _syncEmptyStateUI() {
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
-                this._initCardInteract(wrap);
+                
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -2672,10 +3697,23 @@ _syncEmptyStateUI() {
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
+    // If storage_key changed, push it into HA editor immediately
+    if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
+      try {
+        const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: updated },
+            bubbles: true,
+            composed: true,
+          }));
+      } catch {}
+    }
+
     // keep the original config around, but merge options into live props
     this._config = { ...(this._config || {}), ...opts };
 
     if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
+    this._syncEditorsStorageKey();
     if ('grid' in opts)               this.gridSize = Number(opts.grid) || 10;
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
@@ -2741,6 +3779,24 @@ _syncEmptyStateUI() {
         // Apply options (if present) before building cards
         if (json.options) this._applyImportedOptions(json.options, true);
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
+
+        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        if (json?.options?.storage_key) {
+          const newKey = json.options.storage_key;
+          this._config = { ...(this._config || {}), storage_key: newKey };
+          this.storageKey = newKey;
+          this._syncEditorsStorageKey();
+          try {
+            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            this.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: updated },
+              bubbles: true,
+              composed: true,
+            }));
+          } catch {}
+        }
+ // v1 fallback     
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
@@ -2755,7 +3811,9 @@ _syncEmptyStateUI() {
               wrap.style.height = `${conf.size?.height||100}px`;
               if (conf.z != null) wrap.style.zIndex = String(conf.z);
               this.cardContainer.appendChild(wrap);
-              this._initCardInteract(wrap);
+              
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
             }
           }
         } else {
@@ -2775,7 +3833,12 @@ _syncEmptyStateUI() {
 
   /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
+    // only queue save when autosave is enabled, not loading, and in edit mode
     if (!this.autoSave) return;
+    // skip saving while the layout is still loading
+    if (this._loading) return;
+    // respect the user expectation that saving should only happen in edit mode
+    if (!this.editMode) return;
     this._dbgPush('autosave', 'Queued', { reason, debounce: this.autoSaveDebounce });
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce);
@@ -2906,4 +3969,107 @@ if (!customElements.get('drag-and-drop-card')) {
       });
     }
   } catch (e) { /* no-op */ }
+})();
+
+
+/* ==========================================================================
+   Integrated card-mod compatibility enhancements
+   - Ensures card-mod styles apply to nested cards inside drag-and-drop-card
+   - No extra resource needed; executed as part of this script
+   - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
+   ========================================================================== */
+(() => {
+  const SEEN = new WeakSet();
+
+  const isLikelyCard = (el) => {
+    try {
+      if (!(el instanceof Element)) return false;
+      const n = el.localName || "";
+      if (!n) return false;
+      if (n === "ha-card") return true;
+      if (n.endsWith("-card")) return true; // hui-*, custom:*, mushroom-*, etc.
+      return false;
+    } catch { return false; }
+  };
+
+  const rebuildOnce = (el) => {
+    try {
+      if (!el || SEEN.has(el)) return;
+      SEEN.add(el);
+      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+    } catch {}
+  };
+
+  const deepScan = (root) => {
+    try {
+      if (!root) return;
+      if (root instanceof Element && isLikelyCard(root)) rebuildOnce(root);
+      const all = (root instanceof ShadowRoot ? root : root).querySelectorAll?.("*");
+      if (!all) return;
+      for (const el of all) {
+        if (isLikelyCard(el)) rebuildOnce(el);
+        const sr = el.shadowRoot;
+        if (sr) { try { deepScan(sr); } catch {} }
+      }
+    } catch {}
+  };
+
+  const installOnInstance = (host) => {
+    try {
+      if (!host || host.__ddcCardModIntegrated) return;
+      host.__ddcCardModIntegrated = true;
+      const root = host.shadowRoot || host;
+
+      // Initial scan (covers already rendered children)
+      deepScan(root);
+
+      // Observe newly added content within the card
+      const mo = new MutationObserver((muts) => {
+        for (const m of muts) {
+          if (!m.addedNodes || !m.addedNodes.length) continue;
+          for (const n of m.addedNodes) {
+            if (n instanceof Element || n instanceof ShadowRoot) {
+              deepScan(n);
+            }
+          }
+        }
+      });
+      mo.observe(root, { childList: true, subtree: true });
+      host.__ddcCardModIntegratedObserver = mo;
+
+      // Follow-up scans for lazy renders
+      setTimeout(() => { try { deepScan(root); } catch {} }, 250);
+      setTimeout(() => { try { deepScan(root); } catch {} }, 1000);
+    } catch {}
+  };
+
+  const hookExisting = () => {
+    try {
+      document.querySelectorAll("drag-and-drop-card").forEach(installOnInstance);
+    } catch {}
+  };
+
+  if (window.customElements && window.customElements.whenDefined) {
+    window.customElements.whenDefined("drag-and-drop-card").then(() => {
+      // Install on existing instances
+      hookExisting();
+      // Patch prototype to auto-install on future instances
+      const ctor = window.customElements.get("drag-and-drop-card");
+      if (ctor && ctor.prototype) {
+        const origConnected = ctor.prototype.connectedCallback;
+        ctor.prototype.connectedCallback = function() {
+          try { origConnected && origConnected.call(this); } finally {
+            installOnInstance(this);
+          }
+        };
+      }
+      // As a fallback, watch the DOM for new instances
+      const docObserver = new MutationObserver(() => hookExisting());
+      docObserver.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  } else {
+    // Very old environment: periodic best-effort scan
+    const iv = setInterval(hookExisting, 1000);
+    setTimeout(() => clearInterval(iv), 10000);
+  }
 })();
