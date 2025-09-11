@@ -561,7 +561,7 @@ _applyGridVars() {
             background:var(--ddc-card-bg, var(--card-background-color));
             cursor:grab;
             /* ensure buttons and resize handles remain visible on very small cards */
-            overflow:scroll;
+            overflow:auto;
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
@@ -673,24 +673,21 @@ _applyGridVars() {
           .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
 
           .resize-handle{
-            display:none;
+            display:flex;                 /* shown in edit mode via your existing rule */
             position:absolute;
-            /* Position the handle outside the card so it’s always visible and clickable,
-               even when the card is tiny or collapsed. */
-            bottom:-14px;
-            right:-14px;
-            width:30px;
-            height:30px;
+            bottom:8px;                   /* move INSIDE the wrapper bounds */
+            right:8px;                    /* so it can't be clipped by overflow */
+            width:28px;
+            height:28px;
             border-radius:50%;
             background:var(--primary-color);
             color:#fff;
             border:1px solid rgba(255,255,255,.25);
             cursor:se-resize;
-            z-index:50; /* keep it above other card elements */
+            z-index:999;                  /* above the card content */
             box-shadow:0 3px 8px rgba(0,0,0,.28);
             align-items:center;
             justify-content:center;
-            transition:transform .1s, box-shadow .1s, background .12s;
           }
           .resize-handle:hover{transform:scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.35)}
           .card-wrapper.editing .resize-handle{display:flex}
