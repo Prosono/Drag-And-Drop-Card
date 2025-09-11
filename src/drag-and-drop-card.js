@@ -3919,27 +3919,18 @@ this._initCardInteract(wrap);
       try {
         const json = JSON.parse(txt);
 
-        const inHaEditor = this._isInHaEditorPreview?.() === true;
-        const importedKey = json?.options?.storage_key || null;
-        const prevKey = this.storageKey || this._config?.storage_key || null;
-
-        // 1) Apply imported options (grid, etc.) before building cards
-        if (json.options) this._applyImportedOptions(json.options, true);
-        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
-
-        // 2) Storage key strategy:
-        //    - In HA editor preview: adopt imported key and push it into the editor's draft so Save will persist it.
-        //    - Outside HA editor (DDC edit mode): DO NOT switch keys; overwrite the current key so it sticks.
-        if (importedKey && inHaEditor) {
-          this._config = { ...(this._config || {}), storage_key: importedKey };
-          this.storageKey = importedKey;
-          this._syncEditorsStorageKey?.();
-          // Push into the editor's draft so HA's Save persists the new key
-          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-          try { this._syncIntoHaEditor?.(updated); } catch {}
+        // IMPORTANT: Do NOT adopt storage_key from the file.
+        // We keep this.storageKey as-is and overwrite that key’s layout.
+        // Apply only safe visual/options (grid, etc.), but skip storage_key.
+        if (json.options) {
+          const { storage_key, ...safeOpts } = json.options || {};
+          this._applyImportedOptions(safeOpts, true);
+        } else if (typeof json.grid === 'number') {
+          // v1 fallback
+          this._applyImportedOptions({ grid: json.grid }, true);
         }
 
-        // 3) Rebuild the layout from the imported cards
+        // Rebuild the canvas from imported cards
         this.cardContainer.innerHTML = '';
         if (Array.isArray(json.cards) && json.cards.length) {
           for (const conf of json.cards) {
@@ -3951,6 +3942,7 @@ this._initCardInteract(wrap);
                 conf.size?.height || 100
               );
               this.cardContainer.appendChild(p);
+              try { this._rebuildOnce(p.firstElementChild); } catch {}
             } else {
               const el = await this._createCard(conf.card);
               const wrap = this._makeWrapper(el);
@@ -3967,44 +3959,16 @@ this._initCardInteract(wrap);
           this._showEmptyPlaceholder();
         }
 
-        // 4) Persist under the *current* (effective) key
+        // Persist OVER the existing storage key
         this._resizeContainer();
         await this._saveLayout(false);
 
-        // 4b) Safety net: if we adopted a new key in HA editor, also save a copy under the previous key
-        if (inHaEditor && importedKey && prevKey && prevKey !== this.storageKey) {
-          try {
-            const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
-            const saved = wraps.map((w) => {
-              const x = parseFloat(w.getAttribute('data-x')) || 0;
-              const y = parseFloat(w.getAttribute('data-y')) || 0;
-              const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
-              const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
-              const z = parseInt(w.style.zIndex || '1', 10);
-              const cardCfg = this._extractCardConfig(w.firstElementChild);
-              return { card: cardCfg, position: { x, y }, size: { width, height }, z };
-            });
-            const payload = { version: 2, options: this._exportableOptions(), cards: saved };
-            localStorage.setItem(`ddc_local_${prevKey}`, JSON.stringify(payload));
-          } catch {}
-        }
-
-        // 5) UX: notify & badge + broadcast to other instances
+        // UX sugar
         this._toast('Design imported.');
         this._showImportBadge?.('Imported');
         window.dispatchEvent(new CustomEvent('ddc-import-applied', {
           detail: { storage_key: this.storageKey }
         }));
-
-        // 6) If we're in the editor but couldn't reach the custom editor (YAML mode), hint the user
-        if (inHaEditor && importedKey) {
-          const couldSync = (() => {
-            try { return !!this._deepQueryAll?.('drag-and-drop-card-editor')?.length; } catch { return false; }
-          })();
-          if (!couldSync) {
-            this._toast?.('Imported — update storage_key in the editor and Save to persist.');
-          }
-        }
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -4012,6 +3976,7 @@ this._initCardInteract(wrap);
     };
     inp.click();
   }
+
   
 
   /* ----------------------------- Save / load ----------------------------- */
