@@ -198,11 +198,51 @@ class DragAndDropCard extends HTMLElement {
       </div>
 
       <!-- Actions -->
-      <div class="cfg-row" style="justify-content:flex-end">
+      <div class="apply-bar hidden" id="applyBar">
+        <div class="apply-hint" id="applyHint">
+          <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+          <span>Changes pending — click <b>Apply</b> to update this card</span>
+        </div>
         <mwc-button id="revertBtn" outlined>Revert</mwc-button>
-        <mwc-button id="applyBtn" raised disabled>Apply</mwc-button>
+        <mwc-button id="applyBtn" class="apply-emphasis" raised>Apply</mwc-button>
       </div>
+
+      <style>
+        .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
+        input[type="text"],input[type="number"],select{
+          padding:6px;border-radius:8px;border:1px solid var(--divider-color);
+          background:var(--primary-background-color);color:var(--primary-text-color)
+        }
+        label{font-weight:600;min-width:130px}
+        .inline{display:inline-flex;gap:8px;align-items:center}
+        .hint{opacity:.65;font-size:.85rem}
+
+        /* NEW: sticky apply bar */
+        .apply-bar{
+          position: sticky; bottom: 0;
+          display:flex; gap:8px; align-items:center; justify-content:flex-end;
+          padding:10px; margin-top:12px;
+          background: var(--card-background-color);
+          border-top: 1px solid var(--divider-color);
+          box-shadow: 0 -2px 6px rgba(0,0,0,.06);
+          z-index: 2;
+        }
+        .hidden{ display:none }
+        .apply-hint{
+          margin-right:auto; display:flex; align-items:center; gap:8px;
+          color: var(--warning-color, #b15d00);
+          background: color-mix(in oklab, var(--warning-color) 12%, transparent);
+          border: 1px solid color-mix(in oklab, var(--warning-color) 35%, transparent);
+          border-radius:10px; padding:8px 10px; font-size:.92rem;
+        }
+        .apply-hint ha-icon{ --mdc-icon-size:20px; }
+        /* Gentle pulse to draw attention */
+        .apply-emphasis { animation: ddc-apply-pulse 1.4s ease-in-out infinite; }
+        @keyframes ddc-apply-pulse { 0%{transform:scale(1)} 50%{transform:scale(1.03)} 100%{transform:scale(1)} }
+      </style>
+      
     `;
+
 
     // Presets into #sizePreset
     const og = document.createElement('optgroup');
@@ -272,16 +312,40 @@ class DragAndDropCard extends HTMLElement {
     };
 
     // Dirty / Apply handling
-    const applyBtn = el.querySelector('#applyBtn');
+    const applyBar  = el.querySelector('#applyBar');
+    const applyBtn  = el.querySelector('#applyBtn');
     const revertBtn = el.querySelector('#revertBtn');
 
     const isDirty = () => {
       try { return JSON.stringify(el.getConfig()) !== JSON.stringify(el._config); }
       catch { return true; }
     };
+
     const updateButtons = () => {
-      if (applyBtn) applyBtn.disabled = !isDirty();
+      const dirty = isDirty();
+      applyBtn.disabled = !dirty;
+      applyBar.classList.toggle('hidden', !dirty);
     };
+
+    // Keep your on(...) wiring, but DO NOT dispatch config-changed on input.
+    // Just call updateButtons() on any input/change:
+    const on = (sel, ev = 'input') =>
+      el.querySelector(sel)?.addEventListener(ev, () => {
+        if (sel === '#sizeMode') toggleSizeControls();
+        updateButtons();
+      });
+
+    // Apply / Revert behavior (make sure events bubble+compose):
+    applyBtn?.addEventListener('click', () => {
+      el.dispatchEvent(new CustomEvent('config-changed', {
+        detail: { config: el.getConfig() }, bubbles: true, composed: true
+      }));
+      el._config = el.getConfig(); // baseline now matches
+      updateButtons();
+    });
+
+    revertBtn?.addEventListener('click', () => el.setConfig(el._config));
+
 
     const fire = () => {
       el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
@@ -289,12 +353,6 @@ class DragAndDropCard extends HTMLElement {
       el._config = el.getConfig();
       updateButtons();
     };
-
-    const on = (sel, ev = 'input') =>
-      el.querySelector(sel)?.addEventListener(ev, () => {
-        if (sel === '#sizeMode') toggleSizeControls();
-        updateButtons(); // <- no immediate fire while typing
-      });
 
     // Listeners (no per-keystroke fire)
     on('#storage_key'); on('#grid');
@@ -1209,13 +1267,31 @@ _applyGridVars() {
     const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
     wraps.forEach((w) => {
       w.classList.toggle('editing', this.editMode);
+
+      // Always enforce handle visibility explicitly
       const handle = w.querySelector('.resize-handle');
       if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
+
+      // Proper InteractJS enable/disable
       if (!w.dataset.placeholder && window.interact) {
-        window.interact(w).draggable(this.editMode).resizable(this.editMode);
+        const it = window.interact(w);
+        it.draggable({ enabled: this.editMode });
+        it.resizable({
+          enabled: this.editMode,
+          // edges already configured in _initCardInteract; re-state for safety
+          edges: { right: '.resize-handle', bottom: '.resize-handle' }
+        });
       }
+
       w.style.touchAction = this.editMode ? 'none' : 'auto';
     });
+
+    // Fallback: hide any stray handles (e.g., wrappers added late)
+    try {
+      (this.shadowRoot || this).querySelectorAll('.resize-handle')
+        .forEach(h => h.style.display = this.editMode ? 'flex' : 'none');
+    } catch {}
+    
     if (!this.editMode) this._clearSelection();
 
     if (!this.editMode) {
@@ -3648,8 +3724,8 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+                try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+                this._initCardInteract(wrap);
               }
             }
           } else {
