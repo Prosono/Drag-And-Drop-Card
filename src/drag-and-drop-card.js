@@ -435,63 +435,29 @@ _resolveFixedSize() {
     return true;
   }
 
-_applyContainerSizingFromConfig(initial=false) {
-  // set container size according to mode
-  const c = this.cardContainer; if (!c) return;
+  _applyContainerSizingFromConfig(initial=false) {
+    // set container size according to mode
+    const c = this.cardContainer; if (!c) return;
 
-  if (this._isContainerFixed()) {
-    const { w, h } = this._resolveFixedSize();
-    c.style.width  = `${w}px`;
-    c.style.height = `${h}px`;
-    // ensure overflow hidden (hard lock)
-    c.style.overflow = 'hidden';
-    if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
-    // pull any existing cards back inside
-    this._clampAllCardsInside();
-  } else {
-    // dynamic — let _resizeContainer compute; clear inline to allow growth/shrink
-    c.style.overflow = 'hidden';
-    // keep width/height managed by _resizeContainer
-    if (!initial) this._dbgPush?.('size', 'Applied dynamic size');
-    this._resizeContainer();
-  }
-}
-
-  // Walk the stored Lovelace config and return every DDC card with its JSON path.
-  _scanDdcCards(llConfig) {
-    const hits = []; // { path: string[], view: number, card: object }
-    const push = (view, path, obj) => {
-      if (obj?.type === 'custom:drag-and-drop-card') {
-        hits.push({ view, path: [...path], card: obj });
-      }
-    };
-
-    const visit = (node, viewIdx, path) => {
-      if (!node) return;
-      if (Array.isArray(node)) {
-        node.forEach((n, i) => visit(n, viewIdx, path.concat(i)));
-        return;
-      }
-      if (typeof node !== 'object') return;
-
-      if ('type' in node) push(viewIdx, path, node);
-
-      for (const [k, v] of Object.entries(node)) {
-        if (k === 'views' && Array.isArray(v)) {
-          v.forEach((vv, i) => visit(vv, i, ['views', i]));
-        } else if (Array.isArray(v)) {
-          visit(v, viewIdx, path.concat(k));
-        } else if (v && typeof v === 'object') {
-          visit(v, viewIdx, path.concat(k));
-        }
-      }
-    };
-
-    visit(llConfig, -1, []);
-    return hits;
+    if (this._isContainerFixed()) {
+      const { w, h } = this._resolveFixedSize();
+      c.style.width  = `${w}px`;
+      c.style.height = `${h}px`;
+      // ensure overflow hidden (hard lock)
+      c.style.overflow = 'hidden';
+      if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
+      // pull any existing cards back inside
+      this._clampAllCardsInside();
+    } else {
+      // dynamic — let _resizeContainer compute; clear inline to allow growth/shrink
+      c.style.overflow = 'hidden';
+      // keep width/height managed by _resizeContainer
+      if (!initial) this._dbgPush?.('size', 'Applied dynamic size');
+      this._resizeContainer();
+    }
   }
 
-  // Robust lovelace getter (works across shadow roots/versions)
+  // --- robust lovelace getter (works across HA versions) ---
   _getLovelace() {
     let hop = 0, host = this;
     while (host && hop++ < 20) {
@@ -513,8 +479,31 @@ _applyContainerSizingFromConfig(initial=false) {
     return undefined;
   }
 
-  // Persist imported options into the stored dashboard YAML
-  async _persistOptionsToYaml(opts) {
+  // --- scan all DDCs inside stored dashboard, with paths (for logging + targeting) ---
+  _scanDdcCards(cfg) {
+    const hits = []; // { view:number, path:string[], card:object }
+    const push = (view, path, obj) => {
+      if (obj?.type === 'custom:drag-and-drop-card') hits.push({ view, path: [...path], card: obj });
+    };
+    const visit = (node, viewIdx, path) => {
+      if (!node) return;
+      if (Array.isArray(node)) { node.forEach((n, i) => visit(n, viewIdx, path.concat(i))); return; }
+      if (typeof node !== 'object') return;
+
+      if ('type' in node) push(viewIdx, path, node);
+
+      for (const [k, v] of Object.entries(node)) {
+        if (k === 'views' && Array.isArray(v)) v.forEach((vv, i) => visit(vv, i, ['views', i]));
+        else if (Array.isArray(v)) visit(v, viewIdx, path.concat(k));
+        else if (v && typeof v === 'object') visit(v, viewIdx, path.concat(k));
+      }
+    };
+    visit(cfg, -1, []);
+    return hits;
+  }
+
+  // --- persist imported options into stored YAML; fallback patches current-view DDCs ---
+  async _persistOptionsToYaml(opts, { forcePatchCurrentView = true } = {}) {
     const ll = this._getLovelace();
     if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
     if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
@@ -523,43 +512,40 @@ _applyContainerSizingFromConfig(initial=false) {
     const cfg = JSON.parse(JSON.stringify(ll.config));
     const hits = this._scanDdcCards(cfg);
 
-    console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({
-      view: h.view,
-      path: h.path.join('.'),
-      storage_key: h.card.storage_key || null
-    })));
+    console.debug('[ddc:import] persist: found DDC cards',
+      hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
 
-    // choose targets
+    // choose targets: exact key match -> (fallback) all in current view -> (last) single DDC in dashboard
+    const curView = ll.current_view ?? 0;
     let targets = hits.filter(h => key && h.card.storage_key === key);
-    if (!targets.length) {
-      const cur = ll.current_view ?? 0;
-      const inCur = hits.filter(h => h.view === cur);
-      if (inCur.length === 1) targets = inCur;
+
+    if (!targets.length && forcePatchCurrentView) {
+      const inCur = hits.filter(h => h.view === curView);
+      if (inCur.length) targets = inCur; // patch all DDCs in the current view
     }
     if (!targets.length && hits.length === 1) targets = hits;
 
     if (!targets.length) {
-      console.debug('[ddc:import] persist: no unique target. Give this card a unique storage_key and try again.', { key });
+      console.debug('[ddc:import] persist: no target. Hint: set a unique storage_key on this card and import again.', { key });
       return false;
     }
 
-    // build patch and apply
+    // ensure storage_key goes in the patch so future imports match exactly
     const patch = { type: 'custom:drag-and-drop-card', ...opts };
+    if (key && !patch.storage_key) patch.storage_key = key;
+
+    // apply patch at each target path
     for (const t of targets) {
-      // navigate by path and mutate in place
       let ref = cfg;
       for (const seg of t.path) ref = ref[seg];
       Object.assign(ref, patch);
     }
 
-    console.debug('[ddc:import] persist → saving', {
-      patched: targets.length,
-      key,
-      patch
-    });
+    console.debug('[ddc:import] persist → saving', { patched: targets.length, key: key || null, patch });
     await ll.saveConfig(cfg);
     return true;
   }
+
 
 
 _getContainerSize() {
@@ -4100,7 +4086,7 @@ this._initCardInteract(wrap);
       } catch (e) {
         console.warn('[ddc:import] YAML persist failed:', e);
       }
-      
+
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
