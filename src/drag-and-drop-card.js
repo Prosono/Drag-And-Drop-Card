@@ -355,198 +355,27 @@ _resolveFixedSize() {
   return null;
 }
 
-  // Persist the imported options into Lovelace's stored YAML for THIS card
-  async _persistOptionsToYaml(opts) {
-    const keys = [
-      'storage_key','grid','container_background','card_background',
-      'disable_overlap','drag_live_snap','auto_save','auto_save_debounce',
-      'debug','container_size_mode','container_preset_orientation',
-      'container_fixed_width','container_fixed_height','container_preset'
-    ];
+_applyContainerSizingFromConfig(initial=false) {
+  // set container size according to mode
+  const c = this.cardContainer; if (!c) return;
 
-    // Grab Lovelace object
-    const root = document
-      .querySelector('home-assistant')?.shadowRoot
-      ?.querySelector('home-assistant-main')?.shadowRoot
-      ?.querySelector('app-drawer-layout partial-panel-resolver ha-panel-lovelace')?.shadowRoot
-      ?.querySelector('hui-root');
-    const ll = root?.lovelace;
-
-    if (!ll?.config || !ll.saveConfig) {
-      console.debug('[ddc:import] YAML persist skipped (no Lovelace save API)');
-      return false;
-    }
-
-    const viewIndex = ll.current_view ?? 0;
-    const view = ll.config.views?.[viewIndex];
-    if (!view) return false;
-
-    const patch = {};
-    for (const k of keys) if (k in opts) patch[k] = opts[k];
-    patch.type = 'custom:drag-and-drop-card';
-    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
-
-    // Try to find this card in the current view (top-level first)
-    const isMe = (c) =>
-      c?.type === 'custom:drag-and-drop-card' &&
-      (!patch.storage_key || c.storage_key === patch.storage_key);
-
-    let idx = (view.cards || []).findIndex(isMe);
-
-    // Fallback: shallow search inside stack cards (common containers)
-    if (idx === -1 && Array.isArray(view.cards)) {
-      for (let i = 0; i < view.cards.length; i++) {
-        const c = view.cards[i];
-        for (const bucket of ['cards', 'elements', 'sections']) {
-          if (Array.isArray(c?.[bucket])) {
-            const j = c[bucket].findIndex(isMe);
-            if (j !== -1) {
-              // clone config immutably and save inside the stack
-              const newLL = { ...ll.config };
-              newLL.views = [...newLL.views];
-              const newView = { ...view, cards: [...view.cards] };
-              const stack = { ...newView.cards[i], [bucket]: [...c[bucket]] };
-              stack[bucket][j] = { ...stack[bucket][j], ...patch };
-              newView.cards[i] = stack;
-              newLL.views[viewIndex] = newView;
-              console.debug('[ddc:import] YAML persist (stack) → saving', { viewIndex, i, j, patch });
-              await ll.saveConfig(newLL);
-              return true;
-            }
-          }
-        }
-      }
-    }
-
-    if (idx === -1) {
-      console.debug('[ddc:import] YAML persist: card not found in current view');
-      return false;
-    }
-
-    // Persist at top level
-    const newLL = { ...ll.config };
-    newLL.views = [...newLL.views];
-    const newView = { ...view, cards: [...(view.cards || [])] };
-    newView.cards[idx] = { ...newView.cards[idx], ...patch };
-    newLL.views[viewIndex] = newView;
-
-    console.debug('[ddc:import] YAML persist → saving', { viewIndex, idx, patch });
-    await ll.saveConfig(newLL);
-    return true;
+  if (this._isContainerFixed()) {
+    const { w, h } = this._resolveFixedSize();
+    c.style.width  = `${w}px`;
+    c.style.height = `${h}px`;
+    // ensure overflow hidden (hard lock)
+    c.style.overflow = 'hidden';
+    if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
+    // pull any existing cards back inside
+    this._clampAllCardsInside();
+  } else {
+    // dynamic — let _resizeContainer compute; clear inline to allow growth/shrink
+    c.style.overflow = 'hidden';
+    // keep width/height managed by _resizeContainer
+    if (!initial) this._dbgPush?.('size', 'Applied dynamic size');
+    this._resizeContainer();
   }
-
-  _applyContainerSizingFromConfig(initial=false) {
-    // set container size according to mode
-    const c = this.cardContainer; if (!c) return;
-
-    if (this._isContainerFixed()) {
-      const { w, h } = this._resolveFixedSize();
-      c.style.width  = `${w}px`;
-      c.style.height = `${h}px`;
-      // ensure overflow hidden (hard lock)
-      c.style.overflow = 'hidden';
-      if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
-      // pull any existing cards back inside
-      this._clampAllCardsInside();
-    } else {
-      // dynamic — let _resizeContainer compute; clear inline to allow growth/shrink
-      c.style.overflow = 'hidden';
-      // keep width/height managed by _resizeContainer
-      if (!initial) this._dbgPush?.('size', 'Applied dynamic size');
-      this._resizeContainer();
-    }
-  }
-
-  // --- robust lovelace getter (works across HA versions) ---
-  _getLovelace() {
-    let hop = 0, host = this;
-    while (host && hop++ < 20) {
-      const root = host.getRootNode?.();
-      const rHost = root?.host;
-      if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
-      host = rHost || host.parentElement;
-    }
-    const seen = new Set(), q = [document];
-    while (q.length) {
-      const n = q.shift();
-      if (!n || seen.has(n)) continue;
-      seen.add(n);
-      if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
-      if (n.tagName === 'HUI-ROOT') return n.lovelace;
-      if (n.shadowRoot) q.push(n.shadowRoot);
-      if (n.children) for (const c of n.children) q.push(c);
-    }
-    return undefined;
-  }
-
-  // --- scan all DDCs inside stored dashboard, with paths (for logging + targeting) ---
-  _scanDdcCards(cfg) {
-    const hits = []; // { view:number, path:string[], card:object }
-    const push = (view, path, obj) => {
-      if (obj?.type === 'custom:drag-and-drop-card') hits.push({ view, path: [...path], card: obj });
-    };
-    const visit = (node, viewIdx, path) => {
-      if (!node) return;
-      if (Array.isArray(node)) { node.forEach((n, i) => visit(n, viewIdx, path.concat(i))); return; }
-      if (typeof node !== 'object') return;
-
-      if ('type' in node) push(viewIdx, path, node);
-
-      for (const [k, v] of Object.entries(node)) {
-        if (k === 'views' && Array.isArray(v)) v.forEach((vv, i) => visit(vv, i, ['views', i]));
-        else if (Array.isArray(v)) visit(v, viewIdx, path.concat(k));
-        else if (v && typeof v === 'object') visit(v, viewIdx, path.concat(k));
-      }
-    };
-    visit(cfg, -1, []);
-    return hits;
-  }
-
-  // --- persist imported options into stored YAML; fallback patches current-view DDCs ---
-  async _persistOptionsToYaml(opts, { forcePatchCurrentView = true } = {}) {
-    const ll = this._getLovelace();
-    if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
-    if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
-
-    const key = opts.storage_key || this.storageKey || this._config?.storage_key || null;
-    const cfg = JSON.parse(JSON.stringify(ll.config));
-    const hits = this._scanDdcCards(cfg);
-
-    console.debug('[ddc:import] persist: found DDC cards',
-      hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
-
-    // choose targets: exact key match -> (fallback) all in current view -> (last) single DDC in dashboard
-    const curView = ll.current_view ?? 0;
-    let targets = hits.filter(h => key && h.card.storage_key === key);
-
-    if (!targets.length && forcePatchCurrentView) {
-      const inCur = hits.filter(h => h.view === curView);
-      if (inCur.length) targets = inCur; // patch all DDCs in the current view
-    }
-    if (!targets.length && hits.length === 1) targets = hits;
-
-    if (!targets.length) {
-      console.debug('[ddc:import] persist: no target. Hint: set a unique storage_key on this card and import again.', { key });
-      return false;
-    }
-
-    // ensure storage_key goes in the patch so future imports match exactly
-    const patch = { type: 'custom:drag-and-drop-card', ...opts };
-    if (key && !patch.storage_key) patch.storage_key = key;
-
-    // apply patch at each target path
-    for (const t of targets) {
-      let ref = cfg;
-      for (const seg of t.path) ref = ref[seg];
-      Object.assign(ref, patch);
-    }
-
-    console.debug('[ddc:import] persist → saving', { patched: targets.length, key: key || null, patch });
-    await ll.saveConfig(cfg);
-    return true;
-  }
-
-
+}
 
 _getContainerSize() {
   const c = this.cardContainer; if (!c) return { w:0, h:0 };
@@ -1374,44 +1203,6 @@ _applyGridVars() {
       this._updateApplyBtn?.();
     }
   }
-
-  // Recursively patch THIS card’s YAML (by storage_key if provided)
-  async _persistOptionsToYaml(opts) {
-    const ll = this._getLovelace();
-    if (!ll) { console.debug('[ddc:import] YAML persist skipped (no lovelace root)'); return false; }
-
-    const mode = ll.mode || (typeof ll.saveConfig === 'function' ? 'storage' : 'yaml');
-    if (typeof ll.saveConfig !== 'function') {
-      console.debug(`[ddc:import] YAML persist skipped (dashboard mode: ${mode})`);
-      return false;
-    }
-
-    const patch = { type: 'custom:drag-and-drop-card', ...opts };
-    if (!patch.storage_key) patch.storage_key = this.storageKey || this._config?.storage_key;
-
-    const matches = (c) => c?.type === 'custom:drag-and-drop-card' &&
-      (!patch.storage_key || c.storage_key === patch.storage_key);
-
-    const newLL = JSON.parse(JSON.stringify(ll.config));
-    let patched = 0;
-
-    const visit = (node) => {
-      if (!node) return;
-      if (Array.isArray(node)) return node.forEach(visit);
-      if (typeof node !== 'object') return;
-      if (node.type && matches(node)) { Object.assign(node, patch); patched++; }
-      for (const v of Object.values(node)) if (v && (typeof v === 'object' || Array.isArray(v))) visit(v);
-    };
-    visit(newLL.views);
-
-    if (!patched) { console.debug('[ddc:import] YAML persist: no matching card (check storage_key)'); return false; }
-
-    console.debug('[ddc:import] YAML persist → saving', { mode, patched, patch });
-    await ll.saveConfig(newLL);
-    return true;
-  }
-
-
 
 
   /* ------------------------------ Edit mode ------------------------------ */
@@ -3933,8 +3724,6 @@ this._initCardInteract(wrap);
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
-    try { this._dbgInit?.(); this._dbgPush?.('opts','_applyImportedOptions called', { opts, recalc, before: { ...(this._config || {}) } }); console.debug('[ddc:opts] _applyImportedOptions', { opts, recalc }); } catch {}
-
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
     // If storage_key changed, push it into HA editor immediately
      if (this._isInHaEditorPreview()) {
@@ -4009,8 +3798,6 @@ this._initCardInteract(wrap);
   }
   
   _importDesign() {
-    try { this._dbgInit?.(); this._dbgPush?.('import','Begin import'); console.debug('[ddc:import] Begin import'); } catch {}
-
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'application/json';
     inp.onchange = async () => {
@@ -4018,6 +3805,8 @@ this._initCardInteract(wrap);
         const txt = await file.text();
       try {
         const json = JSON.parse(txt);
+        const __prevStorageKey = this.storageKey || (this._config && this._config.storage_key) || null;
+
         // Apply options (if present) before building cards
           if (json.options) {
             const { storage_key, ...optsNoKey } = json.options;
@@ -4025,69 +3814,35 @@ this._initCardInteract(wrap);
           }
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-        
-        // DEBUG + OVERWRITE: also merge all imported options into the card's YAML config
-        try {
-          this._dbgInit?.();
-          const prevCfg = { ...(this._config || {}) };
-          const incoming = json?.options ? ({ ...json.options }) : (typeof json.grid === 'number' ? { grid: json.grid } : {});
-          this._dbgPush?.('import','Incoming options parsed', { incoming }); console.debug('[ddc:import] Incoming options parsed', incoming);
-          if (incoming && Object.keys(incoming).length) {
-            const { storage_key: __sk, ...__rest } = incoming;
-            const __nextCfg = { ...(this._config || {}), ...__rest };
-            if (__sk) {
-              __nextCfg.storage_key = __sk;
-              this.storageKey = __sk;
-              try { this._syncEditorsStorageKey?.(); } catch {}
-            }
-            this._config = __nextCfg;
-            // Diff log
-            const __changed = {};
-            for (const __k of Object.keys(__nextCfg)) {
-              if (prevCfg[__k] !== __nextCfg[__k]) __changed[__k] = { was: prevCfg[__k], now: __nextCfg[__k] };
-            }
-            this._dbgPush?.('import','YAML config overwritten from import', { changed: __changed }); console.debug('[ddc:import] YAML config overwritten from import', __changed);
-            try {
-              const __updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-              this.dispatchEvent(new CustomEvent('config-changed', {
-                detail: { config: __updatedCfg },
-                bubbles: true,
-                composed: true,
-              }));
-              this._dbgPush?.('import','Dispatched config-changed after overwrite', { updatedCfg: __updatedCfg }); console.debug('[ddc:import] Dispatched config-changed after overwrite', __updatedCfg);
-            } catch (__e) {
-              console.warn('[ddc] Failed to dispatch config-changed after import overwrite', __e);
-            }
-          }
-        } catch (__e) { console.warn('[ddc] import logging block failed', __e); }
-// If a storage_key is present in options, make it the live config key AND inform HA editor
-      if (json?.options?.storage_key) {
-        const newKey = json.options.storage_key;
-        this._config = { ...(this._config || {}), storage_key: newKey };
-        this.storageKey = newKey;
-        this._syncEditorsStorageKey();
-        try {
-          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-          this.dispatchEvent(new CustomEvent('config-changed', {
-            detail: { config: updated },
-            bubbles: true,
-            composed: true,
-          }));
-        } catch {}
-      }
-
-      // Persist imported options to Lovelace YAML (Storage mode only)
-      try {
-        const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
-        if (toPersist) {
-          const ok = await this._persistOptionsToYaml(toPersist);
-          console.debug('[ddc:import] YAML persist result:', ok);
+        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        if (json?.options?.storage_key) {
+          const newKey = json.options.storage_key;
+          this._config = { ...(this._config || {}), storage_key: newKey };
+          this.storageKey = newKey;
+          this._syncEditorsStorageKey();
+          try {
+            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            this.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: updated },
+              bubbles: true,
+              composed: true,
+            }));
+          } catch {}
         }
-      } catch (e) {
-        console.warn('[ddc:import] YAML persist failed:', e);
-      }
-
-        this.cardContainer.innerHTML = '';
+ // v1 fallback     
+        
+        // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
+        try {
+          const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
+          if (toPersist) {
+            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey });
+            console.debug('[ddc:import] YAML persist result:', ok);
+          }
+        } catch (e) {
+          console.warn('[ddc:import] YAML persist failed:', e);
+        }
+this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
             if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
@@ -4121,7 +3876,111 @@ this._initCardInteract(wrap);
   }
   
 
-  /* ----------------------------- Save / load ----------------------------- */
+  
+  // ===== DDC: Lovelace persistence helpers (import options -> stored YAML) =====
+  _getLovelace() {
+    // Walk up from this element through shadow roots
+    let hop = 0, host = this;
+    while (host && hop++ < 20) {
+      const root = host.getRootNode?.();
+      const rHost = root?.host;
+      if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
+      host = rHost || host.parentElement;
+    }
+    // Breadth-first fallback
+    const seen = new Set(), q = [document];
+    while (q.length) {
+      const n = q.shift();
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
+      if (n.tagName === 'HUI-ROOT') return n.lovelace;
+      if (n.shadowRoot) q.push(n.shadowRoot);
+      if (n.children) for (const c of n.children) q.push(c);
+    }
+    return undefined;
+  }
+
+  _scanDdcCards(cfg) {
+    const hits = []; // { view:number, path:string[], card:object }
+    const push = (view, path, obj) => {
+      if (obj?.type === 'custom:drag-and-drop-card') hits.push({ view, path: [...path], card: obj });
+    };
+    const visit = (node, viewIdx, path) => {
+      if (!node) return;
+      if (Array.isArray(node)) { node.forEach((n, i) => visit(n, viewIdx, path.concat(i))); return; }
+      if (typeof node !== 'object') return;
+
+      if ('type' in node) push(viewIdx, path, node);
+
+      for (const [k, v] of Object.entries(node)) {
+        if (k === 'views' && Array.isArray(v)) v.forEach((vv, i) => visit(vv, i, ['views', i]));
+        else if (Array.isArray(v)) visit(v, viewIdx, path.concat(k));
+        else if (v && typeof v === 'object') visit(v, viewIdx, path.concat(k));
+      }
+    };
+    visit(cfg, -1, []);
+    return hits;
+  }
+
+  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = true } = {}) {
+    try {
+      const ll = this._getLovelace();
+      if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
+      if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
+
+      // Deep clone to avoid mutating live config
+      const cfg = JSON.parse(JSON.stringify(ll.config));
+      const hits = this._scanDdcCards(cfg);
+      const curView = ll.current_view ?? 0;
+
+      console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
+
+      const newKey = opts?.storage_key ?? null;
+      const keys = [];
+      if (prevKey) keys.push(prevKey);
+      if (newKey) keys.push(newKey);
+      if (this.storageKey) keys.push(this.storageKey);
+      if (this._config?.storage_key) keys.push(this._config.storage_key);
+
+      // Prefer exact key matches (either previous or new)
+      let targets = hits.filter(h => h.card.storage_key && keys.includes(h.card.storage_key));
+
+      // If no exact match: if only one DDC in current view, target it
+      if (!targets.length) {
+        const inCur = hits.filter(h => h.view === curView);
+        if (inCur.length === 1) targets = inCur;
+        // Otherwise optionally patch all in current view to force key + options in
+        else if (patchAllInCurrentViewIfNoKey && inCur.length >= 1) targets = inCur;
+      }
+
+      // As a last resort, if there is only one DDC overall, patch it
+      if (!targets.length && hits.length === 1) targets = hits;
+
+      if (!targets.length) {
+        console.debug('[ddc:import] persist: no target. Provide a unique storage_key on this card and import again.', { prevKey, newKey, storageKey: this.storageKey });
+        return false;
+      }
+
+      // Ensure storage_key is written so future imports can match precisely
+      const patch = { type: 'custom:drag-and-drop-card', ...opts };
+      if ((newKey || prevKey) && !patch.storage_key) patch.storage_key = newKey || prevKey;
+
+      for (const t of targets) {
+        let ref = cfg;
+        for (const seg of t.path) ref = ref[seg];
+        Object.assign(ref, patch);
+      }
+
+      console.debug('[ddc:import] persist → saving', { patched: targets.length, keysTried: keys, patch });
+      await ll.saveConfig(cfg);
+      return true;
+    } catch (e) {
+      console.warn('[ddc:import] persist error', e);
+      return false;
+    }
+  }
+/* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
     // Always mark dirty so Apply becomes enabled
     this._markDirty(reason);
