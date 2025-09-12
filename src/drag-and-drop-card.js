@@ -457,6 +457,111 @@ _applyContainerSizingFromConfig(initial=false) {
   }
 }
 
+  // Walk the stored Lovelace config and return every DDC card with its JSON path.
+  _scanDdcCards(llConfig) {
+    const hits = []; // { path: string[], view: number, card: object }
+    const push = (view, path, obj) => {
+      if (obj?.type === 'custom:drag-and-drop-card') {
+        hits.push({ view, path: [...path], card: obj });
+      }
+    };
+
+    const visit = (node, viewIdx, path) => {
+      if (!node) return;
+      if (Array.isArray(node)) {
+        node.forEach((n, i) => visit(n, viewIdx, path.concat(i)));
+        return;
+      }
+      if (typeof node !== 'object') return;
+
+      if ('type' in node) push(viewIdx, path, node);
+
+      for (const [k, v] of Object.entries(node)) {
+        if (k === 'views' && Array.isArray(v)) {
+          v.forEach((vv, i) => visit(vv, i, ['views', i]));
+        } else if (Array.isArray(v)) {
+          visit(v, viewIdx, path.concat(k));
+        } else if (v && typeof v === 'object') {
+          visit(v, viewIdx, path.concat(k));
+        }
+      }
+    };
+
+    visit(llConfig, -1, []);
+    return hits;
+  }
+
+  // Robust lovelace getter (works across shadow roots/versions)
+  _getLovelace() {
+    let hop = 0, host = this;
+    while (host && hop++ < 20) {
+      const root = host.getRootNode?.();
+      const rHost = root?.host;
+      if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
+      host = rHost || host.parentElement;
+    }
+    const seen = new Set(), q = [document];
+    while (q.length) {
+      const n = q.shift();
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
+      if (n.tagName === 'HUI-ROOT') return n.lovelace;
+      if (n.shadowRoot) q.push(n.shadowRoot);
+      if (n.children) for (const c of n.children) q.push(c);
+    }
+    return undefined;
+  }
+
+  // Persist imported options into the stored dashboard YAML
+  async _persistOptionsToYaml(opts) {
+    const ll = this._getLovelace();
+    if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
+    if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
+
+    const key = opts.storage_key || this.storageKey || this._config?.storage_key || null;
+    const cfg = JSON.parse(JSON.stringify(ll.config));
+    const hits = this._scanDdcCards(cfg);
+
+    console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({
+      view: h.view,
+      path: h.path.join('.'),
+      storage_key: h.card.storage_key || null
+    })));
+
+    // choose targets
+    let targets = hits.filter(h => key && h.card.storage_key === key);
+    if (!targets.length) {
+      const cur = ll.current_view ?? 0;
+      const inCur = hits.filter(h => h.view === cur);
+      if (inCur.length === 1) targets = inCur;
+    }
+    if (!targets.length && hits.length === 1) targets = hits;
+
+    if (!targets.length) {
+      console.debug('[ddc:import] persist: no unique target. Give this card a unique storage_key and try again.', { key });
+      return false;
+    }
+
+    // build patch and apply
+    const patch = { type: 'custom:drag-and-drop-card', ...opts };
+    for (const t of targets) {
+      // navigate by path and mutate in place
+      let ref = cfg;
+      for (const seg of t.path) ref = ref[seg];
+      Object.assign(ref, patch);
+    }
+
+    console.debug('[ddc:import] persist → saving', {
+      patched: targets.length,
+      key,
+      patch
+    });
+    await ll.saveConfig(cfg);
+    return true;
+  }
+
+
 _getContainerSize() {
   const c = this.cardContainer; if (!c) return { w:0, h:0 };
   const w = parseFloat(getComputedStyle(c).width) || c.getBoundingClientRect().width;
@@ -1283,33 +1388,6 @@ _applyGridVars() {
       this._updateApplyBtn?.();
     }
   }
-
-    // Robustly get the Lovelace object, even across shadow roots
-    _getLovelace() {
-      // Walk up through shadow roots from THIS element
-      let hop = 0, host = this;
-      while (host && hop++ < 15) {
-        const root = host.getRootNode?.();
-        const rHost = root?.host;
-        if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
-        host = rHost || host.parentElement;
-      }
-
-      // Fallback: breadth-first search for <hui-root> in the document (handles HA layout changes)
-      const q = (n) => Array.from(n.querySelectorAll?.('*') || []);
-      const enqueue = (arr, n) => { if (n) arr.push(n); if (n?.shadowRoot) arr.push(n.shadowRoot); };
-      const seen = new Set(); const queue = [document];
-      while (queue.length) {
-        const n = queue.shift();
-        if (!n || seen.has(n)) continue;
-        seen.add(n);
-        if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
-        if (n.tagName === 'HUI-ROOT') return n.lovelace;
-        if (n.shadowRoot) enqueue(queue, n.shadowRoot);
-        for (const c of (n.children || q(n))) enqueue(queue, c);
-      }
-      return undefined;
-    }
 
   // Recursively patch THIS card’s YAML (by storage_key if provided)
   async _persistOptionsToYaml(opts) {
@@ -4018,13 +4096,11 @@ this._initCardInteract(wrap);
         if (toPersist) {
           const ok = await this._persistOptionsToYaml(toPersist);
           console.debug('[ddc:import] YAML persist result:', ok);
-          if (!ok) {
-            console.debug('[ddc:import] Note: If you want the import to stick, use a Storage-mode dashboard (HA UI → Dashboards → ••• → Take control).');
-          }
         }
       } catch (e) {
         console.warn('[ddc:import] YAML persist failed:', e);
       }
+      
         this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
