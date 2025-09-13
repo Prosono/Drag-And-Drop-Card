@@ -1884,7 +1884,7 @@ _syncEmptyStateUI() {
     return wrap;
   }
 
-  _makePlaceholderAt(x=0, y=0, w=300, h=100) {
+  _makePlaceholderAt(x=0,y=0,w=300, h=300) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -3892,7 +3892,7 @@ this._initCardInteract(wrap);
           if (toPersist) {
             toPersist.storage_key = this.storageKey;
 e_key = this.storageKey;
-            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: false });
+            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: true });
             console.debug('[ddc:import] YAML persist result:', ok);
           }
         } catch (e) {
