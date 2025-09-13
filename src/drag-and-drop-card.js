@@ -899,38 +899,6 @@ _applyGridVars() {
             40%  { opacity:.7 }
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
-        
-          /* --- EMPTY STATE: 300x300 flashing gradient with instructions --- */
-          .ddc-placeholder{
-            min-width:300px; min-height:300px;
-          }
-          .ddc-placeholder-inner{
-            position:relative;
-            border-radius:12px;
-            /* animated gradient "flash" */
-            background: linear-gradient(135deg,
-              color-mix(in srgb, var(--primary-color, #03a9f4) 55%, transparent),
-              color-mix(in srgb, var(--accent-color, #ff4081) 55%, transparent),
-              color-mix(in srgb, var(--primary-color, #03a9f4) 55%, transparent)
-            );
-            background-size: 200% 200%;
-            animation: ddcGradientFlash 2.6s ease-in-out infinite alternate;
-          }
-          .ddc-placeholder-inner::after{
-            content: "hold me / double click me to enter edit mode";
-            position:absolute; inset:0;
-            display:flex; align-items:center; justify-content:center;
-            padding: 12px; text-align:center; line-height:1.3;
-            font-weight: 700; letter-spacing:.2px;
-            color: var(--primary-text-color, #fff);
-            text-shadow: 0 1px 2px rgba(0,0,0,.45);
-            pointer-events:none;
-          }
-          @keyframes ddcGradientFlash {
-            0%   { background-position: 0% 50%; }
-            100% { background-position: 100% 50%; }
-          }
-    
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -1884,7 +1852,7 @@ _syncEmptyStateUI() {
     return wrap;
   }
 
-  _makePlaceholderAt(x=0,y=0,w=300, h=300) {
+  _makePlaceholderAt(x=0,y=0,w=100,h=100) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -3892,7 +3860,7 @@ this._initCardInteract(wrap);
           if (toPersist) {
             toPersist.storage_key = this.storageKey;
 e_key = this.storageKey;
-            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: true });
+            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: false });
             console.debug('[ddc:import] YAML persist result:', ok);
           }
         } catch (e) {
