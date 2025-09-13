@@ -1438,7 +1438,16 @@ _installLongPressToEnterEdit() {
   };
 
   const onDblClick = (e) => {
+    
     if (this._isInHaEditorPreview()) return;
+    const onlyPlaceholder = this._isLayoutEmpty();
+    if (onlyPlaceholder) {
+      if (!this.editMode) this._toggleEditMode(true);
+      this._openCardManager();
+      return;
+    }
+    // fallback: old behavior
+if (this._isInHaEditorPreview()) return;
     if (!within(e.target) || isOverCard(e)) return;
     const toState = !this.editMode;
     this._toggleEditMode(toState);
@@ -1877,7 +1886,7 @@ this.addButton.classList.remove('cta-empty');
     return wrap;
   }
 
-  _makePlaceholderAt(x=0,y=0,w=100,h=100) {
+  _makePlaceholderAt(x=0,y=0,w=200,h=200) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -1893,6 +1902,8 @@ this.addButton.classList.remove('cta-empty');
     inner.setAttribute('aria-hidden','true');
   
     
+    // Add flashy CTA inside the placehold
+
     // Build flashy CTA inside the placeholder
     inner.setAttribute('aria-hidden','false');
     const cta = document.createElement('div');
