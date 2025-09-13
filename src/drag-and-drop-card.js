@@ -459,10 +459,7 @@ _applyGridVars() {
     this._syncEditorsStorageKey();
 
 
-    
-    // Ensure unique key per-page
-    try { this._enforceUniqueKeyOnPage?.(); } catch {}
-// Store incoming config and update properties
+    // Store incoming config and update properties
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
@@ -3828,6 +3825,7 @@ this._initCardInteract(wrap);
             }));
           } catch {}
         }
+        
  // v1 fallback     
         
         // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
@@ -3835,7 +3833,7 @@ this._initCardInteract(wrap);
           const toPersist = (json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null));
           if (toPersist) {
             toPersist.storage_key = this.storageKey;
-e_key = this.storageKey;
+
             const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: false });
             console.debug('[ddc:import] YAML persist result:', ok);
           }
@@ -3873,7 +3871,7 @@ this.cardContainer.innerHTML = '';
           console.error('Auto-save after import failed', e);
           this._toast('Design imported — saved locally; backend save failed.');
         }
-        } catch (e) {
+} catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
       }
@@ -3929,7 +3927,8 @@ this.cardContainer.innerHTML = '';
     return hits;
   }
 
-  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
+  
+async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
   try {
     const ll = this._getLovelace();
     if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
@@ -3962,7 +3961,63 @@ this.cardContainer.innerHTML = '';
     return false;
   }
 }
+ = {}) {
+    try {
+      const ll = this._getLovelace();
+      if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
+      if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
 
+      // Deep clone to avoid mutating live config
+      const cfg = JSON.parse(JSON.stringify(ll.config));
+      const hits = this._scanDdcCards(cfg);
+      const curView = ll.current_view ?? 0;
+
+      console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
+
+      const newKey = opts?.storage_key ?? null;
+      const keys = [];
+      if (prevKey) keys.push(prevKey);
+      if (newKey) keys.push(newKey);
+      if (this.storageKey) keys.push(this.storageKey);
+      if (this._config?.storage_key) keys.push(this._config.storage_key);
+
+      // Prefer exact key matches (either previous or new)
+      let targets = hits.filter(h => h.card.storage_key && keys.includes(h.card.storage_key));
+
+      // If no exact match: if only one DDC in current view, target it
+      if (!targets.length) {
+        const inCur = hits.filter(h => h.view === curView);
+        if (inCur.length === 1) targets = inCur;
+        // Otherwise optionally patch all in current view to force key + options in
+        else if (patchAllInCurrentViewIfNoKey && inCur.length >= 1) targets = inCur;
+      }
+
+      // As a last resort, if there is only one DDC overall, patch it
+      if (!targets.length && hits.length === 1) targets = hits;
+
+      if (!targets.length) {
+        console.debug('[ddc:import] persist: no target. Provide a unique storage_key on this card and import again.', { prevKey, newKey, storageKey: this.storageKey });
+        return false;
+      }
+
+      // Ensure storage_key is written so future imports can match precisely
+      const patch = { type: 'custom:drag-and-drop-card', ...opts };
+      if ((newKey || prevKey) && !patch.storage_key) patch.storage_key = newKey || prevKey;
+
+      for (const t of targets) {
+        let ref = cfg;
+        for (const seg of t.path) ref = ref[seg];
+        Object.assign(ref, patch);
+      }
+
+      console.debug('[ddc:import] persist → saving', { patched: targets.length, keysTried: keys, patch });
+      await ll.saveConfig(cfg);
+      return true;
+    } catch (e) {
+      console.warn('[ddc:import] persist error', e);
+      return false;
+    }
+  }
 /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
     // Always mark dirty so Apply becomes enabled
@@ -4092,22 +4147,6 @@ this.cardContainer.innerHTML = '';
 if (!customElements.get('drag-and-drop-card')) {
   customElements.define('drag-and-drop-card', DragAndDropCard);
 }
-
-/* Register in HA's card picker */
-(() => {
-  try {
-    const list = (window.customCards = window.customCards || []);
-    if (!list.some(c => c.type === 'drag-and-drop-card')) {
-      list.push({
-        type: 'drag-and-drop-card',   // no "custom:" here
-        name: 'Drag & Drop Card',
-        description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
-        preview: true
-      });
-    }
-  } catch (e) { /* no-op */ }
-})();
-
 
 /* ==========================================================================
    Integrated card-mod compatibility enhancements
