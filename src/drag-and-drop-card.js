@@ -3842,6 +3842,26 @@ this._initCardInteract(wrap);
         } catch (e) {
           console.warn('[ddc:import] YAML persist failed:', e);
         }
+
+        // --- DDC: persist imported options to Lovelace YAML so file-imports stick ---
+        try {
+          const __prevKey = this.storageKey || (this._config && this._config.storage_key) || null;
+          const __toPersist = (json && json.options) ? json.options : (typeof json?.grid === 'number' ? { grid: json.grid } : null);
+          if (__toPersist) {
+            if (json?.options?.storage_key) {
+              // ensure live storage_key matches import before saving
+              this.storageKey = json.options.storage_key;
+              this._config = { ...(this._config || {}), storage_key: json.options.storage_key };
+              try { this._syncEditorsStorageKey?.(); } catch {}
+            }
+            const __ok = await (this._persistOptionsToYaml?.call(this, __toPersist, { prevKey: __prevKey, noDownload: true }) || false);
+            console.debug('[ddc:import] YAML persist (file import) result:', __ok);
+            try {
+              const __updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+              this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: __updated }, bubbles: true, composed: true }));
+            } catch {}
+          }
+        } catch(e) { console.warn('[ddc:import] persist block failed', e); }
 this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
@@ -4228,13 +4248,12 @@ if (!customElements.get('drag-and-drop-card')) {
   }
 })();
 
-/* ==== DDC AUGMENTATION v4: backup on persist + inline toolbar switcher + load-by-key + edit-mode visibility ==== */
+/* ==== DDC AUGMENTATION v6: backup on persist + inline toolbar switcher + load-by-key + edit-mode visibility ==== */
 (function(){
   const tag = 'drag-and-drop-card';
   const Cls = customElements.get(tag);
   if (!Cls) { console.warn('[ddc:augment] Could not find custom element', tag); return; }
 
-  // --- robust lovelace getter ---
   function _getLovelace() {
     try {
       let hop = 0, host = this;
@@ -4257,8 +4276,6 @@ if (!customElements.get('drag-and-drop-card')) {
     } catch(e) {}
     return undefined;
   }
-
-  // --- deep scan DDC cards ---
   function _scanDdcCards(cfg) {
     const hits = [];
     const push = (view, path, obj) => { if (obj?.type === 'custom:drag-and-drop-card') hits.push({ view, path: [...path], card: obj }); };
@@ -4276,20 +4293,12 @@ if (!customElements.get('drag-and-drop-card')) {
     visit(cfg, -1, []);
     return hits;
   }
-
-  // --- backup helpers ---
   function _makeYamlBackup(llConfig, targets, patch) {
     const when = new Date().toISOString().replace(/[:.]/g,'-');
     const items = targets.map(t => {
       let ref = llConfig;
       for (const seg of t.path) ref = ref[seg];
-      return {
-        view: t.view,
-        path: t.path,
-        storage_key: (ref && ref.storage_key) || null,
-        before: ref,
-        patch,
-      };
+      return { view: t.view, path: t.path, storage_key: (ref && ref.storage_key) || null, before: ref, patch };
     });
     const backup = { kind: 'ddc-import-backup', created_at: when, count: items.length, items };
     try {
@@ -4310,8 +4319,6 @@ if (!customElements.get('drag-and-drop-card')) {
       setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch(e){ console.warn('[ddc:backup] download failed', e); }
   }
-
-  // --- recent keys ---
   function _recordRecentKey(key) {
     if (!key) return;
     try {
@@ -4342,55 +4349,38 @@ if (!customElements.get('drag-and-drop-card')) {
     } catch {}
     return Array.from(keys);
   }
-
-  // --- persist with backup (noDownload option) ---
   async function _persistOptionsToYaml(opts, { prevKey, noDownload } = {}) {
     const ll = this._getLovelace?.() || _getLovelace.call(this);
     if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
     if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
-
     const key = opts.storage_key || this.storageKey || this._config?.storage_key || prevKey || null;
     const cfg = JSON.parse(JSON.stringify(ll.config));
     const hits = (this._scanDdcCards || _scanDdcCards)(cfg);
-
     console.debug('[ddc:import] persist: found DDC cards',
       hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
-
     const curView = ll.current_view ?? 0;
     let targets = hits.filter(h => key && h.card.storage_key === key);
     if (!targets.length) {
       const inCur = hits.filter(h => h.view === curView);
-      if (inCur.length) targets = inCur; // patch all DDCs in view as fallback
+      if (inCur.length) targets = inCur;
     }
     if (!targets.length && hits.length === 1) targets = hits;
-
-    if (!targets.length) {
-      console.debug('[ddc:import] persist: no target (set a unique storage_key and try again).', { key });
-      return false;
-    }
-
+    if (!targets.length) { console.debug('[ddc:import] persist: no target', { key }); return false; }
     const patch = { type: 'custom:drag-and-drop-card', ...opts };
     if (key && !patch.storage_key) patch.storage_key = key;
-
-    // backup
     const backup = _makeYamlBackup(ll.config, targets, patch);
     console.debug('[ddc:import] backup created', { file: backup.name, items: backup.data.count });
     if (!noDownload) _offerBackupDownload(backup.name, backup.data);
-
-    // apply patch
     for (const t of targets) {
       let ref = cfg;
       for (const seg of t.path) ref = ref[seg];
       Object.assign(ref, patch);
     }
-
     console.debug('[ddc:import] persist → saving', { patched: targets.length, key: key || null, patch });
     await ll.saveConfig(cfg);
     _recordRecentKey(patch.storage_key);
     return true;
   }
-
-  // --- backend: fetch keys + fetch layout by key ---
   async function _fetchBackendKeys() {
     const parseKeys = (data) => {
       if (!data) return [];
@@ -4424,16 +4414,13 @@ if (!customElements.get('drag-and-drop-card')) {
     }
     return [];
   }
-
   async function _fetchLayoutByKey(key) {
     const parseDesign = (data) => {
       if (!data) return null;
       if (data.options || data.cards) return data;
       if (typeof data.design === 'object') return data.design;
       if (typeof data.payload === 'object') return data.payload;
-      try {
-        if (typeof data === 'string') return JSON.parse(data);
-      } catch {}
+      try { if (typeof data === 'string') return JSON.parse(data); } catch {}
       return null;
     };
     const tryCall = async (method, path, params) => {
@@ -4458,8 +4445,6 @@ if (!customElements.get('drag-and-drop-card')) {
       } catch(e) {}
       return null;
     };
-
-    // Attempt common endpoints
     const enc = encodeURIComponent(key);
     return await (tryCall('get', `dragdrop_storage/${enc}`)
       || tryFetch(`/api/dragdrop_storage/${enc}`)
@@ -4467,38 +4452,26 @@ if (!customElements.get('drag-and-drop-card')) {
       || tryCall('post', 'dragdrop_storage/get', { key })
       || null);
   }
-
-  // --- apply design object (like _importDesign without file dialog) ---
   async function _applyDesignObject(json, { source='switcher', newKey=null } = {}) {
     if (!json || typeof json !== 'object') throw new Error('Invalid design payload');
     const prevKey = this.storageKey || this._config?.storage_key || null;
     try { this._dbgInit?.(); this._dbgPush?.('import', 'Begin import (programmatic)', { source, newKey }); } catch {}
-
-    // Apply options
     if (json.options) {
       const { storage_key, ...optsNoKey } = json.options;
       this._applyImportedOptions?.(optsNoKey, true);
     } else if (typeof json.grid === 'number') {
       this._applyImportedOptions?.({ grid: json.grid }, true);
     }
-
-    // update storage key (prefer explicit newKey)
     const key = newKey || json?.options?.storage_key || prevKey;
     if (key) {
       this.storageKey = key;
       this._config = { ...(this._config || {}), storage_key: key };
       try { this._syncEditorsStorageKey?.(); } catch {}
     }
-
-    // Persist options to YAML (no backup download from switcher)
     try {
       const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
       await (this._persistOptionsToYaml?.call(this, { ...toPersist, storage_key: key }, { prevKey, noDownload: (source==='switcher') }));
-    } catch(e) {
-      console.warn('[ddc:apply] persist failed', e);
-    }
-
-    // Rebuild cards
+    } catch(e) { console.warn('[ddc:apply] persist failed', e); }
     try {
       this.cardContainer.innerHTML = '';
       if (Array.isArray(json.cards) && json.cards.length) {
@@ -4529,41 +4502,33 @@ if (!customElements.get('drag-and-drop-card')) {
       this._toast?.('Import failed during rebuild.');
     }
   }
-
-  // --- Edit mode visibility helper ---
   function _updateSwitcherVisibility() {
     try {
       const host = this.shadowRoot || this.renderRoot || this;
       const el = host.querySelector('.ddc-switcher-inline');
       if (!el) return;
       const ll = this._getLovelace?.() || _getLovelace.call(this);
-      // HA stores edit mode on hui-root
       let edit = false;
       try {
-        const hui = (this.getRootNode?.() || document).host;
+        const hui = (host.getRootNode && host.getRootNode())?.host;
         edit = !!(ll && (ll.editMode === true || (hui && hui.editMode === true)));
       } catch {}
       el.style.display = edit ? 'inline-flex' : 'none';
     } catch {}
   }
-
-  // --- inline toolbar switcher ---
   function _ensureInlineSwitcher() {
     try {
       if (this._ddcSwitcherInstalled) return;
       const host = this.shadowRoot || this.renderRoot || this;
       const toolbar = host.querySelector('.toolbar');
       if (!toolbar) return;
-
       const wrap = document.createElement('div');
       wrap.className = 'ddc-switcher-inline';
       Object.assign(wrap.style, { display: 'inline-flex', gap: '6px', alignItems: 'center', marginLeft: 'auto' });
-
       const label = document.createElement('span');
       label.textContent = 'Layout:';
       label.style.fontSize = '12px';
       label.style.opacity = '0.8';
-
       const select = document.createElement('select');
       Object.assign(select.style, {
         fontSize: '12px', padding: '4px 6px', borderRadius: '8px',
@@ -4572,32 +4537,26 @@ if (!customElements.get('drag-and-drop-card')) {
       });
       select.title = 'Select stored layout (storage_key)';
       select.id = 'ddcKeySelect';
-
       const btn = document.createElement('button');
       btn.className = 'btn secondary';
       btn.type = 'button';
       btn.style.padding = '6px 10px';
       btn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon><span style="margin-left:6px">Refresh</span>';
-
       wrap.appendChild(label);
       wrap.appendChild(select);
       wrap.appendChild(btn);
       toolbar.appendChild(wrap);
       this._ddcSwitcherInstalled = true;
-
       const fill = async () => {
         const current = this.storageKey || (this._config && this._config.storage_key) || '';
         const serverKeys = await _fetchBackendKeys.call(this);
         const backupKeys = _collectBackupKeys();
         const recentKeys = _getRecentKeys();
         const toUnique = (arr) => Array.from(new Set(arr.filter(Boolean)));
-
         const server = toUnique(serverKeys);
         const backups = toUnique(backupKeys);
         const recent = toUnique(recentKeys);
-
         select.innerHTML = '';
-
         if (current && !server.includes(current) && !backups.includes(current) && !recent.includes(current)) {
           const opt = document.createElement('option'); opt.value=current; opt.textContent = `${current} (current)`; select.appendChild(opt);
         }
@@ -4613,28 +4572,21 @@ if (!customElements.get('drag-and-drop-card')) {
         makeGroup('Server', server);
         makeGroup('Backups', backups);
         makeGroup('Recent', recent);
-
         if (!select.children.length) {
           const none = document.createElement('option'); none.value=''; none.textContent='— none —'; none.selected = true;
           select.appendChild(none);
         }
         _updateSwitcherVisibility.call(this);
       };
-
       fill();
       btn.addEventListener('click', fill);
-
       select.addEventListener('change', async (e) => {
         const newKey = e.target.value;
         if (this._ddcLoadingFromKey) return;
         this._ddcLoadingFromKey = true;
         try {
-          // fetch the design and apply; persist options to YAML without backup download
           const design = await _fetchLayoutByKey.call(this, newKey);
-          if (!design) {
-            this._toast?.(`No layout found for "${newKey}"`);
-            return;
-          }
+          if (!design) { this._toast?.(`No layout found for "${newKey}"`); return; }
           await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
         } catch(err) {
           console.warn('[ddc:switcher] load/apply failed', err);
@@ -4643,8 +4595,6 @@ if (!customElements.get('drag-and-drop-card')) {
           this._ddcLoadingFromKey = false;
         }
       });
-
-      // visibility polling (edit-mode only)
       this._ddcVisTimer && clearInterval(this._ddcVisTimer);
       this._ddcVisTimer = setInterval(() => _updateSwitcherVisibility.call(this), 800);
       _updateSwitcherVisibility.call(this);
@@ -4652,40 +4602,26 @@ if (!customElements.get('drag-and-drop-card')) {
       console.warn('[ddc:switcher] inline install failed', e);
     }
   }
-
-  // Attach/override methods on prototype
   if (!Cls.prototype._getLovelace) Cls.prototype._getLovelace = _getLovelace;
   if (!Cls.prototype._scanDdcCards) Cls.prototype._scanDdcCards = _scanDdcCards;
   Cls.prototype._persistOptionsToYaml = _persistOptionsToYaml;
   if (!Cls.prototype._applyDesignObject) Cls.prototype._applyDesignObject = _applyDesignObject;
-
-  // Ensure switcher after hass is set and after first render
   try {
     const desc = Object.getOwnPropertyDescriptor(Cls.prototype, 'hass');
     if (desc && (desc.set || desc.get)) {
       const origSet = desc.set;
       Object.defineProperty(Cls.prototype, 'hass', {
-        configurable: true,
-        enumerable: true,
-        set(v) {
-          if (origSet) origSet.call(this, v);
-          try { _ensureInlineSwitcher.call(this); } catch(e){}
-        },
+        configurable: true, enumerable: true,
+        set(v) { if (origSet) origSet.call(this, v); try { _ensureInlineSwitcher.call(this); } catch(e){} },
         get: desc.get || function(){ return this._hass; }
       });
     } else if (typeof Cls.prototype.setHass === 'function') {
       const orig = Cls.prototype.setHass;
-      Cls.prototype.setHass = function(v){
-        if (orig) orig.call(this, v);
-        try { _ensureInlineSwitcher.call(this); } catch(e){}
-      }
+      Cls.prototype.setHass = function(v){ if (orig) orig.call(this, v); try { _ensureInlineSwitcher.call(this); } catch(e){} }
     } else {
       const origUpdate = Cls.prototype.updated || Cls.prototype.firstUpdated;
-      Cls.prototype.updated = function(...args){
-        if (origUpdate) origUpdate.apply(this, args);
-        try { _ensureInlineSwitcher.call(this); } catch(e){}
-      }
+      Cls.prototype.updated = function(...args){ if (origUpdate) origUpdate.apply(this, args); try { _ensureInlineSwitcher.call(this); } catch(e){} }
     }
   } catch(e){ console.warn('[ddc:switcher] wrap hass setter failed', e); }
 })();
-/* ==== /DDC AUGMENTATION v4 ==== */
+/* ==== /DDC AUGMENTATION v6 ==== */
