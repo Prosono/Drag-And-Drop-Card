@@ -3827,14 +3827,15 @@ this._initCardInteract(wrap);
               composed: true,
             }));
           } catch {}
-        
         }
  // v1 fallback     
         
         // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
         try {
-          const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
+          const toPersist = (json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null));
           if (toPersist) {
+            toPersist.storage_key = this.storageKey;
+e_key = this.storageKey;
             const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: false });
             console.debug('[ddc:import] YAML persist result:', ok);
           }
@@ -3929,84 +3930,38 @@ this.cardContainer.innerHTML = '';
   }
 
   async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
-    try {
-      const ll = this._getLovelace();
-      if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
-      if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
+  try {
+    const ll = this._getLovelace();
+    if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
+    if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
+    if (!this.storageKey) { console.debug('[ddc:import] persist: no storageKey on this instance'); return false; }
 
-      // Deep clone to avoid mutating live config
-      const cfg = JSON.parse(JSON.stringify(ll.config));
-      const hits = this._scanDdcCards(cfg);
-      const curView = ll.current_view ?? 0;
+    const cfg = JSON.parse(JSON.stringify(ll.config));
+    const hits = this._scanDdcCards(cfg);
 
-      console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
-
-      const newKey = opts?.storage_key ?? null;
-      const keys = [];
-      if (prevKey) keys.push(prevKey);
-      if (newKey) keys.push(newKey);
-      if (this.storageKey) keys.push(this.storageKey);
-      if (this._config?.storage_key) keys.push(this._config.storage_key);
-
-      // Prefer exact key matches (either previous or new)
-      let targets = hits.filter(h => h.card.storage_key && keys.includes(h.card.storage_key));
-
-      // If no exact match: if only one DDC in current view, target it
-      if (!targets.length) {
-        const inCur = hits.filter(h => h.view === curView);
-        if (inCur.length === 1) targets = inCur;
-        // Otherwise optionally patch all in current view to force key + options in
-        else if (patchAllInCurrentViewIfNoKey && inCur.length >= 1) targets = inCur;
-      }
-
-      // As a last resort, if there is only one DDC overall, patch it
-      if (!targets.length && hits.length === 1) targets = hits;
-
-      if (!targets.length) {
-        console.debug('[ddc:import] persist: no target. Provide a unique storage_key on this card and import again.', { prevKey, newKey, storageKey: this.storageKey });
-        return false;
-      }
-
-      // Ensure storage_key is written so future imports can match precisely
-      const patch = { type: 'custom:drag-and-drop-card', ...opts };
-      if ((newKey || prevKey) && !patch.storage_key) patch.storage_key = newKey || prevKey;
-
-      for (const t of targets) {
-        let ref = cfg;
-        for (const seg of t.path) ref = ref[seg];
-        Object.assign(ref, patch);
-      }
-
-      console.debug('[ddc:import] persist → saving', { patched: targets.length, keysTried: keys, patch });
-      await ll.saveConfig(cfg);
-      return true;
-    } catch (e) {
-      console.warn('[ddc:import] persist error', e);
+    // Scope strictly to THIS instance's storage_key
+    const targets = hits.filter(h => (h.card && h.card.storage_key) === this.storageKey);
+    if (!targets.length) {
+      console.debug('[ddc:import] persist: no card with matching storage_key found; aborting', { storageKey: this.storageKey });
       return false;
     }
-  }
 
-  /* Ensure this card's storage_key is unique on the page */
-  _enforceUniqueKeyOnPage() {
-    try {
-      const all = Array.from(document.querySelectorAll('drag-and-drop-card, custom\\:drag-and-drop-card'))
-        .filter(el => el !== this && el.storageKey === this.storageKey);
-      if (all.length) {
-        const old = this.storageKey;
-        this.storageKey = `${old}-${Math.random().toString(36).slice(2,6)}`;
-        // reflect in config and editor
-        this._config = { ...(this._config || {}), storage_key: this.storageKey };
-        if (typeof this._syncEditorsStorageKey === 'function') this._syncEditorsStorageKey();
-        try {
-          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-          this.dispatchEvent(new CustomEvent('config-changed', {
-            detail: { config: updated }, bubbles: true, composed: true
-          }));
-        } catch {}
-        console.warn('[ddc] Duplicate storage_key detected; reassigned for this instance.', { old, newKey: this.storageKey });
-      }
-    } catch {}
+    const patch = { type: 'custom:drag-and-drop-card', ...opts, storage_key: this.storageKey };
+
+    for (const t of targets) {
+      let ref = cfg;
+      for (const seg of t.path) ref = ref[seg];
+      Object.assign(ref, patch);
+    }
+
+    console.debug('[ddc:import] persist → saving (scoped)', { patched: targets.length, storage_key: this.storageKey });
+    await ll.saveConfig(cfg);
+    return true;
+  } catch (e) {
+    console.warn('[ddc:import] persist error', e);
+    return false;
   }
+}
 
 /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
