@@ -4397,23 +4397,132 @@ if (!customElements.get('drag-and-drop-card')) {
   function _getLovelace(){ try{ let hop=0,host=this; while(host&&hop++<20){ const root=host.getRootNode?.(); const r=root?.host; if(r?.tagName==='HUI-ROOT') return r.lovelace; host=r||host.parentElement; } const seen=new Set(),q=[document]; while(q.length){ const n=q.shift(); if(!n||seen.has(n)) continue; seen.add(n); if(n.host?.tagName==='HUI-ROOT') return n.host.lovelace; if(n.tagName==='HUI-ROOT') return n.lovelace; if(n.shadowRoot) q.push(n.shadowRoot); if(n.children) for(const c of n.children) q.push(c); } }catch{} }
   function _scanDdcCards(cfg){ const hits=[]; const push=(v,p,o)=>{ if(o?.type==='custom:drag-and-drop-card') hits.push({view:v,path:[...p],card:o}); }; const visit=(node,viewIdx,path)=>{ if(!node) return; if(Array.isArray(node)){ node.forEach((n,i)=>visit(n,viewIdx,path.concat(i))); return; } if(typeof node!=='object') return; if('type' in node) push(viewIdx,path,node); for(const [k,v] of Object.entries(node)){ if(k==='views'&&Array.isArray(v)) v.forEach((vv,i)=>visit(vv,i,['views',i])); else if(Array.isArray(v)) visit(v,viewIdx,path.concat(k)); else if(v&&typeof v==='object') visit(v,viewIdx,path.concat(k)); } }; visit(cfg,-1,[]); return hits; }
 
-  async function _persistOptionsToYaml(opts, { prevKey, noDownload, strict=true } = {}){
-    const ll = this._getLovelace?.() || _getLovelace.call(this); if(!ll||typeof ll.saveConfig!=='function') return false;
-    const keysToTry = Array.from(new Set([opts&&opts.storage_key,this.storageKey,this._config&&this._config.storage_key,prevKey].filter(Boolean)));
-    const cfg = JSON.parse(JSON.stringify(ll.config));
-    const hits = (this._scanDdcCards||_scanDdcCards)(cfg);
-    console.debug('[ddc:import] persist: found DDC cards', hits.map(h=>({view:h.view,path:h.path.join('.'),storage_key:h.card.storage_key||null})));
-    let matches = hits.filter(h => h.card && keysToTry.includes(h.card.storage_key));
-    if(!matches.length){ if(strict){ console.debug('[ddc:import] persist: no match for', {keysToTry}); return false; } else { if(hits.length===1) matches=hits.slice(0,1); else { console.debug('[ddc:import] persist: ambiguous; refusing'); return false; } } }
-    if(matches.length>1){ console.warn('[ddc:import] persist: duplicate storage_key; aborting', {keysToTry, matches:matches.map(m=>({view:m.view,path:m.path.join('.')}))}); return false; }
-    const targets = matches; const key = (targets[0].card&&targets[0].card.storage_key)||keysToTry[0]||null;
-    const patch = Object.assign({ type:'custom:drag-and-drop-card' }, opts); if(key && !patch.storage_key) patch.storage_key = key;
-    // backup (local-only, no download here)
-    try{ const when=new Date().toISOString().replace(/[:.]/g,'-'); const items=targets.map(t=>{ let ref=ll.config; for(const seg of t.path) ref=ref[seg]; return {view:t.view,path:t.path,storage_key:ref&&ref.storage_key||null,before:ref,patch}; }); const backup={kind:'ddc-import-backup',created_at:when,count:items.length,items}; const bkey=`ddc.backup.${when}`; localStorage.setItem(bkey, JSON.stringify(backup)); const all=Object.keys(localStorage).filter(k=>k.startsWith('ddc.backup.')).sort().reverse(); for(const k of all.slice(10)) localStorage.removeItem(k); }catch{}
-    for(const t of targets){ let ref=cfg; for(const seg of t.path) ref=ref[seg]; Object.assign(ref, patch); }
-    await ll.saveConfig(cfg); try{ const K='ddc.recent.keys'; const arr=JSON.parse(localStorage.getItem(K)||'[]'); if(key && !arr.includes(key)){ arr.unshift(key); localStorage.setItem(K, JSON.stringify(arr.slice(0,20))); } }catch{}
-    return true;
+  
+async function _persistOptionsToYaml(opts, { prevKey, noDownload, strict = true } = {}) {
+  const ll = this._getLovelace?.() || (function(){ try {
+    let hop = 0, host = this;
+    while (host && hop++ < 20) {
+      const root = host.getRootNode?.();
+      const rHost = root?.host;
+      if (rHost?.tagName === 'HUI-ROOT') return rHost.lovelace;
+      host = rHost || host.parentElement;
+    }
+    const seen = new Set(), q = [document];
+    while (q.length) {
+      const n = q.shift();
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      if (n.host?.tagName === 'HUI-ROOT') return n.host.lovelace;
+      if (n.tagName === 'HUI-ROOT') return n.lovelace;
+      if (n.shadowRoot) q.push(n.shadowRoot);
+      if (n.children) for (const c of n.children) q.push(c);
+    }
+  } catch(e) {} return undefined; }).call(this);
+  if (!ll || typeof ll.saveConfig !== 'function') return false;
+
+  const keysToTry = Array.from(new Set([
+    opts && opts.storage_key,
+    this.storageKey,
+    this._config && this._config.storage_key,
+    prevKey
+  ].filter(Boolean)));
+
+  const cfg = JSON.parse(JSON.stringify(ll.config));
+  const hits = (this._scanDdcCards || (function _scanDdcCards(cfg){
+    const hits=[]; const push=(v,p,o)=>{ if(o?.type==='custom:drag-and-drop-card') hits.push({view:v,path:[...p],card:o}); };
+    const visit=(node,viewIdx,path)=>{
+      if(!node) return;
+      if(Array.isArray(node)){ node.forEach((n,i)=>visit(n,viewIdx,path.concat(i))); return; }
+      if(typeof node!=='object') return;
+      if('type' in node) push(viewIdx,path,node);
+      for(const [k,v] of Object.entries(node)){
+        if(k==='views' && Array.isArray(v)) v.forEach((vv,i)=>visit(vv,i,['views',i]));
+        else if(Array.isArray(v)) visit(v,viewIdx,path.concat(k));
+        else if(v && typeof v==='object') visit(v,viewIdx,path.concat(k));
+      }
+    };
+    visit(cfg,-1,[]); return hits;
+  }))(cfg);
+
+  console.debug('[ddc:import] persist: found DDC cards',
+    hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
+
+  // 1) Try strict storage_key match
+  let matches = hits.filter(h => h.card && keysToTry.includes(h.card.storage_key));
+
+  // 2) DOM-index fallback: if no key match, map THIS element to its index among DDC elements in current view,
+  //    then patch only that corresponding config entry for the same view + index.
+  if (!matches.length) {
+    try {
+      const curView = ll.current_view ?? 0;
+      const viewRoot = (this.closest && this.closest('hui-view')) || (this.getRootNode && this.getRootNode().querySelector && this.getRootNode().querySelector('hui-view')) || null;
+      if (viewRoot) {
+        const els = Array.from(viewRoot.querySelectorAll('drag-and-drop-card'));
+        const idx = els.indexOf(this);
+        const inCur = hits.filter(h => h.view === curView);
+        if (idx >= 0 && inCur.length === els.length && inCur[idx]) {
+          matches = [inCur[idx]]; // select the config that corresponds to this element's order
+          console.debug('[ddc:import] persist: using DOM-index fallback', { index: idx, view: curView });
+        }
+      }
+    } catch (e) {
+      console.debug('[ddc:import] persist: DOM-index fallback failed', e);
+    }
   }
+
+  // 3) If still no match
+  if (!matches.length) {
+    if (strict) {
+      console.debug('[ddc:import] persist: no match for storage_key(s)', { keysToTry });
+      return false;
+    } else {
+      if (hits.length === 1) matches = hits.slice(0, 1);
+      else { console.debug('[ddc:import] persist: ambiguous without key; refusing to patch multiple.'); return false; }
+    }
+  }
+
+  // 4) Duplicates guard
+  if (matches.length > 1) {
+    console.warn('[ddc:import] persist: multiple cards match; aborting to avoid cross-updates.', {
+      keysToTry,
+      matches: matches.map(m => ({ view: m.view, path: m.path.join('.') }))
+    });
+    return false;
+  }
+
+  const targets = matches;
+  const key = (targets[0].card && targets[0].card.storage_key) || keysToTry[0] || null;
+
+  const patch = { type: 'custom:drag-and-drop-card', ...opts };
+  if (key && !patch.storage_key) patch.storage_key = key;
+
+  // local backup only (no download here unless caller wants it)
+  try {
+    const when = new Date().toISOString().replace(/[:.]/g,'-');
+    const items = targets.map(t => { let ref = ll.config; for (const seg of t.path) ref = ref[seg]; return { view: t.view, path: t.path, storage_key: (ref&&ref.storage_key)||null, before: ref, patch }; });
+    const backup = { kind: 'ddc-import-backup', created_at: when, count: items.length, items };
+    const bkey = `ddc.backup.${when}`;
+    localStorage.setItem(bkey, JSON.stringify(backup));
+    const all = Object.keys(localStorage).filter(k => k.startsWith('ddc.backup.')).sort().reverse();
+    for (const k of all.slice(10)) localStorage.removeItem(k);
+  } catch {}
+
+  // apply patch
+  for (const t of targets) {
+    let ref = cfg;
+    for (const seg of t.path) ref = ref[seg];
+    Object.assign(ref, patch);
+  }
+
+  await ll.saveConfig(cfg);
+  try {
+    const K = 'ddc.recent.keys';
+    const arr = JSON.parse(localStorage.getItem(K) || '[]');
+    if (key && !arr.includes(key)) { arr.unshift(key); localStorage.setItem(K, JSON.stringify(arr.slice(0, 20))); }
+  } catch {}
+
+  return true;
+}
 
   async function _fetchBackendKeys(){ try{ if(this?.hass?.callApi){ const r=await this.hass.callApi('get','dragdrop_storage'); if(Array.isArray(r)) return r; if(Array.isArray(r?.keys)) return r.keys; } }catch{} try{ const resp=await fetch('/api/dragdrop_storage',{cache:'no-store'}); const j=await resp.json(); if(Array.isArray(j)) return j; if(Array.isArray(j?.keys)) return j.keys; }catch{} return []; }
   async function _fetchLayoutByKey(key){ try{ if(this?.hass?.callApi){ const r=await this.hass.callApi('get',`dragdrop_storage/${encodeURIComponent(key)}`); if(r && (r.options||r.cards||r.design||r.payload)) return r.design||r.payload||r; } }catch{} try{ const resp=await fetch(`/api/dragdrop_storage/${encodeURIComponent(key)}`,{cache:'no-store'}); const j=await resp.json(); if(j && (j.options||j.cards||j.design||j.payload)) return j.design||j.payload||j; }catch{} return null; }
