@@ -459,7 +459,10 @@ _applyGridVars() {
     this._syncEditorsStorageKey();
 
 
-    // Store incoming config and update properties
+    
+    // Ensure unique key per-page
+    try { this._enforceUniqueKeyOnPage?.(); } catch {}
+// Store incoming config and update properties
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
     this.gridSize                 = Number(config.grid ?? 10);
@@ -3814,21 +3817,17 @@ this._initCardInteract(wrap);
           }
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        // Ignore imported storage_key to keep this instance isolated; reflect current key in editor if needed
         if (json?.options?.storage_key) {
-          const newKey = json.options.storage_key;
-          this._config = { ...(this._config || {}), storage_key: newKey };
-          this.storageKey = newKey;
-          this._syncEditorsStorageKey();
           try {
-            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
-            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}), storage_key: this.storageKey };
             this.dispatchEvent(new CustomEvent('config-changed', {
               detail: { config: updated },
               bubbles: true,
               composed: true,
             }));
           } catch {}
+        
         }
  // v1 fallback     
         
@@ -3836,7 +3835,7 @@ this._initCardInteract(wrap);
         try {
           const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
           if (toPersist) {
-            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey });
+            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey, patchAllInCurrentViewIfNoKey: false });
             console.debug('[ddc:import] YAML persist result:', ok);
           }
         } catch (e) {
@@ -3866,8 +3865,14 @@ this.cardContainer.innerHTML = '';
         }
         this._resizeContainer();
         this._markDirty('import');
-        this._toast('Design imported — click Apply to save.');
-      } catch (e) {
+        try {
+          await this._saveLayout(false);
+          this._toast('Design imported and saved.');
+        } catch (e) {
+          console.error('Auto-save after import failed', e);
+          this._toast('Design imported — saved locally; backend save failed.');
+        }
+        } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
       }
@@ -3923,7 +3928,7 @@ this.cardContainer.innerHTML = '';
     return hits;
   }
 
-  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = true } = {}) {
+  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
     try {
       const ll = this._getLovelace();
       if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
@@ -3980,6 +3985,29 @@ this.cardContainer.innerHTML = '';
       return false;
     }
   }
+
+  /* Ensure this card's storage_key is unique on the page */
+  _enforceUniqueKeyOnPage() {
+    try {
+      const all = Array.from(document.querySelectorAll('drag-and-drop-card, custom\\:drag-and-drop-card'))
+        .filter(el => el !== this && el.storageKey === this.storageKey);
+      if (all.length) {
+        const old = this.storageKey;
+        this.storageKey = `${old}-${Math.random().toString(36).slice(2,6)}`;
+        // reflect in config and editor
+        this._config = { ...(this._config || {}), storage_key: this.storageKey };
+        if (typeof this._syncEditorsStorageKey === 'function') this._syncEditorsStorageKey();
+        try {
+          const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: updated }, bubbles: true, composed: true
+          }));
+        } catch {}
+        console.warn('[ddc] Duplicate storage_key detected; reassigned for this instance.', { old, newKey: this.storageKey });
+      }
+    } catch {}
+  }
+
 /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
     // Always mark dirty so Apply becomes enabled
