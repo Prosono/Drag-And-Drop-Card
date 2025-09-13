@@ -852,8 +852,31 @@ _applyGridVars() {
 
           /* placeholder tile */
           .ddc-placeholder-inner{
-            display:flex;align-items:center;justify-content:center;width:100%;height:100%;
-            background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
+            display:flex; align-items:center; justify-content:center;
+            width:100%; height:100%;
+            padding:8px; box-sizing:border-box;
+            pointer-events:auto;
+          }
+          .ddc-placeholder-cta{
+            display:flex; align-items:center; justify-content:center; text-align:center;
+            width:100%; height:100%;
+            border-radius:18px;
+            background: linear-gradient(135deg, #6a11cb, #2575fc, #00c9ff, #92fe9d);
+            background-size: 300% 300%;
+            animation: ddc-flashy 6s ease infinite;
+            box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.25);
+            cursor: pointer;
+          }
+          .ddc-placeholder-cta .text{
+            font-weight:700; line-height:1.3; padding:10px 12px;
+            color:#fff;
+            text-shadow:0 2px 10px rgba(0,0,0,.35);
+            font-size:.95rem;
+          }
+          @keyframes ddc-flashy{
+            0%{ background-position:0% 50% }
+            50%{ background-position:100% 50% }
+            100%{ background-position:0% 50% }
           }
 
           /* --- hold-to-edit ring (cursor progress) --- */
@@ -1446,9 +1469,11 @@ _syncEmptyStateUI() {
   // Show Add button even outside edit mode when empty; style it as a CTA.
   const empty = this._isLayoutEmpty();
   if (this.addButton) {
-    const show = this.editMode || empty;
-    this.addButton.style.display = show ? 'inline-block' : 'none';
-    this.addButton.classList.toggle('cta-empty', !this.editMode && empty);
+    
+const show = this.editMode;
+this.addButton.style.display = show ? 'inline-block' : 'none';
+this.addButton.classList.remove('cta-empty');
+
   }
 
   // Keep other toolbar buttons hidden unless we’re in edit mode
@@ -1867,7 +1892,39 @@ _syncEmptyStateUI() {
     // purely decorative; nothing clickable
     inner.setAttribute('aria-hidden','true');
   
-    const shield = document.createElement('div');
+    
+    // Build flashy CTA inside the placeholder
+    inner.setAttribute('aria-hidden','false');
+    const cta = document.createElement('div');
+    cta.className = 'ddc-placeholder-cta';
+    cta.setAttribute('role','button');
+    cta.setAttribute('tabindex','0');
+    cta.setAttribute('aria-label','Add cards');
+    cta.innerHTML = `<div class="text">Hold me / double click me to add cards</div>`;
+    inner.appendChild(cta);
+
+    // Interactions: long-press or double-click to open card manager
+    const openMgr = (ev) => { try { ev?.preventDefault?.(); ev?.stopPropagation?.(); } catch {} this._openCardManager(); };
+    cta.addEventListener('dblclick', openMgr);
+    // long-press detection
+    (function attachLongPress(el, host){
+      let t=null, pid=null, sx=0, sy=0;
+      const HOLD_MS=800, DRIFT_PX=18;
+      const clear=()=>{ if(t){ clearTimeout(t); t=null;} pid=null; };
+      el.addEventListener('pointerdown', (e)=>{
+        try { e.stopPropagation(); } catch{}
+        pid = e.pointerId || 'mouse'; sx = e.clientX; sy = e.clientY;
+        t = setTimeout(()=>{ clear(); openMgr(e); }, HOLD_MS);
+      });
+      el.addEventListener('pointermove', (e)=>{
+        if(pid===(e.pointerId||'mouse') && t){
+          if(Math.abs(e.clientX-sx)>DRIFT_PX || Math.abs(e.clientY-sy)>DRIFT_PX){ clear(); }
+        }
+      });
+      window.addEventListener('pointerup', clear, { passive:true });
+      window.addEventListener('pointercancel', clear, { passive:true });
+    })(cta, this);
+const shield = document.createElement('div');
     shield.className = 'shield';
   
     wrap.append(inner, shield);
@@ -1913,7 +1970,7 @@ _syncEmptyStateUI() {
 
   _showEmptyPlaceholder() {
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    const p = this._makePlaceholderAt(0,0,100,100);
+    const p = this._makePlaceholderAt(0,0,200, 200);
     this.cardContainer.appendChild(p);
     this._resizeContainer();
     this._syncEmptyStateUI();
