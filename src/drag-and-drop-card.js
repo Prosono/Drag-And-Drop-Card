@@ -852,31 +852,8 @@ _applyGridVars() {
 
           /* placeholder tile */
           .ddc-placeholder-inner{
-            display:flex; align-items:center; justify-content:center;
-            width:100%; height:100%;
-            padding:8px; box-sizing:border-box;
-            pointer-events:auto;
-          }
-          .ddc-placeholder-cta{
-            display:flex; align-items:center; justify-content:center; text-align:center;
-            width:100%; height:100%;
-            border-radius:18px;
-            background: linear-gradient(135deg, #6a11cb, #2575fc, #00c9ff, #92fe9d);
-            background-size: 300% 300%;
-            animation: ddc-flashy 6s ease infinite;
-            box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.25);
-            cursor: pointer;
-          }
-          .ddc-placeholder-cta .text{
-            font-weight:700; line-height:1.3; padding:10px 12px;
-            color:#fff;
-            text-shadow:0 2px 10px rgba(0,0,0,.35);
-            font-size:.95rem;
-          }
-          @keyframes ddc-flashy{
-            0%{ background-position:0% 50% }
-            50%{ background-position:100% 50% }
-            100%{ background-position:0% 50% }
+            display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+            background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
           }
 
           /* --- hold-to-edit ring (cursor progress) --- */
@@ -922,6 +899,38 @@ _applyGridVars() {
             40%  { opacity:.7 }
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
+        
+          /* --- EMPTY STATE: 300x300 flashing gradient with instructions --- */
+          .ddc-placeholder{
+            min-width:300px; min-height:300px;
+          }
+          .ddc-placeholder-inner{
+            position:relative;
+            border-radius:12px;
+            /* animated gradient "flash" */
+            background: linear-gradient(135deg,
+              color-mix(in srgb, var(--primary-color, #03a9f4) 55%, transparent),
+              color-mix(in srgb, var(--accent-color, #ff4081) 55%, transparent),
+              color-mix(in srgb, var(--primary-color, #03a9f4) 55%, transparent)
+            );
+            background-size: 200% 200%;
+            animation: ddcGradientFlash 2.6s ease-in-out infinite alternate;
+          }
+          .ddc-placeholder-inner::after{
+            content: "hold me / double click me to enter edit mode";
+            position:absolute; inset:0;
+            display:flex; align-items:center; justify-content:center;
+            padding: 12px; text-align:center; line-height:1.3;
+            font-weight: 700; letter-spacing:.2px;
+            color: var(--primary-text-color, #fff);
+            text-shadow: 0 1px 2px rgba(0,0,0,.45);
+            pointer-events:none;
+          }
+          @keyframes ddcGradientFlash {
+            0%   { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+          }
+    
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -1438,16 +1447,7 @@ _installLongPressToEnterEdit() {
   };
 
   const onDblClick = (e) => {
-    
     if (this._isInHaEditorPreview()) return;
-    const onlyPlaceholder = this._isLayoutEmpty();
-    if (onlyPlaceholder) {
-      if (!this.editMode) this._toggleEditMode(true);
-      this._openCardManager();
-      return;
-    }
-    // fallback: old behavior
-if (this._isInHaEditorPreview()) return;
     if (!within(e.target) || isOverCard(e)) return;
     const toState = !this.editMode;
     this._toggleEditMode(toState);
@@ -1478,11 +1478,9 @@ _syncEmptyStateUI() {
   // Show Add button even outside edit mode when empty; style it as a CTA.
   const empty = this._isLayoutEmpty();
   if (this.addButton) {
-    
-const show = this.editMode;
-this.addButton.style.display = show ? 'inline-block' : 'none';
-this.addButton.classList.remove('cta-empty');
-
+    const show = this.editMode || empty;
+    this.addButton.style.display = show ? 'inline-block' : 'none';
+    this.addButton.classList.toggle('cta-empty', !this.editMode && empty);
   }
 
   // Keep other toolbar buttons hidden unless we’re in edit mode
@@ -1886,7 +1884,7 @@ this.addButton.classList.remove('cta-empty');
     return wrap;
   }
 
-  _makePlaceholderAt(x=0,y=0,w=200,h=200) {
+  _makePlaceholderAt(x=0, y=0, w=300, h=100) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -1901,41 +1899,7 @@ this.addButton.classList.remove('cta-empty');
     // purely decorative; nothing clickable
     inner.setAttribute('aria-hidden','true');
   
-    
-    // Add flashy CTA inside the placehold
-
-    // Build flashy CTA inside the placeholder
-    inner.setAttribute('aria-hidden','false');
-    const cta = document.createElement('div');
-    cta.className = 'ddc-placeholder-cta';
-    cta.setAttribute('role','button');
-    cta.setAttribute('tabindex','0');
-    cta.setAttribute('aria-label','Add cards');
-    cta.innerHTML = `<div class="text">Hold me / double click me to add cards</div>`;
-    inner.appendChild(cta);
-
-    // Interactions: long-press or double-click to open card manager
-    const openMgr = (ev) => { try { ev?.preventDefault?.(); ev?.stopPropagation?.(); } catch {} this._openCardManager(); };
-    cta.addEventListener('dblclick', openMgr);
-    // long-press detection
-    (function attachLongPress(el, host){
-      let t=null, pid=null, sx=0, sy=0;
-      const HOLD_MS=800, DRIFT_PX=18;
-      const clear=()=>{ if(t){ clearTimeout(t); t=null;} pid=null; };
-      el.addEventListener('pointerdown', (e)=>{
-        try { e.stopPropagation(); } catch{}
-        pid = e.pointerId || 'mouse'; sx = e.clientX; sy = e.clientY;
-        t = setTimeout(()=>{ clear(); openMgr(e); }, HOLD_MS);
-      });
-      el.addEventListener('pointermove', (e)=>{
-        if(pid===(e.pointerId||'mouse') && t){
-          if(Math.abs(e.clientX-sx)>DRIFT_PX || Math.abs(e.clientY-sy)>DRIFT_PX){ clear(); }
-        }
-      });
-      window.addEventListener('pointerup', clear, { passive:true });
-      window.addEventListener('pointercancel', clear, { passive:true });
-    })(cta, this);
-const shield = document.createElement('div');
+    const shield = document.createElement('div');
     shield.className = 'shield';
   
     wrap.append(inner, shield);
@@ -1981,7 +1945,7 @@ const shield = document.createElement('div');
 
   _showEmptyPlaceholder() {
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    const p = this._makePlaceholderAt(0,0,200, 200);
+    const p = this._makePlaceholderAt(0,0,100,100);
     this.cardContainer.appendChild(p);
     this._resizeContainer();
     this._syncEmptyStateUI();
