@@ -31,6 +31,26 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
+  _isInHaCardEditorOnly() {
+    // Walk up through shadow DOM hosts and parents to determine context.
+    let n = this;
+    while (n) {
+      const tag = (n.nodeType === 1 && n.localName) ? n.localName.toLowerCase() : '';
+      if (tag === 'hui-card-editor') return true;     // actual config editor
+      if (tag === 'hui-card-picker') return false;     // inside card picker list/grid
+      // Bail out explicitly if we detect the add-card dialog container
+      if (tag === 'ha-dialog' || tag === 'mwc-dialog') {
+        // Being inside a dialog isn't enough; editor check above decides true
+        // If we reach here without finding hui-card-editor, treat as not editor
+      }
+      const root = n.getRootNode && n.getRootNode();
+      n = n.parentElement || (root && root.host) || null;
+    }
+    return false;
+  }
+
+
+
   __booting = false;  
 
   constructor() {
@@ -457,29 +477,6 @@ _applyGridVars() {
     this._config = config;
     this.storageKey = config.storage_key;
     this._syncEditorsStorageKey();
-    // Optional: register/unregister in native HA Add Card picker to avoid hijacking default selection
-    try {
-      const list = (window.customCards = window.customCards || []);
-      const idx = list.findIndex(c => c.type === 'drag-and-drop-card');
-      if (this.registerInPicker) {
-        if (idx === -1) {
-          list.push({
-            type: 'drag-and-drop-card',
-            name: 'Drag & Drop Card',
-            description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
-            preview: false // keep false to avoid auto-preselect
-          });
-        } else {
-          list[idx].preview = false;
-          list[idx].name = 'Drag & Drop Card';
-          list[idx].description = 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.';
-        }
-      } else if (idx !== -1) {
-        // Remove to prevent native picker from defaulting to this card globally
-        list.splice(idx, 1);
-      }
-    } catch {}
-
 
 
     
@@ -488,8 +485,7 @@ _applyGridVars() {
 // Store incoming config and update properties
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
-        this.registerInPicker        = !!config.register_in_picker;
-this.gridSize                 = Number(config.grid ?? 10);
+    this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
     this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
@@ -3753,14 +3749,16 @@ this._initCardInteract(wrap);
   _applyImportedOptions(opts = {}, recalc = true) {
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
     // If storage_key changed, push it into HA editor immediately
-     if (this._isInHaEditorPreview()) {
+     if (this._isInHaCardEditorOnly()) {
        try {
          const updatedCfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+         if (this._isInHaCardEditorOnly()) {
          this.dispatchEvent(new CustomEvent('config-changed', {
            detail: { config: updatedCfg },
            bubbles: true,
            composed: true,
          }));
+         }
        } catch {}
      }
     }
@@ -3845,11 +3843,13 @@ this._initCardInteract(wrap);
         if (json?.options?.storage_key) {
           try {
             const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}), storage_key: this.storageKey };
+            if (this._isInHaCardEditorOnly()) {
             this.dispatchEvent(new CustomEvent('config-changed', {
               detail: { config: updated },
               bubbles: true,
               composed: true,
             }));
+            }
           } catch {}
         }
  // v1 fallback     
@@ -4116,6 +4116,22 @@ this.cardContainer.innerHTML = '';
 if (!customElements.get('drag-and-drop-card')) {
   customElements.define('drag-and-drop-card', DragAndDropCard);
 }
+
+/* Register in HA's card picker */
+(() => {
+  try {
+    const list = (window.customCards = window.customCards || []);
+    if (!list.some(c => c.type === 'drag-and-drop-card')) {
+      list.push({
+        type: 'drag-and-drop-card',   // no "custom:" here
+        name: 'Drag & Drop Card',
+        description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
+        preview: true
+      });
+    }
+  } catch (e) { /* no-op */ }
+})();
+
 
 /* ==========================================================================
    Integrated card-mod compatibility enhancements
