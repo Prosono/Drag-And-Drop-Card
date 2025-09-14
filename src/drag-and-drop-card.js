@@ -457,29 +457,6 @@ _applyGridVars() {
     this._config = config;
     this.storageKey = config.storage_key;
     this._syncEditorsStorageKey();
-    // Optional: register/unregister in native HA Add Card picker to avoid hijacking default selection
-    try {
-      const list = (window.customCards = window.customCards || []);
-      const idx = list.findIndex(c => c.type === 'drag-and-drop-card');
-      if (this.registerInPicker) {
-        if (idx === -1) {
-          list.push({
-            type: 'drag-and-drop-card',
-            name: 'Drag & Drop Card',
-            description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
-            preview: false // keep false to avoid auto-preselect
-          });
-        } else {
-          list[idx].preview = false;
-          list[idx].name = 'Drag & Drop Card';
-          list[idx].description = 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.';
-        }
-      } else if (idx !== -1) {
-        // Remove to prevent native picker from defaulting to this card globally
-        list.splice(idx, 1);
-      }
-    } catch {}
-
 
 
     
@@ -488,8 +465,7 @@ _applyGridVars() {
 // Store incoming config and update properties
     this.storageKey = config.storage_key || undefined;
     this._syncEditorsStorageKey();
-        this.registerInPicker        = !!config.register_in_picker;
-this.gridSize                 = Number(config.grid ?? 10);
+    this.gridSize                 = Number(config.grid ?? 10);
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
     this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
@@ -4116,6 +4092,22 @@ this.cardContainer.innerHTML = '';
 if (!customElements.get('drag-and-drop-card')) {
   customElements.define('drag-and-drop-card', DragAndDropCard);
 }
+
+/* Register in HA's card picker */
+(() => {
+  try {
+    const list = (window.customCards = window.customCards || []);
+    if (!list.some(c => c.type === 'drag-and-drop-card')) {
+      list.push({
+        type: 'drag-and-drop-card',   // no "custom:" here
+        name: 'Drag & Drop Card',
+        description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
+        preview: true
+      });
+    }
+  } catch (e) { /* no-op */ }
+})();
+
 
 /* ==========================================================================
    Integrated card-mod compatibility enhancements
