@@ -130,8 +130,6 @@ class DragAndDropCard extends HTMLElement {
       auto_save: true,
       auto_save_debounce: 800,
       container_size_mode: 'dynamic',
-      container_fixed_width: 400,
-      container_fixed_height: 400,
 
       // your baked-in hero image, if you want it visible by default
       hero_image:
@@ -1067,14 +1065,22 @@ _applyGridVars() {
 
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
-   // Boot/rebuild logic
+    // --- Boot/rebuild logic (replace your current if/else with this) ---
     this.__cfgReady = true;
-    if (keyChanged && this.__booted) {
-      this._initialLoad(true);
+
+    const fromEditor = this._isInHaEditorPreview();
+
+    // Rebuild in these cases:
+    // 1) storage_key changed (you already had this)
+    // 2) we're in the editor (user pressed Update and expects immediate changes)
+    if ((fromEditor || keyChanged) && this.__probed) {
+      if (!this.__booted) this.__booted = true;
+      this._initialLoad(true);              // full rebuild now
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
-      this._initialLoad();
+      this._initialLoad();                  // first boot
     } else {
+      // lightweight tweaks only, when nothing structural changed
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
