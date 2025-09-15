@@ -3807,15 +3807,29 @@ this._initCardInteract(wrap);
         const json = JSON.parse(txt);
         const __prevStorageKey = this.storageKey || (this._config && this._config.storage_key) || null;
 
-      // Apply options (if present) before building cards, but NEVER change storage_key here
-      if (json.options) {
-        const { storage_key: _ignored, ...optsNoKey } = json.options;
-        this._applyImportedOptions(optsNoKey, true);
-      } else if (typeof json.grid === 'number') {
-        this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
-      }
+        // Apply options (if present) before building cards
+          if (json.options) {
+            const { storage_key, ...optsNoKey } = json.options;
+            this._applyImportedOptions(optsNoKey, true);
+          }
+        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-// DO NOT touch this.storageKey or this._config.storage_key on import
+        // If a storage_key is present in options, make it the live config key AND inform HA editor
+        if (json?.options?.storage_key) {
+          const newKey = json.options.storage_key;
+          this._config = { ...(this._config || {}), storage_key: newKey };
+          this.storageKey = newKey;
+          this._syncEditorsStorageKey();
+          try {
+            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
+            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+            this.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: updated },
+              bubbles: true,
+              composed: true,
+            }));
+          } catch {}
+        }
  // v1 fallback     
         
         // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
@@ -3830,18 +3844,24 @@ this._initCardInteract(wrap);
         }
 
         // --- DDC: persist imported options to Lovelace YAML so file-imports stick ---
-        // Persist imported options to Lovelace YAML WITHOUT changing storage_key
         try {
-          const prevKey = this.storageKey || (this._config && this._config.storage_key) || null;
-          const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
-          if (toPersist) {
-            const { storage_key: _ignored, ...optsNoKey } = toPersist;
-            await (this._persistOptionsToYaml?.call(this, { ...optsNoKey, storage_key: prevKey }, { prevKey, noDownload: true }) || false);
-            // Do NOT modify live storageKey here
+          const __prevKey = this.storageKey || (this._config && this._config.storage_key) || null;
+          const __toPersist = (json && json.options) ? json.options : (typeof json?.grid === 'number' ? { grid: json.grid } : null);
+          if (__toPersist) {
+            if (json?.options?.storage_key) {
+              // ensure live storage_key matches import before saving
+              this.storageKey = json.options.storage_key;
+              this._config = { ...(this._config || {}), storage_key: json.options.storage_key };
+              try { this._syncEditorsStorageKey?.(); } catch {}
+            }
+            const __ok = await (this._persistOptionsToYaml?.call(this, __toPersist, { prevKey: __prevKey, noDownload: true }) || false);
+            console.debug('[ddc:import] YAML persist (file import) result:', __ok);
+            try {
+              const __updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+              this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: __updated }, bubbles: true, composed: true }));
+            } catch {}
           }
-        } catch (e) {
-          console.warn('[ddc:import] YAML persist failed:', e);
-        }
+        } catch(e) { console.warn('[ddc:import] persist block failed', e); }
 this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
@@ -3866,8 +3886,7 @@ this.cardContainer.innerHTML = '';
         }
         this._resizeContainer();
         this._markDirty('import');
-        await this._saveLayout(false);    // save under THIS card’s key
-        this._toast('Design imported and saved.');
+        this._toast('Design imported — click Apply to save.');
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -4562,21 +4581,14 @@ if (!customElements.get('drag-and-drop-card')) {
       fill();
       btn.addEventListener('click', fill);
       select.addEventListener('change', async (e) => {
-        const sourceKey = e.target.value; // layout to COPY FROM
-        if (!sourceKey) return;
+        const newKey = e.target.value;
         if (this._ddcLoadingFromKey) return;
         this._ddcLoadingFromKey = true;
-
         try {
-          const design = await _fetchLayoutByKey.call(this, sourceKey);
-          if (!design) { this._toast?.(`No layout found for "${sourceKey}"`); return; }
-
-          // IMPORTANT: do NOT pass a newKey and do NOT touch storage_key here.
-          await this._applyDesignObject?.(design, { source: 'switcher', newKey: null });
-
-          // Persist the applied design under THIS card’s existing storage_key.
-          await this._saveLayout?.(false);
-        } catch (err) {
+          const design = await _fetchLayoutByKey.call(this, newKey);
+          if (!design) { this._toast?.(`No layout found for "${newKey}"`); return; }
+          await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
+        } catch(err) {
           console.warn('[ddc:switcher] load/apply failed', err);
           this._toast?.('Failed to load layout.');
         } finally {
@@ -4612,85 +4624,4 @@ if (!customElements.get('drag-and-drop-card')) {
     }
   } catch(e){ console.warn('[ddc:switcher] wrap hass setter failed', e); }
 })();
-
 /* ==== /DDC AUGMENTATION v6 ==== */
-
-/* ==== DDC: keep key + persist only THIS instance ==== */
-/* ==== DDC: apply design locally (keep storage_key) + rebuild + safe persist ==== */
-(() => {
-  const TAG = 'drag-and-drop-card';
-  const Cls = customElements.get(TAG);
-  if (!Cls) return;
-
-  Cls.prototype._applyDesignObject = async function (json, { source = 'switcher', newKey = null } = {}) {
-    if (!json || typeof json !== 'object') {
-      this._toast?.('Invalid design payload.');
-      return;
-    }
-
-    // Keep THIS instance's key, never take it from the payload or UI.
-    const keepKey = this.storageKey || this._config?.storage_key || null;
-
-    // 1) Apply options locally (drop any incoming storage_key)
-    try {
-      const opts = json.options || {};
-      const { storage_key: _ignored, ...optsNoKey } = opts;
-      this._applyImportedOptions?.(optsNoKey, true);
-    } catch {}
-
-    // 2) Rebuild canvas from json.cards (live)
-    try {
-      this.cardContainer.innerHTML = '';
-      const list = Array.isArray(json.cards) ? json.cards : [];
-
-      if (list.length) {
-        for (const conf of list) {
-          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            const p = this._makePlaceholderAt?.(
-              conf.position?.x || 0,
-              conf.position?.y || 0,
-              conf.size?.width || 100,
-              conf.size?.height || 100
-            );
-            if (p) this.cardContainer.appendChild(p);
-            continue;
-          }
-          const el = await this._createCard(conf.card);
-          const wrap = this._makeWrapper(el);
-          this._setCardPosition?.(wrap, conf.position?.x || 0, conf.position?.y || 0);
-          wrap.style.width  = `${conf.size?.width  || 140}px`;
-          wrap.style.height = `${conf.size?.height || 100}px`;
-          if (conf.z != null) wrap.style.zIndex = String(conf.z);
-          this.cardContainer.appendChild(wrap);
-          try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
-          this._initCardInteract?.(wrap);
-        }
-      } else {
-        this._showEmptyPlaceholder?.();
-      }
-
-      this._resizeContainer?.();
-      this._markDirty?.('apply-design');
-      if (source === 'switcher') this._toast?.('Layout loaded (local).');
-    } catch (e) {
-      console.warn('[ddc:apply] rebuild failed', e);
-      this._toast?.('Failed to render cards from the design.');
-    }
-
-    // 3) Persist only this instance’s options back to YAML (safe, single-match)
-    try {
-      const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
-      const { storage_key: _drop, ...optsNoKey } = toPersist || {};
-      await this._persistOptionsToYaml?.(optsNoKey, { prevKey: keepKey, noDownload: (source === 'switcher') });
-
-      // Make sure the instance still “knows” its own key locally
-      if (keepKey) {
-        this.storageKey = keepKey;
-        this._config = { ...(this._config || {}), storage_key: keepKey };
-        try { this._syncEditorsStorageKey?.(); } catch {}
-      }
-    } catch (e) {
-      console.warn('[ddc:apply] persist-after-apply failed', e);
-    }
-  };
-})();
