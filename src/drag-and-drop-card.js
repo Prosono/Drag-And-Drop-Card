@@ -3816,44 +3816,34 @@ this._initCardInteract(wrap);
 
  // v1 fallback     
         
-        // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
-      // Target = this card's key only; ignore any storage_key in the file
-      try {
-        const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
-        const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
+  // DDC: Persist imported design (options + cards) into stored Lovelace YAML
+  try {
+    const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
 
-        if (!targetKey) {
-          console.warn('[ddc:import] No storage_key on this card; aborting persist.');
-        } else if (toPersist) {
-          const ok = await this._persistOptionsToYaml(toPersist, {
-            forceTargetKey: String(targetKey),
-            noDownload: true,         // or false if you want a backup download
-          });
-          console.debug('[ddc:import] YAML persist result:', ok);
-        }
-      } catch (e) {
-        console.warn('[ddc:import] YAML persist failed:', e);
-      }
+    // Build a patch that includes options AND cards
+    const designPatch = {
+      ...(json.options ?? {}),
+    };
+    if (Array.isArray(json.cards)) {
+      designPatch.cards = json.cards;
+    } else if (typeof json.grid === 'number') {
+      // v1 fallback for grid-only layouts
+      designPatch.grid = json.grid;
+    }
 
-        // --- DDC: persist imported options to Lovelace YAML so file-imports stick ---
-        try {
-          const __prevKey = this.storageKey || (this._config && this._config.storage_key) || null;
-          const __toPersist = (json && json.options) ? json.options : (typeof json?.grid === 'number' ? { grid: json.grid } : null);
-          if (__toPersist) {
-            if (json?.options?.storage_key) {
-              // ensure live storage_key matches import before saving
-              this.storageKey = json.options.storage_key;
-              this._config = { ...(this._config || {}), storage_key: json.options.storage_key };
-              try { this._syncEditorsStorageKey?.(); } catch {}
-            }
-            const __ok = await (this._persistOptionsToYaml?.call(this, __toPersist, { prevKey: __prevKey, noDownload: true }) || false);
-            console.debug('[ddc:import] YAML persist (file import) result:', __ok);
-            try {
-              const __updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-              this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: __updated }, bubbles: true, composed: true }));
-            } catch {}
-          }
-        } catch(e) { console.warn('[ddc:import] persist block failed', e); }
+    if (!targetKey) {
+      console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+    } else if (Object.keys(designPatch).length) {
+      const ok = await this._persistOptionsToYaml(designPatch, {
+        forceTargetKey: String(targetKey),
+        noDownload: true, // set false if you want a backup download prompt
+      });
+      console.debug('[ddc:import] YAML persist result:', ok);
+    }
+  } catch (e) {
+    console.warn('[ddc:import] YAML persist failed:', e);
+  }
+
 this.cardContainer.innerHTML = '';
         if (json.cards?.length) {
           for (const conf of json.cards) {
