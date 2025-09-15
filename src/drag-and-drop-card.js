@@ -3943,7 +3943,7 @@ this.cardContainer.innerHTML = '';
     return hits;
   }
 
-  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = true } = {}) {
+  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
     try {
       const ll = this._getLovelace();
       if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
@@ -3967,12 +3967,11 @@ this.cardContainer.innerHTML = '';
       let targets = hits.filter(h => h.card.storage_key && keys.includes(h.card.storage_key));
 
       // If no exact match: if only one DDC in current view, target it
-      if (!targets.length) {
+       if (!targets.length) {
         const inCur = hits.filter(h => h.view === curView);
-        if (inCur.length === 1) targets = inCur;
-        // Otherwise optionally patch all in current view to force key + options in
-        else if (patchAllInCurrentViewIfNoKey && inCur.length >= 1) targets = inCur;
-      }
+         if (inCur.length === 1) targets = inCur;   // safe only if exactly one
+         // else: no target → abort instead of touching multiple cards
+       }
 
       // As a last resort, if there is only one DDC overall, patch it
       if (!targets.length && hits.length === 1) targets = hits;
@@ -3982,15 +3981,36 @@ this.cardContainer.innerHTML = '';
         return false;
       }
 
-      // Ensure storage_key is written so future imports can match precisely
-      const patch = { type: 'custom:drag-and-drop-card', ...opts };
-      if ((newKey || prevKey) && !patch.storage_key) patch.storage_key = newKey || prevKey;
-
-      for (const t of targets) {
-        let ref = cfg;
-        for (const seg of t.path) ref = ref[seg];
-        Object.assign(ref, patch);
-      }
+       // Build a patch for options ONLY — never stamp a global storage_key into multiple cards
+       const basePatch = { type: 'custom:drag-and-drop-card', ...opts };
+       // Remove any incoming storage_key so it doesn't overwrite per-card keys accidentally
+       if ('storage_key' in basePatch) delete basePatch.storage_key;
+       if ('storageKey' in basePatch)  delete basePatch.storageKey;
+ 
+       for (const t of targets) {
+         // Resolve the YAML object to patch
+         let ref = cfg;
+         for (const seg of t.path) ref = ref[seg];
+ 
+         // Remember the card’s existing key (support legacy camelCase & nested)
+         const existingKey =
+           ref?.storage_key ?? ref?.storageKey ?? ref?.options?.storage_key ?? ref?.options?.storageKey ?? null;
+ 
+         // Decide if this specific card is being renamed (only when prevKey→newKey and it matches)
+         const shouldRename = !!(prevKey && newKey && existingKey === prevKey && newKey !== prevKey);
+ 
+         // Apply options WITHOUT a key
+         Object.assign(ref, basePatch);
+ 
+         // Restore / set the right key per-card
+         if (shouldRename) {
+           ref.storage_key = String(newKey);
+         } else if (existingKey) {
+           ref.storage_key = String(existingKey);
+         }
+         // Clean up legacy field
+         if ('storageKey' in ref) delete ref.storageKey;
+       }
 
       console.debug('[ddc:import] persist → saving', { patched: targets.length, keysTried: keys, patch });
       await ll.saveConfig(cfg);
