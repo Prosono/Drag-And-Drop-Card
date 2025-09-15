@@ -4608,100 +4608,83 @@ if (!customElements.get('drag-and-drop-card')) {
 /* ==== /DDC AUGMENTATION v6 ==== */
 
 /* ==== DDC: keep key + persist only THIS instance ==== */
+/* ==== DDC: apply design locally (keep storage_key) + rebuild canvas ==== */
 (() => {
   const TAG = 'drag-and-drop-card';
   const Cls = customElements.get(TAG);
   if (!Cls) return;
 
-  /* 1) Never take storage_key from imported options */
-  if (!Cls.prototype.__ddc_orig_applyImportedOptions) {
-    Cls.prototype.__ddc_orig_applyImportedOptions = Cls.prototype._applyImportedOptions;
-    Cls.prototype._applyImportedOptions = function (opts = {}, recalc = true) {
-      try { console.debug('[ddc:patch] _applyImportedOptions (drop storage_key)', { incoming: opts }); } catch {}
-      const { storage_key: _ignored, ...rest } = opts || {};
-      return this.__ddc_orig_applyImportedOptions.call(this, rest, recalc);
-    };
-  }
+  Cls.prototype._applyDesignObject = async function (json, { source = 'switcher', newKey = null } = {}) {
+    if (!json || typeof json !== 'object') {
+      this._toast?.('Invalid design payload.');
+      return;
+    }
 
-  /* 2) Persist ONLY this instance’s card in YAML */
-  Cls.prototype._persistOptionsToYaml = async function (opts = {}, { prevKey = null, noDownload = true } = {}) {
+    // 1) Keep current storage_key – never take it from the payload
+    const keepKey = this.storageKey || this._config?.storage_key || null;
+
+    // 2) Apply options locally (strip any incoming storage_key)
     try {
-      const ll = this._getLovelace?.();
-      if (!ll || typeof ll.saveConfig !== 'function') {
-        console.debug('[ddc:patch] persist: no Lovelace root / storage dashboard');
-        return false;
-      }
+      const opts = json.options || {};
+      const { storage_key: _ignored, ...optsNoKey } = opts;
+      this._applyImportedOptions?.(optsNoKey, true);
+    } catch {}
 
-      const cfg  = JSON.parse(JSON.stringify(ll.config));
-      const hits = (this._scanDdcCards?.(cfg) || []).filter(h => h?.card?.type === 'custom:drag-and-drop-card');
-      const curView = ll.current_view ?? 0;
-      const inView  = hits.filter(h => h.view === curView);
+    // 3) Rebuild canvas from json.cards (live, for THIS instance)
+    try {
+      this.cardContainer.innerHTML = '';
 
-      // --- DOM → index inside this view
-      const findViewHost = (node) => {
-        let n = node;
-        for (let i = 0; i < 40 && n; i++) {
-          const root = n.getRootNode?.();
-          const host = root?.host;
-          if (host && /^(HUI-VIEW|HUI-PANEL-.*|HUI-ROOT)$/i.test(host.tagName || '')) return host;
-          n = host || n?.parentElement || null;
+      const list = Array.isArray(json.cards) ? json.cards : [];
+      if (list.length) {
+        for (const conf of list) {
+          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+            // empty slot -> placeholder
+            const p = this._makePlaceholderAt?.(
+              conf.position?.x || 0,
+              conf.position?.y || 0,
+              conf.size?.width || 100,
+              conf.size?.height || 100
+            );
+            if (p) this.cardContainer.appendChild(p);
+            continue;
+          }
+          const el = await this._createCard(conf.card);
+          const wrap = this._makeWrapper(el);
+          this._setCardPosition?.(wrap, conf.position?.x || 0, conf.position?.y || 0);
+          wrap.style.width  = `${conf.size?.width  || 140}px`;
+          wrap.style.height = `${conf.size?.height || 100}px`;
+          if (conf.z != null) wrap.style.zIndex = String(conf.z);
+          this.cardContainer.appendChild(wrap);
+          try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
+          this._initCardInteract?.(wrap);
         }
-        return null;
-      };
-      const viewHost = findViewHost(this) || document.body;
-      let domCards = [];
-      try {
-        const root = viewHost.shadowRoot || viewHost;
-        domCards = Array.from(root.querySelectorAll('drag-and-drop-card'));
-      } catch {}
-      if (!domCards.length) domCards = Array.from(document.querySelectorAll('drag-and-drop-card'));
-
-      const currentKey = this.storageKey || this._config?.storage_key || null;
-
-      // Rank among DOM cards with the same key
-      const domSameKey  = currentKey ? domCards.filter(c => (c.storageKey || c._config?.storage_key) === currentKey) : [];
-      const sameKeyRank = currentKey ? domSameKey.indexOf(this) : -1;
-
-      let target = null;
-
-      // 1) Prefer same-key + same ordinal
-      if (currentKey && sameKeyRank >= 0) {
-        const yamlSameKey = inView.filter(h => h.card?.storage_key === currentKey);
-        if (yamlSameKey[sameKeyRank]) target = yamlSameKey[sameKeyRank];
-      }
-      // 2) Fallback: overall DOM index inside this view
-      if (!target) {
-        const idxAll = domCards.indexOf(this);
-        if (idxAll >= 0 && inView[idxAll]) target = inView[idxAll];
-      }
-      // 3) Fallback: unique key match in this view
-      if (!target && currentKey) {
-        const uniques = inView.filter(h => h.card?.storage_key === currentKey);
-        if (uniques.length === 1) target = uniques[0];
+      } else {
+        this._showEmptyPlaceholder?.();
       }
 
-      if (!target) {
-        this._toast?.('Could not locate this DDC in YAML to save. Give THIS card a unique storage_key.');
-        console.debug('[ddc:patch] persist: no target', { currentKey, inViewKeys: inView.map(h => h.card?.storage_key) });
-        return false;
-      }
-
-      // Build patch — NEVER overwrite storage_key with incoming value
-      const { storage_key: _ignored, ...rest } = opts || {};
-      const finalKey = target.card.storage_key || currentKey || prevKey || null;
-      const patch = { type: 'custom:drag-and-drop-card', ...rest, storage_key: finalKey };
-
-      // Apply the patch at the located path
-      let ref = cfg;
-      for (const seg of target.path) ref = ref[seg];
-      Object.assign(ref, patch);
-
-      await ll.saveConfig(cfg);
-      console.debug('[ddc:patch] persist OK', { finalKey, path: target.path.join('.') });
-      return true;
+      this._resizeContainer?.();
+      this._markDirty?.('apply-design');
+      if (source === 'switcher') this._toast?.('Layout loaded (local).');
     } catch (e) {
-      console.warn('[ddc:patch] persist error', e);
-      return false;
+      console.warn('[ddc:apply] rebuild failed', e);
+      this._toast?.('Failed to render cards from the design.');
+    }
+
+    // 4) Persist ONLY this instance back to YAML, keeping the card’s key
+    try {
+      const toPersist =
+        json.options ??
+        (typeof json.grid === 'number' ? { grid: json.grid } : {});
+      const { storage_key: _drop, ...optsNoKey } = toPersist || {};
+      await this._persistOptionsToYaml?.(optsNoKey, { prevKey: keepKey, noDownload: (source === 'switcher') });
+      // restore/ensure the live key on the instance
+      if (keepKey) {
+        this.storageKey = keepKey;
+        this._config = { ...(this._config || {}), storage_key: keepKey };
+        try { this._syncEditorsStorageKey?.(); } catch {}
+      }
+    } catch (e) {
+      console.warn('[ddc:apply] persist-after-apply failed', e);
     }
   };
 })();
