@@ -3814,34 +3814,26 @@ this._initCardInteract(wrap);
           }
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
-        // If a storage_key is present in options, make it the live config key AND inform HA editor
-        if (json?.options?.storage_key) {
-          const newKey = json.options.storage_key;
-          this._config = { ...(this._config || {}), storage_key: newKey };
-          this.storageKey = newKey;
-          this._syncEditorsStorageKey();
-          try {
-            // Tell Lovelace editor that our card config changed so the storage key shows up in the UI immediately
-            const updated = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
-            this.dispatchEvent(new CustomEvent('config-changed', {
-              detail: { config: updated },
-              bubbles: true,
-              composed: true,
-            }));
-          } catch {}
-        }
  // v1 fallback     
         
         // DDC: Persist imported options into stored Lovelace YAML (Storage mode)
-        try {
-          const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
-          if (toPersist) {
-            const ok = await this._persistOptionsToYaml(toPersist, { prevKey: __prevStorageKey });
-            console.debug('[ddc:import] YAML persist result:', ok);
-          }
-        } catch (e) {
-          console.warn('[ddc:import] YAML persist failed:', e);
+      // Target = this card's key only; ignore any storage_key in the file
+      try {
+        const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
+        const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : null);
+
+        if (!targetKey) {
+          console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+        } else if (toPersist) {
+          const ok = await this._persistOptionsToYaml(toPersist, {
+            forceTargetKey: String(targetKey),
+            noDownload: true,         // or false if you want a backup download
+          });
+          console.debug('[ddc:import] YAML persist result:', ok);
         }
+      } catch (e) {
+        console.warn('[ddc:import] YAML persist failed:', e);
+      }
 
         // --- DDC: persist imported options to Lovelace YAML so file-imports stick ---
         try {
