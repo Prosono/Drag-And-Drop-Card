@@ -220,6 +220,14 @@ class DragAndDropCard extends HTMLElement {
     // Set incoming values (keep type + unknown keys)
     el.setConfig = (config = {}) => {
       el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
+
+
+      // If no storage_key yet, create one and plan to persist automatically
+      if (!el._config.storage_key) {
+        el._config.storage_key = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
+        el.__autokeyPending = true;  // <- remember to fire once after UI binds
+      }
+      // populate fields from el._config (not raw config)
       el.querySelector('#storage_key').value = config.storage_key || '';
       el.querySelector('#grid').value = config.grid ?? 10;
       el.querySelector('#liveSnap').checked = !!config.drag_live_snap;
@@ -230,7 +238,7 @@ class DragAndDropCard extends HTMLElement {
       el.querySelector('#debug').checked = !!config.debug;
       el.querySelector('#noOverlap').checked = !!config.disable_overlap;
 
-      // NEW
+      // NEW sizing fields
       el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
       el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
       el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
@@ -244,6 +252,12 @@ class DragAndDropCard extends HTMLElement {
 
       toggleSizeControls();
       updateButtons();
+
+      // If we just generated a key, immediately persist it so the dashboard saves it
+      if (el.__autokeyPending) {
+        el.__autokeyPending = false;
+        fire(); // uses your existing fire() below to dispatch 'config-changed'
+      }
     };
 
     // Collect current values
