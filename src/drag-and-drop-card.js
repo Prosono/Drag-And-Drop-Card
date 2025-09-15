@@ -3814,61 +3814,64 @@ this._initCardInteract(wrap);
           }
         else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
 
- // v1 fallback     
-        
-  // DDC: Persist imported design (options + cards) into stored Lovelace YAML
-  try {
-    const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
+        // v1 fallback     
+                
+          // DDC: Persist imported design (options + cards) into stored Lovelace YAML
+          try {
+            const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
 
-    // Build a patch that includes options AND cards
-    const designPatch = {
-      ...(json.options ?? {}),
-    };
-    if (Array.isArray(json.cards)) {
-      designPatch.cards = json.cards;
-    } else if (typeof json.grid === 'number') {
-      // v1 fallback for grid-only layouts
-      designPatch.grid = json.grid;
-    }
+            // Persist OPTIONS (not cards) to Lovelace YAML for this card only
+            const importedOptions =
+              json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
 
-    if (!targetKey) {
-      console.warn('[ddc:import] No storage_key on this card; aborting persist.');
-    } else if (Object.keys(designPatch).length) {
-      const ok = await this._persistOptionsToYaml(designPatch, {
-        forceTargetKey: String(targetKey),
-        noDownload: true, // set false if you want a backup download prompt
-      });
-      console.debug('[ddc:import] YAML persist result:', ok);
-    }
-  } catch (e) {
-    console.warn('[ddc:import] YAML persist failed:', e);
-  }
-
-this.cardContainer.innerHTML = '';
-        if (json.cards?.length) {
-          for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
-              this.cardContainer.appendChild(p);
+            if (!targetKey) {
+              console.warn('[ddc:import] No storage_key on this card; aborting persist.');
             } else {
-              const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-              wrap.style.width  = `${conf.size?.width||140}px`;
-              wrap.style.height = `${conf.size?.height||100}px`;
-              if (conf.z != null) wrap.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(wrap);
-              
-            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-            this._initCardInteract(wrap);
+              const result = await this._persistOptionsToYaml(importedOptions, {
+                forceTargetKey: String(targetKey),
+                noDownload: true,
+              });
+              const yamlOk = !!(result && result.yamlSaved);
+              console.debug('[ddc:import] YAML persist result:', yamlOk);
             }
+
+
+          } catch (e) {
+            console.warn('[ddc:import] YAML persist failed:', e);
+          }
+
+          this.cardContainer.innerHTML = '';
+          if (json.cards?.length) {
+            for (const conf of json.cards) {
+                if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+                  const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                  this.cardContainer.appendChild(p);
+                } else {
+                  const el = await this._createCard(conf.card);
+                  const wrap = this._makeWrapper(el);
+                  this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+                  wrap.style.width  = `${conf.size?.width||140}px`;
+                  wrap.style.height = `${conf.size?.height||100}px`;
+                  if (conf.z != null) wrap.style.zIndex = String(conf.z);
+                  this.cardContainer.appendChild(wrap);
+                  
+                try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+                this._initCardInteract(wrap);
+                }
           }
         } else {
           this._showEmptyPlaceholder();
         }
         this._resizeContainer();
+      // Persist the imported layout (cards) to our storage (backend/local) for THIS storage_key
+      try {
+        await this._saveLayout(true);  // 'true' means silent toast; change to false if you want the "Layout saved." toast
+        this._toast('Design imported & saved.');
+      } catch (e) {
+        console.warn('[ddc:import] saveLayout failed', e);
         this._markDirty('import');
         this._toast('Design imported — click Apply to save.');
+      }
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -4409,6 +4412,9 @@ async function _persistOptionsToYaml(opts, {
     if ('storage_key' in patch.options) delete patch.options.storage_key;
     if ('storageKey'  in patch.options) delete patch.options.storageKey;
   }
+     // IMPORTANT: do NOT put the actual layout into Lovelace YAML
+   const cardsForStorage = Array.isArray(patch.cards) ? patch.cards : null;
+   delete patch.cards;
 
   // Optional: backup (keeps your previous behavior if helpers exist)
   try {
@@ -4447,7 +4453,8 @@ async function _persistOptionsToYaml(opts, {
   });
 
   await ll.saveConfig(cfg);
-  return true;
+  // Let the caller know if there were cards to save elsewhere
+  return { yamlSaved: true, cardsForStorage };
 }
 
   async function _fetchBackendKeys() {
