@@ -110,44 +110,6 @@ class DragAndDropCard extends HTMLElement {
     } catch {}
   }
 
-  // Handle edits coming from child card editors (live apply without page refresh)
-  async _onChildConfigChanged(ev) {
-    // Ignore edits for *this* card’s own config (HA editor for the container)
-    const cfg = ev.detail?.config;
-    if (!cfg || cfg?.type === 'custom:drag-and-drop-card') return;
-
-    // We only care if the event came from one of our child cards
-    const target = ev.target;
-    const wrap = target?.closest?.('.card-wrapper');
-    if (!wrap || wrap.parentElement !== this.cardContainer) return;
-
-    // We will handle it; don’t let HA/others double-handle
-    ev.stopPropagation();
-
-    try {
-      // 1) Rebuild the edited child with the new config
-      const newEl = await this._createCard(cfg);
-      if (this._hass) newEl.hass = this._hass;
-
-      // 2) Update our cached config on the wrapper for persistence
-      try { wrap.dataset.cfg = JSON.stringify(cfg); } catch {}
-
-      // 3) Swap DOM node
-      const oldEl = wrap.firstElementChild;
-      if (oldEl) oldEl.replaceWith(newEl); else wrap.appendChild(newEl);
-
-      // 4) Make sure nested styles / card-mod / signals re-attach
-      try { this._rebuildOnce(newEl); } catch {}
-      try { this._processCardModOnce?.(); } catch {}
-
-      // 5) Persist updated layout
-      this._queueSave?.('edit');
-    } catch (e) {
-      console.warn('[DDC] Failed to live-apply child edit:', e);
-    }
-  }
-  
-
   /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
@@ -515,6 +477,8 @@ _applyGridVars() {
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
     this.containerPreset          = config.container_preset || 'fullhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
+    this.heroImage = config?.hero_image || "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png";
+
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
@@ -867,8 +831,49 @@ _applyGridVars() {
 
           /* placeholder tile */
           .ddc-placeholder-inner{
-            display:flex;align-items:center;justify-content:center;width:100%;height:100%;
-            background:repeating-conic-gradient(from 45deg, rgba(0,0,0,.05) 0% 25%, transparent 0% 50%) 50% / 14px 14px;pointer-events: none;
+            position: relative;
+            display:flex; align-items:center; justify-content:center;
+            width:100%; height:100%;
+            border-radius:16px;
+            overflow: hidden;
+            /* cool gradient derived from HA primary color */
+            background:
+              radial-gradient(120% 120% at 100% 0%,
+                color-mix(in srgb, var(--primary-color) 18%, #000 0%) 0%,
+                transparent 60%),
+              linear-gradient(135deg,
+                color-mix(in srgb, var(--primary-color) 70%, #000 0%) 0%,
+                color-mix(in srgb, var(--primary-color) 35%, #000 0%) 100%);
+          }
+
+          /* subtle shine */
+          .ddc-placeholder-inner::after{
+            content:"";
+            position:absolute; inset:0;
+            background: radial-gradient(120% 90% at 0% 100%, rgba(255,255,255,.15), transparent 60%);
+            pointer-events:none;
+          }
+
+          /* center stack */
+          .ddc-hero{
+            position:absolute; inset:0;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:16px; text-align:center; padding:24px;
+            color:rgba(255,255,255,.98);
+            text-shadow:0 1px 2px rgba(0,0,0,.35);
+            user-select:none; pointer-events:none; /* click goes to shield below */
+          }
+
+          .ddc-hero img{
+            width:128px; height:128px; object-fit:contain; opacity:.95; filter: drop-shadow(0 4px 14px rgba(0,0,0,.25));
+          }
+
+          .ddc-hero .ddc-title{
+            font-weight:800; font-size:1.25rem; letter-spacing:.2px;
+          }
+
+          .ddc-hero .ddc-sub{
+            font-weight:600; opacity:.95;
           }
 
           /* --- hold-to-edit ring (cursor progress) --- */
@@ -1039,10 +1044,6 @@ _applyGridVars() {
   
     // NEW: ensure we never boot in edit mode
     this._toggleEditMode(false);
-
-    // Listen for edits from child card editors
-    if (!this.__onChildCfg) this.__onChildCfg = this._onChildConfigChanged.bind(this);
-    this.cardContainer?.addEventListener('config-changed', this.__onChildCfg, { capture: true });
   }
   
   disconnectedCallback() {
@@ -1063,10 +1064,6 @@ _applyGridVars() {
       window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
-    }
-
-    if (this.__onChildCfg) {
-    this.cardContainer?.removeEventListener('config-changed', this.__onChildCfg, { capture: true });
     }
   }
   
@@ -1191,8 +1188,8 @@ _applyGridVars() {
             const wrap = this._makePlaceholderAt(
               conf.position?.x || 0,
               conf.position?.y || 0,
-              conf.size?.width  || 100,
-              conf.size?.height || 100
+              conf.size?.width  || 200,
+              conf.size?.height || 200
             );
             this.cardContainer.appendChild(wrap);
             try { this._rebuildOnce(wrap.firstElementChild); } catch {}
@@ -1875,7 +1872,7 @@ _syncEmptyStateUI() {
     return wrap;
   }
 
-  _makePlaceholderAt(x=0,y=0,w=100,h=100) {
+  _makePlaceholderAt(x=0,y=0,w=400,h=400) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -1889,6 +1886,37 @@ _syncEmptyStateUI() {
     inner.className = 'ddc-placeholder-inner';
     // purely decorative; nothing clickable
     inner.setAttribute('aria-hidden','true');
+
+    // --- Hero UI (image + text) ---
+    const hero = document.createElement('div');
+    hero.className = 'ddc-hero';
+
+    // Optional image: from config.hero_image (e.g. /local/dragdrop-hero.png)
+    // If not provided, this block simply won’t render an <img>.
+    const heroImgUrl = this.heroImage; // already set to default or config override
+    if (heroImgUrl) {
+      const img = document.createElement('img');
+      img.src = heroImgUrl;
+      img.alt = "";
+      hero.appendChild(img);
+    }
+
+    // Title + subtitle
+    const title = document.createElement('div');
+    title.className = 'ddc-title';
+    title.textContent = 'Drag & Drop Card';
+    const sub = document.createElement('div');
+    sub.className   = 'ddc-sub';
+    sub.textContent = 'Hold me / double click me to enter Edit mode';
+
+    hero.append(title, sub);
+    inner.appendChild(hero);
+
+    // Let users double-click anywhere on the placeholder to enter edit
+    wrap.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      this._toggleEditMode(true);
+    });
   
     const shield = document.createElement('div');
     shield.className = 'shield';
@@ -1936,7 +1964,7 @@ _syncEmptyStateUI() {
 
   _showEmptyPlaceholder() {
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    const p = this._makePlaceholderAt(0,0,100,100);
+    const p = this._makePlaceholderAt(0,0,200,200);
     this.cardContainer.appendChild(p);
     this._resizeContainer();
     this._syncEmptyStateUI();
@@ -3692,7 +3720,7 @@ this._initCardInteract(wrap);
           if (json.cards?.length) {
             for (const conf of json.cards) {
               if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
                 this.cardContainer.appendChild(p);
               } else {
                 const el = await this._createCard(conf.card);
@@ -3702,8 +3730,8 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-                  try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-                  this._initCardInteract(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+this._initCardInteract(wrap);
               }
             }
           } else {
@@ -3890,7 +3918,7 @@ this._initCardInteract(wrap);
           if (json.cards?.length) {
             for (const conf of json.cards) {
                 if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-                  const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+                  const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
                   this.cardContainer.appendChild(p);
                 } else {
                   const el = await this._createCard(conf.card);
@@ -4599,7 +4627,7 @@ async function _persistOptionsToYaml(opts, {
       if (Array.isArray(json.cards) && json.cards.length) {
         for (const conf of json.cards) {
           if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            const p = this._makePlaceholderAt?.(conf.position?.x||0, conf.position?.y||0, conf.size?.width||100, conf.size?.height||100);
+            const p = this._makePlaceholderAt?.(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
             if (p) this.cardContainer.appendChild(p);
           } else {
             const el = await this._createCard(conf.card);
