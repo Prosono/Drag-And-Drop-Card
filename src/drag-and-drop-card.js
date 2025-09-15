@@ -4369,38 +4369,105 @@ if (!customElements.get('drag-and-drop-card')) {
     } catch {}
     return Array.from(keys);
   }
-  async function _persistOptionsToYaml(opts, { prevKey, noDownload } = {}) {
-    const ll = this._getLovelace?.() || _getLovelace.call(this);
-    if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
-    if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
-    const key = opts.storage_key || this.storageKey || this._config?.storage_key || prevKey || null;
-    const cfg = JSON.parse(JSON.stringify(ll.config));
-    const hits = (this._scanDdcCards || _scanDdcCards)(cfg);
-    console.debug('[ddc:import] persist: found DDC cards',
-      hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
-    const curView = ll.current_view ?? 0;
-    let targets = hits.filter(h => key && h.card.storage_key === key);
-    if (!targets.length) {
-      const inCur = hits.filter(h => h.view === curView);
-      if (inCur.length) targets = inCur;
-    }
-    if (!targets.length && hits.length === 1) targets = hits;
-    if (!targets.length) { console.debug('[ddc:import] persist: no target', { key }); return false; }
-    const patch = { type: 'custom:drag-and-drop-card', ...opts };
-    if (key && !patch.storage_key) patch.storage_key = key;
-    const backup = _makeYamlBackup(ll.config, targets, patch);
-    console.debug('[ddc:import] backup created', { file: backup.name, items: backup.data.count });
-    if (!noDownload) _offerBackupDownload(backup.name, backup.data);
-    for (const t of targets) {
-      let ref = cfg;
-      for (const seg of t.path) ref = ref[seg];
-      Object.assign(ref, patch);
-    }
-    console.debug('[ddc:import] persist → saving', { patched: targets.length, key: key || null, patch });
-    await ll.saveConfig(cfg);
-    _recordRecentKey(patch.storage_key);
-    return true;
+async function _persistOptionsToYaml(opts, {
+  forceTargetKey = null,   // when set, import ONLY into card with this key
+  onlyThisCard   = false,  // reserved; current impl always enforces single-card import
+  prevKey,
+  noDownload
+} = {}) {
+  const ll = this._getLovelace?.() || _getLovelace.call(this);
+  if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
+  if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
+
+  // Determine the EXACT key we will import into (the clicked card)
+  const norm = (s) => (typeof s === 'string' ? s.trim() : null);
+  const myKey =
+    norm(forceTargetKey) ||
+    norm(this?._config?.storage_key) ||
+    norm(this?.storageKey) ||
+    norm(prevKey);
+
+  if (!myKey) {
+    console.warn('[ddc:import] persist: missing target storage_key on this card; aborting');
+    return false;
   }
+
+  // Clone config and scan
+  const cfg  = JSON.parse(JSON.stringify(ll.config));
+  const hits = (this._scanDdcCards || _scanDdcCards)(cfg);
+
+  console.debug('[ddc:import] persist: found DDC cards',
+    hits.map(h => ({
+      view: h.view,
+      path: h.path.join('.'),
+      storage_key: (h.card && (h.card.storage_key || h.card.storageKey)) || null
+    }))
+  );
+
+  // Select exactly one target by key (no “patch-all-in-view” fallback)
+  let targets = hits.filter(h => {
+    const sk =
+      norm(h.card?.storage_key) ??
+      norm(h.card?.storageKey) ??
+      norm(h.card?.options?.storage_key) ??
+      norm(h.card?.options?.storageKey);
+    return sk === myKey;
+  });
+
+  if (targets.length !== 1) {
+    console.warn('[ddc:import] persist: expected exactly one target with key, got', targets.length, { myKey });
+    return false;
+  }
+
+  // Build patch WITHOUT storage_key so we don't overwrite per-card keys
+  const patch = { type: 'custom:drag-and-drop-card', ...(opts || {}) };
+  if ('storage_key' in patch)  delete patch.storage_key;
+  if ('storageKey'  in patch)  delete patch.storageKey;
+  if (patch?.options) {
+    if ('storage_key' in patch.options) delete patch.options.storage_key;
+    if ('storageKey'  in patch.options) delete patch.options.storageKey;
+  }
+
+  // Optional: backup (keeps your previous behavior if helpers exist)
+  try {
+    const backup = _makeYamlBackup?.(ll.config, targets, patch);
+    if (backup) {
+      console.debug('[ddc:import] backup created', { file: backup.name, items: backup.data?.count });
+      if (!noDownload && typeof _offerBackupDownload === 'function') _offerBackupDownload(backup.name, backup.data);
+    }
+  } catch (e) {
+    console.debug('[ddc:import] backup skipped/error:', e?.message || e);
+  }
+
+  // Apply to the single matched ref
+  const t = targets[0];
+  let ref = cfg;
+  for (const seg of t.path) ref = ref[seg];
+
+  const existingKey =
+    norm(ref?.storage_key) ??
+    norm(ref?.storageKey) ?? null;
+
+  Object.assign(ref, patch);
+
+  // Preserve the original key on this card
+  if (existingKey) {
+    ref.storage_key = existingKey;
+  } else {
+    ref.storage_key = myKey;
+  }
+  if ('storageKey' in ref) delete ref.storageKey;
+
+  console.debug('[ddc:import] persist → saving', {
+    patched: 1,
+    into_key: ref.storage_key,
+    ignored_file_key: norm(opts?.storage_key) || norm(opts?.storageKey) || null
+  });
+
+  await ll.saveConfig(cfg);
+  return true;
+}
+
   async function _fetchBackendKeys() {
     const parseKeys = (data) => {
       if (!data) return [];
