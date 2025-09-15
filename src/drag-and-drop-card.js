@@ -64,6 +64,7 @@ class DragAndDropCard extends HTMLElement {
   }
 
 
+
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -473,6 +474,16 @@ _clampAllCardsInside() {
   });
 }
 
+_teardown() {
+  try { this._resizeObs?.disconnect?.(); } catch {}
+  this._resizeObs = null;
+  // remove any global listeners/timers you added
+  // window.removeEventListener('resize', this._onResizeBound);
+  // cancelAnimationFrame(this._rafId); clearTimeout(this._tid);
+
+  const root = this.shadowRoot || this.attachShadow?.({ mode: 'open' }) || this;
+  while (root.firstChild) root.removeChild(root.firstChild);
+}
 
 
 _applyGridVars() {
@@ -1117,6 +1128,14 @@ _applyGridVars() {
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
+
+    // Simple, robust fix:
+    this._teardown?.();
+    this._initialLoad?.(true);
+    this.requestUpdate?.();
+    queueMicrotask(() =>
+      this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }))
+    );
   }
 
   connectedCallback() {
