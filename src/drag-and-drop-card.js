@@ -110,6 +110,35 @@ class DragAndDropCard extends HTMLElement {
     } catch {}
   }
 
+  // Inside class DragAndDropCard extends ...
+  static _genKey() {
+    const id =
+      globalThis.crypto?.randomUUID?.() ||
+      `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    return `layout_${id}`;
+  }
+
+  static getStubConfig(/* hass, entities, entitiesFallback */) {
+    return {
+      type: 'custom:drag-and-drop-card',
+      // ← generated immediately when the card is added
+      storage_key: this._genKey(),
+
+      // (optional) sensible defaults you already use:
+      grid: 10,
+      drag_live_snap: false,
+      auto_save: true,
+      auto_save_debounce: 800,
+      container_size_mode: 'fixed_custom',
+      container_fixed_width: 400,
+      container_fixed_height: 400,
+
+      // your baked-in hero image, if you want it visible by default
+      hero_image:
+        "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
+    };
+  }
+
   /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
@@ -456,6 +485,12 @@ _applyGridVars() {
     // Keep previous to detect real key changes
     const prevKey = this.storageKey;
     // Use existing instance key if present
+
+    this.config = { ...config };
+    if (!this.config.storage_key || this.config.storage_key === "") {
+      this.config.storage_key = this.constructor._genKey();
+    }
+    this.storageKey = this.config.storage_key;
 
     // STABLE storage_key: reuse instance key if none provided
     if (!config.storage_key) {
