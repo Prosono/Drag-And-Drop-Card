@@ -3866,7 +3866,8 @@ this.cardContainer.innerHTML = '';
         }
         this._resizeContainer();
         this._markDirty('import');
-        this._toast('Design imported — click Apply to save.');
+        await this._saveLayout(false);    // save under THIS card’s key
+        this._toast('Design imported and saved.');
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
@@ -4561,14 +4562,21 @@ if (!customElements.get('drag-and-drop-card')) {
       fill();
       btn.addEventListener('click', fill);
       select.addEventListener('change', async (e) => {
-        const newKey = e.target.value;
+        const sourceKey = e.target.value; // layout to COPY FROM
+        if (!sourceKey) return;
         if (this._ddcLoadingFromKey) return;
         this._ddcLoadingFromKey = true;
+
         try {
-          const design = await _fetchLayoutByKey.call(this, newKey);
-          if (!design) { this._toast?.(`No layout found for "${newKey}"`); return; }
-          await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
-        } catch(err) {
+          const design = await _fetchLayoutByKey.call(this, sourceKey);
+          if (!design) { this._toast?.(`No layout found for "${sourceKey}"`); return; }
+
+          // IMPORTANT: do NOT pass a newKey and do NOT touch storage_key here.
+          await this._applyDesignObject?.(design, { source: 'switcher', newKey: null });
+
+          // Persist the applied design under THIS card’s existing storage_key.
+          await this._saveLayout?.(false);
+        } catch (err) {
           console.warn('[ddc:switcher] load/apply failed', err);
           this._toast?.('Failed to load layout.');
         } finally {
@@ -4608,7 +4616,7 @@ if (!customElements.get('drag-and-drop-card')) {
 /* ==== /DDC AUGMENTATION v6 ==== */
 
 /* ==== DDC: keep key + persist only THIS instance ==== */
-/* ==== DDC: apply design locally (keep storage_key) + rebuild canvas ==== */
+/* ==== DDC: apply design locally (keep storage_key) + rebuild + safe persist ==== */
 (() => {
   const TAG = 'drag-and-drop-card';
   const Cls = customElements.get(TAG);
@@ -4620,25 +4628,24 @@ if (!customElements.get('drag-and-drop-card')) {
       return;
     }
 
-    // 1) Keep current storage_key – never take it from the payload
+    // Keep THIS instance's key, never take it from the payload or UI.
     const keepKey = this.storageKey || this._config?.storage_key || null;
 
-    // 2) Apply options locally (strip any incoming storage_key)
+    // 1) Apply options locally (drop any incoming storage_key)
     try {
       const opts = json.options || {};
       const { storage_key: _ignored, ...optsNoKey } = opts;
       this._applyImportedOptions?.(optsNoKey, true);
     } catch {}
 
-    // 3) Rebuild canvas from json.cards (live, for THIS instance)
+    // 2) Rebuild canvas from json.cards (live)
     try {
       this.cardContainer.innerHTML = '';
-
       const list = Array.isArray(json.cards) ? json.cards : [];
+
       if (list.length) {
         for (const conf of list) {
           if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            // empty slot -> placeholder
             const p = this._makePlaceholderAt?.(
               conf.position?.x || 0,
               conf.position?.y || 0,
@@ -4670,14 +4677,13 @@ if (!customElements.get('drag-and-drop-card')) {
       this._toast?.('Failed to render cards from the design.');
     }
 
-    // 4) Persist ONLY this instance back to YAML, keeping the card’s key
+    // 3) Persist only this instance’s options back to YAML (safe, single-match)
     try {
-      const toPersist =
-        json.options ??
-        (typeof json.grid === 'number' ? { grid: json.grid } : {});
+      const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
       const { storage_key: _drop, ...optsNoKey } = toPersist || {};
       await this._persistOptionsToYaml?.(optsNoKey, { prevKey: keepKey, noDownload: (source === 'switcher') });
-      // restore/ensure the live key on the instance
+
+      // Make sure the instance still “knows” its own key locally
       if (keepKey) {
         this.storageKey = keepKey;
         this._config = { ...(this._config || {}), storage_key: keepKey };
