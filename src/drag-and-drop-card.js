@@ -110,6 +110,44 @@ class DragAndDropCard extends HTMLElement {
     } catch {}
   }
 
+  // Handle edits coming from child card editors (live apply without page refresh)
+  async _onChildConfigChanged(ev) {
+    // Ignore edits for *this* card’s own config (HA editor for the container)
+    const cfg = ev.detail?.config;
+    if (!cfg || cfg?.type === 'custom:drag-and-drop-card') return;
+
+    // We only care if the event came from one of our child cards
+    const target = ev.target;
+    const wrap = target?.closest?.('.card-wrapper');
+    if (!wrap || wrap.parentElement !== this.cardContainer) return;
+
+    // We will handle it; don’t let HA/others double-handle
+    ev.stopPropagation();
+
+    try {
+      // 1) Rebuild the edited child with the new config
+      const newEl = await this._createCard(cfg);
+      if (this._hass) newEl.hass = this._hass;
+
+      // 2) Update our cached config on the wrapper for persistence
+      try { wrap.dataset.cfg = JSON.stringify(cfg); } catch {}
+
+      // 3) Swap DOM node
+      const oldEl = wrap.firstElementChild;
+      if (oldEl) oldEl.replaceWith(newEl); else wrap.appendChild(newEl);
+
+      // 4) Make sure nested styles / card-mod / signals re-attach
+      try { this._rebuildOnce(newEl); } catch {}
+      try { this._processCardModOnce?.(); } catch {}
+
+      // 5) Persist updated layout
+      this._queueSave?.('edit');
+    } catch (e) {
+      console.warn('[DDC] Failed to live-apply child edit:', e);
+    }
+  }
+  
+
   /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
@@ -1001,6 +1039,10 @@ _applyGridVars() {
   
     // NEW: ensure we never boot in edit mode
     this._toggleEditMode(false);
+
+    // Listen for edits from child card editors
+    if (!this.__onChildCfg) this.__onChildCfg = this._onChildConfigChanged.bind(this);
+    this.cardContainer?.addEventListener('config-changed', this.__onChildCfg, { capture: true });
   }
   
   disconnectedCallback() {
@@ -1021,6 +1063,10 @@ _applyGridVars() {
       window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
+    }
+
+    if (this.__onChildCfg) {
+    this.cardContainer?.removeEventListener('config-changed', this.__onChildCfg, { capture: true });
     }
   }
   
@@ -3656,8 +3702,8 @@ this._initCardInteract(wrap);
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+                  try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+                  this._initCardInteract(wrap);
               }
             }
           } else {
@@ -4144,7 +4190,7 @@ if (!customElements.get('drag-and-drop-card')) {
         type: 'drag-and-drop-card',   // no "custom:" here
         name: 'Drag & Drop Card',
         description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
-        preview: true
+        preview: false
       });
     }
   } catch (e) { /* no-op */ }
