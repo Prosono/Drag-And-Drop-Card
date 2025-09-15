@@ -475,7 +475,7 @@ _applyGridVars() {
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
-    this.containerPreset          = config.container_preset || 'fullhd';
+    this.containerPreset          = config.container_preset || 'fhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
@@ -669,10 +669,6 @@ _applyGridVars() {
             transition:opacity .15s;
             z-index:30;
             pointer-events: none;
-          }
-          .card-wrapper.editing .chip{
-            opacity:1;
-            pointer-events: auto;
           }
           .card-wrapper.editing .chip{
             opacity:1;
@@ -1007,21 +1003,22 @@ _applyGridVars() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
-  
-    // NEW: remove long-press listeners if installed
+
+    // clear long-press (pointer) listeners
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
-      cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
-      window.removeEventListener('mousemove', this.__lpHandlers.mouseMove);
-      window.removeEventListener('mouseup', this.__lpHandlers.mouseUp);
-      window.removeEventListener('contextmenu', this.__lpHandlers.contextMenu);
-      cont?.removeEventListener('touchstart', this.__lpHandlers.touchStart);
-      window.removeEventListener('touchmove', this.__lpHandlers.touchMove);
-      window.removeEventListener('touchend', this.__lpHandlers.touchEnd);
-      window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
+      cont?.removeEventListener('pointerdown', this.__lpHandlers.onPointerDown);
+      window.removeEventListener('pointermove', this.__lpHandlers.onPointerMove);
+      window.removeEventListener('pointerup', this.__lpHandlers.onPointerUpOrCancel);
+      window.removeEventListener('pointercancel', this.__lpHandlers.onPointerUpOrCancel);
+      window.removeEventListener('contextmenu', this.__lpHandlers.onContextMenu);
+      cont?.removeEventListener('dblclick', this.__lpHandlers.onDblClick);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
+
+    // clear inline switcher visibility timer
+    if (this._ddcVisTimer) { clearInterval(this._ddcVisTimer); this._ddcVisTimer = null; }
   }
   
 
@@ -3943,7 +3940,7 @@ this.cardContainer.innerHTML = '';
     return hits;
   }
 
-  async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = true } = {}) {
+  async _persistOptionsToYaml(opts, { prevKey = null } = {}) {
     try {
       const ll = this._getLovelace();
       if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
@@ -3952,39 +3949,31 @@ this.cardContainer.innerHTML = '';
       // Deep clone to avoid mutating live config
       const cfg = JSON.parse(JSON.stringify(ll.config));
       const hits = this._scanDdcCards(cfg);
-      const curView = ll.current_view ?? 0;
 
-      console.debug('[ddc:import] persist: found DDC cards', hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
+      // Build the set of candidate keys that identify THIS instance
+      const keys = Array.from(new Set([
+        prevKey || null,
+        opts?.storage_key || null,
+        this.storageKey || null,
+        this._config?.storage_key || null
+      ].filter(Boolean)));
 
-      const newKey = opts?.storage_key ?? null;
-      const keys = [];
-      if (prevKey) keys.push(prevKey);
-      if (newKey) keys.push(newKey);
-      if (this.storageKey) keys.push(this.storageKey);
-      if (this._config?.storage_key) keys.push(this._config.storage_key);
+      console.debug('[ddc:import] persist: candidate keys', keys);
 
-      // Prefer exact key matches (either previous or new)
+      // Only target exact storage_key matches
       let targets = hits.filter(h => h.card.storage_key && keys.includes(h.card.storage_key));
 
-      // If no exact match: if only one DDC in current view, target it
       if (!targets.length) {
-        const inCur = hits.filter(h => h.view === curView);
-        if (inCur.length === 1) targets = inCur;
-        // Otherwise optionally patch all in current view to force key + options in
-        else if (patchAllInCurrentViewIfNoKey && inCur.length >= 1) targets = inCur;
-      }
-
-      // As a last resort, if there is only one DDC overall, patch it
-      if (!targets.length && hits.length === 1) targets = hits;
-
-      if (!targets.length) {
-        console.debug('[ddc:import] persist: no target. Provide a unique storage_key on this card and import again.', { prevKey, newKey, storageKey: this.storageKey });
+        console.debug('[ddc:import] persist: no exact storage_key match; not touching other instances.', {
+          keys,
+          found: hits.map(h => h.card.storage_key || null)
+        });
         return false;
       }
 
       // Ensure storage_key is written so future imports can match precisely
       const patch = { type: 'custom:drag-and-drop-card', ...opts };
-      if ((newKey || prevKey) && !patch.storage_key) patch.storage_key = newKey || prevKey;
+      if (!patch.storage_key) patch.storage_key = keys[0];
 
       for (const t of targets) {
         let ref = cfg;
@@ -3992,7 +3981,7 @@ this.cardContainer.innerHTML = '';
         Object.assign(ref, patch);
       }
 
-      console.debug('[ddc:import] persist → saving', { patched: targets.length, keysTried: keys, patch });
+      console.debug('[ddc:import] persist → saving', { patched: targets.length, keys, patch });
       await ll.saveConfig(cfg);
       return true;
     } catch (e) {
@@ -4000,6 +3989,7 @@ this.cardContainer.innerHTML = '';
       return false;
     }
   }
+
 /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
     // Always mark dirty so Apply becomes enabled
@@ -4349,38 +4339,67 @@ if (!customElements.get('drag-and-drop-card')) {
     } catch {}
     return Array.from(keys);
   }
-  async function _persistOptionsToYaml(opts, { prevKey, noDownload } = {}) {
+  async function _persistOptionsToYaml(opts, { prevKey } = {}) {
     const ll = this._getLovelace?.() || _getLovelace.call(this);
     if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
     if (typeof ll.saveConfig !== 'function') { console.debug('[ddc:import] persist: dashboard not in Storage mode'); return false; }
-    const key = opts.storage_key || this.storageKey || this._config?.storage_key || prevKey || null;
-    const cfg = JSON.parse(JSON.stringify(ll.config));
+
+    const keyCandidates = Array.from(new Set([
+      prevKey || null,
+      opts?.storage_key || null,
+      this.storageKey || null,
+      this._config?.storage_key || null
+    ].filter(Boolean)));
+
+    const cfg  = JSON.parse(JSON.stringify(ll.config));
     const hits = (this._scanDdcCards || _scanDdcCards)(cfg);
-    console.debug('[ddc:import] persist: found DDC cards',
-      hits.map(h => ({ view: h.view, path: h.path.join('.'), storage_key: h.card.storage_key || null })));
-    const curView = ll.current_view ?? 0;
-    let targets = hits.filter(h => key && h.card.storage_key === key);
+
+    console.debug('[ddc:import] persist: candidate keys', keyCandidates);
+
+    // Only exact storage_key matches
+    let targets = hits.filter(h => h.card.storage_key && keyCandidates.includes(h.card.storage_key));
+
     if (!targets.length) {
-      const inCur = hits.filter(h => h.view === curView);
-      if (inCur.length) targets = inCur;
+      console.debug('[ddc:import] persist: no exact storage_key match; not touching other instances.', {
+        keys: keyCandidates,
+        found: hits.map(h => h.card.storage_key || null)
+      });
+      return false;
     }
-    if (!targets.length && hits.length === 1) targets = hits;
-    if (!targets.length) { console.debug('[ddc:import] persist: no target', { key }); return false; }
+
     const patch = { type: 'custom:drag-and-drop-card', ...opts };
-    if (key && !patch.storage_key) patch.storage_key = key;
-    const backup = _makeYamlBackup(ll.config, targets, patch);
-    console.debug('[ddc:import] backup created', { file: backup.name, items: backup.data.count });
-    if (!noDownload) _offerBackupDownload(backup.name, backup.data);
+    if (!patch.storage_key) patch.storage_key = keyCandidates[0];
+
+    // Optional tiny local backup kept in localStorage (unchanged behavior)
+    const backup = (function makeBackup(llConfig, targets, patch) {
+      const when = new Date().toISOString().replace(/[:.]/g,'-');
+      const items = targets.map(t => {
+        let ref = llConfig;
+        for (const seg of t.path) ref = ref[seg];
+        return { view: t.view, path: t.path, storage_key: (ref && ref.storage_key) || null, before: ref, patch };
+      });
+      const obj = { kind: 'ddc-import-backup', created_at: when, count: items.length, items };
+      try {
+        const key = `ddc.backup.${when}`;
+        localStorage.setItem(key, JSON.stringify(obj));
+        const all = Object.keys(localStorage).filter(k => k.startsWith('ddc.backup.')).sort().reverse();
+        for (const k of all.slice(10)) localStorage.removeItem(k);
+      } catch(e){}
+      return obj;
+    })(ll.config, targets, patch);
+
+    // Apply patch only to matched targets
     for (const t of targets) {
       let ref = cfg;
       for (const seg of t.path) ref = ref[seg];
       Object.assign(ref, patch);
     }
-    console.debug('[ddc:import] persist → saving', { patched: targets.length, key: key || null, patch });
+
+    console.debug('[ddc:import] persist → saving', { patched: targets.length, patch, backupCount: backup.count });
     await ll.saveConfig(cfg);
-    _recordRecentKey(patch.storage_key);
     return true;
   }
+
   async function _fetchBackendKeys() {
     const parseKeys = (data) => {
       if (!data) return [];
