@@ -125,11 +125,11 @@ class DragAndDropCard extends HTMLElement {
       storage_key: this._genKey(),
 
       // (optional) sensible defaults you already use:
-      grid: 10,
-      drag_live_snap: false,
+      grid: 20,
+      drag_live_snap: true,
       auto_save: true,
       auto_save_debounce: 800,
-      container_size_mode: 'fixed_custom',
+      container_size_mode: 'dynamic',
       container_fixed_width: 400,
       container_fixed_height: 400,
 
@@ -139,7 +139,6 @@ class DragAndDropCard extends HTMLElement {
     };
   }
 
-  /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
