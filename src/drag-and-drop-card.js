@@ -1099,10 +1099,6 @@ _applyGridVars() {
       this.__probed = true;         // ensure initialLoad runs
       this._initialLoad?.(true);    // full rebuild now
       this.requestUpdate?.();
-      queueMicrotask(() => {
-        // if HA still shows a stale instance, force remount
-        this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-      });
   }
 
   connectedCallback() {
