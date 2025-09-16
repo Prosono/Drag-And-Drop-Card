@@ -1882,13 +1882,28 @@ _syncEmptyStateUI() {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
-          newEl.hass = this.hass;
+
           // update dataset with the new configuration for persistence
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
+            // keep the card_mod hint in sync (optional but nice)
+            if (this._hasCardModDeep(newCfg)) wrap.dataset.needsCardMod = 'true';
+            else delete wrap.dataset.needsCardMod;
           } catch {}
+
+          // attach first, then wire hass so it can render immediately
           wrap.replaceChild(newEl, wrap.firstElementChild);
+          newEl.hass = this.hass;
+
+          // give it a microtask/frame to connect, then poke rebuild hooks
+          await new Promise(r => requestAnimationFrame(r));
           try { this._rebuildOnce(newEl); } catch {}
+
+          // optional but helpful if some interact handlers depend on child structure
+          // this._initCardInteract(wrap);
+          // optional container reflow
+          // this._resizeContainer();
+
           this._queueSave('edit');
         });
       }
