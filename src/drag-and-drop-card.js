@@ -88,33 +88,26 @@ class DragAndDropCard extends HTMLElement {
     return results;
   }
 
-  // Canonicalize any JS value (recursively) with sorted keys
+  // Canonicalize any JS value with sorted keys; drop volatile keys
   _canon(v) {
-    if (v === null || v === undefined) return null;
+    if (v == null) return null;
     if (Array.isArray(v)) return v.map((x) => this._canon(x));
     if (typeof v === 'object') {
       const out = {};
       Object.keys(v).sort().forEach((k) => {
-        // Drop volatile keys from the signature
-        if (k === 'storage_key' || k === 'type') return;
+        if (k === 'storage_key' || k === 'type') return; // ignore volatile keys
         const val = v[k];
-        if (val === undefined) return;
-        out[k] = this._canon(val);
+        if (val !== undefined) out[k] = this._canon(val);
       });
       return out;
     }
-    // Normalize numbers/booleans/strings
     if (typeof v === 'number' && !Number.isFinite(v)) return String(v);
     return v;
   }
 
   _configSignature(cfg = {}) {
-    try {
-      return JSON.stringify(this._canon(cfg));
-    } catch {
-      // Fallback shouldn’t be needed; ensures we never throw
-      return String(Date.now());
-    }
+    try { return JSON.stringify(this._canon(cfg)); }
+    catch { return `sig-fallback-${Date.now()}`; }
   }
 
 
@@ -514,6 +507,10 @@ _applyGridVars() {
     // Keep previous to detect real key changes
     const prevKey = this.storageKey;
     // Use existing instance key if present
+
+    // Track previous state for change detection
+    const __prevSig = this.__cfgSig ?? this._configSignature(this._config || {});
+    const __prevKey = this.storageKey || null;
 
     this.config = { ...config };
     if (!this.config.storage_key || this.config.storage_key === "") {
@@ -1076,7 +1073,7 @@ _applyGridVars() {
        });
 
       this.exploreBtn.addEventListener('click', () =>
-        window.open('https://cardstore.smarti.dev/', '_blank', 'noopener,noreferrer')
+        window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
       );
 
       // apply container sizing early
@@ -1132,6 +1129,25 @@ _applyGridVars() {
       this._resizeContainer();
     }
 
+    // --- Rebuild decisions for subsequent updates ---
+    const keyChanged2 = (__prevKey !== (this.storageKey || null));
+    const newSig     = this._configSignature(this._config || config);
+    const cfgChanged2 = (newSig !== __prevSig);
+    this.__cfgSig    = newSig;
+
+    if (this._built && (keyChanged2 || cfgChanged2)) {
+      // 1) Full live rebuild of the canvas/layout
+      try { if (this.cardContainer) this.cardContainer.innerHTML = ''; } catch {}
+      try { this._initialLoad(true); } catch (e) { /* no-op */ }
+
+      // 2) Hint Lovelace to recalc card size/grid
+      try { window.dispatchEvent(new Event('resize')); } catch {}
+
+      // 3) Belt & suspenders: ask Lovelace to remount if it kept a stale instance
+      queueMicrotask(() => {
+        try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+      });
+    }
     
   }
 
