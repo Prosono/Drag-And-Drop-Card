@@ -4813,22 +4813,46 @@ async function _persistOptionsToYaml(opts, {
       fill();
       btn.addEventListener('click', fill);
       select.addEventListener('change', async (e) => {
-        const newKey = e.target.value;
+        const newKey = String(e.target.value);
+        if (!newKey) return;
         if (this._ddcLoadingFromKey) return;
         this._ddcLoadingFromKey = true;
+
         try {
           const design = await _fetchLayoutByKey.call(this, newKey);
-          if (!design) { this._toast?.(`No layout found for "${newKey}"`); return; }
-          await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
+          if (!design) {
+            this._toast?.(`No layout found for "${newKey}"`);
+            return;
+          }
 
+          // Apply the design (build cards etc.)
+          await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
           this._resizeContainer?.();
-          this._markDirty?.('import');
           this._toast?.(`Loaded layout "${newKey}"`);
 
-          // flush + hard reload (reuse your helper if you added it)
+          // 1) Persist the SELECTED KEY into the Lovelace card options
+          try {
+            // update in-memory key so subsequent saves write to the right place
+            this.storageKey = newKey;
+            if (this._config) this._config.storage_key = newKey;
+
+            // write the storage_key into Lovelace YAML/options for this card
+            await this._persistOptionsToYaml({ storage_key: newKey }, {
+              forceTargetKey: newKey,
+              noDownload: true,
+            });
+          } catch (err) {
+            console.warn('[ddc:switcher] failed to persist storage_key', err);
+            // we can still continue, but reload may revert if this fails
+          }
+
+          // 2) Flush-save the CURRENT layout under the NEW key (avoid debounce race)
           if (this._saveTimer) clearTimeout(this._saveTimer);
           await this._saveLayout(true);
+
+          // 3) Hard reload so the selected layout appears immediately
           window.location.reload();
+
         } catch (err) {
           console.warn('[ddc:switcher] load/apply failed', err);
           this._toast?.('Failed to load layout.');
