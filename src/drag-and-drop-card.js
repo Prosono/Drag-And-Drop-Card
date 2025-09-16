@@ -64,7 +64,6 @@ class DragAndDropCard extends HTMLElement {
   }
 
 
-
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -86,28 +85,6 @@ class DragAndDropCard extends HTMLElement {
     };
     visit(root);
     return results;
-  }
-
-  // Canonicalize any JS value with sorted keys; drop volatile keys
-  _canon(v) {
-    if (v == null) return null;
-    if (Array.isArray(v)) return v.map((x) => this._canon(x));
-    if (typeof v === 'object') {
-      const out = {};
-      Object.keys(v).sort().forEach((k) => {
-        if (k === 'storage_key' || k === 'type') return; // ignore volatile keys
-        const val = v[k];
-        if (val !== undefined) out[k] = this._canon(val);
-      });
-      return out;
-    }
-    if (typeof v === 'number' && !Number.isFinite(v)) return String(v);
-    return v;
-  }
-
-  _configSignature(cfg = {}) {
-    try { return JSON.stringify(this._canon(cfg)); }
-    catch { return `sig-fallback-${Date.now()}`; }
   }
 
 
@@ -418,6 +395,13 @@ _resolveFixedSize() {
   return null;
 }
 
+_teardown() {
+  try { this._resizeObs?.disconnect?.(); } catch {}
+  this._resizeObs = null;
+  const root = this.shadowRoot || this.attachShadow?.({ mode: 'open' }) || this;
+  while (root.firstChild) root.removeChild(root.firstChild);
+}
+
 _applyContainerSizingFromConfig(initial=false) {
   // set container size according to mode
   const c = this.cardContainer; if (!c) return;
@@ -473,8 +457,6 @@ _clampAllCardsInside() {
   });
 }
 
-
-
 _applyGridVars() {
   const sz = `${this.gridSize || 10}px`;
   // host (inherits down)
@@ -507,10 +489,6 @@ _applyGridVars() {
     // Keep previous to detect real key changes
     const prevKey = this.storageKey;
     // Use existing instance key if present
-
-    // Track previous state for change detection
-    const __prevSig = this.__cfgSig ?? this._configSignature(this._config || {});
-    const __prevKey = this.storageKey || null;
 
     this.config = { ...config };
     if (!this.config.storage_key || this.config.storage_key === "") {
@@ -558,12 +536,6 @@ _applyGridVars() {
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
     const keyChanged = prevKey !== this.storageKey;
-
-    // Did any meaningful config actually change?
-    const prevSig = this.__cfgSig || null;
-    this.__cfgSig = this._configSignature(this._config || config);
-    const cfgChanged = !!prevSig && prevSig !== this.__cfgSig;
-
 
       // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
     if (this.editMode && !this.__booting && !keyChanged) {
@@ -1073,7 +1045,7 @@ _applyGridVars() {
        });
 
       this.exploreBtn.addEventListener('click', () =>
-        window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
+        window.open('https://cardstore.smarti.dev/', '_blank', 'noopener,noreferrer')
       );
 
       // apply container sizing early
@@ -1105,50 +1077,32 @@ _applyGridVars() {
 
     const fromEditor = this._isInHaEditorPreview();
 
-    // --- Boot/rebuild logic ---
-    this.__cfgReady = true;
-
-    // Rebuild when:
-    // 1) storage_key changed (switching layouts), OR
-    // 2) the actual JSON config changed (ignores storage_key/type)
-    if (this.__booted && (keyChanged || cfgChanged)) {
-      // Live rebuild
-      this._initialLoad(true);
-      // Help HA recalc card size / grid
-      try { window.dispatchEvent(new Event('resize')); } catch {}
-      // Belt-and-suspenders: ask Lovelace to remount if it cached the old instance
-      queueMicrotask(() => {
-        try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-      });
+    // Rebuild in these cases:
+    // 1) storage_key changed (you already had this)
+    // 2) we're in the editor (user pressed Update and expects immediate changes)
+    if ((fromEditor || keyChanged) && this.__probed) {
+      if (!this.__booted) this.__booted = true;
+      this._initialLoad(true);              // full rebuild now
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
-      this._initialLoad();
+      this._initialLoad();                  // first boot
     } else {
-      // Lightweight path when nothing meaningful changed
+      // lightweight tweaks only, when nothing structural changed
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
 
-    // --- Rebuild decisions for subsequent updates ---
-    const keyChanged2 = (__prevKey !== (this.storageKey || null));
-    const newSig     = this._configSignature(this._config || config);
-    const cfgChanged2 = (newSig !== __prevSig);
-    this.__cfgSig    = newSig;
 
-    if (this._built && (keyChanged2 || cfgChanged2)) {
-      // 1) Full live rebuild of the canvas/layout
-      try { if (this.cardContainer) this.cardContainer.innerHTML = ''; } catch {}
-      try { this._initialLoad(true); } catch (e) { /* no-op */ }
-
-      // 2) Hint Lovelace to recalc card size/grid
-      try { window.dispatchEvent(new Event('resize')); } catch {}
-
-      // 3) Belt & suspenders: ask Lovelace to remount if it kept a stale instance
+      // 🔧 make Update behave like the early version:
+      this._teardown?.();           // clear old DOM/listeners
+      this.__booted = false;        // reset any “built once” guards
+      this.__probed = true;         // ensure initialLoad runs
+      this._initialLoad?.(true);    // full rebuild now
+      this.requestUpdate?.();
       queueMicrotask(() => {
-        try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+        // if HA still shows a stale instance, force remount
+        this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
       });
-    }
-    
   }
 
   connectedCallback() {
