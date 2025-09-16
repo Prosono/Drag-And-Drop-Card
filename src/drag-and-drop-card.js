@@ -1924,31 +1924,30 @@ _syncEmptyStateUI() {
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
-          // update dataset with the new configuration for persistence
-          try {
-            wrap.dataset.cfg = JSON.stringify(newCfg);
-          } catch {}
+
+          try { wrap.dataset.cfg = JSON.stringify(newCfg); } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
+
+          // let card render fully
+          if (newEl.requestUpdate) {
+            newEl.requestUpdate();
+            try { await newEl.updateComplete; } catch {}
+          }
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
           try { this._rebuildOnce(newEl); } catch {}
+
+          // re-bind DnD & resize canvas
+          try { this._initCardInteract(wrap); } catch {}
+          try { this._resizeContainer(); } catch {}
+
+          // nudge downstream listeners
+          try { newEl.dispatchEvent(new Event('iron-resize', { bubbles: true, composed: true })); } catch {}
+          try { newEl.dispatchEvent(new Event('ll-rebuild',   { bubbles: true, composed: true })); } catch {}
+
           this._queueSave('edit');
 
-          // Ensure the new card is fully integrated and the canvas/layout reacts
-          try {
-            // re-bind drag/resize/etc for this wrapper (safe to call again)
-            this._initCardInteract(wrap);
-          } catch {}
-
-          try {
-            // recalc container size in case the card’s intrinsic size/ha-card frame changed
-            this._resizeContainer();
-          } catch {}
-
-          try {
-            // nudge HA/card-mod/lazy children: same signal you already use elsewhere
-            newEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
-          } catch {}
-
-          // Optional: if you sometimes still see stale visuals, uncomment this:
+          // If anything still appears stale in your setup:
           // this._initialLoad(true);
         });
       }
