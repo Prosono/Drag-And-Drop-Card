@@ -1931,6 +1931,25 @@ _syncEmptyStateUI() {
           wrap.replaceChild(newEl, wrap.firstElementChild);
           try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
+
+          // Ensure the new card is fully integrated and the canvas/layout reacts
+          try {
+            // re-bind drag/resize/etc for this wrapper (safe to call again)
+            this._initCardInteract(wrap);
+          } catch {}
+
+          try {
+            // recalc container size in case the card’s intrinsic size/ha-card frame changed
+            this._resizeContainer();
+          } catch {}
+
+          try {
+            // nudge HA/card-mod/lazy children: same signal you already use elsewhere
+            newEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+          } catch {}
+
+          // Optional: if you sometimes still see stale visuals, uncomment this:
+          // this._initialLoad(true);
         });
       }
     });
