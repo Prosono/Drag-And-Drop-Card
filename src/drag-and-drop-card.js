@@ -4812,8 +4812,9 @@ async function _persistOptionsToYaml(opts, {
       };
       fill();
       btn.addEventListener('click', fill);
+      
       select.addEventListener('change', async (e) => {
-        const newKey = String(e.target.value);
+        const newKey = String(e.target.value || '');
         if (!newKey) return;
         if (this._ddcLoadingFromKey) return;
         this._ddcLoadingFromKey = true;
@@ -4825,32 +4826,43 @@ async function _persistOptionsToYaml(opts, {
             return;
           }
 
-          // Apply the design (build cards etc.)
+          // Apply the newly selected design to the canvas
           await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
           this._resizeContainer?.();
           this._toast?.(`Loaded layout "${newKey}"`);
 
-          // 1) Persist the SELECTED KEY into the Lovelace card options
+          // ---- PERSIST THE SELECTED KEY *TO THE CARD OPTIONS* ----
+          // IMPORTANT: persist against the *old* key so the YAML updater finds this card
+          const oldKey = String(this._config?.storage_key || this.storageKey || '');
+
           try {
-            // update in-memory key so subsequent saves write to the right place
+            const persistOpts = oldKey
+              ? { forceTargetKey: oldKey, noDownload: true }
+              : { noDownload: true };
+
+            await this._persistOptionsToYaml({ storage_key: newKey }, persistOpts);
+
+            // Only after successful persist, update in-memory config
             this.storageKey = newKey;
             if (this._config) this._config.storage_key = newKey;
-
-            // write the storage_key into Lovelace YAML/options for this card
-            await this._persistOptionsToYaml({ storage_key: newKey }, {
-              forceTargetKey: newKey,
-              noDownload: true,
-            });
           } catch (err) {
-            console.warn('[ddc:switcher] failed to persist storage_key', err);
-            // we can still continue, but reload may revert if this fails
+            console.warn('[ddc:switcher] failed to persist storage_key to YAML', err);
+            this._toast?.('Failed to persist selected layout. Keeping current.');
+            return; // bail so we don't reload into the wrong key
           }
 
-          // 2) Flush-save the CURRENT layout under the NEW key (avoid debounce race)
-          if (this._saveTimer) clearTimeout(this._saveTimer);
-          await this._saveLayout(true);
+          // ---- FLUSH SAVE UNDER THE *NEW* KEY, THEN HARD-RELOAD ----
+          try {
+            if (this._saveTimer) clearTimeout(this._saveTimer);
+            await this._saveLayout(true);      // writes under this.storageKey (now newKey)
+          } catch (e2) {
+            console.warn('[ddc:switcher] saveLayout failed', e2);
+            this._markDirty?.('switcher');
+            this._toast?.('Layout loaded — click Apply to save.');
+            return;
+          }
 
-          // 3) Hard reload so the selected layout appears immediately
+          // Finally, reload so the selected layout is what loads on startup
           window.location.reload();
 
         } catch (err) {
