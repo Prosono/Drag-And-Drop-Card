@@ -1880,20 +1880,55 @@ _syncEmptyStateUI() {
       } else if (act === 'edit') {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
+          const oldEl = wrap.firstElementChild;
+
+          // Create the new card element, but don't set hass yet
           const newEl = await this._createCard(newCfg);
-          newEl.hass = this.hass;
-          // update dataset with the new configuration for persistence
+
+          // Persist the new config on the wrapper (used on reload)
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
+            // keep needsCardMod flag in sync
+            if (this._hasCardModDeep(newCfg)) {
+              wrap.dataset.needsCardMod = 'true';
+            } else {
+              delete wrap.dataset.needsCardMod;
+            }
           } catch {}
-          // Inside the 'edit' action handling callback after replacing the card:
-          wrap.replaceChild(newEl, wrap.firstElementChild);
+
+          // Replace the old card with the new one
+          wrap.replaceChild(newEl, oldEl);
+
+          // Ensure it's actually connected before we drive updates
+          await raf();
+
+          // NOW set hass (after connected) and nudge a render
+          try {
+            newEl.hass = this.hass;
+            // Some cards (Lit) need an explicit update tick
+            newEl.requestUpdate?.();
+            if (newEl.updateComplete) {
+              try { await newEl.updateComplete; } catch {}
+            }
+          } catch {}
+
+          // Special case: mod-card benefits from re-applying setConfig once connected
+          if (newCfg?.type === 'custom:mod-card' && typeof newEl.setConfig === 'function') {
+            try { newEl.setConfig(newCfg); } catch {}
+          }
+
+          // Let card-mod (and HA) re-hook styles/slots if needed
           try { this._rebuildOnce(newEl); } catch {}
+          try { newEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+
+          // Recompute the dynamic container size (if in dynamic mode)
+          this._resizeContainer();
+
+          // Save the change (respects autosave + editMode)
           this._queueSave('edit');
-          this._resizeContainer();  // <- trigger container to recalc size and render updates
-          
         });
       }
+
     });
 
     // ADD THE MISSING SHIELD ELEMENT
