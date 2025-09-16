@@ -1897,6 +1897,7 @@ _syncEmptyStateUI() {
           try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
           this._resizeContainer();  // <- trigger container to recalc size and render updates
+          location.reload();
           
         });
       }
@@ -2957,7 +2958,7 @@ _syncEmptyStateUI() {
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
     // default: Visual
-    showTab('yaml');
+    showTab('visual');
 
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
