@@ -4010,15 +4010,24 @@ this._initCardInteract(wrap);
           this._showEmptyPlaceholder();
         }
         this._resizeContainer();
-      // Persist the imported layout (cards) to our storage (backend/local) for THIS storage_key
-      try {
-        await this._saveLayout(true);  // 'true' means silent toast; change to false if you want the "Layout saved." toast
-        this._toast('Design imported & saved.');
-      } catch (e) {
-        console.warn('[ddc:import] saveLayout failed', e);
-        this._markDirty('import');
-        this._toast('Design imported — click Apply to save.');
-      }
+        // Persist the imported layout (cards) to our storage (backend/local) for THIS storage_key
+        try {
+          // cancel any pending debounced save (if any)
+          if (this._saveTimer) clearTimeout(this._saveTimer);
+
+          // flush save immediately so changes are persisted before reload
+          await this._saveLayout(true);  // 'true' = silent toast in your implementation
+
+          // optional toast before reload
+          this._toast('Design imported & saved. Reloading...');
+
+          // hard refresh so the imported design shows up right away
+          window.location.reload();
+        } catch (e) {
+          console.warn('[ddc:import] saveLayout failed', e);
+          this._markDirty('import');
+          this._toast('Design imported — click Apply to save.');
+        }
       } catch (e) {
         console.error('Import failed', e);
         this._toast('Import failed — invalid file.');
