@@ -1880,25 +1880,39 @@ _syncEmptyStateUI() {
       } else if (act === 'edit') {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
+          const oldEl = wrap.firstElementChild;
           const newEl = await this._createCard(newCfg);
-          newEl.hass = this.hass;
-          // update dataset with the new configuration for persistence
+
+          // persist cfg on wrapper (and card-mod flag if you use it)
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
+            if (this._hasCardModDeep?.(newCfg)) wrap.dataset.needsCardMod = 'true';
+            else delete wrap.dataset.needsCardMod;
           } catch {}
-          // Inside the 'edit' action handling callback after replacing the card:
-          wrap.replaceChild(newEl, wrap.firstElementChild);
 
-          // Force the new card to render its updated config, if possible
-          if (typeof newEl.requestUpdate === 'function') {
-              newEl.requestUpdate();
-          }
+          // swap the element
+          wrap.replaceChild(newEl, oldEl);
+
+          // ensure connected before driving updates (important for Lit cards)
+          await raf();
+          try {
+            newEl.hass = this.hass;
+            newEl.requestUpdate?.();
+            if (newEl.updateComplete) { try { await newEl.updateComplete; } catch {} }
+          } catch {}
 
           try { this._rebuildOnce(newEl); } catch {}
-          this._queueSave('edit');
-          this._resizeContainer();  // <- trigger container to recalc size and render updates
-          location.reload();
-          
+          try { newEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+
+          this._resizeContainer?.();
+
+          // SAVE -> THEN HARD RELOAD (avoid debounce race)
+          try {
+            clearTimeout(this._saveTimer);           // cancel debounced save
+            await this._saveLayout(true);            // flush save now
+          } catch (e) { console.warn('Save before reload failed', e); }
+
+          window.location.reload();                  // force refresh so edited card appears
         });
       }
     });
