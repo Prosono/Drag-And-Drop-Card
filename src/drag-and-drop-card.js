@@ -4820,7 +4820,16 @@ async function _persistOptionsToYaml(opts, {
           const design = await _fetchLayoutByKey.call(this, newKey);
           if (!design) { this._toast?.(`No layout found for "${newKey}"`); return; }
           await _applyDesignObject.call(this, design, { source: 'switcher', newKey });
-        } catch(err) {
+
+          this._resizeContainer?.();
+          this._markDirty?.('import');
+          this._toast?.(`Loaded layout "${newKey}"`);
+
+          // flush + hard reload (reuse your helper if you added it)
+          if (this._saveTimer) clearTimeout(this._saveTimer);
+          await this._saveLayout(true);
+          window.location.reload();
+        } catch (err) {
           console.warn('[ddc:switcher] load/apply failed', err);
           this._toast?.('Failed to load layout.');
         } finally {
