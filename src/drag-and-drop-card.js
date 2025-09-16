@@ -64,7 +64,6 @@ class DragAndDropCard extends HTMLElement {
   }
 
 
-
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -88,29 +87,6 @@ class DragAndDropCard extends HTMLElement {
     return results;
   }
 
-  // Track whether the *meaningful* config changed (independent of storage_key)
-  _configSignature(cfg = {}) {
-    // include the fields that affect rendering/behavior
-    const watch = {
-      grid: cfg.grid,
-      drag_live_snap: cfg.drag_live_snap,
-      auto_save: cfg.auto_save,
-      auto_save_debounce: cfg.auto_save_debounce,
-      container_background: cfg.container_background,
-      card_background: cfg.card_background,
-      debug: cfg.debug,
-      disable_overlap: cfg.disable_overlap,
-      container_size_mode: cfg.container_size_mode,
-      container_fixed_width: cfg.container_fixed_width,
-      container_fixed_height: cfg.container_fixed_height,
-      container_preset: cfg.container_preset,
-      container_preset_orientation: cfg.container_preset_orientation,
-      hero_image: cfg.hero_image,
-      // include embedded YAML child-cards too so changing them rebuilds
-      cards: cfg.cards,
-    };
-    try { return JSON.stringify(watch); } catch { return ''; }
-  }
 
   // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
   _syncEditorsStorageKey() {
@@ -149,11 +125,13 @@ class DragAndDropCard extends HTMLElement {
       storage_key: this._genKey(),
 
       // (optional) sensible defaults you already use:
-      grid: 20,
-      drag_live_snap: true,
+      grid: 10,
+      drag_live_snap: false,
       auto_save: true,
       auto_save_debounce: 800,
-      container_size_mode: 'dynamic',
+      container_size_mode: 'fixed_custom',
+      container_fixed_width: 400,
+      container_fixed_height: 400,
 
       // your baked-in hero image, if you want it visible by default
       hero_image:
@@ -161,6 +139,7 @@ class DragAndDropCard extends HTMLElement {
     };
   }
 
+  /* ------------------------- Mini config editor (HA) ------------------------- */
   /* ------------------------- Mini config editor (HA) ------------------------- */
   static getConfigElement() {
     const el = document.createElement('div');
@@ -474,8 +453,6 @@ _clampAllCardsInside() {
   });
 }
 
-
-
 _applyGridVars() {
   const sz = `${this.gridSize || 10}px`;
   // host (inherits down)
@@ -555,12 +532,6 @@ _applyGridVars() {
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
     const keyChanged = prevKey !== this.storageKey;
-
-    // Did any meaningful config actually change?
-    const prevSig = this.__cfgSig || null;
-    this.__cfgSig = this._configSignature(this._config || config);
-    const cfgChanged = !!prevSig && prevSig !== this.__cfgSig;
-
 
       // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
     if (this.editMode && !this.__booting && !keyChanged) {
@@ -1097,29 +1068,17 @@ _applyGridVars() {
 
     // Only rebuild from storage on first boot or when storage_key changes.
     // For normal config tweaks, just reflow with the new options.
-    // --- Boot/rebuild logic (replace your current if/else with this) ---
+   // Boot/rebuild logic
     this.__cfgReady = true;
-
-    const fromEditor = this._isInHaEditorPreview();
-
-    // --- Boot/rebuild logic ---
-    this.__cfgReady = true;
-
-    if (this.__booted && (keyChanged || cfgChanged)) {
-      // Any real change after first boot → live rebuild of the canvas + children
+    if (keyChanged && this.__booted) {
       this._initialLoad(true);
-      // Nudge layout in case parent needs a recalc
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
       this._initialLoad();
     } else {
-      // Lightweight path for true no-op edits
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
-
-    
   }
 
   connectedCallback() {
@@ -1924,31 +1883,13 @@ _syncEmptyStateUI() {
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
           newEl.hass = this.hass;
-
-          try { wrap.dataset.cfg = JSON.stringify(newCfg); } catch {}
+          // update dataset with the new configuration for persistence
+          try {
+            wrap.dataset.cfg = JSON.stringify(newCfg);
+          } catch {}
           wrap.replaceChild(newEl, wrap.firstElementChild);
-
-          // let card render fully
-          if (newEl.requestUpdate) {
-            newEl.requestUpdate();
-            try { await newEl.updateComplete; } catch {}
-          }
-          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
           try { this._rebuildOnce(newEl); } catch {}
-
-          // re-bind DnD & resize canvas
-          try { this._initCardInteract(wrap); } catch {}
-          try { this._resizeContainer(); } catch {}
-
-          // nudge downstream listeners
-          try { newEl.dispatchEvent(new Event('iron-resize', { bubbles: true, composed: true })); } catch {}
-          try { newEl.dispatchEvent(new Event('ll-rebuild',   { bubbles: true, composed: true })); } catch {}
-
           this._queueSave('edit');
-
-          // If anything still appears stale in your setup:
-          // this._initialLoad(true);
         });
       }
     });
