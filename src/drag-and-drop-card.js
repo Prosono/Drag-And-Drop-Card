@@ -131,6 +131,7 @@ class DragAndDropCard extends HTMLElement {
       auto_save_debounce: 800,
       container_size_mode: 'dynamic',
 
+
       // your baked-in hero image, if you want it visible by default
       hero_image:
         "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
@@ -754,7 +755,7 @@ _applyGridVars() {
           .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
 
           .resize-handle{
-            display:flex;                 /* shown in edit mode via your existing rule */
+            display:none;                 /* shown in edit mode via your existing rule */
             position:absolute;
             bottom:8px;                   /* move INSIDE the wrapper bounds */
             right:8px;                    /* so it can't be clipped by overflow */
@@ -1885,9 +1886,12 @@ _syncEmptyStateUI() {
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
           } catch {}
+          // Inside the 'edit' action handling callback after replacing the card:
           wrap.replaceChild(newEl, wrap.firstElementChild);
           try { this._rebuildOnce(newEl); } catch {}
           this._queueSave('edit');
+          this._resizeContainer();  // <- trigger container to recalc size and render updates
+          
         });
       }
     });
@@ -1899,6 +1903,7 @@ _syncEmptyStateUI() {
     // ADD THE MISSING HANDLE ELEMENT
     const handle = document.createElement('div');
     handle.classList.add('resize-handle');
+    if (!this.editMode) handle.style.display = 'none';  // hide handle if not editing
     handle.title = 'Resize';
     handle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
 
