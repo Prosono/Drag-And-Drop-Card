@@ -1241,6 +1241,7 @@ _applyGridVars() {
               conf.size?.height || 200
             );
             this.cardContainer.appendChild(wrap);
+            wrap.firstElementChild.hass = this.hass;
             try { this._rebuildOnce(wrap.firstElementChild); } catch {}
             builtAny = true;
             continue;
@@ -1798,7 +1799,7 @@ _syncEmptyStateUI() {
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
-    el.hass = this.hass;
+    //el.hass = this.hass;
     
     // Special handling for mod-card
     if (cfg.type === 'custom:mod-card') {
@@ -1894,6 +1895,8 @@ _syncEmptyStateUI() {
           // attach first, then wire hass so it can render immediately
           wrap.replaceChild(newEl, wrap.firstElementChild);
           newEl.hass = this.hass;
+          if (newEl.requestUpdate) { try { newEl.requestUpdate(); await newEl.updateComplete?.catch(()=>{}); } catch {} }
+          newEl.dispatchEvent(new CustomEvent('ll-rebuild', { bubbles:true, composed:true }));
 
           // give it a microtask/frame to connect, then poke rebuild hooks
           await new Promise(r => requestAnimationFrame(r));
