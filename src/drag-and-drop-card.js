@@ -88,29 +88,35 @@ class DragAndDropCard extends HTMLElement {
     return results;
   }
 
-  // Track whether the *meaningful* config changed (independent of storage_key)
-  _configSignature(cfg = {}) {
-    // include the fields that affect rendering/behavior
-    const watch = {
-      grid: cfg.grid,
-      drag_live_snap: cfg.drag_live_snap,
-      auto_save: cfg.auto_save,
-      auto_save_debounce: cfg.auto_save_debounce,
-      container_background: cfg.container_background,
-      card_background: cfg.card_background,
-      debug: cfg.debug,
-      disable_overlap: cfg.disable_overlap,
-      container_size_mode: cfg.container_size_mode,
-      container_fixed_width: cfg.container_fixed_width,
-      container_fixed_height: cfg.container_fixed_height,
-      container_preset: cfg.container_preset,
-      container_preset_orientation: cfg.container_preset_orientation,
-      hero_image: cfg.hero_image,
-      // include embedded YAML child-cards too so changing them rebuilds
-      cards: cfg.cards,
-    };
-    try { return JSON.stringify(watch); } catch { return ''; }
+  // Canonicalize any JS value (recursively) with sorted keys
+  _canon(v) {
+    if (v === null || v === undefined) return null;
+    if (Array.isArray(v)) return v.map((x) => this._canon(x));
+    if (typeof v === 'object') {
+      const out = {};
+      Object.keys(v).sort().forEach((k) => {
+        // Drop volatile keys from the signature
+        if (k === 'storage_key' || k === 'type') return;
+        const val = v[k];
+        if (val === undefined) return;
+        out[k] = this._canon(val);
+      });
+      return out;
+    }
+    // Normalize numbers/booleans/strings
+    if (typeof v === 'number' && !Number.isFinite(v)) return String(v);
+    return v;
   }
+
+  _configSignature(cfg = {}) {
+    try {
+      return JSON.stringify(this._canon(cfg));
+    } catch {
+      // Fallback shouldn’t be needed; ensures we never throw
+      return String(Date.now());
+    }
+  }
+
 
   // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
   _syncEditorsStorageKey() {
@@ -1105,16 +1111,23 @@ _applyGridVars() {
     // --- Boot/rebuild logic ---
     this.__cfgReady = true;
 
+    // Rebuild when:
+    // 1) storage_key changed (switching layouts), OR
+    // 2) the actual JSON config changed (ignores storage_key/type)
     if (this.__booted && (keyChanged || cfgChanged)) {
-      // Any real change after first boot → live rebuild of the canvas + children
+      // Live rebuild
       this._initialLoad(true);
-      // Nudge layout in case parent needs a recalc
+      // Help HA recalc card size / grid
       try { window.dispatchEvent(new Event('resize')); } catch {}
+      // Belt-and-suspenders: ask Lovelace to remount if it cached the old instance
+      queueMicrotask(() => {
+        try { this.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
+      });
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
       this._initialLoad();
     } else {
-      // Lightweight path for true no-op edits
+      // Lightweight path when nothing meaningful changed
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
