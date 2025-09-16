@@ -125,14 +125,11 @@ class DragAndDropCard extends HTMLElement {
       storage_key: this._genKey(),
 
       // (optional) sensible defaults you already use:
-      grid: 10,
+      grid: 20,
       drag_live_snap: false,
       auto_save: true,
       auto_save_debounce: 800,
-      container_size_mode: 'fixed_custom',
-      container_fixed_width: 400,
-      container_fixed_height: 400,
-
+      container_size_mode: 'dynamic',
       // your baked-in hero image, if you want it visible by default
       hero_image:
         "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
