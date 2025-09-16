@@ -125,11 +125,12 @@ class DragAndDropCard extends HTMLElement {
       storage_key: this._genKey(),
 
       // (optional) sensible defaults you already use:
-      grid: 20,
+      grid: 10,
       drag_live_snap: false,
       auto_save: true,
       auto_save_debounce: 800,
       container_size_mode: 'dynamic',
+
       // your baked-in hero image, if you want it visible by default
       hero_image:
         "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
@@ -1238,7 +1239,6 @@ _applyGridVars() {
               conf.size?.height || 200
             );
             this.cardContainer.appendChild(wrap);
-            wrap.firstElementChild.hass = this.hass;
             try { this._rebuildOnce(wrap.firstElementChild); } catch {}
             builtAny = true;
             continue;
@@ -1796,7 +1796,7 @@ _syncEmptyStateUI() {
   async _createCard(cfg) {
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
-    //el.hass = this.hass;
+    el.hass = this.hass;
     
     // Special handling for mod-card
     if (cfg.type === 'custom:mod-card') {
@@ -1880,30 +1880,13 @@ _syncEmptyStateUI() {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const newEl = await this._createCard(newCfg);
-
+          newEl.hass = this.hass;
           // update dataset with the new configuration for persistence
           try {
             wrap.dataset.cfg = JSON.stringify(newCfg);
-            // keep the card_mod hint in sync (optional but nice)
-            if (this._hasCardModDeep(newCfg)) wrap.dataset.needsCardMod = 'true';
-            else delete wrap.dataset.needsCardMod;
           } catch {}
-
-          // attach first, then wire hass so it can render immediately
           wrap.replaceChild(newEl, wrap.firstElementChild);
-          newEl.hass = this.hass;
-          if (newEl.requestUpdate) { try { newEl.requestUpdate(); await newEl.updateComplete?.catch(()=>{}); } catch {} }
-          newEl.dispatchEvent(new CustomEvent('ll-rebuild', { bubbles:true, composed:true }));
-
-          // give it a microtask/frame to connect, then poke rebuild hooks
-          await new Promise(r => requestAnimationFrame(r));
           try { this._rebuildOnce(newEl); } catch {}
-
-          // optional but helpful if some interact handlers depend on child structure
-          // this._initCardInteract(wrap);
-          // optional container reflow
-          // this._resizeContainer();
-
           this._queueSave('edit');
         });
       }
