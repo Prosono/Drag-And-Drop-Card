@@ -64,6 +64,7 @@ class DragAndDropCard extends HTMLElement {
   }
 
 
+
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
@@ -87,6 +88,29 @@ class DragAndDropCard extends HTMLElement {
     return results;
   }
 
+  // Track whether the *meaningful* config changed (independent of storage_key)
+  _configSignature(cfg = {}) {
+    // include the fields that affect rendering/behavior
+    const watch = {
+      grid: cfg.grid,
+      drag_live_snap: cfg.drag_live_snap,
+      auto_save: cfg.auto_save,
+      auto_save_debounce: cfg.auto_save_debounce,
+      container_background: cfg.container_background,
+      card_background: cfg.card_background,
+      debug: cfg.debug,
+      disable_overlap: cfg.disable_overlap,
+      container_size_mode: cfg.container_size_mode,
+      container_fixed_width: cfg.container_fixed_width,
+      container_fixed_height: cfg.container_fixed_height,
+      container_preset: cfg.container_preset,
+      container_preset_orientation: cfg.container_preset_orientation,
+      hero_image: cfg.hero_image,
+      // include embedded YAML child-cards too so changing them rebuilds
+      cards: cfg.cards,
+    };
+    try { return JSON.stringify(watch); } catch { return ''; }
+  }
 
   // Keep visible editors (HA sidebar or in-card modal) in sync with current storage_key
   _syncEditorsStorageKey() {
@@ -395,13 +419,6 @@ _resolveFixedSize() {
   return null;
 }
 
-_teardown() {
-  try { this._resizeObs?.disconnect?.(); } catch {}
-  this._resizeObs = null;
-  const root = this.shadowRoot || this.attachShadow?.({ mode: 'open' }) || this;
-  while (root.firstChild) root.removeChild(root.firstChild);
-}
-
 _applyContainerSizingFromConfig(initial=false) {
   // set container size according to mode
   const c = this.cardContainer; if (!c) return;
@@ -456,6 +473,8 @@ _clampAllCardsInside() {
     this._setCardPosition(w, nx2, ny2);
   });
 }
+
+
 
 _applyGridVars() {
   const sz = `${this.gridSize || 10}px`;
@@ -536,6 +555,12 @@ _applyGridVars() {
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
     const keyChanged = prevKey !== this.storageKey;
+
+    // Did any meaningful config actually change?
+    const prevSig = this.__cfgSig || null;
+    this.__cfgSig = this._configSignature(this._config || config);
+    const cfgChanged = !!prevSig && prevSig !== this.__cfgSig;
+
 
       // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
     if (this.editMode && !this.__booting && !keyChanged) {
@@ -1077,28 +1102,24 @@ _applyGridVars() {
 
     const fromEditor = this._isInHaEditorPreview();
 
-    // Rebuild in these cases:
-    // 1) storage_key changed (you already had this)
-    // 2) we're in the editor (user pressed Update and expects immediate changes)
-    if ((fromEditor || keyChanged) && this.__probed) {
-      if (!this.__booted) this.__booted = true;
-      this._initialLoad(true);              // full rebuild now
+    // --- Boot/rebuild logic ---
+    this.__cfgReady = true;
+
+    if (this.__booted && (keyChanged || cfgChanged)) {
+      // Any real change after first boot → live rebuild of the canvas + children
+      this._initialLoad(true);
+      // Nudge layout in case parent needs a recalc
+      try { window.dispatchEvent(new Event('resize')); } catch {}
     } else if (!this.__booted && this.__probed) {
       this.__booted = true;
-      this._initialLoad();                  // first boot
+      this._initialLoad();
     } else {
-      // lightweight tweaks only, when nothing structural changed
+      // Lightweight path for true no-op edits
       this._applyContainerSizingFromConfig(true);
       this._resizeContainer();
     }
 
-
-      // 🔧 make Update behave like the early version:
-      this._teardown?.();           // clear old DOM/listeners
-      this.__booted = false;        // reset any “built once” guards
-      this.__probed = true;         // ensure initialLoad runs
-      this._initialLoad?.(true);    // full rebuild now
-      this.requestUpdate?.();
+    
   }
 
   connectedCallback() {
