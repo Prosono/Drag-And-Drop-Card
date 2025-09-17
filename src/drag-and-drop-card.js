@@ -779,7 +779,7 @@ _applyGridVars() {
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
             width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; 
-            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:auto
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:hidden
           }
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
@@ -792,7 +792,14 @@ _applyGridVars() {
           .btn:disabled{opacity:.6;cursor:not-allowed}
 
           /* picker layout */
-          .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
+          .layout
+          {
+            display: grid;
+            flex: 1 1 auto;
+            min-height: 0;
+            grid-template-columns:260px 1fr;
+            }
+
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:visible;background:var(--primary-background-color)}
           .rightGrid{
