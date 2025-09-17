@@ -776,29 +776,10 @@ _applyGridVars() {
           .resize-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px;pointer-events:none}
 
           /* modal */
-          .modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.45);
-            display: flex;
-            /* Align to top so modal content can grow downward */
-            align-items: flex-start;          /* was align-items: center */
-            justify-content: center;         /* center horizontally */
-            overflow-y: auto;               /* make entire modal scrollable */
-            z-index: 9000;
-          }
-          .dialog {
-            width: min(1220px, 96vw);
-            /* Remove fixed max-height so dialog can expand with content */
-            max-height: none;               /* was max-height: min(90vh, 900px) */
-            display: flex;
-            flex-direction: column;
-            background: var(--card-background-color);
-            border-radius: 20px;
-            padding: 0;
-            border: 1px solid var(--divider-color);
-            /* Allow content to overflow (for dropdowns) */
-            overflow: visible;             /* was overflow: auto */
+          .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
+          .dialog{
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; 
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:hidden
           }
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
@@ -807,49 +788,24 @@ _applyGridVars() {
               radial-gradient(900px 110px at 80% -40px, rgba(0,150,136,.18), transparent 60%);
           }
           .dlg-head h3{margin:0;font-size:1.1rem;letter-spacing:.2px}
-          .dlg-foot {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            padding: 12px;
-            border-top: 1px solid var(--divider-color);
-            background: var(--primary-background-color);
-            /* (Note: footer now sits at bottom of .dialog content naturally) */
-          }
+          .dlg-foot{display:flex;gap:10px;justify-content:flex-end;padding:12px;border-top:1px solid var(--divider-color);background:var(--primary-background-color)}
+          .btn:disabled{opacity:.6;cursor:not-allowed}
+
           /* picker layout */
-          .layout {
+          .layout
+          {
             display: grid;
-            grid-template-columns: 260px 1fr;
-            /* Remove fixed height to allow auto-resize */
-            /* was height: min(84vh, 820px); */
-          }
+            flex: 1 1 auto;
+            min-height: 0;
+            grid-template-columns:260px 1fr;
+            }
 
-          #leftPane {
-            border-right: 1px solid var(--divider-color);
-            overflow: auto;               /* left pane can scroll independently */
-            background: var(--primary-background-color);
-            contain: content;
+          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
+          #rightPane{overflow:visible;background:var(--primary-background-color)}
+          .rightGrid{
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative; overflow:auto;contain: none !important;
           }
-
-          #rightPane {
-            /* allow right content to expand; overflow visible for dropdowns */
-            overflow: visible;
-            background: var(--primary-background-color);
-          }
-
-          .rightGrid {
-            display: grid;
-            grid-template-columns: 540px 1fr;
-            /* Use auto rows so content defines height (preview grows with content) */
-            grid-template-rows: auto auto auto;   /* was auto auto 1fr */
-            gap: 12px;
-            padding: 12px;
-            box-sizing: border-box;
-            position: relative;
-            /* Remove internal scroll container */
-            /* was height: 100%; overflow: auto; */
-          }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:none !important}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -868,14 +824,22 @@ _applyGridVars() {
             height: 100%;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; }
+          #optionsSec {
+            min-height: 0;
+            overflow: visible !important;   /* was: auto */
+            height: auto !important;        /* was: 100% */
+            max-height: none !important; 
+          }
           #optionsSec .bd {
             overflow: auto;        /* scroll inside the Visual editor section */
             /* allow the visual editor to use the full available space instead of a fixed max height */
             max-height: none;
             height: 100%;
           }
-          #editorHost { display:block; min-height: 0; }
+          #editorHost { 
+            display: contents !important;   /* gives the child editor “native” layout */
+            min-height: 0 !important;
+          }
 
           #quickFillSec { 
             display: flex; 
@@ -927,6 +891,9 @@ _applyGridVars() {
             background: color-mix(in srgb, var(--primary-color) 10%, transparent);
             pointer-events:none; z-index:50;
           }
+
+          .ddc--yaml-active #yamlSec { z-index: 5; }
+          .ddc--yaml-active ha-code-editor { z-index: 6; }
 
           /* placeholder tile */
           .ddc-placeholder-inner{
@@ -3019,6 +2986,11 @@ _syncEmptyStateUI() {
         try { visualEditor.setConfig?.(currentConfig); } catch {}
       }
     });
+    
+    const root = this.shadowRoot.host || this;  // your component host
+    if (wantYaml) root.classList.add('ddc--yaml-active');
+    else root.classList.remove('ddc--yaml-active');
+
 
     tabYaml.addEventListener('click', () => showTab('yaml'));
     
@@ -3333,7 +3305,7 @@ _syncEmptyStateUI() {
         enableCommit(true);
         if (__activeTab !== 'visual') showTab('yaml');
         return false;
-}
+        }
     
       try {
         editor.hass = this.hass;
