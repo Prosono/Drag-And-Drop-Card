@@ -822,7 +822,7 @@ _applyGridVars() {
             /* allow the visual editor to use the full available space instead of a fixed max height */
             height: 100%;
           }
-          #editorHost { display:block; min-height: 0; }
+          #editorHost { display:block; min-height: 0; overflow: auto; }
 
           #quickFillSec { 
             display: flex; 
