@@ -776,10 +776,17 @@ _applyGridVars() {
           .resize-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px;pointer-events:none}
 
           /* modal */
-          .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
+          .modal{
+            position:fixed;inset:0;background:rgba(0,0,0,.45);
+            display:flex;align-items:center;justify-content:center;z-index:9000
+          }
           .dialog{
-            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; overflow:auto;
-            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
+            width:min(1220px,96vw);max-height:min(90vh, 900px);
+            display:flex;flex-direction:column;
+            background:var(--card-background-color);border-radius:20px;padding:0;
+            border:1px solid var(--divider-color);
+            /* was overflow:auto; — allow fly-out menus to escape the dialog box */
+            overflow:visible;
           }
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
@@ -796,11 +803,13 @@ _applyGridVars() {
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:visible;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative; overflow:auto;
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;
+            box-sizing:border-box;position:relative; overflow:auto;
           }
           .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
-          .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
-          .sec .bd{padding:12px;overflow:visible}       
+          /* header previously had z-index:10; remove to avoid invisible overlay eating clicks */
+          .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index:auto}
+          .sec .bd{padding:12px;overflow:visible}
           .tabs{display:flex;gap:6px;margin-left:auto}
           .tab{
             font-size:.85rem;padding:6px 10px;border-radius:10px;border:1px solid var(--divider-color);
@@ -809,22 +818,36 @@ _applyGridVars() {
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height: 0; }
+          #yamlSec { min-height: 0; overflow: visible !important; }
           #yamlSec .bd { 
-            overflow: auto;        /* allow scrolling inside the YAML section */
-            /* allow the YAML editor to use the full available space instead of a fixed max height */
+            /* allow scrolling inside the YAML section */
+            overflow: auto;
             max-height: none;
             height: 100%;
           }
-          /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; }
-          #optionsSec .bd {
-            overflow: auto;        /* scroll inside the Visual editor section */
-            /* allow the visual editor to use the full available space instead of a fixed max height */
-            max-height: none;
-            height: 100%;
+
+          /* --- FIX: Visual editor menus (ha-select/mwc-menu) must escape containers --- */
+          /* Keep the outer containers visible so fly-out menus are not clipped */
+          #optionsSec { min-height: 0; overflow: visible !important; }
+          #optionsSec .bd { overflow: visible !important; }
+
+          /* Allow the editor host and descendants to let menus render outside bounds */
+          #editorHost { display:block; min-height:0; position:relative; overflow:visible !important; }
+          mushroom-lock-card-editor,
+          mushroom-lock-card-editor * { overflow: visible !important; }
+
+          /* Provide an inner scroller so the section is still usable without clipping menus */
+          #optionsSec .bd > div {
+            max-height: min(70vh, 700px);
+            overflow: auto;
           }
-          #editorHost { display:block; min-height: 0; }
+
+          /* Ensure the menu surface renders above the dialog and any headers */
+          mwc-menu-surface,
+          mwc-menu {
+            z-index: 10001 !important;
+          }
+
 
           #quickFillSec { 
             display: flex; 
@@ -1040,7 +1063,7 @@ _applyGridVars() {
        });
 
       this.exploreBtn.addEventListener('click', () =>
-        window.open('https://cardstore.smarti.dev/', '_blank', 'noopener,noreferrer')
+        window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
       );
 
       // apply container sizing early
