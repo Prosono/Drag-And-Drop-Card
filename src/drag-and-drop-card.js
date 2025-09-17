@@ -776,17 +776,10 @@ _applyGridVars() {
           .resize-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px;pointer-events:none}
 
           /* modal */
-          .modal{
-            position:fixed;inset:0;background:rgba(0,0,0,.45);
-            display:flex;align-items:center;justify-content:center;z-index:9000
-          }
+          .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
-            width:min(1220px,96vw);max-height:min(90vh, 900px);
-            display:flex;flex-direction:column;
-            background:var(--card-background-color);border-radius:20px;padding:0;
-            border:1px solid var(--divider-color);
-            /* was overflow:auto; — allow fly-out menus to escape the dialog box */
-            overflow:visible;
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; 
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:auto
           }
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
@@ -803,13 +796,11 @@ _applyGridVars() {
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
           #rightPane{overflow:visible;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;
-            box-sizing:border-box;position:relative; overflow:auto;
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative; overflow:auto;
           }
           .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
-          /* header previously had z-index:10; remove to avoid invisible overlay eating clicks */
-          .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index:auto}
-          .sec .bd{padding:12px;overflow:visible}
+          .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
+          .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
           .tab{
             font-size:.85rem;padding:6px 10px;border-radius:10px;border:1px solid var(--divider-color);
@@ -818,36 +809,22 @@ _applyGridVars() {
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
 
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height: 0; overflow: visible !important; }
+          #yamlSec { min-height: 0; }
           #yamlSec .bd { 
-            /* allow scrolling inside the YAML section */
-            overflow: auto;
+            overflow: auto;        /* allow scrolling inside the YAML section */
+            /* allow the YAML editor to use the full available space instead of a fixed max height */
             max-height: none;
             height: 100%;
           }
-
-          /* --- FIX: Visual editor menus (ha-select/mwc-menu) must escape containers --- */
-          /* Keep the outer containers visible so fly-out menus are not clipped */
-          #optionsSec { min-height: 0; overflow: visible !important; }
-          #optionsSec .bd { overflow: visible !important; }
-
-          /* Allow the editor host and descendants to let menus render outside bounds */
-          #editorHost { display:block; min-height:0; position:relative; overflow:visible !important; }
-          mushroom-lock-card-editor,
-          mushroom-lock-card-editor * { overflow: visible !important; }
-
-          /* Provide an inner scroller so the section is still usable without clipping menus */
-          #optionsSec .bd > div {
-            max-height: min(70vh, 700px);
-            overflow: auto;
+          /* --- make Visual editor area scrollable, like YAML --- */
+          #optionsSec { min-height: 0; }
+          #optionsSec .bd {
+            overflow: auto;        /* scroll inside the Visual editor section */
+            /* allow the visual editor to use the full available space instead of a fixed max height */
+            max-height: none;
+            height: 100%;
           }
-
-          /* Ensure the menu surface renders above the dialog and any headers */
-          mwc-menu-surface,
-          mwc-menu {
-            z-index: 10001 !important;
-          }
-
+          #editorHost { display:block; min-height: 0; }
 
           #quickFillSec { 
             display: flex; 
@@ -3940,10 +3917,11 @@ this._initCardInteract(wrap);
     }
   }
 
-
   _exportDesign() {
-    const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
-    const saved = wraps.map((w)=>{
+    const wraps = Array.from(
+      this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
+    );
+    const saved = wraps.map((w) => {
       const x = parseFloat(w.getAttribute('data-x')) || 0;
       const y = parseFloat(w.getAttribute('data-y')) || 0;
       const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
@@ -3952,12 +3930,20 @@ this._initCardInteract(wrap);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
       return { card: cardCfg, position:{x,y}, size:{width,height}, z };
     });
+
     const payload = {
-        version: 2,
-        options: this._exportableOptions(),
-        cards: saved
-      };
-    const name = `ddc_design_${this.storageKey || 'layout'}.json`;
+      version: 2,
+      options: this._exportableOptions(),
+      cards: saved
+    };
+
+    // NEW: preserve card_mod (if present) as part of options so it exports with the design
+    if (this._config && this._config.card_mod) {
+      payload.options = payload.options || {};
+      payload.options.card_mod = this._config.card_mod;
+    }
+
+    const name = `DragAndDrop_Design_${this.storageKey || 'layout'}.json`;
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -3965,86 +3951,92 @@ this._initCardInteract(wrap);
     a.click();
     URL.revokeObjectURL(a.href);
     this._toast('Design exported.');
-  }
+  }  
   
   _importDesign() {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'application/json';
     inp.onchange = async () => {
       const file = inp.files?.[0]; if (!file) return;
-        const txt = await file.text();
+      const txt = await file.text();
       try {
         const json = JSON.parse(txt);
         const __prevStorageKey = this.storageKey || (this._config && this._config.storage_key) || null;
 
         // Apply options (if present) before building cards
-          if (json.options) {
-            const { storage_key, ...optsNoKey } = json.options;
-            this._applyImportedOptions(optsNoKey, true);
+        if (json.options) {
+          // keep everything except storage_key; card_mod stays in optsNoKey
+          const { storage_key, ...optsNoKey } = json.options;
+
+          this._applyImportedOptions(optsNoKey, true);
+
+          // NEW: explicitly apply card_mod to this card’s config so styling survives
+          if (json.options.card_mod) {
+            this._config = this._config || {};
+            this._config.card_mod = json.options.card_mod;
+            // trigger render if your component uses Lit/HA update cycle
+            this.requestUpdate && this.requestUpdate();
           }
-        else if (typeof json.grid === 'number') this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback     
+        } else if (typeof json.grid === 'number') {
+          this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
+        }
 
-        // v1 fallback     
-                
-          // DDC: Persist imported design (options + cards) into stored Lovelace YAML
-          try {
-            const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
+        // Persist imported options (now includes card_mod if present) to YAML
+        try {
+          const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
 
-            // Persist OPTIONS (not cards) to Lovelace YAML for this card only
-            const importedOptions =
-              json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
+          // keep the full options object (with card_mod) if present
+          const importedOptions =
+            json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
 
-            if (!targetKey) {
-              console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+          if (!targetKey) {
+            console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+          } else {
+            const result = await this._persistOptionsToYaml(importedOptions, {
+              forceTargetKey: String(targetKey),
+              noDownload: true,
+            });
+            const yamlOk = !!(result && result.yamlSaved);
+            console.debug('[ddc:import] YAML persist result:', yamlOk);
+          }
+        } catch (e) {
+          console.warn('[ddc:import] YAML persist failed:', e);
+        }
+
+        // Build cards
+        this.cardContainer.innerHTML = '';
+        if (json.cards?.length) {
+          for (const conf of json.cards) {
+            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
+              const p = this._makePlaceholderAt(
+                conf.position?.x||0, conf.position?.y||0,
+                conf.size?.width||200, conf.size?.height||200
+              );
+              this.cardContainer.appendChild(p);
             } else {
-              const result = await this._persistOptionsToYaml(importedOptions, {
-                forceTargetKey: String(targetKey),
-                noDownload: true,
-              });
-              const yamlOk = !!(result && result.yamlSaved);
-              console.debug('[ddc:import] YAML persist result:', yamlOk);
+              const el = await this._createCard(conf.card);
+              const wrap = this._makeWrapper(el);
+              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+              wrap.style.width  = `${conf.size?.width||140}px`;
+              wrap.style.height = `${conf.size?.height||100}px`;
+              if (conf.z != null) wrap.style.zIndex = String(conf.z);
+              this.cardContainer.appendChild(wrap);
+
+              try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+              this._initCardInteract(wrap);
             }
-
-
-          } catch (e) {
-            console.warn('[ddc:import] YAML persist failed:', e);
-          }
-
-          this.cardContainer.innerHTML = '';
-          if (json.cards?.length) {
-            for (const conf of json.cards) {
-                if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-                  const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
-                  this.cardContainer.appendChild(p);
-                } else {
-                  const el = await this._createCard(conf.card);
-                  const wrap = this._makeWrapper(el);
-                  this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-                  wrap.style.width  = `${conf.size?.width||140}px`;
-                  wrap.style.height = `${conf.size?.height||100}px`;
-                  if (conf.z != null) wrap.style.zIndex = String(conf.z);
-                  this.cardContainer.appendChild(wrap);
-                  
-                try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-                this._initCardInteract(wrap);
-                }
           }
         } else {
           this._showEmptyPlaceholder();
         }
+
         this._resizeContainer();
-        // Persist the imported layout (cards) to our storage (backend/local) for THIS storage_key
+
+        // Persist the imported layout
         try {
-          // cancel any pending debounced save (if any)
           if (this._saveTimer) clearTimeout(this._saveTimer);
-
-          // flush save immediately so changes are persisted before reload
-          await this._saveLayout(true);  // 'true' = silent toast in your implementation
-
-          // optional toast before reload
+          await this._saveLayout(true);
           this._toast('Design imported & saved. Reloading...');
-
-          // hard refresh so the imported design shows up right away
           window.location.reload();
         } catch (e) {
           console.warn('[ddc:import] saveLayout failed', e);
@@ -4058,6 +4050,7 @@ this._initCardInteract(wrap);
     };
     inp.click();
   }
+
   
 
   
