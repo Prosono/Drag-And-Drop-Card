@@ -778,8 +778,8 @@ _applyGridVars() {
           /* modal */
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
-            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; 
-            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:hidden;
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column;
+            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
           }
           .dlg-head{
             display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
@@ -794,9 +794,9 @@ _applyGridVars() {
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
           #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
-          #rightPane{overflow:visible;background:var(--primary-background-color)}
+          #rightPane{overflow:hidden;background:var(--primary-background-color)}
           .rightGrid{
-            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative; overflow:auto;
+            display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
           .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
@@ -813,16 +813,18 @@ _applyGridVars() {
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
             /* allow the YAML editor to use the full available space instead of a fixed max height */
+            max-height: none;
             height: 100%;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; overflow: auto; height: 100%}
+          #optionsSec { min-height: 0; }
           #optionsSec .bd {
             overflow: auto;        /* scroll inside the Visual editor section */
             /* allow the visual editor to use the full available space instead of a fixed max height */
+            max-height: none;
             height: 100%;
           }
-          #editorHost { display:block; min-height: 0; overflow: visible; z-index: 9998; }
+          #editorHost { display:block; min-height: 0; }
 
           #quickFillSec { 
             display: flex; 
@@ -837,6 +839,9 @@ _applyGridVars() {
           /* ha-code-editor / CodeMirror height: fixed and scroll inside */
           ha-code-editor { 
             display: block; 
+            height: 260px !important; 
+          }
+          .CodeMirror { 
             height: 260px !important; 
           }
 
@@ -854,15 +859,16 @@ _applyGridVars() {
           }
 
           /* YAML editor safety / visibility */
-          #yamlSec{ z-index:10; }
+          #yamlSec{ z-index:5; }
           #yamlHost, #yamlHost * { touch-action: auto; }
           ha-code-editor, ha-code-editor * { touch-action: auto; }
-          ha-code-editor{ display:block; height:260px; z-index:11; }
+          ha-code-editor{ display:block; height:260px; z-index:6; }
 
           /* loading spinners */
           .spin-center{
             position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events: none; /* let clicks pass through to tabs and controls */
           }
+
 
           /* marquee selection rectangle */
           .marquee{
