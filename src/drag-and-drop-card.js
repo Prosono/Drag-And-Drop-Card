@@ -778,7 +778,7 @@ _applyGridVars() {
           /* modal */
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
-            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column;
+            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column; overflow:auto;
             background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
           }
           .dlg-head{
