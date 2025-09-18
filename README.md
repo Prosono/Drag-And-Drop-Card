@@ -156,7 +156,7 @@ cards:
 
 ## 🧑‍🏫 Editor UX & Shortcuts
 
-- **Enter Edit**: Long-press on blank canvas (≈4s).
+- **Enter Edit**: Long-press /souble click on blank canvas (≈1s).
 - **Exit Edit**: Press **Esc** or use the **Exit** button.
 - **Apply**: **Ctrl/Cmd + S** in edit mode or click **Apply**.
 - **Multi-select**: Drag selection marquee; use **Shift/Ctrl/Cmd** to extend selection.
@@ -165,7 +165,7 @@ cards:
   - Reload
   - Diagnostics
   - Export / Import
-  - Apply layout
+  - Apply layout (only needed whan autosve is turned off)
   - Exit edit
 
 ---
@@ -182,6 +182,33 @@ card_mod:
     :host {
       --ddc-grid-color: rgba(255, 255, 255, 0.15);
     }
+```
+NOTE: Only the main card supports card mod for now. If you want to style the inner cards you will hace to style them using card mod
+```yaml
+card_mod:
+  style: |
+    :host {
+      --ha-card-background: transparent;
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    /* Child internals stay clean */
+    .ddc-root,
+    .card-container,
+    .layout,
+    .pane,
+    .rightGrid,
+    .section,
+    .toolbar,
+    .mdc-card,
+    .card,
+    .card *[class~="card"],
+    .mini,
+    .bd {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
 ```
 
 ---
