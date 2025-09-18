@@ -139,144 +139,200 @@ class DragAndDropCard extends HTMLElement {
   }
 
   /* ------------------------- Mini config editor (HA) ------------------------- */
-  /* ------------------------- Mini config editor (HA) ------------------------- */
+// Replace your existing static getConfigElement() with the version below.
+// It uses HA-native inputs (ha-textfield, ha-select, ha-formfield + ha-checkbox)
+// for consistent styling, clearer alignment, helper text, and a subtle animation
+  // for the Apply button when there are unapplied changes.
+
   static getConfigElement() {
     const el = document.createElement('div');
     el.innerHTML = `
       <style>
-        .cfg-row{display:flex;gap:12px;align-items:center;margin:8px 0;flex-wrap:wrap}
-        input[type="text"],input[type="number"],select{
-          padding:6px;border-radius:8px;border:1px solid var(--divider-color);
-          background:var(--primary-background-color);color:var(--primary-text-color)
+        :host, .ddc-editor { all: initial; font-family: var(--paper-font-body1_-_font-family, Roboto, system-ui, sans-serif); color: var(--primary-text-color); }
+
+        .ddc-editor { display: grid; grid-template-columns: 220px 1fr; gap: 10px 16px; align-items: center; box-sizing: border-box; padding: 8px 4px; }
+        .section { grid-column: 1 / -1; margin: 10px 0 2px; font-weight: 600; opacity: 0.9; }
+        .row-spacer { grid-column: 1 / -1; height: 2px; background: var(--divider-color); opacity: .2; border-radius: 2px; }
+
+        .label { align-self: flex-start; padding-top: 6px; font-weight: 600; opacity: .9; }
+        .helper { grid-column: 2 / 3; font-size: .85rem; opacity: .7; margin-top: -6px; }
+
+        .inline { display: inline-flex; align-items: center; gap: 8px; }
+        .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+        .actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+        .actions ha-button[disabled] { opacity: .6; }
+
+        /* Subtle pulse for enabled Apply button */
+        @keyframes ddcPulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+          50% { transform: scale(1.035); box-shadow: 0 0 12px 2px rgba(255,255,255,.22); }
         }
-        label{font-weight:600;min-width:130px}
-        .inline{display:inline-flex;gap:8px;align-items:center}
-        .hint{opacity:.65;font-size:.85rem}
+        #applyBtn:not([disabled]) { animation: ddcPulse 1.8s ease-in-out infinite; }
+
+        /* Make HA inputs fill width nicely */
+        ha-textfield, ha-select { width: 100%; }
+
+        /* Checkbox rows: keep left column reserved so alignment stays consistent */
+        .left-empty { visibility: hidden; }
       </style>
 
-      <div class="cfg-row">
-        <label>Storage key</label>
-        <input id="storage_key" type="text" placeholder="my_unique_layout_key" />
-      </div>
+      <div class="ddc-editor">
+        <div class="section">Layout & Behavior</div>
 
-      <div class="cfg-row">
-        <label>Grid size</label>
-        <input id="grid" type="number" min="4" max="32" step="1" value="10" style="width:90px" />
-        <span class="hint">Grid cell in px; affects snap & default card size</span>
-      </div>
+        <div class="label">Storage key</div>
+        <ha-textfield id="storage_key" label="Storage key" placeholder="my_unique_layout_key"></ha-textfield>
+        <div class="helper">Unique key for saving layout positions. Auto-generated if empty.</div>
 
-      <div class="cfg-row">
-        <label><input type="checkbox" id="liveSnap"> Snap while dragging (live)</label>
-      </div>
+        <div class="label">Grid size</div>
+        <ha-textfield id="grid" label="Grid (px)" type="number" min="4" max="32" step="1" value="10"></ha-textfield>
+        <div class="helper">Pixel size of each grid cell. Affects snap and default card size.</div>
 
-      <div class="cfg-row">
-        <label>Auto-save</label>
-        <input type="checkbox" id="autoSave" checked>
-        <span style="margin-left:auto">Debounce (ms)</span>
-        <input type="number" id="autoSaveDebounce" min="0" step="50" value="800" style="width:90px">
-      </div>
+        <div class="label">Snap while dragging</div>
+        <ha-formfield label="Snap to grid during drag (live)">
+          <ha-checkbox id="liveSnap"></ha-checkbox>
+        </ha-formfield>
+        <div class="helper">If on, elements snap to grid while dragging. If off, snap occurs on drop.</div>
 
-      <div class="cfg-row">
-        <label>Container Background</label>
-        <input type="text" id="containerBg"
-          placeholder="transparent or css e.g. linear-gradient(...)"
-          title="Try: transparent, #232f3e, linear-gradient(...), radial-gradient(...)" />
-      </div>
+        <div class="label">Auto-save</div>
+        <div class="two-col">
+          <ha-formfield label="Auto-save changes">
+            <ha-checkbox id="autoSave"></ha-checkbox>
+          </ha-formfield>
+          <ha-textfield id="autoSaveDebounce" label="Debounce (ms)" type="number" min="0" step="50" value="800"></ha-textfield>
+        </div>
+        <div class="helper">When enabled, layout changes are saved automatically after a short delay.</div>
 
-      <div class="cfg-row">
-        <label>Card Background</label>
-        <input type="text" id="cardBg"
-          placeholder="var(--ha-card-background) or css e.g. #ffffffcc"
-          title="Try: transparent, #151515aa, linear-gradient(...)" />
-      </div>
+        <div class="row-spacer"></div>
+        <div class="section">Appearance</div>
 
-      <div class="cfg-row">
-        <label><input type="checkbox" id="debug"> Debug logs</label>
-      </div>
+        <div class="label">Container background</div>
+        <ha-textfield id="containerBg" label="CSS color/gradient" placeholder="transparent, #232f3e, linear-gradient(...)" helper=""></ha-textfield>
+        <div class="helper">Examples: <code>transparent</code>, <code>#232f3e</code>, <code>linear-gradient(...)</code>.</div>
 
-      <div class="cfg-row">
-        <label><input type="checkbox" id="noOverlap"> Disable overlap</label>
-      </div>
+        <div class="label">Card background</div>
+        <ha-textfield id="cardBg" label="CSS color/gradient" placeholder="var(--ha-card-background) or #ffffffcc"></ha-textfield>
+        <div class="helper">Background for each card in the layout; can use theme vars.</div>
 
-      <!-- Size controls -->
-      <div class="cfg-row">
-        <label>Container size</label>
-        <select id="sizeMode">
-          <option value="dynamic">Dynamic (auto)</option>
-          <option value="fixed_custom">Fixed (custom)</option>
-          <option value="preset">Preset</option>
-        </select>
+        <div class="label">Debug logs</div>
+        <ha-formfield label="Enable console debug">
+          <ha-checkbox id="debug"></ha-checkbox>
+        </ha-formfield>
 
-        <span id="sizeCustom" class="inline" style="display:none">
-          <span>W</span><input id="sizeW" type="number" min="100" step="10" style="width:90px">
-          <span>H</span><input id="sizeH" type="number" min="100" step="10" style="width:90px">
-        </span>
+        <div class="label">Disable overlap</div>
+        <ha-formfield label="Prevent cards from overlapping">
+          <ha-checkbox id="noOverlap"></ha-checkbox>
+        </ha-formfield>
 
-        <span id="sizePresetWrap" class="inline" style="display:none">
-          <select id="sizePreset"></select>
-          <select id="sizeOrientation">
-            <option value="auto">Auto</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-          </select>
-        </span>
-      </div>
+        <div class="row-spacer"></div>
+        <div class="section">Container Size</div>
 
-      <!-- Actions -->
-      <div class="cfg-row" style="justify-content:flex-end">
-        <mwc-button id="revertBtn" outlined>Revert</mwc-button>
-        <mwc-button id="applyBtn" raised disabled>Apply</mwc-button>
+        <div class="label">Mode</div>
+        <ha-select id="sizeMode" label="Container size mode" naturalMenuWidth="true">
+          <mwc-list-item value="dynamic">Dynamic (auto)</mwc-list-item>
+          <mwc-list-item value="fixed_custom">Fixed (custom)</mwc-list-item>
+          <mwc-list-item value="preset">Preset</mwc-list-item>
+        </ha-select>
+
+        <div class="label">Fixed size</div>
+        <div class="inline" id="sizeCustom" style="display:none">
+          <ha-textfield id="sizeW" type="number" label="W" min="100" step="10"></ha-textfield>
+          <ha-textfield id="sizeH" type="number" label="H" min="100" step="10"></ha-textfield>
+        </div>
+
+        <div class="label">Preset</div>
+        <div class="inline" id="sizePresetWrap" style="display:none">
+          <ha-select id="sizePreset" label="Preset" naturalMenuWidth="true"></ha-select>
+          <ha-select id="sizeOrientation" label="Orientation" naturalMenuWidth="true">
+            <mwc-list-item value="auto">Auto</mwc-list-item>
+            <mwc-list-item value="landscape">Landscape</mwc-list-item>
+            <mwc-list-item value="portrait">Portrait</mwc-list-item>
+          </ha-select>
+        </div>
+
+        <div class="actions">
+          <ha-button id="revertBtn">Revert</ha-button>
+          <ha-button id="applyBtn" raised disabled>Apply</ha-button>
+        </div>
       </div>
     `;
 
-    // Presets into #sizePreset
-    const og = document.createElement('optgroup');
-    og.label = 'Presets';
-    (DragAndDropCard._sizePresets?.() || []).forEach((p) => {
-      const o = document.createElement('option');
-      o.value = p.key; o.textContent = `${p.label} (${p.w}×${p.h})`;
-      og.appendChild(o);
-    });
-    el.querySelector('#sizePreset')?.appendChild(og);
+    // ---- Utility helpers ----
+    const updateButtons = () => {
+      const dirty = isDirty();
+      applyBtn.disabled = !dirty;
+    };
+
+    const fire = () => {
+      const newConfig = el.getConfig();
+      el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig } }));
+      // Re-check button states after applying
+      updateButtons();
+    };
 
     const toggleSizeControls = () => {
       const mode = el.querySelector('#sizeMode').value;
-      el.querySelector('#sizeCustom').style.display = mode==='fixed_custom' ? 'inline-flex' : 'none';
-      el.querySelector('#sizePresetWrap').style.display = mode==='preset' ? 'inline-flex' : 'none';
+      el.querySelector('#sizeCustom').style.display = mode === 'fixed_custom' ? 'inline-flex' : 'none';
+      el.querySelector('#sizePresetWrap').style.display = mode === 'preset' ? 'inline-flex' : 'none';
     };
 
-    // Set incoming values (keep type + unknown keys)
+    // Keep reference to controls
+    const applyBtn  = el.querySelector('#applyBtn');
+    const revertBtn = el.querySelector('#revertBtn');
+
+    // --- Public API: set incoming values (preserve unknown keys)
     el.setConfig = (config = {}) => {
       el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
 
-
-      // If no storage_key yet, create one and plan to persist automatically
+      // Auto-generate storage key once if not present
       if (!el._config.storage_key) {
         el._config.storage_key = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
-        el.__autokeyPending = true;  // <- remember to fire once after UI binds
+        el.__autokeyPending = true;
       }
-      // populate fields from el._config (not raw config)
-      el.querySelector('#storage_key').value = config.storage_key || '';
-      el.querySelector('#grid').value = config.grid ?? 10;
-      el.querySelector('#liveSnap').checked = !!config.drag_live_snap;
-      el.querySelector('#autoSave').checked = config.auto_save !== false;
-      el.querySelector('#autoSaveDebounce').value = config.auto_save_debounce ?? 800;
-      el.querySelector('#containerBg').value = config.container_background ?? 'transparent';
-      el.querySelector('#cardBg').value = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
-      el.querySelector('#debug').checked = !!config.debug;
-      el.querySelector('#noOverlap').checked = !!config.disable_overlap;
 
-      // NEW sizing fields
-      el.querySelector('#sizeMode').value = config.container_size_mode || 'dynamic';
-      el.querySelector('#sizeW').value = config.container_fixed_width ?? '';
-      el.querySelector('#sizeH').value = config.container_fixed_height ?? '';
-      const presetSel = el.querySelector('#sizePreset');
-      const presets = DragAndDropCard._sizePresets?.() || [];
-      if (presetSel && ![...presetSel.options].some(o => o.value === (config.container_preset || ''))) {
-        // already appended above; nothing else needed
+      // Populate inputs
+      el.querySelector('#storage_key').value = el._config.storage_key || '';
+      el.querySelector('#grid').value = el._config.grid ?? 10;
+      el.querySelector('#liveSnap').checked = !!el._config.drag_live_snap;
+      el.querySelector('#autoSave').checked = el._config.auto_save !== false;
+      el.querySelector('#autoSaveDebounce').value = el._config.auto_save_debounce ?? 800;
+      el.querySelector('#containerBg').value = el._config.container_background ?? 'transparent';
+      el.querySelector('#cardBg').value = el._config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+      el.querySelector('#debug').checked = !!el._config.debug;
+      el.querySelector('#noOverlap').checked = !!el._config.disable_overlap;
+
+      el.querySelector('#sizeMode').value = el._config.container_size_mode || 'dynamic';
+      el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
+      el.querySelector('#sizeH').value = el._config.container_fixed_height ?? '';
+      el.querySelector('#sizeOrientation').value = el._config.container_preset_orientation || 'auto';
+
+      // Build size preset list once (grouped)
+      const presetSelect = el.querySelector('#sizePreset');
+      if (!presetSelect.__filled) {
+        const groups = (this._sizePresets?.() || []).reduce((acc, p) => {
+          (acc[p.group || 'other'] ||= []).push(p); return acc;
+        }, {});
+        presetSelect.innerHTML = '';
+        for (const [group, items] of Object.entries(groups)) {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = group.replace(/(^.|-.?)/g, s => s.toUpperCase());
+          items.forEach(preset => {
+            const item = document.createElement('mwc-list-item');
+            item.value = preset.key;
+            item.textContent = `${preset.label} (${preset.w}×${preset.h})`;
+            optgroup.appendChild(item);
+          });
+          // Note: <optgroup> isn't supported inside mwc-menu; append flat items with prefix
+          // so we create visual grouping by inserting disabled headers
+          const header = document.createElement('mwc-list-item');
+          header.setAttribute('disabled', '');
+          header.textContent = `— ${optgroup.label} —`;
+          presetSelect.appendChild(header);
+          Array.from(optgroup.children).forEach(child => presetSelect.appendChild(child));
+        }
+        presetSelect.__filled = true;
       }
-      presetSel.value = config.container_preset || (presets[0]?.key || 'fhd');
-      el.querySelector('#sizeOrientation').value = config.container_preset_orientation || 'auto';
+      if (el._config.container_preset) presetSelect.value = el._config.container_preset;
 
       toggleSizeControls();
       updateButtons();
@@ -284,11 +340,11 @@ class DragAndDropCard extends HTMLElement {
       // If we just generated a key, immediately persist it so the dashboard saves it
       if (el.__autokeyPending) {
         el.__autokeyPending = false;
-        fire(); // uses your existing fire() below to dispatch 'config-changed'
+        fire();
       }
     };
 
-    // Collect current values
+    // --- Public API: collect values into config
     el.getConfig = () => {
       const base = { ...(el._config || {}) };
       base.storage_key = el.querySelector('#storage_key').value || '';
@@ -301,53 +357,45 @@ class DragAndDropCard extends HTMLElement {
       base.debug = !!el.querySelector('#debug').checked;
       base.disable_overlap = !!el.querySelector('#noOverlap').checked;
 
-      // NEW
       base.container_size_mode = el.querySelector('#sizeMode').value;
       base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
       base.container_fixed_height = Number(el.querySelector('#sizeH').value || 0) || undefined;
       base.container_preset = el.querySelector('#sizePreset').value || undefined;
       base.container_preset_orientation = el.querySelector('#sizeOrientation').value || 'auto';
+
       return base;
     };
 
-    // Dirty / Apply handling
-    const applyBtn = el.querySelector('#applyBtn');
-    const revertBtn = el.querySelector('#revertBtn');
-
+    // Change detection (don’t fire immediately on each keystroke)
     const isDirty = () => {
-      try { return JSON.stringify(el.getConfig()) !== JSON.stringify(el._config); }
-      catch { return true; }
-    };
-    const updateButtons = () => {
-      if (applyBtn) applyBtn.disabled = !isDirty();
+      const current = el.getConfig();
+      const baseline = el._config || {};
+      try {
+        return JSON.stringify(current) !== JSON.stringify(baseline);
+      } catch { return true; }
     };
 
-    const fire = () => {
-      el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: el.getConfig() } }));
-      // Baseline becomes the new config after Apply
-      el._config = el.getConfig();
+    const on = (sel, ev = 'input') => el.querySelector(sel)?.addEventListener(ev, () => {
+      if (sel === '#sizeMode') toggleSizeControls();
       updateButtons();
-    };
+    });
 
-    const on = (sel, ev = 'input') =>
-      el.querySelector(sel)?.addEventListener(ev, () => {
-        if (sel === '#sizeMode') toggleSizeControls();
-        updateButtons(); // <- no immediate fire while typing
-      });
-
-    // Listeners (no per-keystroke fire)
+    // Listeners
     on('#storage_key'); on('#grid');
-    on('#liveSnap','change'); on('#autoSave','change'); on('#autoSaveDebounce');
+    on('#liveSnap', 'change'); on('#autoSave', 'change'); on('#autoSaveDebounce');
     on('#containerBg'); on('#cardBg');
-    on('#debug','change'); on('#noOverlap','change');
-    on('#sizeMode','change'); on('#sizeW'); on('#sizeH');
-    on('#sizePreset','change'); on('#sizeOrientation','change');
+    on('#debug', 'change'); on('#noOverlap', 'change');
+    on('#sizeMode', 'change'); on('#sizeW'); on('#sizeH');
+    on('#sizePreset', 'selected'); on('#sizeOrientation', 'selected');
 
-    applyBtn?.addEventListener('click', fire);
+    applyBtn?.addEventListener('click', () => {
+      fire();
+    });
     revertBtn?.addEventListener('click', () => el.setConfig(el._config));
 
     return el;
   }
+
 
   
     /* ---------------------------- Size helpers ---------------------------- */
