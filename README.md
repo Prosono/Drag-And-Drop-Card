@@ -216,8 +216,8 @@ card_mod:
 ## 🛠 Troubleshooting
 
 - **Module doesn’t load**: Confirm resource URL & type. Hard-reload browser.
-- **Cards snap oddly**: Adjust `grid` or disable `drag_live_snap`.
-- **Overlaps happen**: Use `disable_overlap: true`.
+- **Cards snap oddly**: Adjust `grid` or disable `Disable Overlap`.
+- **Overlaps happen**: Use `disable_overlap: true` - This is an experimental feature at the moment.
 - **Layout didn’t persist**: Ensure **Apply** or `auto_save` on; check `storage_key`.
 - **Imported design looks wrong**: Check version & cards exist. Re-apply/tweak canvas.
 
@@ -252,3 +252,10 @@ The bundle logs version in console:
 ```
 drag-and-drop-card vX.Y.Z
 ```
+
+## 🧾 Known bugs
+
+A couple of bugs are already known: 
+
+1. On some custom cards some of the dropdowns will cause the visual editor to dissappear until you select an option. We are working on this
+2. Card mod support on cards within the Dra-gAnd-Drop-Card. This is currently not behaving as we would like and we are working on this as well. 
