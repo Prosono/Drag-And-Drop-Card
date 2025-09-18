@@ -81,7 +81,7 @@ Now:
 
 ## HADS - Home Assistant Dashboard Store 
 
-This card makes it possible to import designs from HADS -> https://www.hads.smarti.dev
+This card makes it possible to import designs from HADS -> https://hads.smarti.dev/
 ---
 
 ## ⚙️ Configuration Options
