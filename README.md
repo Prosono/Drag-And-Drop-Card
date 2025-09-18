@@ -262,5 +262,5 @@ drag-and-drop-card vX.Y.Z
 A couple of bugs are already known: 
 
 1. On some custom cards some of the dropdowns will cause the visual editor to dissappear until you select an option.
-2. Card mod support on cards within the Dra-gAnd-Drop-Card. This is currently not behaving as we would like.
-3. If you import a design on to an existing design, not all style settings are overweritten. When you import, always do so on an empty Drag and Drop Card. 
+2. Card mod support on cards within the Drag-And-Drop-Card. This is currently not behaving as we would like and WILL NOT WORK!
+3. ?? Probably more
