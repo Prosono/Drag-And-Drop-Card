@@ -819,10 +819,10 @@ _applyGridVars() {
           /* --- make Visual editor area scrollable, like YAML --- */
           #optionsSec { min-height: 0; }
           #optionsSec .bd {
-            overflow: auto;        /* scroll inside the Visual editor section */
-            /* allow the visual editor to use the full available space instead of a fixed max height */
-            max-height: none;
-            height: 100%;
+            position: relative;
+            overflow: auto;
+            height: auto;
+            max-height: 100%;
           }
           #editorHost { display:block; min-height: 0; }
 
