@@ -3542,10 +3542,18 @@ async _getStubConfigForType(type) {
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
     const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
+    let base = { type };
     if (CardClass?.getStubConfig) {
-      try { return await CardClass.getStubConfig(this.hass, all, byDomain); } catch {}
+      try {
+        const stub = await CardClass.getStubConfig(this.hass, all, byDomain);
+        if (type !== 'entity') {
+          // keep old behavior for all non-entity cards
+          return stub;
+        }
+        // For 'entity': merge the stub but DO NOT return yet — let defaults fill .entity if missing
+        if (stub && typeof stub === 'object') base = { ...base, ...stub };
+      } catch {}
     }
-    const base = { type };
     const first = all[0];
     const firstSensor = byDomain('sensor')[0] || first;
 
@@ -3664,8 +3672,8 @@ async _getStubConfigForType(type) {
     wrap.style.zIndex = String(this._highestZ() + 1);
     this.cardContainer.appendChild(wrap);
     
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+  try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+    this._initCardInteract(wrap);
     this._resizeContainer();
     this._queueSave('add');
     this._toast('Card added to layout.');
