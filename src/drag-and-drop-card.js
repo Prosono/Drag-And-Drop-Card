@@ -4405,7 +4405,7 @@ _importDesign() {
   _updateStoreBadge() {
     const el = this.storeBadge; if (!el) return;
     const usingHost = this._backendOK && !!this.storageKey;
-    el.textContent = usingHost ? 'storage: backend' : 'storage: local';
+    el.textContent = usingHost ? 'storage: backend - OK' : 'storage: local. Your Changes are NOT being SAVED. You need to download the Drag and Drop Card backend integration';
     el.style.background = usingHost ? 'rgba(76,175,80,.15)' : 'rgba(255,193,7,.15)';
     el.style.borderColor = usingHost ? 'rgba(76,175,80,.45)' : 'rgba(255,193,7,.45)';
   }
