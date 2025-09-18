@@ -3286,6 +3286,12 @@ _syncEmptyStateUI() {
     };
 
     const mountPreview = (cfg) => {
+      if ((cfg?.type || '') === 'custom_card') {
+        __lastPreviewCfgJSON = JSON.stringify(cfg || {});
+        cardHost.innerHTML = '<div style="opacity:.6;font-size:.9rem;padding:8px">Preview not available for the custom card placeholder. Use the YAML editor.</div>';
+        previewSpin.hidden = true;
+        return;
+      }
       const cfgJSON = JSON.stringify(cfg || {});
       if (cfgJSON === __lastPreviewCfgJSON) return; // same config, skip
       __lastPreviewCfgJSON = cfgJSON;
@@ -3306,26 +3312,29 @@ _syncEmptyStateUI() {
       }, 150); // 150–250ms is a sweet spot
     };
 
-    const mountVisualEditor = async (cfg) => {
-      const seq = ++pickSeq;
-      editorSpin.hidden = false;
-      editorHost.innerHTML = '';
-      await idle();
-      if (seq !== pickSeq) { editorSpin.hidden = true; return false; }
-    
-      // Try to get a UI editor for *any* card type (core or custom)
-      const wantType = cfg.type || currentType;
-      let editor = await this._getEditorElementForType(wantType, cfg);
+      const mountVisualEditor = async (cfg) => {
+        const seq = ++pickSeq;
+        editorSpin.hidden = false;
+        editorHost.innerHTML = '';
+        await idle();
 
-      // If not available yet, warm the card module and retry a few times
-      if (!editor) {
-        await this._ensureCardModuleLoaded(wantType, cfg);
-        for (const delay of [0, 120, 250, 500, 900, 2000, 4000]) {
-          if (delay) await new Promise(r => setTimeout(r, delay));
-          editor = await this._getEditorElementForType(wantType, cfg);
-          if (editor) break;
+        const wantType = cfg.type || currentType;
+
+        // 🚫 Visual editor not supported for the placeholder entry
+        if (wantType === 'custom_card') {
+          // Show a friendly note and switch to YAML
+          const p = document.createElement('div');
+          p.style.opacity = '.7';
+          p.style.fontSize = '.9rem';
+          p.textContent = 'Custom card placeholder: use the YAML editor to paste the card type and options.';
+          editorHost.appendChild(p);
+
+          visualEditor = null;
+          if (__activeTab !== 'yaml') showTab('yaml');
+          enableCommit(true);
+          editorSpin.hidden = true;
+          return false;
         }
-      }
 
       if (!editor) {
         // No UI editor → show YAML (unless user explicitly selected Visual)
@@ -3535,9 +3544,7 @@ async _getStubConfigForType(type) {
 
     // Provide a blank stub when the user selects the "Custom Card" entry.
     // A blank type lets the YAML editor drive the configuration entirely.
-    if (type === 'custom_card') {
-      return { type: 'custom_card' };
-    }
+    if (type === 'custom_card') return null;
 
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
