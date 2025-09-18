@@ -1,6 +1,6 @@
 # Drag & Drop Card for Home Assistant (Lovelace)
 
-[![Watch the video](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
+[![Watch the video](https://img.youtube.com/vi/__4U081hwtM/hqdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
 
 A freeform **drag / resize / snap-to-grid** canvas for Lovelace cards.  
 Arrange any Lovelace cards visually, save the layout (auto-save or manual), export/import full designs, and quickly prototype dashboards with device-size presets.
