@@ -261,7 +261,10 @@ drag-and-drop-card vX.Y.Z
 
 A couple of bugs are already known: 
 
-1. On some custom cards some of the dropdowns will cause the visual editor to dissappear until you select an option.
+1. On some custom cards some of the dropdowns will cause the visual editor to dissappear and you will only see your possible selections. The visual editor returns once you ahve selected an an option.
+
 2. Card mod support on cards within the Drag-And-Drop-Card. This is currently not behaving as we would like and WILL NOT WORK!
+
 3. The visual editor for the Entity card is broken in the Card Selector inside the Drag And Drop Card. 
-3. ?? Probably more
+
+4. ?? Probably more
