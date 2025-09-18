@@ -817,7 +817,7 @@ _applyGridVars() {
             height: 100%;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; overflow: atuo;}
+          #optionsSec { min-height: 0; overflow: auto;}
           #optionsSec .bd {
             position: relative;
             overflow: auto;
