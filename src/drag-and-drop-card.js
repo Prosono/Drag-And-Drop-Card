@@ -4011,103 +4011,171 @@ this._initCardInteract(wrap);
     this._toast('Design exported.');
   }  
   
-  _importDesign() {
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = 'application/json';
-    inp.onchange = async () => {
-      const file = inp.files?.[0]; if (!file) return;
-      const txt = await file.text();
-      try {
-        const json = JSON.parse(txt);
-        const __prevStorageKey = this.storageKey || (this._config && this._config.storage_key) || null;
+_importDesign() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json';
 
-        // Apply options (if present) before building cards
-        if (json.options) {
-          // keep everything except storage_key; card_mod stays in optsNoKey
-          const { storage_key, ...optsNoKey } = json.options;
+  // ---- tweak these if you like ----
+  const HARD_REPLACE = true;                 // fully overwrite existing options
+  const ADOPT_IMPORTED_STORAGE_KEY = false;  // keep current storage_key by default
+  const KNOWN_OPT_KEYS = [
+    'grid','drag_live_snap','auto_save','auto_save_debounce',
+    'container_background','card_background','debug','disable_overlap',
+    'container_size_mode','container_fixed_width','container_fixed_height',
+    'container_preset','container_preset_orientation','card_mod','storage_key'
+  ];
+  // ----------------------------------
 
-          this._applyImportedOptions(optsNoKey, true);
+  inp.onchange = async () => {
+    const file = inp.files?.[0]; if (!file) return;
+    const txt = await file.text();
+    try {
+      const json = JSON.parse(txt);
+      const __prevStorageKey = this.storageKey || this._config?.storage_key || null;
 
-          // NEW: explicitly apply card_mod to this card’s config so styling survives
-          if (json.options.card_mod) {
-            this._config = this._config || {};
-            this._config.card_mod = json.options.card_mod;
-            // trigger render if your component uses Lit/HA update cycle
-            this.requestUpdate && this.requestUpdate();
+      // ---- APPLY OPTIONS (with hard-replace) ----
+      if (json.options) {
+        // shallow copy so we can safely delete fields like storage_key
+        const imported = { ...json.options };
+        if (!ADOPT_IMPORTED_STORAGE_KEY) delete imported.storage_key;
+
+        if (HARD_REPLACE) {
+          const cfg = this._config || { type: 'custom:drag-and-drop-card' };
+
+          // 1) remove stale option keys that aren't in the import
+          for (const k of KNOWN_OPT_KEYS) {
+            if (k === 'storage_key' && !ADOPT_IMPORTED_STORAGE_KEY) continue;
+            if (!(k in imported) && k in cfg) delete cfg[k];
           }
-        } else if (typeof json.grid === 'number') {
-          this._applyImportedOptions({ grid: json.grid }, true); // v1 fallback
-        }
 
-        // Persist imported options (now includes card_mod if present) to YAML
-        try {
-          const targetKey = (this._config && this._config.storage_key) || this.storageKey || null;
+          // 2) clear previously applied DOM styles that could linger
+          try {
+            // container styles (adjust if you use different nodes/props)
+            if (this.cardContainer) {
+              this.cardContainer.style.background = '';
+              this.cardContainer.style.width = '';
+              this.cardContainer.style.height = '';
+            }
+            // root/theming leftovers (if you use CSS vars, clear here)
+            this.style?.removeProperty?.('--ddc-container-bg');
+            this.style?.removeProperty?.('--ddc-card-bg');
+          } catch {}
 
-          // keep the full options object (with card_mod) if present
-          const importedOptions =
-            json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
+          // 3) apply imported options
+          this._config = { ...cfg, ...imported };
+          if (!('card_mod' in imported)) delete this._config.card_mod;
 
-          if (!targetKey) {
-            console.warn('[ddc:import] No storage_key on this card; aborting persist.');
-          } else {
-            const result = await this._persistOptionsToYaml(importedOptions, {
-              forceTargetKey: String(targetKey),
-              noDownload: true,
-            });
-            const yamlOk = !!(result && result.yamlSaved);
-            console.debug('[ddc:import] YAML persist result:', yamlOk);
+          // sync storage key if we adopt it
+          if (ADOPT_IMPORTED_STORAGE_KEY && imported.storage_key) {
+            this.storageKey = imported.storage_key;
           }
-        } catch (e) {
-          console.warn('[ddc:import] YAML persist failed:', e);
-        }
 
-        // Build cards
-        this.cardContainer.innerHTML = '';
-        if (json.cards?.length) {
-          for (const conf of json.cards) {
-            if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-              const p = this._makePlaceholderAt(
-                conf.position?.x||0, conf.position?.y||0,
-                conf.size?.width||200, conf.size?.height||200
-              );
-              this.cardContainer.appendChild(p);
-            } else {
-              const el = await this._createCard(conf.card);
-              const wrap = this._makeWrapper(el);
-              this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-              wrap.style.width  = `${conf.size?.width||140}px`;
-              wrap.style.height = `${conf.size?.height||100}px`;
-              if (conf.z != null) wrap.style.zIndex = String(conf.z);
-              this.cardContainer.appendChild(wrap);
-
-              try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-              this._initCardInteract(wrap);
+          // keep runtime cache in sync if you maintain one
+          if (this._opts) {
+            this._opts = { ...this._opts, ...imported };
+            for (const k of KNOWN_OPT_KEYS) {
+              if (!(k in imported)) delete this._opts[k];
             }
           }
+
+          // re-apply options to DOM if you have a helper for that
+          this._applyOptionsToDom?.(this._config);
+          this.requestUpdate?.();
+
         } else {
-          this._showEmptyPlaceholder();
+          // your original merge behavior
+          this._applyImportedOptions(imported, true);
+          if (imported.card_mod !== undefined) {
+            this._config = this._config || {};
+            this._config.card_mod = imported.card_mod;
+            this.requestUpdate?.();
+          }
         }
 
-        this._resizeContainer();
+      } else if (typeof json.grid === 'number') {
+        // v1 fallback
+        const imported = { grid: json.grid };
+        HARD_REPLACE ? (this._config = { ...(this._config||{}), ...imported }) :
+                       this._applyImportedOptions(imported, true);
+        this.requestUpdate?.();
+      }
 
-        // Persist the imported layout
-        try {
-          if (this._saveTimer) clearTimeout(this._saveTimer);
-          await this._saveLayout(true);
-          this._toast('Design imported & saved. Reloading...');
-          window.location.reload();
-        } catch (e) {
-          console.warn('[ddc:import] saveLayout failed', e);
-          this._markDirty('import');
-          this._toast('Design imported — click Apply to save.');
+      // ---- PERSIST IMPORTED OPTIONS TO YAML (replace semantics) ----
+      try {
+        const targetKey = this._config?.storage_key || this.storageKey || null;
+        const importedOptions = json.options
+          ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
+        const persistOptions = { ...importedOptions };
+        if (!ADOPT_IMPORTED_STORAGE_KEY) delete persistOptions.storage_key;
+
+        if (!targetKey) {
+          console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+        } else {
+          // if your helper supports it, these flags instruct a full replace
+          const result = await this._persistOptionsToYaml(persistOptions, {
+            forceTargetKey: String(targetKey),
+            noDownload: true,
+            replace: true,
+            wipeUnknownKeys: true,
+          });
+          const yamlOk = !!(result && result.yamlSaved);
+          console.debug('[ddc:import] YAML persist result:', yamlOk);
         }
       } catch (e) {
-        console.error('Import failed', e);
-        this._toast('Import failed — invalid file.');
+        console.warn('[ddc:import] YAML persist failed:', e);
       }
-    };
-    inp.click();
-  }
+
+      // ---- BUILD CARDS ----
+      this.cardContainer.innerHTML = '';
+      if (json.cards?.length) {
+        for (const conf of json.cards) {
+          if (!conf?.card || (typeof conf.card === 'object' && !Object.keys(conf.card).length)) {
+            const p = this._makePlaceholderAt(
+              conf.position?.x||0, conf.position?.y||0,
+              conf.size?.width||200, conf.size?.height||200
+            );
+            this.cardContainer.appendChild(p);
+          } else {
+            const el = await this._createCard(conf.card);
+            const wrap = this._makeWrapper(el);
+            this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+            wrap.style.width  = `${conf.size?.width||140}px`;
+            wrap.style.height = `${conf.size?.height||100}px`;
+            if (conf.z != null) wrap.style.zIndex = String(conf.z);
+            this.cardContainer.appendChild(wrap);
+
+            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+            this._initCardInteract(wrap);
+          }
+        }
+      } else {
+        this._showEmptyPlaceholder();
+      }
+
+      // apply container sizing/appearance based on new options
+      this._resizeContainer();
+      this._applyOptionsToDom?.(this._config);
+
+      // ---- SAVE LAYOUT ----
+      try {
+        if (this._saveTimer) clearTimeout(this._saveTimer);
+        await this._saveLayout(true);
+        this._toast('Design imported & saved. Reloading...');
+        window.location.reload();
+      } catch (e) {
+        console.warn('[ddc:import] saveLayout failed', e);
+        this._markDirty('import');
+        this._toast('Design imported — click Apply to save.');
+      }
+    } catch (e) {
+      console.error('Import failed', e);
+      this._toast('Import failed — invalid file.');
+    }
+  };
+  inp.click();
+}
+
 
   
 
