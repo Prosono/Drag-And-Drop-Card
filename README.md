@@ -73,11 +73,15 @@ debug: false                       # verbose console logs
 ```
 
 Now:
-- **Long-press** on blank canvas (≈4s) to enter **Edit Mode**.
+- **Long-press** on blank canvas (≈1s) og double click on an epmty space to enter **Edit Mode**.
 - Use the **toolbar** to **Add** cards, **Import/Export**, **Apply**, or **Exit** edit mode.
 - **Ctrl/Cmd + S** applies (saves) the layout in edit mode.
 - **Esc** exits edit mode.
 
+
+## HADS - Home Assistant Dashboard Store 
+
+This card makes it possible to import designs from HADS -> https://www.hads.smarti.dev
 ---
 
 ## ⚙️ Configuration Options
