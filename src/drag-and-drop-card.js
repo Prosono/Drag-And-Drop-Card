@@ -4932,7 +4932,11 @@ async function _persistOptionsToYaml(opts, {
         const recent = toUnique(recentKeys);
         select.innerHTML = '';
         if (current && !server.includes(current) && !backups.includes(current) && !recent.includes(current)) {
-          const opt = document.createElement('option'); opt.value=current; opt.textContent = `${current} (current)`; select.appendChild(opt);
+          const opt = document.createElement('option');
+          opt.value = current;
+          opt.textContent = `${current} (current)`;
+          opt.selected = true; // ensure the dropdown shows the actual current value
+          select.appendChild(opt);
         }
         const makeGroup = (label, list) => {
           if (!list.length) return;
@@ -4977,32 +4981,45 @@ async function _persistOptionsToYaml(opts, {
           // IMPORTANT: persist against the *old* key so the YAML updater finds this card
           const oldKey = String(this._config?.storage_key || this.storageKey || '');
 
+          let persistOk = false;
           try {
             const persistOpts = oldKey
               ? { forceTargetKey: oldKey, noDownload: true }
               : { noDownload: true };
 
-            await this._persistOptionsToYaml({ storage_key: newKey }, persistOpts);
-
-            // Only after successful persist, update in-memory config
-            this.storageKey = newKey;
-            if (this._config) this._config.storage_key = newKey;
+            // NOTE: in YAML mode this can resolve to false (no exception)
+            persistOk = await this._persistOptionsToYaml({ storage_key: newKey }, persistOpts);
           } catch (err) {
             console.warn('[ddc:switcher] failed to persist storage_key to YAML', err);
             this._toast?.('Failed to persist selected layout. Keeping current.');
             return; // bail so we don't reload into the wrong key
           }
 
+          // Always update in-memory state so the UI reflects the selection now
+          this.storageKey = newKey;
+          if (this._config) this._config.storage_key = newKey;
+
+          // If persistence didn’t actually happen (e.g., YAML mode), stop here—don’t reload
+          if (!persistOk) {
+            console.warn('[ddc:switcher] persist returned false (likely YAML mode). Skipping reload.');
+            // Optional: remember across reloads if you want
+            // localStorage.setItem('ddc:lastKey', newKey);
+            return;
+          }
+
           // ---- FLUSH SAVE UNDER THE *NEW* KEY, THEN HARD-RELOAD ----
           try {
             if (this._saveTimer) clearTimeout(this._saveTimer);
-            await this._saveLayout(true);      // writes under this.storageKey (now newKey)
+            await this._saveLayout(true); // writes under this.storageKey (now newKey)
           } catch (e2) {
             console.warn('[ddc:switcher] saveLayout failed', e2);
             this._markDirty?.('switcher');
             this._toast?.('Layout loaded — click Apply to save.');
             return;
           }
+
+          // Only reload if persist succeeded (storage/dashboard mode)
+          window.location.reload();
 
           // Finally, reload so the selected layout is what loads on startup
           window.location.reload();
