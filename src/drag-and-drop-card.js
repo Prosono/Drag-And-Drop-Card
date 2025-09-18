@@ -148,7 +148,7 @@ static getConfigElement() {
   const el = document.createElement('div');
   el.innerHTML = `
     <style>
-      :host, .ddc-editor { all: initial; font-family: var(--paper-font-body1_-_font-family, Roboto, system-ui, sans-serif); color: var(--primary-text-color); }
+      :host, .ddc-editor { font-family: var(--paper-font-body1_-_font-family, Roboto, system-ui, sans-serif); color: var(--primary-text-color); }
 
       .ddc-editor { display: grid; grid-template-columns: 220px 1fr; gap: 10px 16px; align-items: center; box-sizing: border-box; padding: 8px 4px; }
       .section { grid-column: 1 / -1; margin: 10px 0 2px; font-weight: 600; opacity: 0.9; }
@@ -280,15 +280,13 @@ static getConfigElement() {
   const applyBtn  = el.querySelector('#applyBtn');
   const revertBtn = el.querySelector('#revertBtn');
 
-  // Prevent HA dialog from closing when using dropdown menus
-  const swallowSelectEvents = (select) => {
-    if (!select) return;
-    try { select.fixedMenuPosition = true; } catch {}
-    ['click','mousedown','mouseup','touchstart','keydown','selected','closed','opened'].forEach((ev) => {
-      select.addEventListener(ev, (e) => e.stopPropagation(), { capture: true });
-    });
-  };
-  ['#sizeMode','#sizePreset','#sizeOrientation'].forEach((sel) => swallowSelectEvents(el.querySelector(sel)));
+  // Make menus stable in HA dialog without blocking clicks
+  ['#sizeMode','#sizePreset','#sizeOrientation'].forEach((sel) => {
+    const s = el.querySelector(sel);
+    if (!s) return;
+    try { s.fixedMenuPosition = true; } catch {}
+    s.addEventListener('closed', (e) => e.stopPropagation());
+  });
 
   // --- Public API: set incoming values (preserve unknown keys)
   el.setConfig = (config = {}) => {
@@ -405,6 +403,7 @@ static getConfigElement() {
 
   return el;
 }
+
 
 
 
