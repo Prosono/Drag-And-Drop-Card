@@ -46,6 +46,12 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 
 > After adding a new resource, **clear browser cache** or hard-reload to ensure the module loads.
 
+# IMPORTANT!
+In order to make changes persitant when you add / edit / remove cards within the drag-and-drop card, you MUST install the backend integration found here:
+https://github.com/Prosono/Drag-And-Drop-Card-Backend
+
+Without this a simple refresh of your browser or a restart of Home Assistant will wipe your configuration!
+
 ---
 
 ## 🚀 Quick Start
