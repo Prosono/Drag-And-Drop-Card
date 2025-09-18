@@ -351,7 +351,7 @@ var Io=Object.create;var En=Object.defineProperty;var Lo=Object.getOwnPropertyDe
             height: 100%;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; }
+          #optionsSec { min-height: 0; overflow: atuo;}
           #optionsSec .bd {
             position: relative;
             overflow: auto;
