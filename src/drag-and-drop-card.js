@@ -798,7 +798,7 @@ _applyGridVars() {
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content}
+          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content;}
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -807,9 +807,9 @@ _applyGridVars() {
             background:var(--primary-background-color);color:var(--primary-text-color);cursor:pointer
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
-
+          .cm-editor{height: 100%}
           /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height: 0; }
+          #yamlSec { min-height: 0; height: 700px !important; }
           #yamlSec .bd { 
             overflow: auto;        /* allow scrolling inside the YAML section */
             /* allow the YAML editor to use the full available space instead of a fixed max height */
@@ -847,8 +847,8 @@ _applyGridVars() {
 
           /* host that wraps the editor should also allow scroll if content grows */
           #yamlHost { 
-            max-height: 260px; 
-            overflow: auto; 
+            overflow: visible; 
+            height: auto;
           }
 
           /* CodeMirror */
