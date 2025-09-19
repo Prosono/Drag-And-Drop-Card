@@ -46,7 +46,7 @@ The Software may include or depend on third‑party components licensed under th
 ---
 
 ## 6. Data & Privacy
-The Software may process configuration data within your Home Assistant environment. Licensor does not receive personal data unless you choose to share diagnostic information or support logs. Your use of any telemetry or cloud features (if any) is subject to our privacy practices, which will be provided where applicable.
+The Software may process configuration data within your Home Assistant environment. Licensor does not receive personal data.
 
 ---
 
