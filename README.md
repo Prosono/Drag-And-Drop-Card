@@ -1,4 +1,4 @@
-# Drag & Drop Card for Home Assistant (Lovelace)
+# The Drag & Drop Card for Home Assistant
 
 [![Watch the demo on YouTube](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
 
