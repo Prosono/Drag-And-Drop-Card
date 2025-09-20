@@ -37,7 +37,7 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 3. In Home Assistant, go to **Settings → Dashboards → … → Resources**, ensure a resource exists:
    ```yaml
    url: https://github.com/Prosono/Drag-And-Drop-Card
-   type: module
+   type: Dashboard
    ```
 
 ### Option B: Manual
@@ -45,7 +45,7 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 2. Add a Lovelace resource:
    ```yaml
    url: /local/drag-and-drop-card.js
-   type: module
+   type: Javascript module
    ```
 
 > After adding a new resource, **clear browser cache** or hard-reload to ensure the module loads.
