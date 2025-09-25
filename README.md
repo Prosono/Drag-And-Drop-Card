@@ -169,7 +169,7 @@ card_mod:
       --ddc-grid-color: rgba(255, 255, 255, 0.15);
     }
 ```
-NOTE: Only the main card supports card mod for now. If you want to style the inner cards you will hace to style them using card mod
+NOTE: Only the main card supports card mod for now. If you want to style the inner cards you will have to style them using card mod
 ```yaml
 card_mod:
   style: |
