@@ -121,24 +121,6 @@ This card makes it possible to import designs from HADS -> https://hads.smarti.d
 ## 🧱 Adding Cards
 
 Use the **Add** button in edit mode to pick from standard Lovelace cards.  
-You can also embed initial cards directly in YAML (helpful as a starting snapshot):
-
-```yaml
-type: custom:drag-and-drop-card
-storage_key: demo_layout
-grid: 12
-cards:
-  - type: button
-    entity: light.kitchen
-  - type: gauge
-    entity: sensor.temperature_living_room
-    min: 0
-    max: 40
-  - type: entities
-    entities:
-      - switch.coffee_machine
-      - switch.toaster
-```
 
 ---
 
