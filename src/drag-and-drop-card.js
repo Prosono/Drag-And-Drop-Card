@@ -175,9 +175,10 @@ static getConfigElement() {
 
       /* Checkbox rows: keep left column reserved so alignment stays consistent */
       .left-empty { visibility: hidden; }
-    </style>
+    
+      </style>
 
-    <div class="ddc-editor">
+     <div class="ddc-editor">
       <div class="section">Layout & Behavior</div>
 
       <div class="label">Storage key</div>
@@ -584,6 +585,16 @@ _applyGridVars() {
     this.containerPreset          = config.container_preset || 'fullhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
     this.heroImage = config?.hero_image || "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png";
+    // Tabs options
+    this.tabs               = Array.isArray(config.tabs) ? config.tabs : [];
+    this.tabsPosition       = (config.tabs_position === 'left') ? 'left' : 'top';
+    this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
+    this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
+    this.activeTab          = this.defaultTab;
+    try { const lastT = localStorage.getItem(`ddc_lasttab_${this.storageKey}`);
+      if (lastT && this.tabs.some(t=>t.id===lastT)) this.activeTab = lastT; } catch {}
+    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+
 
 
     if (this.cardContainer) this._applyContainerSizingFromConfig(false);
@@ -1025,6 +1036,97 @@ _applyGridVars() {
             40%  { opacity:.7 }
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
+
+                /* --- Tabs bar (DDC) --- */
+      /* --- Tabs bar (DDC) --- */
+      .ddc-tabs{
+        /* Full-width, equal columns */
+        display:grid;
+        grid-auto-flow:column;
+        grid-auto-columns:1fr;
+        gap:6px;
+        padding:6px;
+        align-items:stretch;
+        border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12));
+        width:100%;
+        /* If you prefer flex instead of grid, see the fallback below */
+      }
+
+      /* Vertical/left variant unchanged */
+      .ddc-tabs-left{
+        display:flex;
+        flex-direction:column;
+        width:160px; min-width:160px;
+        border-bottom:none;
+        border-right:1px solid var(--divider-color, rgba(0,0,0,.12));
+      }
+
+      /* Tab button */
+      .ddc-tab{
+        display:flex;
+        align-items:center;
+        justify-content:center;        /* centers label+icon */
+        gap:8px;
+        padding:10px 12px;
+        min-width:0;                   /* allow text ellipsis */
+        border-radius:12px;
+        border:1px solid
+          var(--ha-card-border-color, color-mix(in oklab, var(--primary-text-color) 12%, transparent));
+        background:var(--ha-card-background, rgba(0,0,0,.02));
+        cursor:pointer;
+        font:inherit;
+        position:relative;
+        transition:background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+      }
+      .ddc-tab ha-icon{ --mdc-icon-size:18px; }
+      .ddc-tab span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+      /* Hover */
+      .ddc-tab:hover{
+        background:color-mix(in oklab, var(--primary-color) 8%, transparent);
+        border-color:color-mix(in oklab, var(--primary-color) 40%, transparent);
+        box-shadow:0 1px 2px rgba(0,0,0,.15);
+      }
+
+      /* Active */
+      .ddc-tab.active{
+        border-color:var(--primary-color);
+        background:color-mix(in oklab, var(--primary-color) 14%, transparent);
+        box-shadow:0 2px 6px rgba(0,0,0,.16);
+      }
+
+      /* Active "ink bar" */
+      .ddc-tab.active::after{
+        content:"";
+        position:absolute;
+        left:8px; right:8px; bottom:-6px;
+        height:3px;
+        border-radius:2px;
+        background:var(--primary-color);
+        box-shadow:0 0 0 1px color-mix(in oklab, var(--primary-color) 25%, transparent);
+      }
+
+      /* Focus accessibility */
+      .ddc-tab:focus-visible{
+        outline:3px solid color-mix(in oklab, var(--primary-color) 55%, transparent);
+        outline-offset:2px;
+      }
+
+      /* Layout helper when using vertical tabs alongside content */
+      .ddc-tabs-left-layout{
+        display: grid;
+        grid-template-columns: 160px 1fr;   /* tabs | content */
+        grid-template-rows: auto 1fr;       /* toolbar | main */
+        grid-template-areas:
+          "toolbar toolbar"
+          "tabs    content";
+      } 
+
+      /* Place children into the intended areas */
+      .ddc-tabs-left-layout .toolbar{ grid-area: toolbar; }
+      .ddc-tabs-left-layout #tabsBar{ grid-area: tabs; }
+      .ddc-tabs-left-layout #cardContainer{ grid-area: content; }
+      
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -1062,6 +1164,7 @@ _applyGridVars() {
             </button>
             <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
           </div>
+          <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
           <div class="card-container" id="cardContainer"></div>
         </div>
       `;
@@ -1074,7 +1177,11 @@ _applyGridVars() {
       this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
       this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
-      this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');     
+      this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
+      this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
+      this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
+      try { this._renderTabs(); this._applyActiveTab(); } catch {}
+     
 
       this._applyGridVars();
       
@@ -1274,7 +1381,7 @@ _applyGridVars() {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation'
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single'
       ];
       const cfgOpts = {};
       for (const k of overrideKeys) {
@@ -1306,6 +1413,7 @@ _applyGridVars() {
           const cardEl = await this._createCard(conf.card);
           const wrap = this._makeWrapper(cardEl);
           if (this.editMode) wrap.classList.add('editing');
+          wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
 
           this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
           wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
@@ -1350,11 +1458,97 @@ _applyGridVars() {
       this.__booting = false;
       this.__dirty = false;
       this._updateApplyBtn?.();
+      try { this._renderTabs(); this._applyActiveTab(); } catch {}
     }
   }
 
 
-  /* ------------------------------ Edit mode ------------------------------ */
+  
+  /* ------------------------------ Tabs support ------------------------------ */
+  _normalizeTabId(tabId) {
+    const valid = Array.isArray(this.tabs) ? this.tabs.map(t => t.id) : [];
+    if (!valid.length) return this.defaultTab || 'default';
+    return (tabId && valid.includes(tabId)) ? tabId : (this.defaultTab || valid[0]);
+  }
+  _renderTabs() {
+    const bar = this.tabsBar; if (!bar) return;
+    const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+    if (!tabs.length || (tabs.length === 1 && this.hideTabsWhenSingle)) {
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.display = '';
+    bar.className = 'ddc-tabs ' + (this.tabsPosition === 'left' ? 'ddc-tabs-left' : '');
+    bar.innerHTML = '';
+    for (const t of tabs) {
+      const btn = document.createElement('button');
+      btn.className = 'ddc-tab' + (t.id === this.activeTab ? ' active' : '');
+      btn.dataset.tabId = t.id;
+      btn.title = t.label || t.id;
+      btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
+      btn.addEventListener('click', () => {
+        if (this.activeTab !== t.id) {
+          this.activeTab = t.id;
+          try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
+          this._applyActiveTab();
+          this._renderTabs();
+        }
+      });
+      bar.appendChild(btn);
+    }
+    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+  }
+  _applyActiveTab() {
+    const current = this._normalizeTabId(this.activeTab);
+    const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+    wraps.forEach(w => {
+      const tabId = w.dataset.tabId ? this._normalizeTabId(w.dataset.tabId) : this.defaultTab;
+      if (!this.tabs || !this.tabs.length) {
+        w.style.display = '';
+        w.inert = false;
+        w.classList.remove('ddc-hidden');
+        return;
+      }
+      if (tabId === current) {
+        w.style.display = '';
+        w.inert = false;
+        w.classList.remove('ddc-hidden');
+      } else {
+        w.style.display = 'none';
+        w.inert = true;
+        w.classList.add('ddc-hidden');
+        w.classList.remove('ddc-selected');
+      }
+    });
+    try { this._clearSelection(); } catch {}
+  }
+  _addTabSelectorToChip(wrapper, entryTabId = null) {
+    if (!this.tabs || !this.tabs.length) return;
+    const chip = wrapper.querySelector('.chip'); if (!chip) return;
+    let sel = chip.querySelector('select.ddc-chip-tab');
+    if (!sel) {
+      sel = document.createElement('select');
+      sel.className = 'ddc-chip-tab';
+      sel.style.marginLeft = '6px';
+      sel.title = 'Assign to tab';
+      chip.appendChild(sel);
+    }
+    sel.innerHTML = '';
+    for (const t of this.tabs) {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.label || t.id;
+      sel.appendChild(opt);
+    }
+    const cur = this._normalizeTabId(entryTabId || wrapper.dataset.tabId || this.activeTab || this.defaultTab);
+    sel.value = cur;
+    wrapper.dataset.tabId = cur;
+    sel.onchange = () => {
+      wrapper.dataset.tabId = this._normalizeTabId(sel.value);
+      this._applyActiveTab();
+      try { this._queueSave('tab-change'); } catch {}
+    };
+  }
+/* ------------------------------ Edit mode ------------------------------ */
   _toggleEditMode(force=null) {
     // NEW: kill any in-flight “enter edit” timer 
     try { this.__clearPressTimer?.(); } catch {}
@@ -1877,6 +2071,7 @@ _syncEmptyStateUI() {
   _makeWrapper(cardEl) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper');
+    wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
     if (this.editMode) wrap.classList.add('editing');
     if (!wrap.style.zIndex) wrap.style.zIndex = String(this._highestZ() + 1);
 
@@ -1899,6 +2094,9 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
+
+    // Tab selector UI
+    try { this._addTabSelectorToChip(wrap, wrap.dataset.tabId); } catch {}
 
     chip.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -3838,7 +4036,8 @@ async _getStubConfigForType(type) {
         const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
         const z = parseInt(w.style.zIndex || '1', 10);
         const cardCfg = this._extractCardConfig(w.firstElementChild);
-        return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+        const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
       });
         const payload = {
             version: 2,
@@ -3872,6 +4071,8 @@ async _getStubConfigForType(type) {
                 const el = await this._createCard(conf.card);
                 const wrap = this._makeWrapper(el);
                 this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+            wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
+            this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
@@ -3936,6 +4137,10 @@ this._initCardInteract(wrap);
       container_fixed_width: this.containerFixedWidth ?? undefined,
       container_fixed_height: this.containerFixedHeight ?? undefined,
       container_preset: this.containerPreset,
+      tabs: this.tabs,
+      tabs_position: this.tabsPosition,
+      default_tab: this.defaultTab,
+      hide_tabs_when_single: !!this.hideTabsWhenSingle,
     };
     // strip undefined to keep files tidy
     Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
@@ -3994,14 +4199,16 @@ this._initCardInteract(wrap);
     const wraps = Array.from(
       this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
     );
-    const saved = wraps.map((w) => {
+    const saved = wraps.map((w) => { // DDC tabs
+        
       const x = parseFloat(w.getAttribute('data-x')) || 0;
       const y = parseFloat(w.getAttribute('data-y')) || 0;
       const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
       const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
-      return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+      const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
     });
 
     const payload = {
@@ -4038,20 +4245,54 @@ _importDesign() {
     'grid','drag_live_snap','auto_save','auto_save_debounce',
     'container_background','card_background','debug','disable_overlap',
     'container_size_mode','container_fixed_width','container_fixed_height',
-    'container_preset','container_preset_orientation','card_mod','storage_key'
+    'container_preset','container_preset_orientation',
+    'tabs','tabs_position','default_tab','hide_tabs_when_single',
+    'card_mod','storage_key'
   ];
   // ----------------------------------
 
   inp.onchange = async () => {
     const file = inp.files?.[0]; if (!file) return;
     const txt = await file.text();
+
     try {
       const json = JSON.parse(txt);
-      const __prevStorageKey = this.storageKey || this._config?.storage_key || null;
+      const prevStorageKey = this.storageKey || this._config?.storage_key || null;
 
-      // ---- APPLY OPTIONS (with hard-replace) ----
+      // -------- BACK-COMPAT: synthesize tabs if missing in older exports --------
+      const hasOptionsTabs = !!(json.options && Array.isArray(json.options.tabs));
+      const hasCardTabIds  = Array.isArray(json.cards) && json.cards.some(c => c?.tabId || c?.tab_id);
+
+      // Build a compatible tabs list:
+      // 1) If options.tabs exist, use them.
+      // 2) Else if cards have tabIds, synthesize from distinct ids.
+      // 3) Else create a single default tab.
+      let compatTabs = [];
+      if (hasOptionsTabs) {
+        compatTabs = json.options.tabs;
+      } else if (hasCardTabIds) {
+        const uniq = Array.from(new Set(json.cards.map(c => c?.tabId || c?.tab_id).filter(Boolean)));
+        compatTabs = uniq.map(id => ({ id, label: id }));
+      } else {
+        compatTabs = [{ id: 'default', label: 'Layout' }];
+      }
+
+      const compatTabsPosition = (json.options?.tabs_position === 'left')
+        ? 'left'
+        : (this.tabsPosition || 'top');
+
+      const compatDefaultTab =
+        json.options?.default_tab
+        || (compatTabs[0]?.id || 'default');
+
+      const compatHideSingle =
+        (json.options?.hide_tabs_when_single !== undefined)
+          ? !!json.options.hide_tabs_when_single
+          : true;
+      // -------------------------------------------------------------------------
+
+      // ---- APPLY OPTIONS (with hard-replace or merge) ----
       if (json.options) {
-        // shallow copy so we can safely delete fields like storage_key
         const imported = { ...json.options };
         if (!ADOPT_IMPORTED_STORAGE_KEY) delete imported.storage_key;
 
@@ -4064,15 +4305,13 @@ _importDesign() {
             if (!(k in imported) && k in cfg) delete cfg[k];
           }
 
-          // 2) clear previously applied DOM styles that could linger
+          // 2) clear any previously-applied DOM styles that could linger
           try {
-            // container styles (adjust if you use different nodes/props)
             if (this.cardContainer) {
               this.cardContainer.style.background = '';
               this.cardContainer.style.width = '';
               this.cardContainer.style.height = '';
             }
-            // root/theming leftovers (if you use CSS vars, clear here)
             this.style?.removeProperty?.('--ddc-container-bg');
             this.style?.removeProperty?.('--ddc-card-bg');
           } catch {}
@@ -4081,12 +4320,10 @@ _importDesign() {
           this._config = { ...cfg, ...imported };
           if (!('card_mod' in imported)) delete this._config.card_mod;
 
-          // sync storage key if we adopt it
           if (ADOPT_IMPORTED_STORAGE_KEY && imported.storage_key) {
             this.storageKey = imported.storage_key;
           }
 
-          // keep runtime cache in sync if you maintain one
           if (this._opts) {
             this._opts = { ...this._opts, ...imported };
             for (const k of KNOWN_OPT_KEYS) {
@@ -4094,12 +4331,9 @@ _importDesign() {
             }
           }
 
-          // re-apply options to DOM if you have a helper for that
           this._applyOptionsToDom?.(this._config);
           this.requestUpdate?.();
-
         } else {
-          // your original merge behavior
           this._applyImportedOptions(imported, true);
           if (imported.card_mod !== undefined) {
             this._config = this._config || {};
@@ -4107,92 +4341,140 @@ _importDesign() {
             this.requestUpdate?.();
           }
         }
-
       } else if (typeof json.grid === 'number') {
         // v1 fallback
         const imported = { grid: json.grid };
-        HARD_REPLACE ? (this._config = { ...(this._config||{}), ...imported }) :
-                       this._applyImportedOptions(imported, true);
+        HARD_REPLACE
+          ? (this._config = { ...(this._config||{}), ...imported })
+          : this._applyImportedOptions(imported, true);
         this.requestUpdate?.();
       }
+
+      // Ensure instance tab options exist even for old files (after options applied)
+      if (!Array.isArray(this.tabs) || !this.tabs.length) this.tabs = compatTabs;
+      if (!this.tabsPosition) this.tabsPosition = compatTabsPosition;
+      if (!this.defaultTab) this.defaultTab = compatDefaultTab;
+      if (this.hideTabsWhenSingle === undefined) this.hideTabsWhenSingle = compatHideSingle;
+      this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
 
       // ---- PERSIST IMPORTED OPTIONS TO YAML (replace semantics) ----
       try {
         const targetKey = this._config?.storage_key || this.storageKey || null;
+
+        // Start from what the file had (v2) or v1 fallback
         const importedOptions = json.options
           ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
-        const persistOptions = { ...importedOptions };
+
+        // Ensure tabs keys are present (either from file or from current instance state)
+        const persistOptions = {
+          ...importedOptions,
+          tabs: importedOptions.tabs ?? this.tabs ?? [],
+          tabs_position: importedOptions.tabs_position ?? this.tabsPosition ?? 'top',
+          default_tab: importedOptions.default_tab
+            ?? this.defaultTab
+            ?? ((importedOptions.tabs?.[0]?.id) || (this.tabs?.[0]?.id) || 'default'),
+          hide_tabs_when_single:
+            importedOptions.hide_tabs_when_single ?? (this.hideTabsWhenSingle ?? true),
+        };
+
+        // Unless you want to adopt the incoming storage_key, drop it
         if (!ADOPT_IMPORTED_STORAGE_KEY) delete persistOptions.storage_key;
 
         if (!targetKey) {
-          console.warn('[ddc:import] No storage_key on this card; aborting persist.');
+          console.warn('[ddc:import] No storage_key on this card; aborting YAML persist.');
         } else {
-          // if your helper supports it, these flags instruct a full replace
-          const result = await this._persistOptionsToYaml(persistOptions, {
+          const result = await this._persistOptionsToYaml?.(persistOptions, {
             forceTargetKey: String(targetKey),
             noDownload: true,
             replace: true,
             wipeUnknownKeys: true,
           });
           const yamlOk = !!(result && result.yamlSaved);
-          console.debug('[ddc:import] YAML persist result:', yamlOk);
+          console.debug?.('[ddc:import] YAML persist result:', yamlOk);
         }
+
+        // SAFETY NET: push tabs into the live card config (so the UI editor/YAML reflects it immediately)
+        try {
+          const cfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          cfg.tabs = persistOptions.tabs;
+          cfg.tabs_position = persistOptions.tabs_position;
+          cfg.default_tab = persistOptions.default_tab;
+          cfg.hide_tabs_when_single = !!persistOptions.hide_tabs_when_single;
+
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: cfg },
+            bubbles: true,
+            composed: true,
+          }));
+        } catch {}
       } catch (e) {
         console.warn('[ddc:import] YAML persist failed:', e);
       }
 
       // ---- BUILD CARDS ----
       this.cardContainer.innerHTML = '';
-      if (json.cards?.length) {
+      if (Array.isArray(json.cards) && json.cards.length) {
         for (const conf of json.cards) {
-          if (!conf?.card || (typeof conf.card === 'object' && !Object.keys(conf.card).length)) {
-            const p = this._makePlaceholderAt(
-              conf.position?.x||0, conf.position?.y||0,
-              conf.size?.width||200, conf.size?.height||200
-            );
-            this.cardContainer.appendChild(p);
-          } else {
-            const el = await this._createCard(conf.card);
-            const wrap = this._makeWrapper(el);
-            this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-            wrap.style.width  = `${conf.size?.width||140}px`;
-            wrap.style.height = `${conf.size?.height||100}px`;
-            if (conf.z != null) wrap.style.zIndex = String(conf.z);
-            this.cardContainer.appendChild(wrap);
+          const x = conf.position?.x || 0;
+          const y = conf.position?.y || 0;
+          const w = conf.size?.width  || 140;
+          const h = conf.size?.height || 100;
+          const z = conf.z;
+          const tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
 
-            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-            this._initCardInteract(wrap);
+          if (!conf?.card || (typeof conf.card === 'object' && !Object.keys(conf.card).length)) {
+            // placeholder still respects tab
+            const p = this._makePlaceholderAt(x, y, w, h);
+            p.dataset.tabId = tabId;
+            this.cardContainer.appendChild(p);
+            continue;
           }
+
+          const el = await this._createCard(conf.card);
+          const wrap = this._makeWrapper(el);
+          wrap.dataset.tabId = tabId;
+          this._setCardPosition(wrap, x, y);
+          wrap.style.width  = `${w}px`;
+          wrap.style.height = `${h}px`;
+          if (z != null) wrap.style.zIndex = String(z);
+          this.cardContainer.appendChild(wrap);
+
+          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+          this._initCardInteract(wrap);
         }
       } else {
         this._showEmptyPlaceholder();
       }
 
-      // apply container sizing/appearance based on new options
-      this._resizeContainer();
+      // apply container sizing/appearance and refresh tabs UI now that cards exist
       this._applyOptionsToDom?.(this._config);
+      this._resizeContainer();
+      try {
+        this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+        this._renderTabs?.();
+        this._applyActiveTab?.();
+      } catch {}
 
       // ---- SAVE LAYOUT ----
       try {
         if (this._saveTimer) clearTimeout(this._saveTimer);
-        await this._saveLayout(true);
-        this._toast('Design imported & saved. Reloading...');
+        await this._saveLayout(true);  // NOTE: ensure _saveLayout returns {…, tabId} per card
+        this._toast?.('Design imported & saved. Reloading...');
         window.location.reload();
       } catch (e) {
         console.warn('[ddc:import] saveLayout failed', e);
-        this._markDirty('import');
-        this._toast('Design imported — click Apply to save.');
+        this._markDirty?.('import');
+        this._toast?.('Design imported — click Apply to save.');
       }
     } catch (e) {
       console.error('Import failed', e);
-      this._toast('Import failed — invalid file.');
+      this._toast?.('Import failed — invalid file.');
     }
   };
+
   inp.click();
 }
 
-
-  
 
   
   // ===== DDC: Lovelace persistence helpers (import options -> stored YAML) =====
@@ -4342,7 +4624,8 @@ _importDesign() {
       const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
-      return { card: cardCfg, position:{x,y}, size:{width,height}, z };
+      const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
     });
     const payload = {
        version: 2,
