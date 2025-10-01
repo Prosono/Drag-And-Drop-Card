@@ -30,6 +30,65 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+  // --- Live reflow + scale while dragging (dynamic mode) ---
+  _scheduleReflowAndScale() {
+    if (this.__reflowRAF) return;
+    this.__reflowRAF = requestAnimationFrame(() => {
+      this.__reflowRAF = null;
+      try {
+        const mode = (this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+        if (mode === 'dynamic') {
+          this._resizeContainer?.(); // recompute content extents so d.h grows live
+        }
+      } catch {}
+      try { this._applyAutoScale?.(); } catch {}
+    });
+  }
+
+  __ddcBindPointerListeners() {
+    if (this.__ddcPtrBound) return;
+    this.__ddcPtrBound = true;
+    // Use bound methods to allow removeEventListener later if needed
+    this.__onDDCPointerDown = (ev) => {
+      try {
+        // Only react to primary button/touch
+        if (ev.button !== undefined && ev.button !== 0) return;
+        const path = ev.composedPath?.() || [];
+        let hit = null;
+        for (const n of path) {
+          if (n && n.classList && n.classList.contains('card-wrapper')) { hit = n; break; }
+        }
+        if (!hit) return;
+        this.__ddcDragging = true;
+        if (this.__scaleOuter) {
+          this.__prevOverflow = this.__scaleOuter.style.overflow;
+          this.__scaleOuter.style.overflow = 'visible'; // avoid "ceiling" clipping
+        }
+        this._scheduleReflowAndScale?.();
+      } catch {}
+    };
+    this.__onDDCPointerMove = (ev) => {
+      try {
+        if (!this.__ddcDragging) return;
+        this._scheduleReflowAndScale?.();
+      } catch {}
+    };
+    this.__onDDCPointerUp = (ev) => {
+      try {
+        if (!this.__ddcDragging) return;
+        this.__ddcDragging = false;
+        if (this.__scaleOuter) this.__scaleOuter.style.overflow = this.__prevOverflow || '';
+        // Final settle
+        try { this._applyAutoScale?.(); } catch {}
+      } catch {}
+    };
+    // Attach listeners
+    try { this.addEventListener('pointerdown', this.__onDDCPointerDown, { passive: true }); } catch {}
+    try { this.addEventListener('pointermove', this.__onDDCPointerMove, { passive: true }); } catch {}
+    try { window.addEventListener('pointerup', this.__onDDCPointerUp, { passive: true }); } catch {}
+    try { window.addEventListener('pointercancel', this.__onDDCPointerUp, { passive: true }); } catch {}
+  }
+
 
 _ensureScaleWrapper() {
   const c = this.cardContainer;
@@ -509,9 +568,6 @@ _applyContainerSizingFromConfig(initial=false) {
     c.style.height = `${h}px`;
     // ensure overflow hidden (hard lock)
     c.style.overflow = 'hidden';
-    // If scaling is off, let the host scroll; don't rely on transforms
-    if (this.rootEl && this.autoResizeCards === false) this.rootEl.style.overflow = 'auto';
-
     if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
     // pull any existing cards back inside
     this._clampAllCardsInside();
@@ -629,12 +685,6 @@ _applyGridVars() {
     this.autoResizeCards         = !!config.auto_resize_cards;
 
     if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
-    // If scaling is disabled, make sure wrapper/transform are torn down immediately
-    if (!this.autoResizeCards && this.cardContainer) {
-      try {
-        this.applyAutoScale?.(); // will unwrap and return
-      } catch(e){}
-    }
     this._applyAutoScale?.();
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
@@ -1356,6 +1406,8 @@ if (!this.__visObs) {
 // Also respond to window resizes
 this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
 window.addEventListener('resize', this.__ddcOnWinResize);
+
+    try { this.__ddcBindPointerListeners?.(); } catch {}
 }
   
   disconnectedCallback() {
@@ -1397,6 +1449,16 @@ this.__visObs = null;
 if (this.__ddcOnWinResize) {
   window.removeEventListener('resize', this.__ddcOnWinResize);
 }
+
+    try {
+      if (this.__ddcPtrBound) {
+        this.removeEventListener('pointerdown', this.__onDDCPointerDown);
+        this.removeEventListener('pointermove', this.__onDDCPointerMove);
+        window.removeEventListener('pointerup', this.__onDDCPointerUp);
+        window.removeEventListener('pointercancel', this.__onDDCPointerUp);
+        this.__ddcPtrBound = false;
+      }
+    } catch {}
 }
   
 
@@ -1500,7 +1562,7 @@ if (this.__ddcOnWinResize) {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single'
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards'
       ];
       const cfgOpts = {};
       for (const k of overrideKeys) {
@@ -2517,63 +2579,64 @@ _syncEmptyStateUI() {
       this.__scaleRAF = null;
     }
   }
-
 _applyAutoScale() {
   const c = this.cardContainer; if (!c) return;
 
-  // If auto-resize disabled, undo wrapper/transform and bail out
+  // Keep the wrapper in place
+  if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+
+  // If auto-resize is off, lock to 1 but still keep scaffold consistent
   if (!this.autoResizeCards) {
-    if (this.__scaleOuter && this.__scaleOuter.contains(c)) {
-      // unwrap
-      if (this.__scaleOuter.parentNode) {
-        this.__scaleOuter.parentNode.insertBefore(c, this.__scaleOuter);
-        this.__scaleOuter.remove();
-      }
-      this.__scaleOuter = null;
-    }
-    c.style.transform = '';
-    c.style.transformOrigin = '';
-    c.style.position = '';
-    // Ensure host scrolls and stop here when scaling is disabled
-    if (this.rootEl) { this.rootEl.style.overflow = 'auto'; }
-    // Stop any running scale watchers
-    this.stopScaleWatch?.();
-    // Bail out completely
-    return;
-    c.style.top = '';
-    c.style.left = '';
-    // In edit mode report the *design* size, else let dynamic sizing run
-    if (this.editMode && typeof this._computeDesignSize === 'function') {
-      const d = this._computeDesignSize();
-      if (d && d.w && d.h) {
-        c.style.width  = `${d.w}px`;
-        c.style.height = `${d.h}px`;
-      }
-    } else if (typeof this._isContainerFixed === 'function' && !this._isContainerFixed()) {
-      if (typeof this._resizeContainer === 'function') this._resizeContainer();
+    // Design size should still reflect config (fixed/preset or content)
+    const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+    c.style.width  = `${d.w}px`;
+    c.style.height = `${d.h}px`;
+    c.style.transform = `scale(1)`;
+    c.style.transformOrigin = 'top left';
+    c.style.position = 'absolute';
+    c.style.top = '0';
+    c.style.left = '0';
+    if (this.__scaleOuter) {
+      // Use parent/host width for layout box so we don't force expansion
+      const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+                 (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+                 (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+                 this.offsetWidth || d.w;
+      this.__scaleOuter.style.width  = `${Math.max(1, pw)}px`;
+      this.__scaleOuter.style.height = `${Math.max(1, d.h)}px`;
     }
     return;
   }
 
-  // Auto-resize ON: transform the inner canvas, size the outer wrapper
-  if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
-
+  // Determine design size (prefer preset/fixed if configured)
   const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
-  const rect = this.getBoundingClientRect ? this.getBoundingClientRect() : { width: this.offsetWidth || d.w };
-  const availableW = Math.max(1, this.offsetWidth || rect.width || d.w);
-  const scale = Math.min(availableW / Math.max(1, d.w), 1); // clamp: no upscaling past native size
 
-  // Layout box reflects *visual* size so the parent lays out correctly
+  // Measure available width from the *parent* (host column) first
+  const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+             (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+             (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+             this.offsetWidth || d.w;
+  const availableW = Math.max(1, pw);
+
+  // Fit & clamp (never upscale beyond native)
+  const scale = Math.min(availableW / Math.max(1, d.w), 1);
+
+  // Outer layout box follows host width and scaled height
   if (this.__scaleOuter) {
-    this.__scaleOuter.style.width  = `${availableW}px`
+    this.__scaleOuter.style.width  = `${availableW}px`;
     this.__scaleOuter.style.height = `${Math.max(1, d.h * scale)}px`;
   }
 
-  // Inner canvas reflects *design* size and is visually scaled
+  // Inner canvas stays at design size and is visually scaled
   c.style.width  = `${d.w}px`;
   c.style.height = `${d.h}px`;
   c.style.transform = `scale(${scale})`;
+  c.style.transformOrigin = 'top left';
+  c.style.position = 'absolute';
+  c.style.top = '0';
+  c.style.left = '0';
 }
+
 
 
 
