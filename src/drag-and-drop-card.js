@@ -3594,11 +3594,10 @@ _applyAutoScale() {
     let currentType = null;
     let yamlEditorApi = null;
     let visualEditor = null;
+    let editor = null;
     let pickSeq = 0; // stale-select guard
     let __previewTimer = null;
     let __lastPreviewCfgJSON = '';
-    let editor = null;
-
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -3824,6 +3823,9 @@ _applyAutoScale() {
         await idle();
 
         const wantType = cfg.type || currentType;
+
+        editor = await this._getEditorElementForType(wantType, cfg);
+
 
         // 🚫 Visual editor not supported for the placeholder entry
         if (wantType === 'custom_card') {
