@@ -363,7 +363,7 @@ static getConfigElement() {
 
   const fire = () => {
     const newConfig = el.getConfig();
-    el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig }, bubbles: true, composed: true}));
+    el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig } }));
     // Re-check button states after applying
     updateButtons();
   };
@@ -3597,6 +3597,8 @@ _applyAutoScale() {
     let pickSeq = 0; // stale-select guard
     let __previewTimer = null;
     let __lastPreviewCfgJSON = '';
+    let editor = null;
+
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
