@@ -363,7 +363,7 @@ static getConfigElement() {
 
   const fire = () => {
     const newConfig = el.getConfig();
-    el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig } }));
+    el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig }, bubbles: true, composed: true}));
     // Re-check button states after applying
     updateButtons();
   };
