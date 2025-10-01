@@ -31,6 +31,38 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 
 class DragAndDropCard extends HTMLElement {
 
+_ensureScaleWrapper() {
+  const c = this.cardContainer;
+  if (!c) return;
+  if (this.__scaleOuter && this.__scaleOuter.contains(c)) return;
+
+  // Create a layout box that will reflect the *visual* size
+  const outer = document.createElement('div');
+  outer.className = 'ddc-scale-outer';
+  Object.assign(outer.style, {
+    position: 'relative',
+    width: '100%',
+    overflow: 'hidden'
+  });
+
+  // Insert wrapper around the current container
+  if (c.parentNode) {
+    c.parentNode.insertBefore(outer, c);
+    outer.appendChild(c);
+  }
+
+  // Make the inner container absolutely positioned and transformable
+  Object.assign(c.style, {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    transformOrigin: 'top left'
+  });
+
+  this.__scaleOuter = outer;
+}
+
+
   __booting = false;  
 
   constructor() {
@@ -225,6 +257,12 @@ static getConfigElement() {
         <ha-checkbox id="noOverlap"></ha-checkbox>
       </ha-formfield>
 
+      <div class="label">Auto-resize cards</div>
+      <ha-formfield label="Scale layout to fit parent (view mode)">
+        <ha-checkbox id="autoResize"></ha-checkbox>
+      </ha-formfield>
+
+
       <div class="row-spacer"></div>
       <div class="section">Container Size</div>
 
@@ -309,6 +347,8 @@ static getConfigElement() {
     el.querySelector('#cardBg').value = el._config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     el.querySelector('#debug').checked = !!el._config.debug;
     el.querySelector('#noOverlap').checked = !!el._config.disable_overlap;
+    el.querySelector('#autoResize').checked = !!el._config.auto_resize_cards;
+
 
     el.querySelector('#sizeMode').value = el._config.container_size_mode || 'dynamic';
     el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
@@ -365,6 +405,8 @@ static getConfigElement() {
     base.card_background = el.querySelector('#cardBg').value || 'var(--ha-card-background, var(--card-background-color))';
     base.debug = !!el.querySelector('#debug').checked;
     base.disable_overlap = !!el.querySelector('#noOverlap').checked;
+    base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
+
 
     base.container_size_mode = el.querySelector('#sizeMode').value;
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
@@ -394,6 +436,7 @@ static getConfigElement() {
   on('#liveSnap', 'change'); on('#autoSave', 'change'); on('#autoSaveDebounce');
   on('#containerBg'); on('#cardBg');
   on('#debug', 'change'); on('#noOverlap', 'change');
+  on('#autoResize', 'change');
   on('#sizeMode', 'change'); on('#sizeW'); on('#sizeH');
   on('#sizePreset', 'selected'); on('#sizeOrientation', 'selected');
 
@@ -466,6 +509,9 @@ _applyContainerSizingFromConfig(initial=false) {
     c.style.height = `${h}px`;
     // ensure overflow hidden (hard lock)
     c.style.overflow = 'hidden';
+    // If scaling is off, let the host scroll; don't rely on transforms
+    if (this.rootEl && this.autoResizeCards === false) this.rootEl.style.overflow = 'auto';
+
     if (!initial) this._dbgPush?.('size', 'Applied fixed size', { w, h, mode: this.containerSizeMode, preset:this.containerPreset, orient:this.containerPresetOrient });
     // pull any existing cards back inside
     this._clampAllCardsInside();
@@ -580,6 +626,16 @@ _applyGridVars() {
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
+    this.autoResizeCards         = !!config.auto_resize_cards;
+
+    if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+    // If scaling is disabled, make sure wrapper/transform are torn down immediately
+    if (!this.autoResizeCards && this.cardContainer) {
+      try {
+        this.applyAutoScale?.(); // will unwrap and return
+      } catch(e){}
+    }
+    this._applyAutoScale?.();
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
     this.containerPreset          = config.container_preset || 'fullhd';
@@ -677,6 +733,7 @@ _applyGridVars() {
 
           .card-container{
             position: relative;
+            transform-origin: top left;
             padding: 10px;
             border: 1px solid var(--divider-color);
             background: var(--ddc-bg, transparent);
@@ -1202,6 +1259,18 @@ _applyGridVars() {
            e.preventDefault();
            this._saveLayout(false);
          }
+    // Observe host size for auto scaling (legacy retention for compatibility)
+    if (!this.__ddcResizeObs && this.autoResizeCards) {
+      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+      try { this.__ddcResizeObs.observe(this); } catch {}
+      try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
+      try { if (this.parentElement) this.__ddcResizeObs.observe(this.parentElement); } catch {}
+      try { if (this.offsetParent) this.__ddcResizeObs.observe(this.offsetParent); } catch {}
+      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+    }
+    // initial scale (legacy)
+    this._applyAutoScale?.();
+
        });
 
       this.exploreBtn.addEventListener('click', () =>
@@ -1210,9 +1279,22 @@ _applyGridVars() {
 
       // apply container sizing early
       this._applyContainerSizingFromConfig(true);
+      this._applyAutoScale?.();
       // Long-press on blank space (4s) to enter edit; Esc exits
       this._installLongPressToEnterEdit();
-      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false); });
+      this._startScaleWatch?.();
+
+      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false);
+    // Observe host size for auto scaling
+    if (!this.__ddcResizeObs) {
+      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+      this.__ddcResizeObs.observe(this);
+      this.__ddcResizeObs.observe(this.cardContainer);
+      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+    }
+    // initial scale
+    this._applyAutoScale?.();
+ });
 
       // selection interactions in container
       this._installSelectionMarquee();
@@ -1241,6 +1323,7 @@ _applyGridVars() {
       this._initialLoad();
     } else {
       this._applyContainerSizingFromConfig(true);
+      this._applyAutoScale?.();
       this._resizeContainer();
     }
   }
@@ -1257,13 +1340,42 @@ _applyGridVars() {
   
     // NEW: ensure we never boot in edit mode
     this._toggleEditMode(false);
-  }
+  
+
+// Ensure scale reapplies when the card becomes visible (e.g., after a tab switch)
+if (!this.__visObs) {
+  const io = new IntersectionObserver((entries) => {
+    if (entries.some(e => e.isIntersecting)) {
+      requestAnimationFrame(() => this._applyAutoScale && this._applyAutoScale());
+    }
+  }, { root: null, threshold: 0 });
+  io.observe(this);
+  this.__visObs = io;
+}
+
+// Also respond to window resizes
+this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
+window.addEventListener('resize', this.__ddcOnWinResize);
+}
   
   disconnectedCallback() {
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
-  
+
+    // cleanup observers
+    try { this.__ddcResizeObs?.disconnect(); } catch {}
+    this.__ddcResizeObs = null;
+
+    // stop scale watcher
+    this._stopScaleWatch?.();
+
+    // remove resize listener
+    if (this.__ddcOnWinResize) {
+      window.removeEventListener('resize', this.__ddcOnWinResize);
+      this.__ddcOnWinResize = null;
+    }
+
     // NEW: remove long-press listeners if installed
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
@@ -1278,7 +1390,14 @@ _applyGridVars() {
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
-  }
+  
+
+try { this.__visObs && this.__visObs.disconnect(); } catch(e) {}
+this.__visObs = null;
+if (this.__ddcOnWinResize) {
+  window.removeEventListener('resize', this.__ddcOnWinResize);
+}
+}
   
 
   set hass(hass) {
@@ -1428,11 +1547,13 @@ _applyGridVars() {
         }
 
         this._resizeContainer();
+        this._applyAutoScale?.();
         this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
       }
 
       if (!builtAny) {
         this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
         this._dbgPush('boot', 'No saved layout found; showing placeholder');
       }
 
@@ -1518,7 +1639,10 @@ _applyGridVars() {
         w.inert = true;
         w.classList.add('ddc-hidden');
         w.classList.remove('ddc-selected');
-      }
+      
+    // apply or clear scaling per mode
+    this._applyAutoScale?.();
+  }
     });
     try { this._clearSelection(); } catch {}
   }
@@ -2303,6 +2427,7 @@ _syncEmptyStateUI() {
   _ensurePlaceholderIfEmpty() {
     const realCards = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
     if (realCards.length === 0) this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
     this._syncEmptyStateUI();
   }
 
@@ -2334,6 +2459,123 @@ _syncEmptyStateUI() {
     el.setAttribute('data-y-raw', String(ny));
   }
   
+
+  // --- Auto-scale helpers (only active when auto_resize_cards === true) ---
+  _computeDesignSize() {
+    const c = this.cardContainer; if (!c) return { w: 1, h: 1 };
+    // If fixed sizing is enabled, use those dimensions as design space
+    if (this._isContainerFixed()) {
+      const { w, h } = this._resolveFixedSize();
+      return { w: Math.max(1, w), h: Math.max(1, h) };
+    }
+    // Otherwise compute from content extents similar to _resizeContainer
+    let maxX = 0, maxY = 0;
+    const cards = Array.from(c.querySelectorAll('.card-wrapper'));
+    if (!cards.length) {
+      const rect = c.getBoundingClientRect();
+      return { w: Math.max(1, rect.width || 1), h: Math.max(1, rect.height || 1) };
+    }
+    for (const wEl of cards) {
+      const x = parseFloat(wEl.getAttribute('data-x-raw') || wEl.getAttribute('data-x') || '0') || 0;
+      const y = parseFloat(wEl.getAttribute('data-y-raw') || wEl.getAttribute('data-y') || '0') || 0;
+      const w = parseFloat(wEl.style.width)  || wEl.getBoundingClientRect().width  || 0;
+      const h = parseFloat(wEl.style.height) || wEl.getBoundingClientRect().height || 0;
+      const right  = x + w;
+      const bottom = y + h;
+      if (right  > maxX) maxX = right;
+      if (bottom > maxY) maxY = bottom;
+    }
+    // Round up to grid to avoid half pixels
+    const gw = Math.max(1, this.gridSize || 10);
+    maxX = Math.ceil(maxX / gw) * gw;
+    maxY = Math.ceil(maxY / gw) * gw;
+    return { w: Math.max(1, maxX), h: Math.max(1, maxY) };
+  }
+
+
+  /* -------------------- Live scale watcher (rAF fallback) -------------------- */
+  _startScaleWatch() {
+    if (!this.autoResizeCards) return;
+    if (this.__scaleRAF) return;
+    const tick = () => {
+      if (!this.autoResizeCards) { this.__scaleRAF = null; return; }
+      // Check host width; if changed, re-apply scaling
+      const rect = this.getBoundingClientRect();
+      const w = Math.max(1, rect.width || 0);
+      if (w !== this.__lastScaleW) {
+        this.__lastScaleW = w;
+        this._applyAutoScale?.();
+      }
+      this.__scaleRAF = requestAnimationFrame(tick);
+    };
+    this.__scaleRAF = requestAnimationFrame(tick);
+  }
+
+  _stopScaleWatch() {
+    if (this.__scaleRAF) {
+      try { cancelAnimationFrame(this.__scaleRAF); } catch {}
+      this.__scaleRAF = null;
+    }
+  }
+
+_applyAutoScale() {
+  const c = this.cardContainer; if (!c) return;
+
+  // If auto-resize disabled, undo wrapper/transform and bail out
+  if (!this.autoResizeCards) {
+    if (this.__scaleOuter && this.__scaleOuter.contains(c)) {
+      // unwrap
+      if (this.__scaleOuter.parentNode) {
+        this.__scaleOuter.parentNode.insertBefore(c, this.__scaleOuter);
+        this.__scaleOuter.remove();
+      }
+      this.__scaleOuter = null;
+    }
+    c.style.transform = '';
+    c.style.transformOrigin = '';
+    c.style.position = '';
+    // Ensure host scrolls and stop here when scaling is disabled
+    if (this.rootEl) { this.rootEl.style.overflow = 'auto'; }
+    // Stop any running scale watchers
+    this.stopScaleWatch?.();
+    // Bail out completely
+    return;
+    c.style.top = '';
+    c.style.left = '';
+    // In edit mode report the *design* size, else let dynamic sizing run
+    if (this.editMode && typeof this._computeDesignSize === 'function') {
+      const d = this._computeDesignSize();
+      if (d && d.w && d.h) {
+        c.style.width  = `${d.w}px`;
+        c.style.height = `${d.h}px`;
+      }
+    } else if (typeof this._isContainerFixed === 'function' && !this._isContainerFixed()) {
+      if (typeof this._resizeContainer === 'function') this._resizeContainer();
+    }
+    return;
+  }
+
+  // Auto-resize ON: transform the inner canvas, size the outer wrapper
+  if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+
+  const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+  const rect = this.getBoundingClientRect ? this.getBoundingClientRect() : { width: this.offsetWidth || d.w };
+  const availableW = Math.max(1, this.offsetWidth || rect.width || d.w);
+  const scale = Math.min(availableW / Math.max(1, d.w), 1); // clamp: no upscaling past native size
+
+  // Layout box reflects *visual* size so the parent lays out correctly
+  if (this.__scaleOuter) {
+    this.__scaleOuter.style.width  = `${availableW}px`
+    this.__scaleOuter.style.height = `${Math.max(1, d.h * scale)}px`;
+  }
+
+  // Inner canvas reflects *design* size and is visually scaled
+  c.style.width  = `${d.w}px`;
+  c.style.height = `${d.h}px`;
+  c.style.transform = `scale(${scale})`;
+}
+
+
 
   _resizeContainer() {
     const c = this.cardContainer; if (!c) return;
@@ -4083,6 +4325,7 @@ this._initCardInteract(wrap);
             }
           } else {
             this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
           }
           this._resizeContainer();
           await this._saveLayout(false);
@@ -4141,7 +4384,8 @@ this._initCardInteract(wrap);
       tabs_position: this.tabsPosition,
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
-    };
+          auto_resize_cards: !!this.autoResizeCards,
+};
     // strip undefined to keep files tidy
     Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
     return opt;
@@ -4182,6 +4426,14 @@ this._initCardInteract(wrap);
     if ('container_fixed_height' in opts)     this.containerFixedHeight = Number(opts.container_fixed_height) || null;
     if ('container_preset' in opts)           this.containerPreset = opts.container_preset || 'fhd';
     if ('container_preset_orientation' in opts) this.containerPresetOrient = opts.container_preset_orientation || 'auto';
+    
+    if ('auto_resize_cards' in opts) {
+      this.autoResizeCards = !!opts.auto_resize_cards;
+      if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+      this._applyAutoScale?.();
+    }
+
+
 
     // reflect to CSS
     this.style.setProperty('--ddc-bg', this.containerBackground);
@@ -4190,8 +4442,11 @@ this._initCardInteract(wrap);
 
     if (recalc) {
       this._applyContainerSizingFromConfig(true);
+      this._applyAutoScale?.();
       this._resizeContainer();
       this._updateStoreBadge?.();
+      this._applyAutoScale?.();
+
     }
   }
 
@@ -4444,6 +4699,7 @@ _importDesign() {
         }
       } else {
         this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
       }
 
       // apply container sizing/appearance and refresh tabs UI now that cards exist
