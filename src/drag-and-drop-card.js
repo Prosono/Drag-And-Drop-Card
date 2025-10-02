@@ -30,6 +30,44 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+  _updateTabsA11y_() {
+  const bar = this.tabsBar; if (!bar) return;
+  bar.setAttribute('role', 'tablist');
+  const btns = bar.querySelectorAll('.ddc-tab');
+  btns.forEach((btn, idx) => {
+    const selected = btn.classList.contains('active');
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', String(selected));
+    btn.setAttribute('tabindex', selected ? '0' : '-1');
+    btn.dataset.index = String(idx);
+  });
+  if (!this.__tabsKeyHandler) {
+    this.__tabsKeyHandler = (e) => {
+      const valid = ['ArrowLeft','ArrowRight','Home','End'];
+      if (!valid.includes(e.key)) return;
+      const list = Array.from(bar.querySelectorAll('.ddc-tab'));
+      if (!list.length) return;
+      e.preventDefault();
+      const focusedIndex = list.findIndex(b => b === document.activeElement);
+      const activeIndex = list.findIndex(b => b.classList.contains('active'));
+      let idx = focusedIndex >= 0 ? focusedIndex : (activeIndex >= 0 ? activeIndex : 0);
+      if (e.key === 'ArrowRight') idx = Math.min(list.length - 1, idx + 1);
+      if (e.key === 'ArrowLeft')  idx = Math.max(0, idx - 1);
+      if (e.key === 'Home')       idx = 0;
+      if (e.key === 'End')        idx = list.length - 1;
+      const target = list[idx];
+      if (target) { try { target.focus({preventScroll:false}); } catch {}; target.click(); }
+    };
+    bar.addEventListener('keydown', this.__tabsKeyHandler);
+  }
+  if (!this.__tabsScrollHandler) {
+    this.__tabsScrollHandler = () => this._updateTabOverflowShadows_?.();
+    bar.addEventListener('scroll', this.__tabsScrollHandler, { passive: true });
+  }
+  this._updateTabOverflowShadows_?.();
+}
+
+
   /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
 _setHeaderVisible_(show=true) {
   try {
@@ -544,8 +582,8 @@ static getConfigElement() {
 
       /* Checkbox rows: keep left column reserved so alignment stays consistent */
       .left-empty { visibility: hidden; }
-    
-      </style>
+
+</style>
 
      <div class="ddc-editor">
       <div class="section">Layout & Behavior</div>
@@ -1445,94 +1483,193 @@ _applyGridVars() {
           }
 
                 /* --- Tabs bar (DDC) --- */
-      /* --- Tabs bar (DDC) --- */
-      .ddc-tabs{
-        /* Full-width, equal columns */
-        display:grid;
-        grid-auto-flow:column;
-        grid-auto-columns:1fr;
-        gap:6px;
-        padding:6px;
-        align-items:stretch;
-        border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12));
-        width:100%;
-        /* If you prefer flex instead of grid, see the fallback below */
-      }
+          /* --- WILD DDC Tabs (drop in and replace your block) --- */
 
-      /* Vertical/left variant unchanged */
-      .ddc-tabs-left{
-        display:flex;
-        flex-direction:column;
-        width:160px; min-width:160px;
-        border-bottom:none;
-        border-right:1px solid var(--divider-color, rgba(0,0,0,.12));
-      }
+          /* --- DDC Tabs — Chrome-style, no backdrop, mobile-friendly --- */
 
-      /* Tab button */
-      .ddc-tab{
-        display:flex;
-        align-items:center;
-        justify-content:center;        /* centers label+icon */
-        gap:8px;
-        padding:10px 12px;
-        min-width:0;                   /* allow text ellipsis */
-        border-radius:12px;
-        border:1px solid
-          var(--ha-card-border-color, color-mix(in oklab, var(--primary-text-color) 12%, transparent));
-        background:var(--ha-card-background, rgba(0,0,0,.02));
-        cursor:pointer;
-        font:inherit;
-        position:relative;
-        transition:background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-      }
-      .ddc-tab ha-icon{ --mdc-icon-size:18px; }
-      .ddc-tab span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+          /* --- DDC Tabs — Chrome-style, fills width, steady hover (no bounce), stronger active shadow --- */
 
-      /* Hover */
-      .ddc-tab:hover{
-        background:color-mix(in oklab, var(--primary-color) 8%, transparent);
-        border-color:color-mix(in oklab, var(--primary-color) 40%, transparent);
-        box-shadow:0 1px 2px rgba(0,0,0,.15);
-      }
+          /* Tabs bar (transparent, no backdrop) */
+ /* --- DDC Tabs — Chrome-style, centered content, smooth tab-change, faint inactive outline --- */
 
-      /* Active */
-      .ddc-tab.active{
-        border-color:var(--primary-color);
-        background:color-mix(in oklab, var(--primary-color) 14%, transparent);
-        box-shadow:0 2px 6px rgba(0,0,0,.16);
-      }
+        /* Tabs bar (transparent, no backdrop; fills width) */
+        .ddc-tabs{
+          position: relative;
+          display: flex;
+          align-items: flex-end; /* Chrome-like baseline */
+          gap: clamp(2px, 1vw, 8px);
+          padding: clamp(4px, 1.2vw, 10px) clamp(6px, 2vw, 12px);
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scroll-snap-type: x proximity;
+          background: transparent;
+          border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
+          scrollbar-width: thin;
+          scrollbar-color: color-mix(in oklab, var(--primary-text-color) 35%, transparent) transparent;
+        }
+        .ddc-tabs::-webkit-scrollbar { height: 8px; }
+        .ddc-tabs::-webkit-scrollbar-thumb {
+          background: color-mix(in oklab, var(--primary-text-color) 35%, transparent);
+          border-radius: 9999px;
+        }
+        .ddc-tabs::-webkit-scrollbar-track { background: transparent; }
 
-      /* Active "ink bar" */
-      .ddc-tab.active::after{
-        content:"";
-        position:absolute;
-        left:8px; right:8px; bottom:-6px;
-        height:3px;
-        border-radius:2px;
-        background:var(--primary-color);
-        box-shadow:0 0 0 1px color-mix(in oklab, var(--primary-color) 25%, transparent);
-      }
+        /* Tab: fills available width, centered icon+text, no hover bounce */
+        .ddc-tab{
+          -webkit-tap-highlight-color: transparent;
+          position: relative;
+          z-index: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;             /* 1) center content */
+          text-align: center;                  /* 1) center label text */
+          gap: clamp(6px, 1.2vw, 10px);
+          padding: clamp(6px, 1.2vw, 10px) clamp(10px, 2vw, 14px);
+          font: 500 clamp(12px, 2.8vw, 14px)/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+          letter-spacing: .2px;
+          color: color-mix(in oklab, var(--primary-text-color) 75%, #000 0%);
+          cursor: pointer;
 
-      /* Focus accessibility */
-      .ddc-tab:focus-visible{
-        outline:3px solid color-mix(in oklab, var(--primary-color) 55%, transparent);
-        outline-offset:2px;
-      }
+          /* fill width but remain scrollable when crowded */
+          flex: 1 1 clamp(120px, 18vw, 280px);
+          min-width: clamp(120px, 18vw, 280px);
+          max-width: 100%;
+          scroll-snap-align: start;
 
-      /* Layout helper when using vertical tabs alongside content */
-      .ddc-tabs-left-layout{
-        display: grid;
-        grid-template-columns: 160px 1fr;   /* tabs | content */
-        grid-template-rows: auto 1fr;       /* toolbar | main */
-        grid-template-areas:
-          "toolbar toolbar"
-          "tabs    content";
-      } 
+          margin: 0;                           /* no overlap for steady layout */
+          border: 0;
+          background: transparent;
 
-      /* Place children into the intended areas */
-      .ddc-tabs-left-layout .toolbar{ grid-area: toolbar; }
-      .ddc-tabs-left-layout #tabsBar{ grid-area: tabs; }
-      .ddc-tabs-left-layout #cardContainer{ grid-area: content; }
+          /* 2&3) keep motion minimal; animate only color/shadow/line */
+          transition: color .18s ease, filter .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        .ddc-tab ha-icon{ --mdc-icon-size:18px; }
+        .ddc-tab .ddc-tab-label{ max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+        /* 3) Inactive tabs have a faint outline */
+        .ddc-tab::before{
+          content:"";
+          position:absolute;
+          inset: 0;
+          border-top-left-radius: 14px;
+          border-top-right-radius: 14px;
+          border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent); /* faint */
+          border-bottom: none;
+          background: transparent;
+          pointer-events: none;
+          z-index: -1;
+        }
+
+        /* Subtle hover: clearer text only (no movement) */
+        .ddc-tab:hover{
+          color: var(--primary-text-color);
+          filter: saturate(1.05);
+        }
+
+        /* Active tab: elevated, stronger shadow */
+        .ddc-tab.active{
+          color: var(--primary-text-color);
+          z-index: 2;
+        }
+        .ddc-tab.active::before{
+          background: var(--card-background-color, #fff);
+          border-color: var(--divider-color, rgba(0,0,0,.18));
+          box-shadow:
+            0 10px 24px rgba(0,0,0,.16),
+            0 4px 10px rgba(0,0,0,.10),
+            0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
+          animation: ddc-pop .18s ease-out;  /* quick, pleasing shadow pop */
+        }
+
+        /* 2) Animated TOP line – appears quickly when tab becomes active */
+        .ddc-tab::after{
+          content:"";
+          position:absolute;
+          top: -2px; left: 10px; right: 10px;
+          height: 0;                            /* hidden by default */
+          border-radius: 3px 3px 0 0;
+          background: linear-gradient(90deg, var(--primary-color), #ff4ecd, #00e0ff, var(--primary-color));
+          background-size: 300% 100%;
+          opacity: 0;
+          transform: scaleX(0);                  /* prepare for quick reveal */
+          transform-origin: 50% 50%;
+          transition: transform .16s ease-out, height .16s ease-out, opacity .16s ease-out;
+          pointer-events: none;
+        }
+        .ddc-tab.active::after{
+          height: 3px;
+          opacity: 1;
+          transform: scaleX(1);
+          animation: ddc-rainbow 4s linear infinite;
+        }
+
+        /* Pressed: keep still (no bounce) */
+        .ddc-tab:active{ box-shadow: 0 1px 0 rgba(0,0,0,0); }
+
+        /* Focus ring without motion */
+        .ddc-tab:focus-visible{
+          outline: none;
+          box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-color) 45%, transparent);
+        }
+
+        /* Mobile scaling — smaller min width & tighter paddings */
+        @media (max-width: 640px){
+          .ddc-tabs{ gap: 4px; padding: 6px 8px; }
+          .ddc-tab{
+            flex: 1 1 clamp(96px, 34vw, 200px);
+            min-width: clamp(96px, 34vw, 200px);
+            padding: 6px 10px;
+            font-size: clamp(11px, 3.4vw, 13px);
+          }
+          .ddc-tab::after{ left: 8px; right: 8px; }
+        }
+
+        /* Vertical tabs rail (transparent) — centered content too */
+        .ddc-tabs-left{
+          display:flex;
+          flex-direction:column;
+          align-items: stretch;
+          width: clamp(150px, 28vw, 220px);
+          padding: 8px 6px;
+          gap: 6px;
+          overflow-y: auto;
+          overflow-x: hidden;
+          border-right: 1px solid var(--divider-color, rgba(0,0,0,.12));
+          border-bottom: none;
+          background: transparent;
+        }
+        .ddc-tabs-left .ddc-tab{
+          justify-content: center;             /* 1) center in vertical list as well */
+          margin: 0;
+          border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
+          border-radius: 10px;
+          padding: 8px 10px;
+          flex: 0 0 auto;
+        }
+        .ddc-tabs-left .ddc-tab::before{ display:none; }
+        .ddc-tabs-left .ddc-tab.active{
+          background: var(--card-background-color, #fff);
+          box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        }
+        .ddc-tabs-left .ddc-tab.active::after{ display:none; } /* top line is only for horizontal */
+
+        /* Animations */
+        @keyframes ddc-rainbow{
+          0% { background-position: 0% 50%; }
+          100% { background-position: 300% 50%; }
+        }
+        @keyframes ddc-pop{
+          0% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+          100% {
+            box-shadow:
+              0 10px 24px rgba(0,0,0,.16),
+              0 4px 10px rgba(0,0,0,.10),
+              0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
+          }
+        }
+
       
         </style>
         <div class="ddc-root">
@@ -1987,6 +2124,8 @@ if (this.__ddcOnWinResize) {
       bar.appendChild(btn);
     }
     if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+  
+    try { this._updateTabsA11y_?.(); } catch {}
   }
   _applyActiveTab() {
     const current = this._normalizeTabId(this.activeTab);
