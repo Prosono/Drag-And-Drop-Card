@@ -30,6 +30,284 @@ const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
 const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r()) : setTimeout(r, 0)));
 
 class DragAndDropCard extends HTMLElement {
+  /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
+_setHeaderVisible_(show=true) {
+  try {
+    // Hide common HA headers (covers various builds)
+    const headers = this._deepQueryAll?.('app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar') || [];
+    headers.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayHeader === undefined) {
+        el.dataset.ddcPrevDisplayHeader = el.style.display || '';
+        el.dataset.ddcPrevMinH = el.style.minHeight || '';
+        el.dataset.ddcPrevH = el.style.height || '';
+        el.dataset.ddcPrevVis = el.style.visibility || '';
+      }
+      if (show) {
+        el.style.display = el.dataset.ddcPrevDisplayHeader || '';
+        el.style.minHeight = el.dataset.ddcPrevMinH || '';
+        el.style.height = el.dataset.ddcPrevH || '';
+        el.style.visibility = el.dataset.ddcPrevVis || '';
+        el.removeAttribute('hidden');
+      } else {
+        el.style.display = 'none';
+        el.style.minHeight = '0';
+        el.style.height = '0';
+        el.style.visibility = 'hidden';
+        el.setAttribute('hidden', '');
+      }
+    });
+
+    // Adjust CSS variables so layout doesn't reserve header space
+    const containers = [
+      ... (this._deepQueryAll?.('home-assistant-main') || []),
+      ... (this._deepQueryAll?.('ha-panel-lovelace') || []),
+      ... (this._deepQueryAll?.('hui-root') || [])
+    ];
+    containers.forEach(host => {
+      if (!host) return;
+      if (host.dataset.ddcPrevHdrVars === undefined) {
+        host.dataset.ddcPrevHdrVars = JSON.stringify({
+          mdc: host.style.getPropertyValue('--mdc-top-app-bar-height') || '',
+          app: host.style.getPropertyValue('--app-header-height') || '',
+          hdr: host.style.getPropertyValue('--header-height') || ''
+        });
+      }
+      if (show) {
+        try {
+          const prev = JSON.parse(host.dataset.ddcPrevHdrVars || '{}');
+          host.style.setProperty('--mdc-top-app-bar-height', prev.mdc || '');
+          host.style.setProperty('--app-header-height', prev.app || '');
+          host.style.setProperty('--header-height', prev.hdr || '');
+        } catch {}
+      } else {
+        host.style.setProperty('--mdc-top-app-bar-height', '0px');
+        host.style.setProperty('--app-header-height', '0px');
+        host.style.setProperty('--header-height', '0px');
+      }
+    });
+
+    // Some themes place header inside hui-root; ensure it's hidden too
+    const extra = this._deepQueryAll?.('hui-root app-header, hui-root ha-top-app-bar, hui-root mwc-top-app-bar-fixed, hui-root ha-header-bar') || [];
+    extra.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayHeader2 === undefined) {
+        el.dataset.ddcPrevDisplayHeader2 = el.style.display || '';
+      }
+      el.style.display = show ? (el.dataset.ddcPrevDisplayHeader2 || '') : 'none';
+    });
+  } catch {}
+}
+
+_setSidebarVisible_(show=true) {
+  try {
+    const sidebars = this._deepQueryAll?.('ha-sidebar') || [];
+    sidebars.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplaySidebar === undefined) {
+        el.dataset.ddcPrevDisplaySidebar = el.style.display || '';
+      }
+      el.style.display = show ? el.dataset.ddcPrevDisplaySidebar || '' : 'none';
+    });
+    const drawers = this._deepQueryAll?.('ha-drawer') || [];
+    drawers.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDrawerWidth === undefined) {
+        el.dataset.ddcPrevDrawerWidth = el.style.getPropertyValue('--mdc-drawer-width') || '';
+      }
+      if (show) {
+        el.style.setProperty('--mdc-drawer-width', el.dataset.ddcPrevDrawerWidth || '');
+      } else {
+        el.style.setProperty('--mdc-drawer-width', '0px');
+      }
+      try { if (!show && typeof el.close === 'function') el.close(); } catch {}
+    });
+  } catch {}
+}
+
+_applyHaChromeVisibility_() {
+  try {
+    const showAll = !!this.editMode || this._isInHaEditorPreview?.();
+    // header
+    if (showAll || !this.hideHaHeader) this._setHeaderVisible_(true);
+    else this._setHeaderVisible_(false);
+    // sidebar
+    if (showAll || !this.hideHaSidebar) this._setSidebarVisible_(true);
+    else this._setSidebarVisible_(false);
+  } catch {}
+}
+
+
+
+  _applyBackgroundImageFromConfig() {
+  const cfg = this._config || {};
+  const bg = cfg.background_image || cfg.bg_image || null;
+  const cont = this.cardContainer;
+  if (!cont) return;
+
+  if (bg && bg.src) {
+    const url = String(bg.src).trim();
+    const repeat = (bg.repeat === true || bg.repeat === 'repeat') ? 'repeat' : 'no-repeat';
+    const opacity = Math.max(0, Math.min(1, Number(bg.opacity ?? 1)));
+    const size = bg.size || 'cover';
+    const position = bg.position || 'center center';
+    const attachment = bg.attachment || 'scroll';
+    const filter = bg.filter || 'none';
+
+    cont.style.setProperty('--ddc-bg-image', url ? `url("${url.replace(/"/g, '\"')}")` : 'none');
+    cont.style.setProperty('--ddc-bg-repeat', repeat);
+    cont.style.setProperty('--ddc-bg-opacity', String(opacity));
+    cont.style.setProperty('--ddc-bg-size', size);
+    cont.style.setProperty('--ddc-bg-position', position);
+    cont.style.setProperty('--ddc-bg-attachment', attachment);
+    cont.style.setProperty('--ddc-bg-filter', filter);
+    cont.classList.add('has-bg-image');
+  } else {
+    cont.style.removeProperty('--ddc-bg-image');
+    cont.style.removeProperty('--ddc-bg-repeat');
+    cont.style.removeProperty('--ddc-bg-opacity');
+    cont.style.removeProperty('--ddc-bg-size');
+    cont.style.removeProperty('--ddc-bg-position');
+    cont.style.removeProperty('--ddc-bg-attachment');
+    cont.style.removeProperty('--ddc-bg-filter');
+    cont.classList.remove('has-bg-image');
+  }
+}
+
+
+  async _onKeyDown_(e) {
+  if (!this.editMode) return;
+  if (this._isTypingTarget_(e.target)) return;
+
+  const gs = Number(this.gridSize || 10);
+  const step = e.altKey ? 1 : (e.shiftKey ? gs * 5 : gs);
+
+  let dx = 0, dy = 0;
+  switch (e.key) {
+    case 'ArrowLeft':  dx = -step; break;
+    case 'ArrowRight': dx =  step; break;
+    case 'ArrowUp':    dy = -step; break;
+    case 'ArrowDown':  dy =  step; break;
+  }
+  if (dx || dy) {
+    e.preventDefault();
+    this._moveSelectionBy_(dx, dy, { liveSnap: !e.altKey });
+    return;
+  }
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const sel = this._selection && this._selection.size ? Array.from(this._selection) : [];
+    if (!sel.length) return;
+    e.preventDefault();
+    sel.forEach(el => el.remove());
+    this._clearSelection?.();
+    this._resizeContainer?.();
+    this._queueSave?.('delete-key');
+    this._ensurePlaceholderIfEmpty?.();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    await this._duplicateSelection_();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key === ']') {
+    e.preventDefault();
+    (this._selection && this._selection.forEach?.(w => this._adjustZ?.(w, +1)));
+    this._queueSave?.('z-up');
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+    e.preventDefault();
+    (this._selection && this._selection.forEach?.(w => this._adjustZ?.(w, -1)));
+    this._queueSave?.('z-down');
+    return;
+  }
+}
+
+
+  async _duplicateSelection_() {
+  if (!this._selection || !this._selection.size) return;
+  const sel = Array.from(this._selection);
+  for (const t of sel) {
+    try {
+      const cfg = this._extractCardConfig?.(t.firstElementChild) || {};
+      const dup = await this._createCard?.(cfg);
+      const w2  = this._makeWrapper?.(dup);
+      if (!dup || !w2) continue;
+
+      w2.style.width  = t.style.width;
+      w2.style.height = t.style.height;
+
+      const step = Number(this.gridSize || 10);
+      const x = (parseFloat(t.getAttribute('data-x')) || 0) + step;
+      const y = (parseFloat(t.getAttribute('data-y')) || 0) + step;
+
+      this._setCardPosition?.(w2, x, y);
+      w2.style.zIndex = String((this._highestZ?.() || 0) + 1);
+      this.cardContainer?.appendChild(w2);
+      try { this._rebuildOnce?.(w2.firstElementChild); } catch {}
+      try { this._initCardInteract?.(w2); } catch {}
+    } catch {}
+  }
+  try { this._resizeContainer?.(); } catch {}
+  try { this._queueSave?.('duplicate'); } catch {}
+}
+
+
+  _moveSelectionBy_(dx, dy, { liveSnap = true } = {}) {
+  if (!this._selection || !this._selection.size) return;
+  const sel = Array.from(this._selection);
+
+  const gs = Number(this.gridSize || 10);
+  const fixed = this._isContainerFixed?.();
+  const box = this._getContainerSize?.() || { w: Infinity, h: Infinity };
+
+  const proposed = sel.map(el => {
+    const rawX = parseFloat(el.getAttribute('data-x-raw')) || parseFloat(el.getAttribute('data-x')) || 0;
+    const rawY = parseFloat(el.getAttribute('data-y-raw')) || parseFloat(el.getAttribute('data-y')) || 0;
+    const w = parseFloat(el.style.width)  || el.getBoundingClientRect().width;
+    const h = parseFloat(el.style.height) || el.getBoundingClientRect().height;
+
+    let nx = rawX + dx;
+    let ny = rawY + dy;
+
+    if (fixed) {
+      nx = Math.max(0, Math.min(nx, Math.max(0, box.w - w)));
+      ny = Math.max(0, Math.min(ny, Math.max(0, box.h - h)));
+    }
+
+    const sx = liveSnap ? Math.round(nx / gs) * gs : nx;
+    const sy = liveSnap ? Math.round(ny / gs) * gs : ny;
+
+    return { el, rawX: nx, rawY: ny, snapX: sx, snapY: sy, w, h };
+  });
+
+  if (this.disableOverlap && typeof this._pushCardsOutOfTheWay === 'function') {
+    try { this._pushCardsOutOfTheWay(proposed, dx, dy, liveSnap, gs); } catch {}
+  }
+
+  for (const p of proposed) {
+    p.el.setAttribute('data-x-raw', String(p.rawX));
+    p.el.setAttribute('data-y-raw', String(p.rawY));
+    try { this._setCardPosition?.(p.el, p.snapX, p.snapY); } catch {}
+  }
+  try { this._resizeContainer?.(); } catch {}
+  try { this._queueSave?.('nudge'); } catch {}
+}
+
+
+  _isTypingTarget_(t) {
+  if (!t || t === window || t === document) return false;
+  const editable = t.closest?.('input, textarea, [contenteditable="true"], ha-textfield, mwc-textfield');
+  if (!editable) return false;
+  const tag = editable.tagName?.toLowerCase?.() || '';
+  return tag === 'input' || tag === 'textarea' || editable.hasAttribute?.('contenteditable');
+}
+
+
   // --- Live reflow + scale while dragging (dynamic mode) ---
   _scheduleReflowAndScale() {
     if (this.__reflowRAF) return;
@@ -677,7 +955,10 @@ _applyGridVars() {
     this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
     this.containerBackground      = config.container_background ?? 'transparent';
     this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
-    this.debug                    = !!config.debug;
+
+    this.hideHaHeader            = !!(config.hide_HA_Header ?? config.hide_ha_header ?? false);
+    this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
+        this.debug                    = !!config.debug;
     this.editMode                 = false;
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
@@ -714,7 +995,11 @@ _applyGridVars() {
     // Grid-related
     this._applyGridVars();
 
-    // Overlay fix for UI based cards
+    
+    try { this._applyBackgroundImageFromConfig?.(); } catch {}
+
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+// Overlay fix for UI based cards
     this._ensureOverlayZFix();
 
     // selection state
@@ -804,11 +1089,26 @@ _applyGridVars() {
             pointer-events:none;
             opacity:0;
             transition: opacity .15s;
-            z-index:0;
+            z-index:1;
           }
           .card-container.grid-on::before{
             opacity:.28;
           }
+          /* background image layer (always behind grid and cards) */
+          .card-container::after{
+            content:'';
+            position:absolute; inset:0;
+            pointer-events:none;
+            z-index:0;
+            opacity: var(--ddc-bg-opacity, 1);
+            background-image: var(--ddc-bg-image, none);
+            background-repeat: var(--ddc-bg-repeat, no-repeat);
+            background-size: var(--ddc-bg-size, cover);
+            background-position: var(--ddc-bg-position, center center);
+            background-attachment: var(--ddc-bg-attachment, scroll);
+            filter: var(--ddc-bg-filter, none);
+          }
+    
 
           .card-wrapper{
             position:absolute;
@@ -823,7 +1123,7 @@ _applyGridVars() {
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
-            z-index:1;
+            z-index:2;
           }
           .card-wrapper.dragging{
             cursor:grabbing;
@@ -1276,6 +1576,7 @@ _applyGridVars() {
         </div>
       `;
       this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+      try { this._applyBackgroundImageFromConfig?.(); } catch {}
       this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
       this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
       this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
@@ -1379,6 +1680,8 @@ _applyGridVars() {
   }
 
   connectedCallback() {
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
     if (!this.__boundExitEdit) {
       this.__boundExitEdit = () => this._toggleEditMode(false);
     }
@@ -1411,6 +1714,10 @@ window.addEventListener('resize', this.__ddcOnWinResize);
 }
   
   disconnectedCallback() {
+    try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+    if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
+    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
@@ -1782,6 +2089,8 @@ if (this.__ddcOnWinResize) {
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
+  
+    try { this._applyHaChromeVisibility_?.(); } catch {}
   }
 
   _isInHaEditorPreview() {
