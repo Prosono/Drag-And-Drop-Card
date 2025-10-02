@@ -437,6 +437,413 @@ _ensureScaleWrapper() {
   this.__scaleOuter = outer;
 }
 
+  _updateTabsA11y_() {
+  const bar = this.tabsBar; if (!bar) return;
+  bar.setAttribute('role', 'tablist');
+  const btns = bar.querySelectorAll('.ddc-tab');
+  btns.forEach((btn, idx) => {
+    const selected = btn.classList.contains('active');
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', String(selected));
+    btn.setAttribute('tabindex', selected ? '0' : '-1');
+    btn.dataset.index = String(idx);
+  });
+  if (!this.__tabsKeyHandler) {
+    this.__tabsKeyHandler = (e) => {
+      const valid = ['ArrowLeft','ArrowRight','Home','End'];
+      if (!valid.includes(e.key)) return;
+      const list = Array.from(bar.querySelectorAll('.ddc-tab'));
+      if (!list.length) return;
+      e.preventDefault();
+      const focusedIndex = list.findIndex(b => b === document.activeElement);
+      const activeIndex = list.findIndex(b => b.classList.contains('active'));
+      let idx = focusedIndex >= 0 ? focusedIndex : (activeIndex >= 0 ? activeIndex : 0);
+      if (e.key === 'ArrowRight') idx = Math.min(list.length - 1, idx + 1);
+      if (e.key === 'ArrowLeft')  idx = Math.max(0, idx - 1);
+      if (e.key === 'Home')       idx = 0;
+      if (e.key === 'End')        idx = list.length - 1;
+      const target = list[idx];
+      if (target) { try { target.focus({preventScroll:false}); } catch {}; target.click(); }
+    };
+    bar.addEventListener('keydown', this.__tabsKeyHandler);
+  }
+  if (!this.__tabsScrollHandler) {
+    this.__tabsScrollHandler = () => this._updateTabOverflowShadows_?.();
+    bar.addEventListener('scroll', this.__tabsScrollHandler, { passive: true });
+  }
+  this._updateTabOverflowShadows_?.();
+}
+
+
+  /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
+_setHeaderVisible_(show=true) {
+  try {
+    // Hide common HA headers (covers various builds)
+    const headers = this._deepQueryAll?.('app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar') || [];
+    headers.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayHeader === undefined) {
+        el.dataset.ddcPrevDisplayHeader = el.style.display || '';
+        el.dataset.ddcPrevMinH = el.style.minHeight || '';
+        el.dataset.ddcPrevH = el.style.height || '';
+        el.dataset.ddcPrevVis = el.style.visibility || '';
+      }
+      if (show) {
+        el.style.display = el.dataset.ddcPrevDisplayHeader || '';
+        el.style.minHeight = el.dataset.ddcPrevMinH || '';
+        el.style.height = el.dataset.ddcPrevH || '';
+        el.style.visibility = el.dataset.ddcPrevVis || '';
+        el.removeAttribute('hidden');
+      } else {
+        el.style.display = 'none';
+        el.style.minHeight = '0';
+        el.style.height = '0';
+        el.style.visibility = 'hidden';
+        el.setAttribute('hidden', '');
+      }
+    });
+
+    // Adjust CSS variables so layout doesn't reserve header space
+    const containers = [
+      ... (this._deepQueryAll?.('home-assistant-main') || []),
+      ... (this._deepQueryAll?.('ha-panel-lovelace') || []),
+      ... (this._deepQueryAll?.('hui-root') || [])
+    ];
+    containers.forEach(host => {
+      if (!host) return;
+      if (host.dataset.ddcPrevHdrVars === undefined) {
+        host.dataset.ddcPrevHdrVars = JSON.stringify({
+          mdc: host.style.getPropertyValue('--mdc-top-app-bar-height') || '',
+          app: host.style.getPropertyValue('--app-header-height') || '',
+          hdr: host.style.getPropertyValue('--header-height') || ''
+        });
+      }
+      if (show) {
+        try {
+          const prev = JSON.parse(host.dataset.ddcPrevHdrVars || '{}');
+          host.style.setProperty('--mdc-top-app-bar-height', prev.mdc || '');
+          host.style.setProperty('--app-header-height', prev.app || '');
+          host.style.setProperty('--header-height', prev.hdr || '');
+        } catch {}
+      } else {
+        host.style.setProperty('--mdc-top-app-bar-height', '0px');
+        host.style.setProperty('--app-header-height', '0px');
+        host.style.setProperty('--header-height', '0px');
+      }
+    });
+
+    // Some themes place header inside hui-root; ensure it's hidden too
+    const extra = this._deepQueryAll?.('hui-root app-header, hui-root ha-top-app-bar, hui-root mwc-top-app-bar-fixed, hui-root ha-header-bar') || [];
+    extra.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayHeader2 === undefined) {
+        el.dataset.ddcPrevDisplayHeader2 = el.style.display || '';
+      }
+      el.style.display = show ? (el.dataset.ddcPrevDisplayHeader2 || '') : 'none';
+    });
+  } catch {}
+}
+
+_setSidebarVisible_(show=true) {
+  try {
+    const sidebars = this._deepQueryAll?.('ha-sidebar') || [];
+    sidebars.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplaySidebar === undefined) {
+        el.dataset.ddcPrevDisplaySidebar = el.style.display || '';
+      }
+      el.style.display = show ? el.dataset.ddcPrevDisplaySidebar || '' : 'none';
+    });
+    const drawers = this._deepQueryAll?.('ha-drawer') || [];
+    drawers.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDrawerWidth === undefined) {
+        el.dataset.ddcPrevDrawerWidth = el.style.getPropertyValue('--mdc-drawer-width') || '';
+      }
+      if (show) {
+        el.style.setProperty('--mdc-drawer-width', el.dataset.ddcPrevDrawerWidth || '');
+      } else {
+        el.style.setProperty('--mdc-drawer-width', '0px');
+      }
+      try { if (!show && typeof el.close === 'function') el.close(); } catch {}
+    });
+  } catch {}
+}
+
+_applyHaChromeVisibility_() {
+  try {
+    const showAll = !!this.editMode || this._isInHaEditorPreview?.();
+    // header
+    if (showAll || !this.hideHaHeader) this._setHeaderVisible_(true);
+    else this._setHeaderVisible_(false);
+    // sidebar
+    if (showAll || !this.hideHaSidebar) this._setSidebarVisible_(true);
+    else this._setSidebarVisible_(false);
+  } catch {}
+}
+
+
+
+  _applyBackgroundImageFromConfig() {
+  const cfg = this._config || {};
+  const bg = cfg.background_image || cfg.bg_image || null;
+  const cont = this.cardContainer;
+  if (!cont) return;
+
+  if (bg && bg.src) {
+    const url = String(bg.src).trim();
+    const repeat = (bg.repeat === true || bg.repeat === 'repeat') ? 'repeat' : 'no-repeat';
+    const opacity = Math.max(0, Math.min(1, Number(bg.opacity ?? 1)));
+    const size = bg.size || 'cover';
+    const position = bg.position || 'center center';
+    const attachment = bg.attachment || 'scroll';
+    const filter = bg.filter || 'none';
+
+    cont.style.setProperty('--ddc-bg-image', url ? `url("${url.replace(/"/g, '\"')}")` : 'none');
+    cont.style.setProperty('--ddc-bg-repeat', repeat);
+    cont.style.setProperty('--ddc-bg-opacity', String(opacity));
+    cont.style.setProperty('--ddc-bg-size', size);
+    cont.style.setProperty('--ddc-bg-position', position);
+    cont.style.setProperty('--ddc-bg-attachment', attachment);
+    cont.style.setProperty('--ddc-bg-filter', filter);
+    cont.classList.add('has-bg-image');
+  } else {
+    cont.style.removeProperty('--ddc-bg-image');
+    cont.style.removeProperty('--ddc-bg-repeat');
+    cont.style.removeProperty('--ddc-bg-opacity');
+    cont.style.removeProperty('--ddc-bg-size');
+    cont.style.removeProperty('--ddc-bg-position');
+    cont.style.removeProperty('--ddc-bg-attachment');
+    cont.style.removeProperty('--ddc-bg-filter');
+    cont.classList.remove('has-bg-image');
+  }
+}
+
+
+  async _onKeyDown_(e) {
+  if (!this.editMode) return;
+  if (this._isTypingTarget_(e.target)) return;
+
+  const gs = Number(this.gridSize || 10);
+  const step = e.altKey ? 1 : (e.shiftKey ? gs * 5 : gs);
+
+  let dx = 0, dy = 0;
+  switch (e.key) {
+    case 'ArrowLeft':  dx = -step; break;
+    case 'ArrowRight': dx =  step; break;
+    case 'ArrowUp':    dy = -step; break;
+    case 'ArrowDown':  dy =  step; break;
+  }
+  if (dx || dy) {
+    e.preventDefault();
+    this._moveSelectionBy_(dx, dy, { liveSnap: !e.altKey });
+    return;
+  }
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const sel = this._selection && this._selection.size ? Array.from(this._selection) : [];
+    if (!sel.length) return;
+    e.preventDefault();
+    sel.forEach(el => el.remove());
+    this._clearSelection?.();
+    this._resizeContainer?.();
+    this._queueSave?.('delete-key');
+    this._ensurePlaceholderIfEmpty?.();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    await this._duplicateSelection_();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key === ']') {
+    e.preventDefault();
+    (this._selection && this._selection.forEach?.(w => this._adjustZ?.(w, +1)));
+    this._queueSave?.('z-up');
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+    e.preventDefault();
+    (this._selection && this._selection.forEach?.(w => this._adjustZ?.(w, -1)));
+    this._queueSave?.('z-down');
+    return;
+  }
+}
+
+
+  async _duplicateSelection_() {
+  if (!this._selection || !this._selection.size) return;
+  const sel = Array.from(this._selection);
+  for (const t of sel) {
+    try {
+      const cfg = this._extractCardConfig?.(t.firstElementChild) || {};
+      const dup = await this._createCard?.(cfg);
+      const w2  = this._makeWrapper?.(dup);
+      if (!dup || !w2) continue;
+
+      w2.style.width  = t.style.width;
+      w2.style.height = t.style.height;
+
+      const step = Number(this.gridSize || 10);
+      const x = (parseFloat(t.getAttribute('data-x')) || 0) + step;
+      const y = (parseFloat(t.getAttribute('data-y')) || 0) + step;
+
+      this._setCardPosition?.(w2, x, y);
+      w2.style.zIndex = String((this._highestZ?.() || 0) + 1);
+      this.cardContainer?.appendChild(w2);
+      try { this._rebuildOnce?.(w2.firstElementChild); } catch {}
+      try { this._initCardInteract?.(w2); } catch {}
+    } catch {}
+  }
+  try { this._resizeContainer?.(); } catch {}
+  try { this._queueSave?.('duplicate'); } catch {}
+}
+
+
+  _moveSelectionBy_(dx, dy, { liveSnap = true } = {}) {
+  if (!this._selection || !this._selection.size) return;
+  const sel = Array.from(this._selection);
+
+  const gs = Number(this.gridSize || 10);
+  const fixed = this._isContainerFixed?.();
+  const box = this._getContainerSize?.() || { w: Infinity, h: Infinity };
+
+  const proposed = sel.map(el => {
+    const rawX = parseFloat(el.getAttribute('data-x-raw')) || parseFloat(el.getAttribute('data-x')) || 0;
+    const rawY = parseFloat(el.getAttribute('data-y-raw')) || parseFloat(el.getAttribute('data-y')) || 0;
+    const w = parseFloat(el.style.width)  || el.getBoundingClientRect().width;
+    const h = parseFloat(el.style.height) || el.getBoundingClientRect().height;
+
+    let nx = rawX + dx;
+    let ny = rawY + dy;
+
+    if (fixed) {
+      nx = Math.max(0, Math.min(nx, Math.max(0, box.w - w)));
+      ny = Math.max(0, Math.min(ny, Math.max(0, box.h - h)));
+    }
+
+    const sx = liveSnap ? Math.round(nx / gs) * gs : nx;
+    const sy = liveSnap ? Math.round(ny / gs) * gs : ny;
+
+    return { el, rawX: nx, rawY: ny, snapX: sx, snapY: sy, w, h };
+  });
+
+  if (this.disableOverlap && typeof this._pushCardsOutOfTheWay === 'function') {
+    try { this._pushCardsOutOfTheWay(proposed, dx, dy, liveSnap, gs); } catch {}
+  }
+
+  for (const p of proposed) {
+    p.el.setAttribute('data-x-raw', String(p.rawX));
+    p.el.setAttribute('data-y-raw', String(p.rawY));
+    try { this._setCardPosition?.(p.el, p.snapX, p.snapY); } catch {}
+  }
+  try { this._resizeContainer?.(); } catch {}
+  try { this._queueSave?.('nudge'); } catch {}
+}
+
+
+  _isTypingTarget_(t) {
+  if (!t || t === window || t === document) return false;
+  const editable = t.closest?.('input, textarea, [contenteditable="true"], ha-textfield, mwc-textfield');
+  if (!editable) return false;
+  const tag = editable.tagName?.toLowerCase?.() || '';
+  return tag === 'input' || tag === 'textarea' || editable.hasAttribute?.('contenteditable');
+}
+
+
+  // --- Live reflow + scale while dragging (dynamic mode) ---
+  _scheduleReflowAndScale() {
+    if (this.__reflowRAF) return;
+    this.__reflowRAF = requestAnimationFrame(() => {
+      this.__reflowRAF = null;
+      try {
+        const mode = (this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+        if (mode === 'dynamic') {
+          this._resizeContainer?.(); // recompute content extents so d.h grows live
+        }
+      } catch {}
+      try { this._applyAutoScale?.(); } catch {}
+    });
+  }
+
+  __ddcBindPointerListeners() {
+    if (this.__ddcPtrBound) return;
+    this.__ddcPtrBound = true;
+    // Use bound methods to allow removeEventListener later if needed
+    this.__onDDCPointerDown = (ev) => {
+      try {
+        // Only react to primary button/touch
+        if (ev.button !== undefined && ev.button !== 0) return;
+        const path = ev.composedPath?.() || [];
+        let hit = null;
+        for (const n of path) {
+          if (n && n.classList && n.classList.contains('card-wrapper')) { hit = n; break; }
+        }
+        if (!hit) return;
+        this.__ddcDragging = true;
+        if (this.__scaleOuter) {
+          this.__prevOverflow = this.__scaleOuter.style.overflow;
+          this.__scaleOuter.style.overflow = 'visible'; // avoid "ceiling" clipping
+        }
+        this._scheduleReflowAndScale?.();
+      } catch {}
+    };
+    this.__onDDCPointerMove = (ev) => {
+      try {
+        if (!this.__ddcDragging) return;
+        this._scheduleReflowAndScale?.();
+      } catch {}
+    };
+    this.__onDDCPointerUp = (ev) => {
+      try {
+        if (!this.__ddcDragging) return;
+        this.__ddcDragging = false;
+        if (this.__scaleOuter) this.__scaleOuter.style.overflow = this.__prevOverflow || '';
+        // Final settle
+        try { this._applyAutoScale?.(); } catch {}
+      } catch {}
+    };
+    // Attach listeners
+    try { this.addEventListener('pointerdown', this.__onDDCPointerDown, { passive: true }); } catch {}
+    try { this.addEventListener('pointermove', this.__onDDCPointerMove, { passive: true }); } catch {}
+    try { window.addEventListener('pointerup', this.__onDDCPointerUp, { passive: true }); } catch {}
+    try { window.addEventListener('pointercancel', this.__onDDCPointerUp, { passive: true }); } catch {}
+  }
+
+
+_ensureScaleWrapper() {
+  const c = this.cardContainer;
+  if (!c) return;
+  if (this.__scaleOuter && this.__scaleOuter.contains(c)) return;
+
+  // Create a layout box that will reflect the *visual* size
+  const outer = document.createElement('div');
+  outer.className = 'ddc-scale-outer';
+  Object.assign(outer.style, {
+    position: 'relative',
+    width: '100%',
+    overflow: 'hidden'
+  });
+
+  // Insert wrapper around the current container
+  if (c.parentNode) {
+    c.parentNode.insertBefore(outer, c);
+    outer.appendChild(c);
+  }
+
+  // Make the inner container absolutely positioned and transformable
+  Object.assign(c.style, {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    transformOrigin: 'top left'
+  });
+
+  this.__scaleOuter = outer;
+}
+
 
   __booting = false;  
 
@@ -585,6 +992,9 @@ static getConfigElement() {
 
 </style>
 
+</style>
+
+     <div class="ddc-editor">
      <div class="ddc-editor">
       <div class="section">Layout & Behavior</div>
 
@@ -631,6 +1041,12 @@ static getConfigElement() {
       <ha-formfield label="Prevent cards from overlapping">
         <ha-checkbox id="noOverlap"></ha-checkbox>
       </ha-formfield>
+
+      <div class="label">Auto-resize cards</div>
+      <ha-formfield label="Scale layout to fit parent (view mode)">
+        <ha-checkbox id="autoResize"></ha-checkbox>
+      </ha-formfield>
+
 
       <div class="label">Auto-resize cards</div>
       <ha-formfield label="Scale layout to fit parent (view mode)">
@@ -724,6 +1140,8 @@ static getConfigElement() {
     el.querySelector('#noOverlap').checked = !!el._config.disable_overlap;
     el.querySelector('#autoResize').checked = !!el._config.auto_resize_cards;
 
+    el.querySelector('#autoResize').checked = !!el._config.auto_resize_cards;
+
 
     el.querySelector('#sizeMode').value = el._config.container_size_mode || 'dynamic';
     el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
@@ -782,6 +1200,8 @@ static getConfigElement() {
     base.disable_overlap = !!el.querySelector('#noOverlap').checked;
     base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
 
+    base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
+
 
     base.container_size_mode = el.querySelector('#sizeMode').value;
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
@@ -811,6 +1231,7 @@ static getConfigElement() {
   on('#liveSnap', 'change'); on('#autoSave', 'change'); on('#autoSaveDebounce');
   on('#containerBg'); on('#cardBg');
   on('#debug', 'change'); on('#noOverlap', 'change');
+  on('#autoResize', 'change');
   on('#autoResize', 'change');
   on('#sizeMode', 'change'); on('#sizeW'); on('#sizeH');
   on('#sizePreset', 'selected'); on('#sizeOrientation', 'selected');
@@ -997,10 +1418,18 @@ _applyGridVars() {
     this.hideHaHeader            = !!(config.hide_HA_Header ?? config.hide_ha_header ?? false);
     this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
         this.debug                    = !!config.debug;
+
+    this.hideHaHeader            = !!(config.hide_HA_Header ?? config.hide_ha_header ?? false);
+    this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
+        this.debug                    = !!config.debug;
     this.editMode                 = false;
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
+    this.autoResizeCards         = !!config.auto_resize_cards;
+
+    if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+    this._applyAutoScale?.();
     this.autoResizeCards         = !!config.auto_resize_cards;
 
     if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
@@ -1010,6 +1439,16 @@ _applyGridVars() {
     this.containerPreset          = config.container_preset || 'fullhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
     this.heroImage = config?.hero_image || "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png";
+    // Tabs options
+    this.tabs               = Array.isArray(config.tabs) ? config.tabs : [];
+    this.tabsPosition       = (config.tabs_position === 'left') ? 'left' : 'top';
+    this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
+    this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
+    this.activeTab          = this.defaultTab;
+    try { const lastT = localStorage.getItem(`ddc_lasttab_${this.storageKey}`);
+      if (lastT && this.tabs.some(t=>t.id===lastT)) this.activeTab = lastT; } catch {}
+    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+
     // Tabs options
     this.tabs               = Array.isArray(config.tabs) ? config.tabs : [];
     this.tabsPosition       = (config.tabs_position === 'left') ? 'left' : 'top';
@@ -1033,6 +1472,11 @@ _applyGridVars() {
     // Grid-related
     this._applyGridVars();
 
+    
+    try { this._applyBackgroundImageFromConfig?.(); } catch {}
+
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+// Overlay fix for UI based cards
     
     try { this._applyBackgroundImageFromConfig?.(); } catch {}
 
@@ -1107,6 +1551,7 @@ _applyGridVars() {
           .card-container{
             position: relative;
             transform-origin: top left;
+            transform-origin: top left;
             padding: 10px;
             border: 1px solid var(--divider-color);
             background: var(--ddc-bg, transparent);
@@ -1128,10 +1573,26 @@ _applyGridVars() {
             opacity:0;
             transition: opacity .15s;
             z-index:1;
+            z-index:1;
           }
           .card-container.grid-on::before{
             opacity:.28;
           }
+          /* background image layer (always behind grid and cards) */
+          .card-container::after{
+            content:'';
+            position:absolute; inset:0;
+            pointer-events:none;
+            z-index:0;
+            opacity: var(--ddc-bg-opacity, 1);
+            background-image: var(--ddc-bg-image, none);
+            background-repeat: var(--ddc-bg-repeat, no-repeat);
+            background-size: var(--ddc-bg-size, cover);
+            background-position: var(--ddc-bg-position, center center);
+            background-attachment: var(--ddc-bg-attachment, scroll);
+            filter: var(--ddc-bg-filter, none);
+          }
+    
           /* background image layer (always behind grid and cards) */
           .card-container::after{
             content:'';
@@ -1161,6 +1622,7 @@ _applyGridVars() {
             border-radius:14px;
             box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
             will-change:transform,width,height,box-shadow; touch-action:auto;
+            z-index:2;
             z-index:2;
           }
           .card-wrapper.dragging{
@@ -1705,10 +2167,12 @@ _applyGridVars() {
             <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
           </div>
           <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
+          <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
           <div class="card-container" id="cardContainer"></div>
         </div>
       `;
       this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+      try { this._applyBackgroundImageFromConfig?.(); } catch {}
       try { this._applyBackgroundImageFromConfig?.(); } catch {}
       this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
       this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
@@ -1718,6 +2182,11 @@ _applyGridVars() {
       this.exportBtn     = this.shadowRoot.querySelector('#exportBtn');
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
       this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
+      this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
+      this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
+      this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
+      try { this._renderTabs(); this._applyActiveTab(); } catch {}
+     
       this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
@@ -1755,6 +2224,18 @@ _applyGridVars() {
     // initial scale (legacy)
     this._applyAutoScale?.();
 
+    // Observe host size for auto scaling (legacy retention for compatibility)
+    if (!this.__ddcResizeObs && this.autoResizeCards) {
+      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+      try { this.__ddcResizeObs.observe(this); } catch {}
+      try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
+      try { if (this.parentElement) this.__ddcResizeObs.observe(this.parentElement); } catch {}
+      try { if (this.offsetParent) this.__ddcResizeObs.observe(this.offsetParent); } catch {}
+      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+    }
+    // initial scale (legacy)
+    this._applyAutoScale?.();
+
        });
 
       this.exploreBtn.addEventListener('click', () =>
@@ -1764,8 +2245,22 @@ _applyGridVars() {
       // apply container sizing early
       this._applyContainerSizingFromConfig(true);
       this._applyAutoScale?.();
+      this._applyAutoScale?.();
       // Long-press on blank space (4s) to enter edit; Esc exits
       this._installLongPressToEnterEdit();
+      this._startScaleWatch?.();
+
+      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false);
+    // Observe host size for auto scaling
+    if (!this.__ddcResizeObs) {
+      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+      this.__ddcResizeObs.observe(this);
+      this.__ddcResizeObs.observe(this.cardContainer);
+      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+    }
+    // initial scale
+    this._applyAutoScale?.();
+ });
       this._startScaleWatch?.();
 
       window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false);
@@ -1808,11 +2303,14 @@ _applyGridVars() {
     } else {
       this._applyContainerSizingFromConfig(true);
       this._applyAutoScale?.();
+      this._applyAutoScale?.();
       this._resizeContainer();
     }
   }
 
   connectedCallback() {
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
     try { this._applyHaChromeVisibility_?.(); } catch {}
     if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
     if (!this.__boundExitEdit) {
@@ -1846,7 +2344,30 @@ window.addEventListener('resize', this.__ddcOnWinResize);
     try { this.__ddcBindPointerListeners?.(); } catch {}
 }
   
+
+// Ensure scale reapplies when the card becomes visible (e.g., after a tab switch)
+if (!this.__visObs) {
+  const io = new IntersectionObserver((entries) => {
+    if (entries.some(e => e.isIntersecting)) {
+      requestAnimationFrame(() => this._applyAutoScale && this._applyAutoScale());
+    }
+  }, { root: null, threshold: 0 });
+  io.observe(this);
+  this.__visObs = io;
+}
+
+// Also respond to window resizes
+this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
+window.addEventListener('resize', this.__ddcOnWinResize);
+
+    try { this.__ddcBindPointerListeners?.(); } catch {}
+}
+  
   disconnectedCallback() {
+    try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
+    try { this._applyHaChromeVisibility_?.(); } catch {}
+    if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
+    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
     try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
     try { this._applyHaChromeVisibility_?.(); } catch {}
     if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
@@ -1854,6 +2375,20 @@ window.addEventListener('resize', this.__ddcOnWinResize);
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
+
+    // cleanup observers
+    try { this.__ddcResizeObs?.disconnect(); } catch {}
+    this.__ddcResizeObs = null;
+
+    // stop scale watcher
+    this._stopScaleWatch?.();
+
+    // remove resize listener
+    if (this.__ddcOnWinResize) {
+      window.removeEventListener('resize', this.__ddcOnWinResize);
+      this.__ddcOnWinResize = null;
+    }
+
 
     // cleanup observers
     try { this.__ddcResizeObs?.disconnect(); } catch {}
@@ -1882,6 +2417,24 @@ window.addEventListener('resize', this.__ddcOnWinResize);
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
+  
+
+try { this.__visObs && this.__visObs.disconnect(); } catch(e) {}
+this.__visObs = null;
+if (this.__ddcOnWinResize) {
+  window.removeEventListener('resize', this.__ddcOnWinResize);
+}
+
+    try {
+      if (this.__ddcPtrBound) {
+        this.removeEventListener('pointerdown', this.__onDDCPointerDown);
+        this.removeEventListener('pointermove', this.__onDDCPointerMove);
+        window.removeEventListener('pointerup', this.__onDDCPointerUp);
+        window.removeEventListener('pointercancel', this.__onDDCPointerUp);
+        this.__ddcPtrBound = false;
+      }
+    } catch {}
+}
   
 
 try { this.__visObs && this.__visObs.disconnect(); } catch(e) {}
@@ -2003,6 +2556,7 @@ if (this.__ddcOnWinResize) {
         'container_background','card_background','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
         'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards'
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards'
       ];
       const cfgOpts = {};
       for (const k of overrideKeys) {
@@ -2035,6 +2589,7 @@ if (this.__ddcOnWinResize) {
           const wrap = this._makeWrapper(cardEl);
           if (this.editMode) wrap.classList.add('editing');
           wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
+          wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
 
           this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
           wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
@@ -2050,11 +2605,13 @@ if (this.__ddcOnWinResize) {
 
         this._resizeContainer();
         this._applyAutoScale?.();
+        this._applyAutoScale?.();
         this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
       }
 
       if (!builtAny) {
         this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
         this._applyAutoScale?.();
         this._dbgPush('boot', 'No saved layout found; showing placeholder');
       }
@@ -2081,6 +2638,102 @@ if (this.__ddcOnWinResize) {
       this.__booting = false;
       this.__dirty = false;
       this._updateApplyBtn?.();
+      try { this._renderTabs(); this._applyActiveTab(); } catch {}
+    }
+  }
+
+
+  
+  /* ------------------------------ Tabs support ------------------------------ */
+  _normalizeTabId(tabId) {
+    const valid = Array.isArray(this.tabs) ? this.tabs.map(t => t.id) : [];
+    if (!valid.length) return this.defaultTab || 'default';
+    return (tabId && valid.includes(tabId)) ? tabId : (this.defaultTab || valid[0]);
+  }
+  _renderTabs() {
+    const bar = this.tabsBar; if (!bar) return;
+    const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+    if (!tabs.length || (tabs.length === 1 && this.hideTabsWhenSingle)) {
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.display = '';
+    bar.className = 'ddc-tabs ' + (this.tabsPosition === 'left' ? 'ddc-tabs-left' : '');
+    bar.innerHTML = '';
+    for (const t of tabs) {
+      const btn = document.createElement('button');
+      btn.className = 'ddc-tab' + (t.id === this.activeTab ? ' active' : '');
+      btn.dataset.tabId = t.id;
+      btn.title = t.label || t.id;
+      btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
+      btn.addEventListener('click', () => {
+        if (this.activeTab !== t.id) {
+          this.activeTab = t.id;
+          try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
+          this._applyActiveTab();
+          this._renderTabs();
+        }
+      });
+      bar.appendChild(btn);
+    }
+    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+  
+    try { this._updateTabsA11y_?.(); } catch {}
+  }
+  _applyActiveTab() {
+    const current = this._normalizeTabId(this.activeTab);
+    const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+    wraps.forEach(w => {
+      const tabId = w.dataset.tabId ? this._normalizeTabId(w.dataset.tabId) : this.defaultTab;
+      if (!this.tabs || !this.tabs.length) {
+        w.style.display = '';
+        w.inert = false;
+        w.classList.remove('ddc-hidden');
+        return;
+      }
+      if (tabId === current) {
+        w.style.display = '';
+        w.inert = false;
+        w.classList.remove('ddc-hidden');
+      } else {
+        w.style.display = 'none';
+        w.inert = true;
+        w.classList.add('ddc-hidden');
+        w.classList.remove('ddc-selected');
+      
+    // apply or clear scaling per mode
+    this._applyAutoScale?.();
+  }
+    });
+    try { this._clearSelection(); } catch {}
+  }
+  _addTabSelectorToChip(wrapper, entryTabId = null) {
+    if (!this.tabs || !this.tabs.length) return;
+    const chip = wrapper.querySelector('.chip'); if (!chip) return;
+    let sel = chip.querySelector('select.ddc-chip-tab');
+    if (!sel) {
+      sel = document.createElement('select');
+      sel.className = 'ddc-chip-tab';
+      sel.style.marginLeft = '6px';
+      sel.title = 'Assign to tab';
+      chip.appendChild(sel);
+    }
+    sel.innerHTML = '';
+    for (const t of this.tabs) {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.label || t.id;
+      sel.appendChild(opt);
+    }
+    const cur = this._normalizeTabId(entryTabId || wrapper.dataset.tabId || this.activeTab || this.defaultTab);
+    sel.value = cur;
+    wrapper.dataset.tabId = cur;
+    sel.onchange = () => {
+      wrapper.dataset.tabId = this._normalizeTabId(sel.value);
+      this._applyActiveTab();
+      try { this._queueSave('tab-change'); } catch {}
+    };
+  }
+/* ------------------------------ Edit mode ------------------------------ */
       try { this._renderTabs(); this._applyActiveTab(); } catch {}
     }
   }
@@ -2224,6 +2877,8 @@ if (this.__ddcOnWinResize) {
       const oy = this.__lastHoldY ?? null;
       this._playEditRipple(ox, oy);
     }
+  
+    try { this._applyHaChromeVisibility_?.(); } catch {}
   
     try { this._applyHaChromeVisibility_?.(); } catch {}
   }
@@ -2702,6 +3357,7 @@ _syncEmptyStateUI() {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper');
     wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+    wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
     if (this.editMode) wrap.classList.add('editing');
     if (!wrap.style.zIndex) wrap.style.zIndex = String(this._highestZ() + 1);
 
@@ -2724,6 +3380,9 @@ _syncEmptyStateUI() {
         <ha-icon icon="mdi:close-thick"></ha-icon>
       </button>
     `;
+
+    // Tab selector UI
+    try { this._addTabSelectorToChip(wrap, wrap.dataset.tabId); } catch {}
 
     // Tab selector UI
     try { this._addTabSelectorToChip(wrap, wrap.dataset.tabId); } catch {}
@@ -2934,6 +3593,7 @@ _syncEmptyStateUI() {
     const realCards = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
     if (realCards.length === 0) this._showEmptyPlaceholder();
         this._applyAutoScale?.();
+        this._applyAutoScale?.();
     this._syncEmptyStateUI();
   }
 
@@ -2964,6 +3624,125 @@ _syncEmptyStateUI() {
     el.setAttribute('data-x-raw', String(nx));
     el.setAttribute('data-y-raw', String(ny));
   }
+  
+
+  // --- Auto-scale helpers (only active when auto_resize_cards === true) ---
+  _computeDesignSize() {
+    const c = this.cardContainer; if (!c) return { w: 1, h: 1 };
+    // If fixed sizing is enabled, use those dimensions as design space
+    if (this._isContainerFixed()) {
+      const { w, h } = this._resolveFixedSize();
+      return { w: Math.max(1, w), h: Math.max(1, h) };
+    }
+    // Otherwise compute from content extents similar to _resizeContainer
+    let maxX = 0, maxY = 0;
+    const cards = Array.from(c.querySelectorAll('.card-wrapper'));
+    if (!cards.length) {
+      const rect = c.getBoundingClientRect();
+      return { w: Math.max(1, rect.width || 1), h: Math.max(1, rect.height || 1) };
+    }
+    for (const wEl of cards) {
+      const x = parseFloat(wEl.getAttribute('data-x-raw') || wEl.getAttribute('data-x') || '0') || 0;
+      const y = parseFloat(wEl.getAttribute('data-y-raw') || wEl.getAttribute('data-y') || '0') || 0;
+      const w = parseFloat(wEl.style.width)  || wEl.getBoundingClientRect().width  || 0;
+      const h = parseFloat(wEl.style.height) || wEl.getBoundingClientRect().height || 0;
+      const right  = x + w;
+      const bottom = y + h;
+      if (right  > maxX) maxX = right;
+      if (bottom > maxY) maxY = bottom;
+    }
+    // Round up to grid to avoid half pixels
+    const gw = Math.max(1, this.gridSize || 10);
+    maxX = Math.ceil(maxX / gw) * gw;
+    maxY = Math.ceil(maxY / gw) * gw;
+    return { w: Math.max(1, maxX), h: Math.max(1, maxY) };
+  }
+
+
+  /* -------------------- Live scale watcher (rAF fallback) -------------------- */
+  _startScaleWatch() {
+    if (!this.autoResizeCards) return;
+    if (this.__scaleRAF) return;
+    const tick = () => {
+      if (!this.autoResizeCards) { this.__scaleRAF = null; return; }
+      // Check host width; if changed, re-apply scaling
+      const rect = this.getBoundingClientRect();
+      const w = Math.max(1, rect.width || 0);
+      if (w !== this.__lastScaleW) {
+        this.__lastScaleW = w;
+        this._applyAutoScale?.();
+      }
+      this.__scaleRAF = requestAnimationFrame(tick);
+    };
+    this.__scaleRAF = requestAnimationFrame(tick);
+  }
+
+  _stopScaleWatch() {
+    if (this.__scaleRAF) {
+      try { cancelAnimationFrame(this.__scaleRAF); } catch {}
+      this.__scaleRAF = null;
+    }
+  }
+_applyAutoScale() {
+  const c = this.cardContainer; if (!c) return;
+
+  // Keep the wrapper in place
+  if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+
+  // If auto-resize is off, lock to 1 but still keep scaffold consistent
+  if (!this.autoResizeCards) {
+    // Design size should still reflect config (fixed/preset or content)
+    const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+    c.style.width  = `${d.w}px`;
+    c.style.height = `${d.h}px`;
+    c.style.transform = `scale(1)`;
+    c.style.transformOrigin = 'top left';
+    c.style.position = 'absolute';
+    c.style.top = '0';
+    c.style.left = '0';
+    if (this.__scaleOuter) {
+      // Use parent/host width for layout box so we don't force expansion
+      const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+                 (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+                 (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+                 this.offsetWidth || d.w;
+      this.__scaleOuter.style.width  = `${Math.max(1, pw)}px`;
+      this.__scaleOuter.style.height = `${Math.max(1, d.h)}px`;
+    }
+    return;
+  }
+
+  // Determine design size (prefer preset/fixed if configured)
+  const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+
+  // Measure available width from the *parent* (host column) first
+  const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+             (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+             (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+             this.offsetWidth || d.w;
+  const availableW = Math.max(1, pw);
+
+  // Fit & clamp (never upscale beyond native)
+  const scale = Math.min(availableW / Math.max(1, d.w), 1);
+
+  // Outer layout box follows host width and scaled height
+  if (this.__scaleOuter) {
+    this.__scaleOuter.style.width  = `${availableW}px`;
+    this.__scaleOuter.style.height = `${Math.max(1, d.h * scale)}px`;
+  }
+
+  // Inner canvas stays at design size and is visually scaled
+  c.style.width  = `${d.w}px`;
+  c.style.height = `${d.h}px`;
+  c.style.transform = `scale(${scale})`;
+  c.style.transformOrigin = 'top left';
+  c.style.position = 'absolute';
+  c.style.top = '0';
+  c.style.left = '0';
+}
+
+
+
   
 
   // --- Auto-scale helpers (only active when auto_resize_cards === true) ---
@@ -4039,6 +4818,7 @@ _applyAutoScale() {
     let yamlEditorApi = null;
     let visualEditor = null;
     let editor = null;
+    let editor = null;
     let pickSeq = 0; // stale-select guard
     let __previewTimer = null;
     let __lastPreviewCfgJSON = '';
@@ -4267,6 +5047,9 @@ _applyAutoScale() {
         await idle();
 
         const wantType = cfg.type || currentType;
+
+        editor = await this._getEditorElementForType(wantType, cfg);
+
 
         editor = await this._getEditorElementForType(wantType, cfg);
 
@@ -4791,6 +5574,8 @@ async _getStubConfigForType(type) {
         const cardCfg = this._extractCardConfig(w.firstElementChild);
         const tabId = w.dataset.tabId || this.defaultTab;
         return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
+        const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
       });
         const payload = {
             version: 2,
@@ -4826,6 +5611,9 @@ async _getStubConfigForType(type) {
                 this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
             wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
             this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
+            wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
+            this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
                 wrap.style.width = `${conf.size?.width||140}px`;
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
@@ -4836,6 +5624,7 @@ this._initCardInteract(wrap);
             }
           } else {
             this._showEmptyPlaceholder();
+        this._applyAutoScale?.();
         this._applyAutoScale?.();
           }
           this._resizeContainer();
@@ -4897,6 +5686,12 @@ this._initCardInteract(wrap);
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
           auto_resize_cards: !!this.autoResizeCards,
 };
+      tabs: this.tabs,
+      tabs_position: this.tabsPosition,
+      default_tab: this.defaultTab,
+      hide_tabs_when_single: !!this.hideTabsWhenSingle,
+          auto_resize_cards: !!this.autoResizeCards,
+};
     // strip undefined to keep files tidy
     Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
     return opt;
@@ -4945,6 +5740,14 @@ this._initCardInteract(wrap);
     }
 
 
+    
+    if ('auto_resize_cards' in opts) {
+      this.autoResizeCards = !!opts.auto_resize_cards;
+      if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+      this._applyAutoScale?.();
+    }
+
+
 
     // reflect to CSS
     this.style.setProperty('--ddc-bg', this.containerBackground);
@@ -4954,8 +5757,11 @@ this._initCardInteract(wrap);
     if (recalc) {
       this._applyContainerSizingFromConfig(true);
       this._applyAutoScale?.();
+      this._applyAutoScale?.();
       this._resizeContainer();
       this._updateStoreBadge?.();
+      this._applyAutoScale?.();
+
       this._applyAutoScale?.();
 
     }
@@ -4967,12 +5773,16 @@ this._initCardInteract(wrap);
     );
     const saved = wraps.map((w) => { // DDC tabs
         
+    const saved = wraps.map((w) => { // DDC tabs
+        
       const x = parseFloat(w.getAttribute('data-x')) || 0;
       const y = parseFloat(w.getAttribute('data-y')) || 0;
       const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
       const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
+      const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
       const tabId = w.dataset.tabId || this.defaultTab;
         return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
     });
@@ -5014,6 +5824,9 @@ _importDesign() {
     'container_preset','container_preset_orientation',
     'tabs','tabs_position','default_tab','hide_tabs_when_single',
     'card_mod','storage_key'
+    'container_preset','container_preset_orientation',
+    'tabs','tabs_position','default_tab','hide_tabs_when_single',
+    'card_mod','storage_key'
   ];
   // ----------------------------------
 
@@ -5021,10 +5834,45 @@ _importDesign() {
     const file = inp.files?.[0]; if (!file) return;
     const txt = await file.text();
 
+
     try {
       const json = JSON.parse(txt);
       const prevStorageKey = this.storageKey || this._config?.storage_key || null;
+      const prevStorageKey = this.storageKey || this._config?.storage_key || null;
 
+      // -------- BACK-COMPAT: synthesize tabs if missing in older exports --------
+      const hasOptionsTabs = !!(json.options && Array.isArray(json.options.tabs));
+      const hasCardTabIds  = Array.isArray(json.cards) && json.cards.some(c => c?.tabId || c?.tab_id);
+
+      // Build a compatible tabs list:
+      // 1) If options.tabs exist, use them.
+      // 2) Else if cards have tabIds, synthesize from distinct ids.
+      // 3) Else create a single default tab.
+      let compatTabs = [];
+      if (hasOptionsTabs) {
+        compatTabs = json.options.tabs;
+      } else if (hasCardTabIds) {
+        const uniq = Array.from(new Set(json.cards.map(c => c?.tabId || c?.tab_id).filter(Boolean)));
+        compatTabs = uniq.map(id => ({ id, label: id }));
+      } else {
+        compatTabs = [{ id: 'default', label: 'Layout' }];
+      }
+
+      const compatTabsPosition = (json.options?.tabs_position === 'left')
+        ? 'left'
+        : (this.tabsPosition || 'top');
+
+      const compatDefaultTab =
+        json.options?.default_tab
+        || (compatTabs[0]?.id || 'default');
+
+      const compatHideSingle =
+        (json.options?.hide_tabs_when_single !== undefined)
+          ? !!json.options.hide_tabs_when_single
+          : true;
+      // -------------------------------------------------------------------------
+
+      // ---- APPLY OPTIONS (with hard-replace or merge) ----
       // -------- BACK-COMPAT: synthesize tabs if missing in older exports --------
       const hasOptionsTabs = !!(json.options && Array.isArray(json.options.tabs));
       const hasCardTabIds  = Array.isArray(json.cards) && json.cards.some(c => c?.tabId || c?.tab_id);
@@ -5072,6 +5920,7 @@ _importDesign() {
           }
 
           // 2) clear any previously-applied DOM styles that could linger
+          // 2) clear any previously-applied DOM styles that could linger
           try {
             if (this.cardContainer) {
               this.cardContainer.style.background = '';
@@ -5113,8 +5962,18 @@ _importDesign() {
         HARD_REPLACE
           ? (this._config = { ...(this._config||{}), ...imported })
           : this._applyImportedOptions(imported, true);
+        HARD_REPLACE
+          ? (this._config = { ...(this._config||{}), ...imported })
+          : this._applyImportedOptions(imported, true);
         this.requestUpdate?.();
       }
+
+      // Ensure instance tab options exist even for old files (after options applied)
+      if (!Array.isArray(this.tabs) || !this.tabs.length) this.tabs = compatTabs;
+      if (!this.tabsPosition) this.tabsPosition = compatTabsPosition;
+      if (!this.defaultTab) this.defaultTab = compatDefaultTab;
+      if (this.hideTabsWhenSingle === undefined) this.hideTabsWhenSingle = compatHideSingle;
+      this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
 
       // Ensure instance tab options exist even for old files (after options applied)
       if (!Array.isArray(this.tabs) || !this.tabs.length) this.tabs = compatTabs;
@@ -5126,6 +5985,8 @@ _importDesign() {
       // ---- PERSIST IMPORTED OPTIONS TO YAML (replace semantics) ----
       try {
         const targetKey = this._config?.storage_key || this.storageKey || null;
+
+        // Start from what the file had (v2) or v1 fallback
 
         // Start from what the file had (v2) or v1 fallback
         const importedOptions = json.options
@@ -5144,11 +6005,27 @@ _importDesign() {
         };
 
         // Unless you want to adopt the incoming storage_key, drop it
+
+        // Ensure tabs keys are present (either from file or from current instance state)
+        const persistOptions = {
+          ...importedOptions,
+          tabs: importedOptions.tabs ?? this.tabs ?? [],
+          tabs_position: importedOptions.tabs_position ?? this.tabsPosition ?? 'top',
+          default_tab: importedOptions.default_tab
+            ?? this.defaultTab
+            ?? ((importedOptions.tabs?.[0]?.id) || (this.tabs?.[0]?.id) || 'default'),
+          hide_tabs_when_single:
+            importedOptions.hide_tabs_when_single ?? (this.hideTabsWhenSingle ?? true),
+        };
+
+        // Unless you want to adopt the incoming storage_key, drop it
         if (!ADOPT_IMPORTED_STORAGE_KEY) delete persistOptions.storage_key;
 
         if (!targetKey) {
           console.warn('[ddc:import] No storage_key on this card; aborting YAML persist.');
+          console.warn('[ddc:import] No storage_key on this card; aborting YAML persist.');
         } else {
+          const result = await this._persistOptionsToYaml?.(persistOptions, {
           const result = await this._persistOptionsToYaml?.(persistOptions, {
             forceTargetKey: String(targetKey),
             noDownload: true,
@@ -5157,7 +6034,23 @@ _importDesign() {
           });
           const yamlOk = !!(result && result.yamlSaved);
           console.debug?.('[ddc:import] YAML persist result:', yamlOk);
+          console.debug?.('[ddc:import] YAML persist result:', yamlOk);
         }
+
+        // SAFETY NET: push tabs into the live card config (so the UI editor/YAML reflects it immediately)
+        try {
+          const cfg = { type: 'custom:drag-and-drop-card', ...(this._config || {}) };
+          cfg.tabs = persistOptions.tabs;
+          cfg.tabs_position = persistOptions.tabs_position;
+          cfg.default_tab = persistOptions.default_tab;
+          cfg.hide_tabs_when_single = !!persistOptions.hide_tabs_when_single;
+
+          this.dispatchEvent(new CustomEvent('config-changed', {
+            detail: { config: cfg },
+            bubbles: true,
+            composed: true,
+          }));
+        } catch {}
 
         // SAFETY NET: push tabs into the live card config (so the UI editor/YAML reflects it immediately)
         try {
@@ -5180,6 +6073,7 @@ _importDesign() {
       // ---- BUILD CARDS ----
       this.cardContainer.innerHTML = '';
       if (Array.isArray(json.cards) && json.cards.length) {
+      if (Array.isArray(json.cards) && json.cards.length) {
         for (const conf of json.cards) {
           const x = conf.position?.x || 0;
           const y = conf.position?.y || 0;
@@ -5188,7 +6082,17 @@ _importDesign() {
           const z = conf.z;
           const tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
 
+          const x = conf.position?.x || 0;
+          const y = conf.position?.y || 0;
+          const w = conf.size?.width  || 140;
+          const h = conf.size?.height || 100;
+          const z = conf.z;
+          const tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
+
           if (!conf?.card || (typeof conf.card === 'object' && !Object.keys(conf.card).length)) {
+            // placeholder still respects tab
+            const p = this._makePlaceholderAt(x, y, w, h);
+            p.dataset.tabId = tabId;
             // placeholder still respects tab
             const p = this._makePlaceholderAt(x, y, w, h);
             p.dataset.tabId = tabId;
@@ -5204,17 +6108,38 @@ _importDesign() {
           wrap.style.height = `${h}px`;
           if (z != null) wrap.style.zIndex = String(z);
           this.cardContainer.appendChild(wrap);
+            continue;
+          }
 
+          const el = await this._createCard(conf.card);
+          const wrap = this._makeWrapper(el);
+          wrap.dataset.tabId = tabId;
+          this._setCardPosition(wrap, x, y);
+          wrap.style.width  = `${w}px`;
+          wrap.style.height = `${h}px`;
+          if (z != null) wrap.style.zIndex = String(z);
+          this.cardContainer.appendChild(wrap);
+
+          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+          this._initCardInteract(wrap);
           try { this._rebuildOnce(wrap.firstElementChild); } catch {}
           this._initCardInteract(wrap);
         }
       } else {
         this._showEmptyPlaceholder();
         this._applyAutoScale?.();
+        this._applyAutoScale?.();
       }
 
       // apply container sizing/appearance and refresh tabs UI now that cards exist
+      // apply container sizing/appearance and refresh tabs UI now that cards exist
       this._applyOptionsToDom?.(this._config);
+      this._resizeContainer();
+      try {
+        this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+        this._renderTabs?.();
+        this._applyActiveTab?.();
+      } catch {}
       this._resizeContainer();
       try {
         this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
@@ -5227,20 +6152,27 @@ _importDesign() {
         if (this._saveTimer) clearTimeout(this._saveTimer);
         await this._saveLayout(true);  // NOTE: ensure _saveLayout returns {…, tabId} per card
         this._toast?.('Design imported & saved. Reloading...');
+        await this._saveLayout(true);  // NOTE: ensure _saveLayout returns {…, tabId} per card
+        this._toast?.('Design imported & saved. Reloading...');
         window.location.reload();
       } catch (e) {
         console.warn('[ddc:import] saveLayout failed', e);
+        this._markDirty?.('import');
+        this._toast?.('Design imported — click Apply to save.');
         this._markDirty?.('import');
         this._toast?.('Design imported — click Apply to save.');
       }
     } catch (e) {
       console.error('Import failed', e);
       this._toast?.('Import failed — invalid file.');
+      this._toast?.('Import failed — invalid file.');
     }
   };
 
+
   inp.click();
 }
+
 
 
   
@@ -5391,6 +6323,8 @@ _importDesign() {
       const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
+      const tabId = w.dataset.tabId || this.defaultTab;
+        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
       const tabId = w.dataset.tabId || this.defaultTab;
         return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
     });
