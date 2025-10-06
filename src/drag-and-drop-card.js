@@ -1495,12 +1495,12 @@ _applyGridVars() {
         /* Tabs bar (transparent, no backdrop; fills width) */
         .ddc-tabs{
           position: relative;
-          display: flex;
+          display: flex; flex-wrap: wrap;
           align-items: flex-end; /* Chrome-like baseline */
           gap: clamp(2px, 1vw, 8px);
           padding: clamp(4px, 1.2vw, 10px) clamp(6px, 2vw, 12px);
           width: 100%;
-          overflow-x: auto;
+          overflow-x: hidden;
           overflow-y: hidden;
           -webkit-overflow-scrolling: touch;
           scroll-snap-type: x proximity;
@@ -1533,8 +1533,8 @@ _applyGridVars() {
           cursor: pointer;
 
           /* fill width but remain scrollable when crowded */
-          flex: 1 1 clamp(120px, 18vw, 280px);
-          min-width: clamp(120px, 18vw, 280px);
+          flex: 1 1 clamp(120px, 18%, 280px);
+          min-width: clamp(120px, 18%, 280px);
           max-width: 100%;
           scroll-snap-align: start;
 
@@ -1618,8 +1618,8 @@ _applyGridVars() {
         @media (max-width: 640px){
           .ddc-tabs{ gap: 4px; padding: 6px 8px; }
           .ddc-tab{
-            flex: 1 1 clamp(96px, 34vw, 200px);
-            min-width: clamp(96px, 34vw, 200px);
+            flex: 1 1 clamp(96px, 34%, 200px);
+            min-width: clamp(96px, 34%, 200px);
             padding: 6px 10px;
             font-size: clamp(11px, 3.4vw, 13px);
           }
