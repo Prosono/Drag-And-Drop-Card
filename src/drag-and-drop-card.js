@@ -285,7 +285,19 @@ _applyHaChromeVisibility_() {
 
       this._setCardPosition?.(w2, x, y);
       w2.style.zIndex = String((this._highestZ?.() || 0) + 1);
+        // Preserve the tab assignment from the original wrapper. Without this,
+        // duplicates incorrectly end up in the currently active tab instead of
+        // inheriting the source tab. See: https://github.com/owner/repo/issues/XYZ
+        try {
+          const tid = t.dataset?.tabId;
+          if (tid) w2.dataset.tabId = tid;
+        } catch {}
+
       this.cardContainer?.appendChild(w2);
+        // When duplicating we need to wire up a tab selector for the new
+        // wrapper so that the user can reassign it later. Passing the
+        // inherited tab ensures the selector defaults correctly.
+        try { this._addTabSelectorToChip?.(w2, w2.dataset.tabId); } catch {}
       try { this._rebuildOnce?.(w2.firstElementChild); } catch {}
       try { this._initCardInteract?.(w2); } catch {}
     } catch {}
@@ -335,6 +347,51 @@ _applyHaChromeVisibility_() {
   try { this._resizeContainer?.(); } catch {}
   try { this._queueSave?.('nudge'); } catch {}
 }
+
+  /**
+   * Synchronise the width of the tabs bar with the visible width of the card
+   * container. When the auto-scaling logic shrinks the canvas, the tabs
+   * should shrink too rather than spanning the entire host width. This
+   * helper queries the scale wrapper (if present) or falls back to the
+   * container itself to derive the actual visual width and applies it
+   * directly to the tabs bar. For vertical (left) tabs we reset any
+   * widths to allow the rail to size naturally.
+   */
+  _syncTabsWidth_() {
+    try {
+      const bar = this.tabsBar;
+      if (!bar) return;
+      // For left-side tabs the width should not be clamped; reset and bail.
+      if (this.tabsPosition === 'left') {
+        bar.style.width = '';
+        bar.style.maxWidth = '';
+        return;
+      }
+      // Determine the element representing the visible card canvas. We use
+      // the bounding box of the card container itself rather than the
+      // outer scaling wrapper. The container has the transform applied to
+      // it, so getBoundingClientRect() returns the actual visible width.
+      const ref = this.cardContainer || this.__scaleOuter;
+      if (!ref) return;
+      let width = 0;
+      try {
+        const rect = ref.getBoundingClientRect();
+        width = rect && rect.width ? rect.width : 0;
+      } catch {}
+      // Fallback: if the container hasn't been laid out yet, try the scale
+      // wrapper. This can happen very early in the lifecycle.
+      if (width <= 0 && this.__scaleOuter && this.__scaleOuter !== ref) {
+        try {
+          const rect2 = this.__scaleOuter.getBoundingClientRect();
+          width = rect2 && rect2.width ? rect2.width : 0;
+        } catch {}
+      }
+      if (width > 0) {
+        bar.style.width = `${width}px`;
+        bar.style.maxWidth = `${width}px`;
+      }
+    } catch {}
+  }
 
 
   _isTypingTarget_(t) {
@@ -1292,7 +1349,7 @@ _applyGridVars() {
           /* modal */
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
           .dialog{
-            width:min(1220px,96vw);max-height:min(90vh, 900px);display:flex;flex-direction:column;
+            width:min(1220px,96%);max-height:min(90vh, 900px);display:flex;flex-direction:column;
             background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
           }
           .dlg-head{
@@ -1307,12 +1364,46 @@ _applyGridVars() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
-          #leftPane{border-right:1px solid var(--divider-color);overflow:auto;background:var(--primary-background-color);contain:content}
-          #rightPane{overflow:hidden;background:var(--primary-background-color)}
+          #leftPane{
+            border-right:1px solid var(--divider-color);
+            overflow:auto;
+            background:var(--primary-background-color);
+            /*
+             * Remove contain:content so that fixed-position menus from
+             * custom card editors can correctly position themselves
+             * relative to the viewport. CSS containment can interfere
+             * with anchoring of overlays.
+             */
+            contain:none;
+          }
+          /*
+           * Allow content like dropdown menus from custom card editors to
+           * overflow the right pane without being clipped. Using overflow
+           * visible instead of hidden prevents menus from being positioned
+           * far away or requiring excessive scrolling when they open.
+           */
+          #rightPane{
+            /* Allow the right-hand editor pane to scroll vertically when
+             * content from custom card editors exceeds the available space.
+             * We hide horizontal overflow to avoid layout shifts. */
+            overflow-y:auto;
+            overflow-x:hidden;
+            background:var(--primary-background-color);
+          }
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
           }
-          .sec{border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color);overflow:visible;position:relative;contain:content;}
+          .sec{
+            border:1px solid var(--divider-color);
+            border-radius:12px;
+            background:var(--card-background-color);
+            overflow:visible;
+            position:relative;
+            /* Remove content containment on sections to prevent the
+             * creation of an artificial containing block which can
+             * disrupt dropdown positioning. */
+            contain:none;
+          }
           .sec .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--divider-color);font-weight:600;position: relative;z-index: 10}
           .sec .bd{padding:12px;overflow:visible}       
           .tabs{display:flex;gap:6px;margin-left:auto}
@@ -1322,23 +1413,47 @@ _applyGridVars() {
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
           .cm-editor{height: 100%}
-          /* --- FIX: YAML editor should scroll and not overflow --- */
-          #yamlSec { min-height: 0; height: 700px !important; }
-          #yamlSec .bd { 
-            overflow: auto;        /* allow scrolling inside the YAML section */
+          /* --- FIX: YAML/Visual editor: ensure the entire content is visible --- */
+          /*
+           * The YAML editor previously had a fixed height which caused the
+           * bottom of longer configurations to be clipped. Removing the fixed
+           * height allows the section to flex based on available space within
+           * the grid row. A min-height of zero lets it collapse when there
+           * isn't much content, while overflow:auto enables scrolling when
+           * content exceeds the visible area.
+           */
+          #yamlSec {
+            min-height: 0;
+            height: auto !important;
+            overflow: auto;
+          }
+          #yamlSec .bd {
             /* allow the YAML editor to use the full available space instead of a fixed max height */
+            overflow: auto;
             max-height: none;
+            /* Fill the available grid row height (1fr) so that scrolling
+             * happens inside this section rather than expanding the editor
+             * beyond the modal boundary. A min-height of zero ensures the
+             * section can shrink when little content is present. */
             height: 100%;
+            min-height: 0;
           }
           /* --- make Visual editor area scrollable, like YAML --- */
-          #optionsSec { min-height: 0; overflow: auto;}
+          #optionsSec {
+            min-height: 0;
+            overflow: auto;
+          }
           #optionsSec .bd {
             position: relative;
             overflow: auto;
             height: auto;
-            max-height: 100%;
+            max-height: none;
+            min-height: 0;
           }
-          #editorHost { display:block; min-height: 0; }
+          #editorHost {
+            display: block;
+            min-height: 0;
+          }
 
           #quickFillSec { 
             display: flex; 
@@ -1350,13 +1465,20 @@ _applyGridVars() {
             max-height: 320px;       /* keep it contained; tweak as you wish */
           }
 
-          /* ha-code-editor / CodeMirror height: fixed and scroll inside */
-          ha-code-editor { 
-            display: block; 
-            height: 260px !important; 
+          /* ha-code-editor / CodeMirror height: allow growth but set a sensible minimum
+           * so that very short snippets don't collapse. Using min-height
+           * instead of a fixed height allows the editor to expand when the
+           * parent container grows. The !important flag ensures that the
+           * component’s inline styles from HA won’t override this sizing.
+           */
+          ha-code-editor {
+            display: block;
+            min-height: 260px;
+            height: auto !important;
           }
-          .CodeMirror { 
-            height: 260px !important; 
+          .CodeMirror {
+            min-height: 260px;
+            height: auto !important;
           }
 
           /* host that wraps the editor should also allow scroll if content grows */
@@ -1497,8 +1619,8 @@ _applyGridVars() {
           position: relative;
           display: flex; flex-wrap: wrap;
           align-items: flex-end; /* Chrome-like baseline */
-          gap: clamp(2px, 1vw, 8px);
-          padding: clamp(4px, 1.2vw, 10px) clamp(6px, 2vw, 12px);
+          gap: 6px;
+          padding: 6px 10px;
           width: 100%;
           overflow-x: hidden;
           overflow-y: hidden;
@@ -1525,9 +1647,9 @@ _applyGridVars() {
           align-items: center;
           justify-content: center;             /* 1) center content */
           text-align: center;                  /* 1) center label text */
-          gap: clamp(6px, 1.2vw, 10px);
-          padding: clamp(6px, 1.2vw, 10px) clamp(10px, 2vw, 14px);
-          font: 500 clamp(12px, 2.8vw, 14px)/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+          gap: 8px;
+          padding: 8px 12px;
+          font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
           letter-spacing: .2px;
           color: color-mix(in oklab, var(--primary-text-color) 75%, #000 0%);
           cursor: pointer;
@@ -1621,7 +1743,7 @@ _applyGridVars() {
             flex: 1 1 clamp(96px, 34%, 200px);
             min-width: clamp(96px, 34%, 200px);
             padding: 6px 10px;
-            font-size: clamp(11px, 3.4vw, 13px);
+            font-size: 12px;
           }
           .ddc-tab::after{ left: 8px; right: 8px; }
         }
@@ -1631,7 +1753,7 @@ _applyGridVars() {
           display:flex;
           flex-direction:column;
           align-items: stretch;
-          width: clamp(150px, 28vw, 220px);
+          width: clamp(150px, 28%, 220px);
           padding: 8px 6px;
           gap: 6px;
           overflow-y: auto;
@@ -2126,6 +2248,12 @@ if (this.__ddcOnWinResize) {
     if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
   
     try { this._updateTabsA11y_?.(); } catch {}
+
+    // After rendering tabs, ensure the bar width matches the visible
+    // card container width (scaled or unscaled). Without syncing the width,
+    // the tabs could stretch to the full page width instead of aligning
+    // with the drag-and-drop container.
+    try { this._syncTabsWidth_?.(); } catch {}
   }
   _applyActiveTab() {
     const current = this._normalizeTabId(this.activeTab);
@@ -2757,7 +2885,18 @@ _syncEmptyStateUI() {
           const y = (parseFloat(t.getAttribute('data-y')) || 0) + this.gridSize;
           this._setCardPosition(w2, x, y);
           w2.style.zIndex = String(this._highestZ() + 1);
+          // Preserve the tab assignment from the original wrapper so that
+          // duplicates appear in the correct tab rather than defaulting to
+          // the currently active tab. See bug #3.
+          try {
+            const tid = t.dataset?.tabId;
+            if (tid) w2.dataset.tabId = tid;
+          } catch {}
           this.cardContainer.appendChild(w2);
+          // Attach a tab selector to the duplicated wrapper so the user can
+          // reassign it later; pass the current tab so the selector defaults
+          // correctly.
+          try { this._addTabSelectorToChip?.(w2, w2.dataset.tabId); } catch {}
           try { this._rebuildOnce(w2.firstElementChild); } catch {}
           this._initCardInteract(w2);
         }
@@ -3053,6 +3192,9 @@ _applyAutoScale() {
       this.__scaleOuter.style.width  = `${Math.max(1, pw)}px`;
       this.__scaleOuter.style.height = `${Math.max(1, d.h)}px`;
     }
+    // When not scaling cards, still ensure the tabs bar width matches the
+    // container width. This prevents the bar from overflowing the card.
+    try { this._syncTabsWidth_?.(); } catch {}
     return;
   }
 
@@ -3083,6 +3225,9 @@ _applyAutoScale() {
   c.style.position = 'absolute';
   c.style.top = '0';
   c.style.left = '0';
+
+  // After scaling, synchronise the tabs width with the new visual size.
+  try { this._syncTabsWidth_?.(); } catch {}
 }
 
 
@@ -3107,6 +3252,11 @@ _applyAutoScale() {
     });
     c.style.width  = `${Math.ceil(maxX/this.gridSize)*this.gridSize || 100}px`;
     c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
+
+    // Whenever the container size changes in dynamic mode, update the tabs bar
+    // width so it remains aligned with the container. If the scale wrapper
+    // recalculates later the call in _applyAutoScale will also update this.
+    try { this._syncTabsWidth_?.(); } catch {}
   }
   
   /**
@@ -3868,11 +4018,9 @@ _applyAutoScale() {
     // Hide the quick fill section entirely so the editor can use the full height.
     const quickFillSecDiv = modal.querySelector('#quickFillSec');
     if (quickFillSecDiv) quickFillSecDiv.style.display = 'none';
-    // Reposition the options and YAML sections upward now that quick fill is hidden
-    const optionsSecDiv = modal.querySelector('#optionsSec');
-    const yamlSecDiv = modal.querySelector('#yamlSec');
-    if (optionsSecDiv) optionsSecDiv.style.gridRow = '1';
-    if (yamlSecDiv) yamlSecDiv.style.gridRow = '2';
+    // Do not reposition the options and YAML sections. The original
+    // grid-template-rows assigns a flexible row (1fr) to the YAML section,
+    // allowing it to scroll instead of forcing the entire editor to grow.
 
     // Set up a header in the editor for showing the selected card and a star to
     // favorite the current card.  We create the elements once and update them
@@ -4724,7 +4872,7 @@ async _getStubConfigForType(type) {
     ).join('');
 
     modal.innerHTML = `
-      <div class="dialog" style="max-width:1100px;width:min(1100px,95vw);height:min(90vh,860px)">
+      <div class="dialog" style="max-width:1100px;width:min(1100px,95%);height:min(90vh,860px)">
         <div class="dlg-head">
           <h3>Drag & Drop — Diagnostics</h3>
           <button class="btn secondary" id="closeDiag"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Close</span></button>
