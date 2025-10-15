@@ -5256,7 +5256,13 @@ _applyAutoScale() {
           del.addEventListener('click', (ev) => {
             // Prevent the click from bubbling to parent elements (which may lock the editor)
             ev.preventDefault();
-            ev.stopPropagation();
+            // Use stopImmediatePropagation to prevent other handlers on the same
+            // element from firing, ensuring this removal logic runs only once.
+            if (typeof ev.stopImmediatePropagation === 'function') {
+              ev.stopImmediatePropagation();
+            } else {
+              ev.stopPropagation();
+            }
             // Remove the correct condition using indexOf on the current list. This
             // avoids relying on the stale idx value.
             const index = visList.indexOf(cond);
@@ -5264,8 +5270,13 @@ _applyAutoScale() {
               visList.splice(index, 1);
             }
             currentConfig.visibility = visList;
-            render();
-            updateConfig();
+            // Delay update/render slightly to ensure concurrent input handlers
+            // finish executing before the configuration is mutated.  This
+            // prevents the removed condition from being re-added.
+            setTimeout(() => {
+              render();
+              updateConfig();
+            }, 0);
           });
           headerDiv.appendChild(del);
           row.appendChild(headerDiv);
@@ -5415,13 +5426,15 @@ _applyAutoScale() {
                 stInput.value = (cond.state_not != null ? cond.state_not : cond.state) || '';
                 stInput.setAttribute('label', '');
                 stInput.addEventListener('input', (ev) => {
-                  // Update the state value immediately.  Stop propagation so the
+                  // Update the state value immediately. Stop propagation so the
                   // card editor does not misinterpret the input as a click
-                  // outside the field.  Updating on each keystroke mirrors
-                  // the behaviour of numeric state conditions.
+                  // outside the field.  Ensure only one of state/state_not
+                  // exists at a time.
                   ev.stopPropagation();
                   const key = opSel.value;
                   cond[key] = stInput.value;
+                  const other = key === 'state' ? 'state_not' : 'state';
+                  delete cond[other];
                   updateConfig();
                 });
               } else {
@@ -5440,10 +5453,12 @@ _applyAutoScale() {
                 stInput.addEventListener('input', (ev) => {
                   // Mirror numeric state behaviour: update immediately on each
                   // keystroke and stop propagation so parent controls remain
-                  // responsive.
+                  // responsive.  Ensure only one of state/state_not exists.
                   ev.stopPropagation();
                   const key = opSel.value;
                   cond[key] = stInput.value;
+                  const other = key === 'state' ? 'state_not' : 'state';
+                  delete cond[other];
                   updateConfig();
                 });
               }
@@ -5892,7 +5907,11 @@ _applyAutoScale() {
           rm.addEventListener('click', (ev) => {
             // Prevent default and stop propagation so the click does not get swallowed
             ev.preventDefault();
-            ev.stopPropagation();
+            if (typeof ev.stopImmediatePropagation === 'function') {
+              ev.stopImmediatePropagation();
+            } else {
+              ev.stopPropagation();
+            }
             // Locate this condition in its parent list and remove it. Using
             // indexOf ensures we remove the correct object even if indices
             // shift due to other operations.
@@ -5900,8 +5919,14 @@ _applyAutoScale() {
             if (index > -1) {
               parentList.splice(index, 1);
             }
-            updateConfig();
-            render();
+            // Delay update/render to allow other event handlers (e.g. input
+            // changes) to complete.  Without this delay, concurrent
+            // value-changed handlers may re-add the condition before it's
+            // removed.
+            setTimeout(() => {
+              updateConfig();
+              render();
+            }, 0);
           });
           header.appendChild(rm);
           row.appendChild(header);
@@ -5961,10 +5986,9 @@ _applyAutoScale() {
                 // Listen for changes when the element is ready.  The event
                 // listener will still fire once upgraded.
                 ent.addEventListener('value-changed', (ev) => {
-                  // Update the selected entity.  Stop propagation so the
-                  // condition can be removed cleanly without triggering other
-                  // listeners in the card editor.
-                  ev.stopPropagation();
+                  // Update the selected entity.  Do not stop propagation here
+                  // so that other click handlers (like remove) continue to work
+                  // properly.  This mirrors the behaviour of numeric state.
                   cond.entity = ev.detail.value || '';
                   updateConfig();
                 });
@@ -6039,9 +6063,12 @@ _applyAutoScale() {
                 st.addEventListener('input', (ev) => {
                     // Mirror numeric state behaviour: update on each keystroke
                     // and stop propagation so parent controls remain responsive.
+                    // Ensure only one of state/state_not exists.
                     ev.stopPropagation();
                     const key = op.value;
                     cond[key] = st.value;
+                    const other = key === 'state' ? 'state_not' : 'state';
+                    delete cond[other];
                     updateConfig();
                   });
                 } else {
@@ -6060,9 +6087,12 @@ _applyAutoScale() {
                   st.addEventListener('input', (ev) => {
                     // Mirror numeric state behaviour: update immediately on
                     // input and stop propagation so the event does not bubble.
+                    // Ensure only one of state/state_not exists at a time.
                     ev.stopPropagation();
                     const key = op.value;
                     cond[key] = st.value;
+                    const other = key === 'state' ? 'state_not' : 'state';
+                    delete cond[other];
                     updateConfig();
                   });
                 }
