@@ -177,7 +177,7 @@ _applyHaChromeVisibility_() {
 
 
 
-  _applyBackgroundImageFromConfig() {
+_applyBackgroundImageFromConfig() {
   const cfg = this._config || {};
   const bg = cfg.background_image || cfg.bg_image || null;
   const cont = this.cardContainer;
@@ -209,6 +209,126 @@ _applyHaChromeVisibility_() {
     cont.style.removeProperty('--ddc-bg-attachment');
     cont.style.removeProperty('--ddc-bg-filter');
     cont.classList.remove('has-bg-image');
+  }
+}
+
+/**
+ * Evaluate an array of visibility conditions against the current hass state.
+ * Returns true if the card should be shown. Conditions follow the same
+ * structure as Home Assistant’s per‑card visibility settings. Only a subset
+ * of condition types are supported: state, numeric_state, screen and user.
+ * Unknown condition types are treated as passing.
+ *
+ * @param {Array} visList Array of condition objects
+ * @returns {boolean} true if all conditions evaluate to true, otherwise false
+ */
+_evaluateVisibility_(visList) {
+  try {
+    const hass = this.hass || this._hass;
+    // If no conditions defined, always visible
+    if (!Array.isArray(visList) || visList.length === 0) return true;
+    /**
+     * Recursively evaluate a single condition or a group of conditions.  The
+     * visibility editor supports nested groups (and/or) as well as leaf
+     * conditions such as state, numeric_state, screen and user.  Unknown
+     * condition types default to passing.
+     *
+     * @param {Object} cond A visibility condition or group
+     * @returns {boolean} true if the condition/group passes
+     */
+    const evalCond = (cond) => {
+      if (!cond || typeof cond !== 'object') return true;
+      const type = cond.condition || cond.type || 'state';
+      // Group: AND / OR
+      if (type === 'and' || type === 'or') {
+        const children = Array.isArray(cond.conditions) ? cond.conditions : [];
+        // Empty group passes by default
+        if (children.length === 0) return true;
+        if (type === 'and') {
+          return children.every((child) => evalCond(child));
+        }
+        // type === 'or'
+        return children.some((child) => evalCond(child));
+      }
+      if (type === 'state') {
+        const entity = cond.entity;
+        if (!entity) return true;
+        const stateObj = hass?.states?.[entity];
+        if (!stateObj) return false;
+        const st = String(stateObj.state ?? '');
+        if (cond.state !== undefined) {
+          const target = Array.isArray(cond.state) ? cond.state : [cond.state];
+          return target.some((v) => String(v) === st);
+        }
+        if (cond.state_not !== undefined) {
+          const target = Array.isArray(cond.state_not) ? cond.state_not : [cond.state_not];
+          return !target.some((v) => String(v) === st);
+        }
+        // No state specified -> pass
+        return true;
+      }
+      if (type === 'numeric_state') {
+        const entity = cond.entity;
+        if (!entity) return true;
+        const stateObj = hass?.states?.[entity];
+        if (!stateObj) return false;
+        const val = parseFloat(stateObj.state);
+        if (isNaN(val)) return false;
+        if (cond.above !== undefined && !(val > Number(cond.above))) return false;
+        if (cond.below !== undefined && !(val < Number(cond.below))) return false;
+        return true;
+      }
+      if (type === 'screen') {
+        const mq = cond.media_query || cond.query;
+        if (!mq || typeof mq !== 'string') return true;
+        try { return window.matchMedia(mq).matches; } catch { return true; }
+      }
+      if (type === 'user') {
+        const users = Array.isArray(cond.users) ? cond.users : (cond.user ? [cond.user] : []);
+        if (!users.length) return true;
+        // In Home Assistant, hass.user?.id contains the current user ID
+        const uid = hass?.user?.id || hass?.user?.id || null;
+        if (!uid) return true;
+        return users.includes(uid);
+      }
+      // Unknown types pass
+      return true;
+    };
+    // Top-level list uses implicit AND semantics (all must pass)
+    return visList.every((c) => evalCond(c));
+  } catch (e) {
+    console.warn('[ddc:visibility] evaluate error', e);
+    return true;
+  }
+}
+
+/**
+ * Apply visibility conditions to all card wrappers. When not in edit mode,
+ * wrappers with conditions that evaluate to false are hidden by setting
+ * display: none; otherwise they are shown. Cards are always visible in
+ * edit mode. Call this after setting hass or updating card configs.
+ */
+_applyVisibility_() {
+  try {
+    const wraps = this.cardContainer?.children || [];
+    // Determine the currently active tab; normalize to an integer
+    const currentTabId = this._normalizeTabId(this.activeTab);
+    for (const wrap of wraps) {
+      if (!wrap || !wrap.firstElementChild) continue;
+      // Only apply visibility rules to wrappers belonging to the active tab.
+      // Leave wrappers on other tabs untouched so that _applyActiveTab can
+      // control their display property.
+      const tabId = this._normalizeTabId(wrap.dataset.tabId);
+      if (tabId !== currentTabId) {
+        continue;
+      }
+      const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+      const visList = cfg.visibility;
+      const shouldShow = this.editMode ? true : this._evaluateVisibility_(visList);
+      wrap.style.display = shouldShow ? '' : 'none';
+    }
+  } catch (e) {
+    console.warn('[ddc:visibility] apply error', e);
   }
 }
 
@@ -2050,6 +2170,11 @@ if (this.__ddcOnWinResize) {
         // Don't reprocess card_mod here - it will be handled by _processCardModOnce
       }
     }
+
+    // After updating hass on all cards, re‑evaluate visibility so that state
+    // conditions are applied when not editing. Visibility is not applied during
+    // edit mode so that all cards remain visible while editing.
+    try { this._applyVisibility_(); } catch {}
   }
   
   get hass() { return this._hass; }
@@ -2208,6 +2333,9 @@ if (this.__ddcOnWinResize) {
       this.__dirty = false;
       this._updateApplyBtn?.();
       try { this._renderTabs(); this._applyActiveTab(); } catch {}
+      // Reevaluate visibility after the layout has been built. Cards with
+      // visibility conditions will hide themselves when not in edit mode.
+      try { this._applyVisibility_(); } catch {}
     }
   }
 
@@ -2241,6 +2369,10 @@ if (this.__ddcOnWinResize) {
           try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
           this._applyActiveTab();
           this._renderTabs();
+          // Reapply visibility for the newly active tab. Visibility must be
+          // evaluated after switching tabs so cards with conditions are
+          // properly hidden when the tab becomes active.
+          try { this._applyVisibility_(); } catch {}
         }
       });
       bar.appendChild(btn);
@@ -2305,6 +2437,8 @@ if (this.__ddcOnWinResize) {
     sel.onchange = () => {
       wrapper.dataset.tabId = this._normalizeTabId(sel.value);
       this._applyActiveTab();
+      // Reapply visibility so conditions evaluate in the new tab context.
+      try { this._applyVisibility_(); } catch {}
       try { this._queueSave('tab-change'); } catch {}
     };
   }
@@ -3502,6 +3636,20 @@ _applyAutoScale() {
       }
     } catch {}
   
+    // Provide a bespoke visual editor for the built‑in Entity card.  The default
+    // `hui-entity-card-editor` often fails to load or throws errors in certain
+    // environments.  To avoid those problems, always supply our own simple
+    // entity editor when the type is exactly 'entity'.  This editor exposes the
+    // most common options (entity, name, icon, attribute, unit, state_color)
+    // through Home Assistant form elements.  See `_getEntityCardEditor` below.
+    if (typeof type === 'string' && type === 'entity') {
+      try {
+        return await this._getEntityCardEditor(cfg || {});
+      } catch (err) {
+        // fall through and attempt other editors if our custom one fails
+        console.warn('[ddc:editor] Custom entity editor failed', err);
+      }
+    }
     // We will compute the card class on demand when needed. Avoid keeping a reference
     // to a potentially undefined variable across different scopes.
     const getCardClass = async () => {
@@ -3531,11 +3679,43 @@ _applyAutoScale() {
     // 1) Static class-provided editor (preferred)
     try {
       const CardClass = await getCardClass();
-      if (CardClass && typeof CardClass.getConfigElement === 'function') {
-        const el = await CardClass.getConfigElement();
-        if (el) {
-          try { console.info('[ddc:editor] Found static class editor', { type }); } catch {}
-          return el;
+      if (CardClass) {
+        // First, attempt to use the classic getConfigElement
+        if (typeof CardClass.getConfigElement === 'function') {
+          const el = await CardClass.getConfigElement();
+          if (el) {
+            try { console.info('[ddc:editor] Found static class editor', { type }); } catch {}
+            return el;
+          }
+        }
+        // Next, attempt to use getConfigForm (introduced in 2022.3) to build a ha-form based editor
+        if (typeof CardClass.getConfigForm === 'function') {
+          try {
+            const formInfo = await CardClass.getConfigForm();
+            if (formInfo && formInfo.schema) {
+              // Ensure ha-form is defined before creating it
+              try { await customElements.whenDefined('ha-form'); } catch {}
+              const formEl = document.createElement('ha-form');
+              formEl.hass = this.hass;
+              // Clone schema to avoid accidental mutations
+              formEl.schema = Array.isArray(formInfo.schema) ? formInfo.schema.map((s) => ({ ...s })) : formInfo.schema;
+              // Use provided computeLabel/computeHelper if available
+              if (typeof formInfo.computeLabel === 'function') {
+                formEl.computeLabel = formInfo.computeLabel.bind(CardClass);
+              }
+              if (typeof formInfo.computeHelper === 'function') {
+                formEl.computeHelper = formInfo.computeHelper.bind(CardClass);
+              }
+              // Provide initial data (cfg) to the form. Spread to avoid mutation
+              formEl.data = { ...cfg };
+              // When the form value changes, fire a value-changed event compatible with our onChange handler
+              formEl.addEventListener('value-changed', (ev) => {
+                // event.detail.value contains the new config object
+              });
+              try { console.info('[ddc:editor] Generated form editor via getConfigForm', { type }); } catch {}
+              return formEl;
+            }
+          } catch {}
         }
       }
     } catch {}
@@ -3545,7 +3725,9 @@ _applyAutoScale() {
     // tag; instantiating them with invalid or empty configs causes errors (e.g.
     // "Entities must be specified"). For custom cards, we derive a stub config
     // to satisfy basic validation and then ask the instance for its editor.
-    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card' || type === 'entity')) {
+    // For custom cards and the custom placeholder, attempt instance-level editors. The 'entity' card is no longer
+    // treated as a custom card here since HA may provide a built-in form via getConfigForm.
+    if (typeof type === 'string' && (type.startsWith('custom:') || type === 'custom_card')) {
       try {
         let stubCfg = undefined;
         try { stubCfg = await this._getStubConfigForType(type); } catch {}
@@ -3694,6 +3876,576 @@ _applyAutoScale() {
       'iframe': S({ fields:[ {key:'url', type:'text', label:'URL'} ]}),
       'area': S({ fields:[ {key:'area', type:'text', label:'Area ID'} ]}),
     })[type] || { fields: [] };
+  }
+
+  /**
+   * Build a simple visual editor for the built‑in Entity card.  The stock
+   * `hui-entity-card-editor` is prone to errors when loaded outside of the
+   * Lovelace editor, so we provide a lightweight form here instead.  The
+   * returned element implements the `setConfig` API and emits a
+   * `config-changed` event whenever the configuration is updated.  Only
+   * common options are exposed; additional options can still be added in the
+   * YAML editor.
+   *
+   * @param {Object} cfg The current card configuration.
+   * @returns {Promise<HTMLElement>}
+   */
+  async _getEntityCardEditor(cfg = {}) {
+    // Create a wrapper element for the editor UI.
+    const wrapper = document.createElement('div');
+    // Style the wrapper to mimic the look of other editors.
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '12px';
+    wrapper.style.padding = '8px 0';
+    // Allow dropdown menus (e.g. ha-select) to overflow this container
+    // without being clipped.  Without this, the attribute dropdown may be
+    // hidden behind the card content.
+    wrapper.style.overflow = 'visible';
+
+    // Local copy of the config that we will mutate.
+    wrapper._cfg = { type: 'entity', ...(cfg || {}) };
+
+    // Helper to dispatch a config-changed event whenever a value changes.
+    const fireChange = () => {
+      // Always build a plain object for the configuration.  Avoid accidental
+      // retention of prototype strings or arrays by using object literal syntax.
+      const clean = { type: 'entity' };
+      // Copy defined keys only.  Include the optional theme in the clean config
+      // so that the YAML shows the selected theme.
+      ['entity', 'name', 'icon', 'attribute', 'unit', 'state_color', 'theme'].forEach((k) => {
+        const v = wrapper._cfg[k];
+        if (v !== undefined && v !== '' && v !== null) {
+          clean[k] = v;
+        }
+      });
+      wrapper.dispatchEvent(new CustomEvent('config-changed', { detail: { config: clean } }));
+    };
+
+    // Build the entity picker row
+    const entRow = document.createElement('div');
+    entRow.style.display = 'flex';
+    entRow.style.flexDirection = 'column';
+    entRow.style.gap = '4px';
+    const entLabel = document.createElement('span');
+    entLabel.textContent = 'Entity';
+    entLabel.style.fontSize = '.8rem';
+    entLabel.style.opacity = '0.8';
+    // Always use the ha-entity-picker so users get a searchable dropdown once the element is defined
+    let entInput = document.createElement('ha-entity-picker');
+    // Provide a label consistent with HA editors
+    entInput.setAttribute('label', 'Select entity');
+    // Listen for changes from the picker.  When the user selects an entity,
+    // update our internal config and fire the change event.
+    entInput.addEventListener('value-changed', (ev) => {
+      // Prevent the event from bubbling up into parent editors which may
+      // incorrectly interpret it as a configuration object
+      ev.stopPropagation();
+      // Extract the selected entity.  Some implementations emit detail.value,
+      // while others set ev.detail directly or expose the value on the target.
+      const newVal = (ev.detail && (ev.detail.value ?? ev.detail)) ?? ev.target?.value;
+      wrapper._cfg.entity = newVal || '';
+      // Rebuild the attribute list for the new entity
+      try { updateAttributeOptions(); } catch {}
+      fireChange();
+    });
+    entRow.appendChild(entLabel);
+    entRow.appendChild(entInput);
+    wrapper.appendChild(entRow);
+
+    // Placeholder for an attribute updater.  This function will be assigned
+    // once the attribute field is created below.  Defining it here ensures
+    // that it is in scope for the entity change handler above.
+    let updateAttributeOptions = () => {};
+
+    // Prepare a grid container for the remaining fields.
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = '1fr 1fr';
+    grid.style.columnGap = '12px';
+    grid.style.rowGap = '12px';
+
+    // Helper to create a field wrapper and append to grid
+    const makeField = (labelText, inputEl) => {
+      const r = document.createElement('div');
+      r.style.display = 'flex';
+      r.style.flexDirection = 'column';
+      r.style.gap = '4px';
+      const lab = document.createElement('span');
+      lab.textContent = labelText;
+      lab.style.fontSize = '.8rem';
+      lab.style.opacity = '0.8';
+      r.appendChild(lab);
+      r.appendChild(inputEl);
+      grid.appendChild(r);
+    };
+
+    // Name field
+    let nameInput;
+    if (customElements.get('ha-textfield')) {
+      nameInput = document.createElement('ha-textfield');
+      nameInput.setAttribute('label', 'Name');
+      nameInput.addEventListener('input', () => {
+        wrapper._cfg.name = nameInput.value || undefined;
+        fireChange();
+      });
+    } else {
+      nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Name';
+      nameInput.addEventListener('input', () => {
+        wrapper._cfg.name = nameInput.value || undefined;
+        fireChange();
+      });
+      Object.assign(nameInput.style, {
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+        border: '1px solid var(--divider-color)',
+        color: 'var(--primary-text-color, inherit)',
+        width: '100%',
+        boxSizing: 'border-box'
+      });
+    }
+    makeField('Name', nameInput);
+
+    // Icon field – provide a searchable icon picker if available.  Fallback to
+    // ha-textfield or native input when the picker is unavailable.
+    let iconInput;
+    if (customElements.get('ha-icon-picker')) {
+      iconInput = document.createElement('ha-icon-picker');
+      iconInput.setAttribute('label', 'Icon');
+      // When the user selects an icon from the picker, update config
+      iconInput.addEventListener('value-changed', (ev) => {
+        ev.stopPropagation();
+        wrapper._cfg.icon = ev.detail?.value || undefined;
+        fireChange();
+      });
+      // Ensure the icon picker overlay appears above surrounding content
+      Object.assign(iconInput.style, { position: 'relative', zIndex: '1000' });
+    } else if (customElements.get('ha-textfield')) {
+      iconInput = document.createElement('ha-textfield');
+      iconInput.setAttribute('label', 'Icon');
+      iconInput.addEventListener('input', () => {
+        wrapper._cfg.icon = iconInput.value || undefined;
+        fireChange();
+      });
+    } else {
+      iconInput = document.createElement('input');
+      iconInput.type = 'text';
+      iconInput.placeholder = 'mdi:icon';
+      iconInput.addEventListener('input', () => {
+        wrapper._cfg.icon = iconInput.value || undefined;
+        fireChange();
+      });
+      Object.assign(iconInput.style, {
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+        border: '1px solid var(--divider-color)',
+        color: 'var(--primary-text-color, inherit)',
+        width: '100%',
+        boxSizing: 'border-box'
+      });
+    }
+    makeField('Icon', iconInput);
+
+    // Attribute field – display a dropdown of attributes for the selected entity.
+    let attrInput;
+    // Helper to populate attributes based on the current entity selection
+    updateAttributeOptions = () => {
+      // Determine available attribute names for the selected entity
+      let attrs = [];
+      const eid = wrapper._cfg?.entity;
+      const h = wrapper._hass;
+      if (eid && h && h.states && h.states[eid] && h.states[eid].attributes) {
+        try {
+          attrs = Object.keys(h.states[eid].attributes || {}).filter((k) => k && typeof k === 'string');
+          attrs.sort();
+        } catch {}
+      }
+      const prev = attrInput && typeof attrInput.value !== 'undefined' ? attrInput.value : undefined;
+      const tag = (attrInput?.tagName || '').toLowerCase();
+      // Lookup table for friendlier attribute names.  If an attribute key
+      // exists in this map, its value will be used for the option label; otherwise
+      // the key will be transformed by replacing underscores with spaces and
+      // capitalizing words.
+      const FRIENDLY_ATTR_NAMES = {
+        min_color_temp_kelvin: 'Minimum color temperature (Kelvin)',
+        max_color_temp_kelvin: 'Maximum color temperature (Kelvin)',
+        min_color_temp_mireds: 'Minimum color temperature (mireds)',
+        max_color_temp_mireds: 'Maximum color temperature (mireds)',
+        min_mireds: 'Minimum color temperature (mireds)',
+        max_mireds: 'Maximum color temperature (mireds)',
+        effect_list: 'Available effects',
+        color_mode: 'Color mode',
+        brightness: 'Brightness',
+        hs_color: 'Hs color',
+        rgb_color: 'Rgb color',
+        xy_color: 'Xy color',
+        entity_id: 'Entity ID',
+        friendly_name: 'Friendly name',
+        icon: 'Icon'
+      };
+      // Helper to compute a label from an attribute key
+      const makeLabel = (key) => {
+        if (FRIENDLY_ATTR_NAMES[key]) return FRIENDLY_ATTR_NAMES[key];
+        return key
+          .split('_')
+          .map((part) => {
+            if (!part) return part;
+            // Preserve units like kelvin/mireds in parentheses
+            if (part.toLowerCase() === 'kelvin') return 'Kelvin';
+            if (part.toLowerCase() === 'mireds') return 'mireds';
+            return part.charAt(0).toUpperCase() + part.slice(1);
+          })
+          .join(' ');
+      };
+      if (tag === 'ha-combo-box') {
+        // Build array of objects for the combo box
+        const items = attrs.map((name) => ({ value: name, label: makeLabel(name) }));
+        // Always include an empty item as first entry to allow clearing the selection
+        items.unshift({ value: '', label: '' });
+        attrInput.items = items;
+        // Restore previous selection if still valid
+        if (prev && attrs.includes(prev)) {
+          attrInput.value = prev;
+        } else {
+          attrInput.value = '';
+        }
+      } else if (tag === 'ha-select') {
+        // Clear current items
+        attrInput.innerHTML = '';
+        // Add an empty option
+        const emptyItem = document.createElement('mwc-list-item');
+        emptyItem.setAttribute('value', '');
+        emptyItem.textContent = '';
+        attrInput.appendChild(emptyItem);
+        for (const name of attrs) {
+          const item = document.createElement('mwc-list-item');
+          item.setAttribute('value', name);
+          item.textContent = makeLabel(name);
+          attrInput.appendChild(item);
+        }
+        // Restore previous selection if still valid
+        if (prev && attrs.includes(prev)) {
+          attrInput.value = prev;
+        } else {
+          attrInput.value = '';
+        }
+        attrInput.requestUpdate?.();
+      } else if (tag === 'select') {
+        attrInput.innerHTML = '';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '';
+        attrInput.appendChild(emptyOpt);
+        for (const name of attrs) {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = makeLabel(name);
+          attrInput.appendChild(opt);
+        }
+        if (prev && attrs.includes(prev)) {
+          attrInput.value = prev;
+        }
+      }
+    };
+
+    // Create the attribute input. Prefer ha-combo-box (for searchable dropdown and correct overlay),
+    // fall back to ha-select, then native select if neither is available.  We
+    // mirror the semantics of the entity picker so the dropdown is rendered in a
+    // global overlay and not clipped by the card.
+    if (customElements.get('ha-combo-box')) {
+      attrInput = document.createElement('ha-combo-box');
+      attrInput.setAttribute('label', 'Attribute');
+      // Provide item-label and item-value paths for our objects
+      attrInput.setAttribute('item-label-path', 'label');
+      attrInput.setAttribute('item-value-path', 'value');
+      attrInput.setAttribute('allow-custom-value', 'false');
+      attrInput.addEventListener('value-changed', (ev) => {
+        // The value may be in ev.detail.value or directly in attrInput.value depending on the component implementation.
+        ev.stopPropagation();
+        const val = ev.detail?.value ?? attrInput.value;
+        wrapper._cfg.attribute = val || undefined;
+        fireChange();
+      });
+    } else if (customElements.get('ha-select')) {
+      attrInput = document.createElement('ha-select');
+      attrInput.setAttribute('label', 'Attribute');
+      attrInput.addEventListener('selected', (ev) => {
+        ev.stopPropagation();
+        // Update config with selected attribute or undefined if empty
+        wrapper._cfg.attribute = attrInput.value || undefined;
+        fireChange();
+      });
+      // Ensure the dropdown menu appears above surrounding card content
+      Object.assign(attrInput.style, { position: 'relative', zIndex: '1000' });
+    } else {
+      attrInput = document.createElement('select');
+      // Always include an empty option; options will be populated by updateAttributeOptions
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '';
+      attrInput.appendChild(emptyOpt);
+      attrInput.addEventListener('change', (ev) => {
+        ev.stopPropagation();
+        wrapper._cfg.attribute = attrInput.value || undefined;
+        fireChange();
+      });
+      // Apply HA-like styling to the native select fallback
+      Object.assign(attrInput.style, {
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+        border: '1px solid var(--divider-color)',
+        color: 'var(--primary-text-color, inherit)',
+        width: '100%',
+        boxSizing: 'border-box'
+      });
+      // Ensure the dropdown menu appears above surrounding card content
+      Object.assign(attrInput.style, { position: 'relative', zIndex: '1000' });
+    }
+    // Populate attributes once element is ready (initially empty).  We'll call
+    // updateAttributeOptions whenever the entity or hass changes.
+    updateAttributeOptions();
+    makeField('Attribute', attrInput);
+
+    // Unit field
+    let unitInput;
+    if (customElements.get('ha-textfield')) {
+      unitInput = document.createElement('ha-textfield');
+      unitInput.setAttribute('label', 'Unit');
+      unitInput.addEventListener('input', () => {
+        wrapper._cfg.unit = unitInput.value || undefined;
+        fireChange();
+      });
+    } else {
+      unitInput = document.createElement('input');
+      unitInput.type = 'text';
+      unitInput.placeholder = 'Unit';
+      unitInput.addEventListener('input', () => {
+        wrapper._cfg.unit = unitInput.value || undefined;
+        fireChange();
+      });
+      Object.assign(unitInput.style, {
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+        border: '1px solid var(--divider-color)',
+        color: 'var(--primary-text-color, inherit)',
+        width: '100%',
+        boxSizing: 'border-box'
+      });
+    }
+    makeField('Unit', unitInput);
+
+    // Theme (optional) field - allow specifying a theme name from a dropdown
+    let themeInput;
+    // Use ha-select if available; otherwise fall back to a native select element.  The
+    // ha-select component uses mwc-list-item children to represent options.  We
+    // populate the options later when hass is set.
+    if (customElements.get('ha-select')) {
+      themeInput = document.createElement('ha-select');
+      themeInput.setAttribute('label', 'Theme (optional)');
+      // When the user picks an item, update config
+      themeInput.addEventListener('selected', (ev) => {
+        // Prevent propagation to avoid other handlers treating the value as config
+        ev.stopPropagation();
+        wrapper._cfg.theme = themeInput.value || undefined;
+        fireChange();
+      });
+    } else {
+      themeInput = document.createElement('select');
+      // Always include an empty option so users can clear their selection.  We
+      // recreate the option list when hass is set so we don't duplicate items.
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '';
+      themeInput.appendChild(emptyOpt);
+      themeInput.addEventListener('change', (ev) => {
+        ev.stopPropagation();
+        wrapper._cfg.theme = themeInput.value || undefined;
+        fireChange();
+      });
+      // Apply HA-like styling to the native select fallback
+      Object.assign(themeInput.style, {
+        padding: '8px 10px',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+        border: '1px solid var(--divider-color)',
+        color: 'var(--primary-text-color, inherit)',
+        width: '100%',
+        boxSizing: 'border-box'
+      });
+    }
+    makeField('Theme (optional)', themeInput);
+
+    // State color toggle field
+    let colorInput;
+    if (customElements.get('ha-switch')) {
+      colorInput = document.createElement('ha-switch');
+      colorInput.addEventListener('change', () => {
+        wrapper._cfg.state_color = !!colorInput.checked;
+        fireChange();
+      });
+    } else {
+      colorInput = document.createElement('input');
+      colorInput.type = 'checkbox';
+      colorInput.addEventListener('change', () => {
+        wrapper._cfg.state_color = !!colorInput.checked;
+        fireChange();
+      });
+    }
+    // Build a field wrapper for state color and append to grid
+    const colWrap = document.createElement('div');
+    colWrap.style.display = 'flex';
+    colWrap.style.alignItems = 'center';
+    colWrap.style.gap = '8px';
+    const colorLabel = document.createElement('span');
+    colorLabel.textContent = 'Show state color';
+    colorLabel.style.fontSize = '.8rem';
+    colorLabel.style.opacity = '0.8';
+    colWrap.appendChild(colorLabel);
+    colWrap.appendChild(colorInput);
+    grid.appendChild(colWrap);
+
+    // Append grid to wrapper
+    wrapper.appendChild(grid);
+
+    // Provide a setConfig method to populate fields from an existing config
+    wrapper.setConfig = (cfg2 = {}) => {
+      wrapper._cfg = { type: 'entity', ...(cfg2 || {}) };
+      const c = wrapper._cfg;
+      // Update each field if available
+      if (entInput) {
+        if ('value' in entInput) entInput.value = c.entity || '';
+        if (entInput.setAttribute) entInput.setAttribute('value', c.entity || '');
+      }
+      if (nameInput) {
+        nameInput.value = c.name || '';
+      }
+      if (iconInput) {
+        iconInput.value = c.icon || '';
+      }
+      if (attrInput) {
+        try { updateAttributeOptions(); } catch {}
+        // After repopulating options, restore the selected attribute if it exists
+        attrInput.value = c.attribute || '';
+      }
+      if (unitInput) {
+        unitInput.value = c.unit || '';
+      }
+      if (themeInput) {
+        themeInput.value = c.theme || '';
+      }
+      if (colorInput) {
+        if ('checked' in colorInput) colorInput.checked = !!c.state_color;
+      }
+    };
+
+    // Define reactive hass property so that nested pickers receive hass
+    Object.defineProperty(wrapper, 'hass', {
+      get() {
+        return this._hass;
+      },
+      set(v) {
+        this._hass = v;
+        // Pass hass to the entity picker so it can populate entities internally.  Assign
+        // the property even if the custom element isn't yet defined; once the
+        // element upgrades, it will use this value.  Additionally, if the
+        // element hasn't been registered yet, schedule a second assignment when
+        // it upgrades to ensure the suggestions list appears.
+        if (entInput) {
+          try { entInput.hass = v; } catch {}
+          // If ha-entity-picker is not yet defined, wait for it to be ready and then
+          // reassign the hass property.  This mirrors the logic used in the
+          // visibility editor to ensure the picker upgrades correctly.
+          if (!customElements.get('ha-entity-picker')) {
+            customElements.whenDefined('ha-entity-picker').then(() => {
+              try { entInput.hass = this._hass; entInput.requestUpdate?.(); } catch {}
+            }).catch(() => {});
+          }
+        }
+        // Pass hass to the icon picker so it can populate icons.  Assign even
+        // if the custom element isn't defined yet; we'll reassign after upgrade.
+        if (iconInput) {
+          try { iconInput.hass = v; } catch {}
+          if (!customElements.get('ha-icon-picker')) {
+            customElements.whenDefined('ha-icon-picker').then(() => {
+              try { iconInput.hass = this._hass; iconInput.requestUpdate?.(); } catch {}
+            }).catch(() => {});
+          }
+        }
+        // Populate the theme dropdown with available themes.  We support both
+        // ha-select (using mwc-list-item children) and a native select element.  For
+        // ha-select, use mwc-list-item; for native selects, use option elements.
+        if (themeInput) {
+          // Determine available theme names
+          let themeNames = [];
+          if (v && v.themes) {
+            if (v.themes.themes) {
+              themeNames = Object.keys(v.themes.themes);
+            } else if (typeof v.themes === 'object') {
+              themeNames = Object.keys(v.themes).filter((k) => k !== 'default_theme');
+            }
+          }
+          // Save previous value to restore after repopulating
+          const prevVal = themeInput.value;
+          const tag = (themeInput.tagName || '').toLowerCase();
+          if (tag === 'ha-select') {
+            // Clear existing items
+            themeInput.innerHTML = '';
+            // Insert an empty item to allow clearing the selection
+            const emptyItem = document.createElement('mwc-list-item');
+            emptyItem.setAttribute('value', '');
+            emptyItem.textContent = '';
+            themeInput.appendChild(emptyItem);
+            for (const name of themeNames) {
+              const item = document.createElement('mwc-list-item');
+              item.setAttribute('value', name);
+              item.textContent = name;
+              themeInput.appendChild(item);
+            }
+            // Restore previous selection if it still exists
+            if (prevVal && themeNames.includes(prevVal)) {
+              themeInput.value = prevVal;
+            } else if (!prevVal) {
+              themeInput.value = '';
+            }
+            // Request update in case the component uses LitElement
+            themeInput.requestUpdate?.();
+          } else if (tag === 'select') {
+            // Clear existing options
+            themeInput.innerHTML = '';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '';
+            themeInput.appendChild(emptyOpt);
+            for (const name of themeNames) {
+              const o = document.createElement('option');
+              o.value = name;
+              o.textContent = name;
+              themeInput.appendChild(o);
+            }
+            if (prevVal && Array.from(themeInput.options).some(o => o.value === prevVal)) {
+              themeInput.value = prevVal;
+            }
+          }
+        }
+
+        // Update attribute options when hass changes since the list of
+        // attributes depends on the selected entity and the hass states.  This
+        // ensures that if hass updates after the editor is created, the
+        // attribute dropdown stays in sync with the current entity.
+        try { updateAttributeOptions(); } catch {}
+      }
+    });
+
+    // Populate initial configuration
+    wrapper.setConfig(cfg || {});
+    // Return the wrapped editor
+    return wrapper;
   }
 
   _shapeBySchema(type, cfg = {}) {
@@ -3942,6 +4694,8 @@ _applyAutoScale() {
                   <div id="optTabs" class="tabs">
                     <button id="tabVisual" class="tab active" aria-selected="true">Visual</button>
                     <button id="tabYaml" class="tab">YAML</button>
+                    <!-- DDC: Visibility tab allows configuring when the card should be shown -->
+                    <button id="tabVis" class="tab">Visibility</button>
                   </div>
                 </div>
                 <div class="spin-center" id="editorSpin" hidden>
@@ -3958,6 +4712,14 @@ _applyAutoScale() {
                 <div class="bd" style="min-height:0">
                   <div id="yamlHost"></div>
                   <div id="yamlErr" class="err" hidden style="color:var(--error-color);font-size:.9rem;margin-top:8px"></div>
+                </div>
+              </div>
+
+              <!-- DDC: Visibility section shares the same grid row as YAML. It is hidden by default and shown when the Visibility tab is selected. -->
+              <div class="sec" id="visSec" style="grid-column:1;grid-row:3;min-height:0;display:none">
+                <div class="hd">Visibility</div>
+                <div class="bd" style="min-height:0">
+                  <div id="visHost"></div>
                 </div>
               </div>
             </div>
@@ -3990,6 +4752,10 @@ _applyAutoScale() {
     const yamlSec = modal.querySelector('#yamlSec');
     const tabVisual = modal.querySelector('#tabVisual');
     const tabYaml = modal.querySelector('#tabYaml');
+    // Visibility tab and section references
+    const tabVis = modal.querySelector('#tabVis');
+    const visSec = modal.querySelector('#visSec');
+    const visHost = modal.querySelector('#visHost');
     const err = modal.querySelector('#err');
     const previewSpin = modal.querySelector('#previewSpin');
     const enableCommit = (on) => { addTop.disabled = addBottom.disabled = !on; };
@@ -4101,18 +4867,34 @@ _applyAutoScale() {
     let __activeTab = 'visual';
 
     const showTab = (name) => {
+      // Determine which of the three tabs is active
       const wantYaml = name === 'yaml';
-      tabVisual.classList.toggle('active', !wantYaml);
-      tabVisual.setAttribute('aria-selected', String(!wantYaml));
+      const wantVis  = name === 'vis';
+      const wantVisual = !wantYaml && !wantVis;
+
+      // Update tab button styling and ARIA attributes
+      tabVisual.classList.toggle('active', wantVisual);
+      tabVisual.setAttribute('aria-selected', String(wantVisual));
       tabYaml.classList.toggle('active', wantYaml);
       tabYaml.setAttribute('aria-selected', String(wantYaml));
-    
-      // Show/hide the two editors
-      editorHost.parentElement.style.display = wantYaml ? 'none' : '';
-      yamlSec.style.display = wantYaml ? '' : 'none';
-    
-      if (wantYaml) yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
-      __activeTab = wantYaml ? 'yaml' : 'visual';
+      if (tabVis) {
+        tabVis.classList.toggle('active', wantVis);
+        tabVis.setAttribute('aria-selected', String(wantVis));
+      }
+
+      // Show/hide the appropriate editor sections. Visual uses editorHost;
+      // YAML uses yamlSec; Visibility uses visSec. Only one is visible at a time.
+      editorHost.parentElement.style.display = wantVisual ? '' : 'none';
+      yamlSec.style.display   = wantYaml  ? '' : 'none';
+      if (visSec) visSec.style.display = wantVis ? '' : 'none';
+
+      if (wantYaml) {
+        yamlSec.scrollIntoView({ behavior:'smooth', block:'start' });
+      } else if (wantVis && visSec) {
+        visSec.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+
+      __activeTab = wantYaml ? 'yaml' : (wantVis ? 'vis' : 'visual');
     };
     
     tabVisual.addEventListener('click', async () => {
@@ -4127,6 +4909,15 @@ _applyAutoScale() {
     });
 
     tabYaml.addEventListener('click', () => showTab('yaml'));
+
+    // When the Visibility tab is clicked, switch to the visibility editor.
+    if (tabVis) {
+      tabVis.addEventListener('click', () => {
+        showTab('vis');
+        // Build or refresh the visibility UI whenever the tab is opened.
+        try { buildVisUI(currentConfig); } catch {}
+      });
+    }
     
     // default: Visual
     showTab('visual');
@@ -4385,6 +5176,1117 @@ _applyAutoScale() {
       quickFill.appendChild(fieldWrap);
     };
 
+    /**
+     * Render the visibility editor UI. This editor allows the user to define
+     * simple conditions that control when a card should be shown. Conditions
+     * mirror the core Home Assistant visibility feature: each object in the
+     * visibility array is evaluated and all conditions must pass for the card
+     * to be visible. Only top‑level AND conditions are supported by this UI.
+     *
+     * Supported condition types:
+     *  - state: entity and state string
+     *  - numeric_state: entity with optional above/below thresholds
+     *  - screen: media query string
+     *  - user: comma separated user ids
+     */
+    // Maintain collapse/expand state for each visibility condition. A WeakMap
+    // allows us to associate transient UI state with each condition object
+    // without persisting it back into the config. The state survives
+    // re-rendering because the same condition objects are reused in the visList.
+    const visExpansionStates = new WeakMap();
+
+    const buildVisUIOld = (cfg) => {
+      if (!visHost) return;
+      // Ensure visibility exists on the config. Clone to avoid mutating directly.
+      let visList = Array.isArray(cfg?.visibility) ? cfg.visibility.map(c => ({ ...c })) : [];
+      const reRender = () => buildVisUI(currentConfig);
+      const updateConfig = () => {
+        // Remove empty conditions
+        visList = visList.filter((c) => c && typeof c === 'object' && c.condition);
+        currentConfig = { ...currentConfig, visibility: visList };
+        try { yamlEditorApi?.setValue(currentConfig); } catch {}
+        try { visualEditor?.setConfig?.(currentConfig); } catch {}
+        mountPreview(currentConfig);
+      };
+      const render = () => {
+        visHost.innerHTML = '';
+        // If no conditions are defined, show a friendly hint
+        if (!visList || !visList.length) {
+          const p = document.createElement('div');
+          p.style.opacity = '.7';
+          p.style.fontSize = '.9rem';
+          p.style.marginBottom = '8px';
+          p.textContent = 'No conditions defined – this card is always visible.';
+          visHost.appendChild(p);
+        }
+        visList.forEach((cond, idx) => {
+          // Container for each condition
+          const row = document.createElement('div');
+          Object.assign(row.style, { display:'flex', flexDirection:'column', gap:'6px', marginBottom:'12px', border:'1px solid var(--divider-color)', borderRadius:'8px', padding:'8px' });
+          // Header with icon and type label
+          const headerDiv = document.createElement('div');
+          Object.assign(headerDiv.style, { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'4px' });
+          const leftWrap = document.createElement('div');
+          leftWrap.style.display = 'flex';
+          leftWrap.style.alignItems = 'center';
+          leftWrap.style.gap = '6px';
+          const icon = document.createElement('ha-icon');
+          let iconName = 'mdi:filter';
+          const type = cond.condition || 'state';
+          if (type === 'numeric_state') iconName = 'mdi:numeric';
+          else if (type === 'screen') iconName = 'mdi:monitor';
+          else if (type === 'user') iconName = 'mdi:account';
+          else if (type === 'state') iconName = 'mdi:state-machine';
+          icon.setAttribute('icon', iconName);
+          const labelSpan = document.createElement('span');
+          labelSpan.style.fontWeight = 'bold';
+          labelSpan.style.textTransform = 'capitalize';
+          labelSpan.textContent = (type === 'numeric_state') ? 'Entity numeric state' : (type === 'state' ? 'Entity state' : (type === 'screen' ? 'Screen' : 'User'));
+          leftWrap.appendChild(icon);
+          leftWrap.appendChild(labelSpan);
+          headerDiv.appendChild(leftWrap);
+          // Menu: remove button
+          const del = document.createElement('button');
+          del.setAttribute('title','Remove condition');
+          del.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+          Object.assign(del.style, { border:'none', background:'transparent', cursor:'pointer', padding:'4px', display:'inline-flex', alignItems:'center' });
+          del.addEventListener('click', (ev) => {
+            // Prevent the click from bubbling to parent elements (which may lock the editor)
+            ev.preventDefault();
+            ev.stopPropagation();
+            // Remove the correct condition using indexOf on the current list. This
+            // avoids relying on the stale idx value.
+            const index = visList.indexOf(cond);
+            if (index > -1) {
+              visList.splice(index, 1);
+            }
+            currentConfig.visibility = visList;
+            render();
+            updateConfig();
+          });
+          headerDiv.appendChild(del);
+          row.appendChild(headerDiv);
+          // Type selector (for choosing the condition type)
+          const typeRow = document.createElement('div');
+          typeRow.style.display = 'flex';
+          typeRow.style.gap = '8px';
+          const typeLabel = document.createElement('label');
+          typeLabel.textContent = 'Type';
+          typeLabel.style.fontSize = '.85rem';
+          typeLabel.style.marginRight = '4px';
+          const typeSel = document.createElement('select');
+          ['state','numeric_state','screen','user'].forEach((opt) => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt.replace('_',' ');
+            typeSel.appendChild(o);
+          });
+          typeSel.value = type;
+          typeSel.addEventListener('change', () => {
+            cond.condition = typeSel.value;
+            delete cond.entity; delete cond.state; delete cond.state_not;
+            delete cond.above; delete cond.below;
+            delete cond.media_query; delete cond.users;
+            render();
+            updateConfig();
+          });
+          typeRow.appendChild(typeLabel);
+          typeRow.appendChild(typeSel);
+          row.appendChild(typeRow);
+          // Fields container
+          const fields = document.createElement('div');
+          Object.assign(fields.style, { display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center' });
+          const addField = (labelText, inputEl) => {
+            const fieldWrap = document.createElement('div');
+            fieldWrap.style.display = 'flex';
+            fieldWrap.style.flexDirection = 'column';
+            fieldWrap.style.gap = '4px';
+            fieldWrap.style.minWidth = '150px';
+            const lbl = document.createElement('span');
+            lbl.textContent = labelText;
+            lbl.style.fontSize = '.75rem';
+            fieldWrap.appendChild(lbl);
+            fieldWrap.appendChild(inputEl);
+            fields.appendChild(fieldWrap);
+          };
+          // Render condition-specific fields
+          const renderFields = () => {
+            fields.innerHTML = '';
+            if (cond.condition === 'state') {
+              // Entity picker
+              let entPicker;
+              if (customElements.get('ha-entity-picker')) {
+                entPicker = document.createElement('ha-entity-picker');
+                entPicker.hass = this.hass;
+                entPicker.setAttribute('label','Select entity');
+                // Ensure the clear icon is visible to allow clearing the selected entity
+                entPicker.removeAttribute('hide-clear-icon');
+                entPicker.value = cond.entity || '';
+                entPicker.addEventListener('value-changed', (ev) => {
+                  // Update the selected entity.  Stop propagation so parent
+                  // controls (like delete) do not mis-handle the event.
+                  ev.stopPropagation();
+                  cond.entity = ev.detail.value || '';
+                  updateConfig();
+                });
+              } else {
+                entPicker = document.createElement('input');
+                entPicker.value = cond.entity || '';
+                entPicker.addEventListener('input', () => {
+                  cond.entity = entPicker.value.trim();
+                  updateConfig();
+                });
+                // Apply Home Assistant-like styling to the entity input fallback
+                Object.assign(entPicker.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+              }
+              addField('Entity', entPicker);
+              // Equals / Not equals selector – use ha-select when available for native styling
+              let opSel;
+              if (customElements.get('ha-select')) {
+                opSel = document.createElement('ha-select');
+                // Build options using mwc-list-item
+                const optEq = document.createElement('mwc-list-item');
+                optEq.setAttribute('value', 'state');
+                optEq.textContent = 'State is equal to';
+                const optNeq = document.createElement('mwc-list-item');
+                optNeq.setAttribute('value', 'state_not');
+                optNeq.textContent = 'State is not equal to';
+                opSel.appendChild(optEq);
+                opSel.appendChild(optNeq);
+                opSel.value = cond.state_not != null ? 'state_not' : 'state';
+                // Listen for selected event to update config
+                opSel.addEventListener('selected', (ev) => {
+                  // Prevent bubbling to avoid the editor being marked dirty incorrectly
+                  ev.stopPropagation();
+                  const v = cond.state_not != null ? cond.state_not : cond.state;
+                  if (opSel.value === 'state_not') {
+                    cond.state_not = v;
+                    delete cond.state;
+                  } else {
+                    cond.state = v;
+                    delete cond.state_not;
+                  }
+                  updateConfig();
+                });
+              } else {
+                // Fallback to native select
+                opSel = document.createElement('select');
+                opSel.innerHTML = '<option value="state">State is equal to</option><option value="state_not">State is not equal to</option>';
+                opSel.value = cond.state_not != null ? 'state_not' : 'state';
+                // Apply HA-like styling
+                Object.assign(opSel.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+                opSel.addEventListener('change', (ev) => {
+                  ev.stopPropagation();
+                  const v = cond.state_not != null ? cond.state_not : cond.state;
+                  if (opSel.value === 'state_not') {
+                    cond.state_not = v;
+                    delete cond.state;
+                  } else {
+                    cond.state = v;
+                    delete cond.state_not;
+                  }
+                  updateConfig();
+                });
+              }
+              addField('Match type', opSel);
+              // State value input – use ha-textfield when available for proper styling
+              let stInput;
+              if (customElements.get('ha-textfield')) {
+                stInput = document.createElement('ha-textfield');
+                stInput.value = (cond.state_not != null ? cond.state_not : cond.state) || '';
+                stInput.setAttribute('label', '');
+                stInput.addEventListener('input', (ev) => {
+                  // Update the state value immediately.  Stop propagation so the
+                  // card editor does not misinterpret the input as a click
+                  // outside the field.  Updating on each keystroke mirrors
+                  // the behaviour of numeric state conditions.
+                  ev.stopPropagation();
+                  const key = opSel.value;
+                  cond[key] = stInput.value;
+                  updateConfig();
+                });
+              } else {
+                stInput = document.createElement('input');
+                stInput.value = (cond.state_not != null ? cond.state_not : cond.state) || '';
+                // Apply HA-like styling
+                Object.assign(stInput.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+                stInput.addEventListener('input', (ev) => {
+                  // Mirror numeric state behaviour: update immediately on each
+                  // keystroke and stop propagation so parent controls remain
+                  // responsive.
+                  ev.stopPropagation();
+                  const key = opSel.value;
+                  cond[key] = stInput.value;
+                  updateConfig();
+                });
+              }
+              addField('State', stInput);
+            } else if (cond.condition === 'numeric_state') {
+              let entPicker;
+              if (customElements.get('ha-entity-picker')) {
+                entPicker = document.createElement('ha-entity-picker');
+                entPicker.hass = this.hass;
+              entPicker.setAttribute('label','Select entity');
+              entPicker.removeAttribute('hide-clear-icon');
+                entPicker.value = cond.entity || '';
+              entPicker.addEventListener('value-changed', (ev) => {
+                  ev.stopPropagation();
+                  cond.entity = ev.detail.value || '';
+                  updateConfig();
+                });
+              } else {
+                entPicker = document.createElement('input');
+                entPicker.value = cond.entity || '';
+                entPicker.addEventListener('input', () => {
+                  cond.entity = entPicker.value.trim();
+                  updateConfig();
+                });
+                // Apply Home Assistant-like styling to the entity input fallback
+                Object.assign(entPicker.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+              }
+              addField('Entity', entPicker);
+              // Above threshold – use ha-textfield (type number) when available
+              let aboveField;
+              if (customElements.get('ha-textfield')) {
+                aboveField = document.createElement('ha-textfield');
+                aboveField.setAttribute('type', 'number');
+                aboveField.value = cond.above != null ? cond.above : '';
+                aboveField.addEventListener('input', (ev) => {
+                  ev.stopPropagation();
+                  const v = aboveField.value;
+                  if (v === '' || isNaN(Number(v))) delete cond.above;
+                  else cond.above = Number(v);
+                  updateConfig();
+                });
+              } else {
+                aboveField = document.createElement('input');
+                aboveField.type = 'number';
+                aboveField.value = cond.above != null ? cond.above : '';
+                Object.assign(aboveField.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+                aboveField.addEventListener('input', () => {
+                  const v = aboveField.value;
+                  if (v === '' || isNaN(Number(v))) delete cond.above;
+                  else cond.above = Number(v);
+                  updateConfig();
+                });
+              }
+              addField('Above', aboveField);
+              // Below threshold – use ha-textfield when available
+              let belowField;
+              if (customElements.get('ha-textfield')) {
+                belowField = document.createElement('ha-textfield');
+                belowField.setAttribute('type', 'number');
+                belowField.value = cond.below != null ? cond.below : '';
+                belowField.addEventListener('input', (ev) => {
+                  ev.stopPropagation();
+                  const v = belowField.value;
+                  if (v === '' || isNaN(Number(v))) delete cond.below;
+                  else cond.below = Number(v);
+                  updateConfig();
+                });
+              } else {
+                belowField = document.createElement('input');
+                belowField.type = 'number';
+                belowField.value = cond.below != null ? cond.below : '';
+                Object.assign(belowField.style, {
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                  border: '1px solid var(--divider-color)',
+                  color: 'var(--primary-text-color, inherit)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                });
+                belowField.addEventListener('input', () => {
+                  const v = belowField.value;
+                  if (v === '' || isNaN(Number(v))) delete cond.below;
+                  else cond.below = Number(v);
+                  updateConfig();
+                });
+              }
+              addField('Below', belowField);
+            } else if (cond.condition === 'screen') {
+              // Predefined options for screen sizes
+              const screenSel = document.createElement('select');
+              const presets = [
+                { label:'Custom', value:'' },
+                { label:'Mobile (max-width: 599px)', value:'(max-width: 599px)' },
+                { label:'Tablet (600px - 991px)', value:'(min-width: 600px) and (max-width: 991px)' },
+                { label:'Desktop (min-width: 992px)', value:'(min-width: 992px)' }
+              ];
+              presets.forEach(p => {
+                const o = document.createElement('option');
+                o.value = p.value;
+                o.textContent = p.label;
+                screenSel.appendChild(o);
+              });
+              screenSel.value = presets.find(p => p.value === (cond.media_query || ''))?.value ?? '';
+              screenSel.addEventListener('change', () => {
+                cond.media_query = screenSel.value;
+                updateConfig();
+              });
+              addField('Screen size', screenSel);
+              // If custom selected, show text input for custom media query
+              if (screenSel.value === '') {
+                const customInp = document.createElement('input');
+                customInp.placeholder = 'e.g. (min-width: 1280px)';
+                customInp.value = cond.media_query || '';
+                customInp.addEventListener('input', () => {
+                  cond.media_query = customInp.value;
+                  updateConfig();
+                });
+                addField('Custom query', customInp);
+              }
+            } else if (cond.condition === 'user') {
+              let userPicker;
+              if (customElements.get('ha-user-picker')) {
+                userPicker = document.createElement('ha-user-picker');
+                userPicker.hass = this.hass;
+                userPicker.value = Array.isArray(cond.users) ? cond.users : [];
+                userPicker.addEventListener('value-changed', (ev) => {
+                  cond.users = Array.isArray(ev.detail.value) ? ev.detail.value : [ev.detail.value];
+                  updateConfig();
+                });
+              } else {
+                userPicker = document.createElement('input');
+                userPicker.value = Array.isArray(cond.users) ? cond.users.join(',') : '';
+                userPicker.addEventListener('input', () => {
+                  cond.users = userPicker.value.split(',').map(s => s.trim()).filter(Boolean);
+                  updateConfig();
+                });
+              }
+              addField('Users', userPicker);
+            }
+          };
+          renderFields();
+          row.appendChild(fields);
+          visHost.appendChild(row);
+        });
+        // Add condition button
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn';
+        addBtn.innerHTML = '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add condition</span>';
+        Object.assign(addBtn.style, { marginTop:'8px' });
+        addBtn.addEventListener('click', () => {
+          visList.push({ condition:'state', entity:'', state:'' });
+          currentConfig.visibility = visList;
+          render();
+          updateConfig();
+        });
+        visHost.appendChild(addBtn);
+      };
+      // Initialize
+      render();
+    };
+
+    /**
+     * Enhanced visibility editor UI supporting nested AND/OR groups and a
+     * selection menu when adding new conditions. This implementation renders
+     * conditions recursively and stores expansion state in the shared
+     * visExpansionStates WeakMap. It does not modify the existing
+     * buildVisUIOld implementation but overrides usage by defining a new
+     * buildVisUI constant. Calls throughout the card manager will use this
+     * enhanced editor.
+     */
+    const buildVisUI = (cfg) => {
+      if (!visHost) return;
+      // Use the actual visibility array (do not clone) so updates persist.
+      let visList = Array.isArray(cfg?.visibility) ? cfg.visibility : [];
+      // Cache for asynchronous user list fetches.  We only fetch once per
+      // buildVisUI invocation to avoid redundant requests.
+      let __cachedUserList = null;
+      const fetchUsers = async () => {
+        // Return cached list if already fetched
+        if (__cachedUserList) return __cachedUserList;
+        try {
+          // Attempt to use WebSocket API to list users (requires admin privileges)
+          if (this.hass && typeof this.hass.callWS === 'function') {
+            try {
+              const resp = await this.hass.callWS({ type: 'config/auth/list' });
+              if (Array.isArray(resp)) {
+                __cachedUserList = resp;
+                return resp;
+              }
+            } catch {}
+          }
+          // Fallback to REST API (may require auth)
+          if (this.hass && typeof this.hass.callApi === 'function') {
+            try {
+              const resp = await this.hass.callApi('get', 'users');
+              if (Array.isArray(resp)) {
+                __cachedUserList = resp;
+                return resp;
+              }
+            } catch {}
+          }
+          // Attempt to extract users from hass object when API is unavailable.
+          const fallbackLists = [];
+          // Some HA versions expose authorized users or user registry on hass
+          // Try various common properties to discover user info
+          if (this.hass && this.hass.users && Array.isArray(this.hass.users)) {
+            fallbackLists.push(...this.hass.users);
+          }
+          if (this.hass && this.hass.userData && Array.isArray(this.hass.userData.users)) {
+            fallbackLists.push(...this.hass.userData.users);
+          }
+          if (this.hass && this.hass.authorizedUsers && Array.isArray(this.hass.authorizedUsers)) {
+            fallbackLists.push(...this.hass.authorizedUsers);
+          }
+          // Remove duplicates based on id
+          if (fallbackLists.length) {
+            const map = new Map();
+            fallbackLists.forEach((u) => {
+              const uid = u.id || u.user_id || u.uid || u.name || '';
+              if (!map.has(uid)) map.set(uid, u);
+            });
+            const arr = Array.from(map.values());
+            __cachedUserList = arr;
+            return arr;
+          }
+        } catch {}
+        // If nothing is found, return empty array
+        __cachedUserList = [];
+        return [];
+      };
+
+      const updateConfig = () => {
+        // Clean up any null/undefined conditions
+        visList = visList.filter((c) => c && typeof c === 'object' && c.condition);
+        currentConfig.visibility = visList;
+        try { yamlEditorApi?.setValue(currentConfig); } catch {}
+        try { visualEditor?.setConfig?.(currentConfig); } catch {}
+        mountPreview(currentConfig);
+      };
+      const render = () => {
+        visHost.innerHTML = '';
+        // Instruction message
+        const instr = document.createElement('div');
+        instr.style.opacity = '.75';
+        instr.style.fontSize = '.85rem';
+        instr.style.marginBottom = '12px';
+        instr.textContent = 'The card will be shown when ALL conditions below are fulfilled. If no conditions are set, the card will always be shown.';
+        visHost.appendChild(instr);
+        // Recursive render for lists
+        const renderList = (list, container) => {
+          list.forEach((cond, idx) => {
+            renderCondition(cond, list, idx, container);
+          });
+          // Add button for this list
+          const addWrap = document.createElement('div');
+          addWrap.style.marginTop = '8px';
+          const btn = document.createElement('button');
+          btn.className = 'btn';
+          btn.innerHTML = '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add condition</span>';
+          // Apply pill-like styling similar to the official editor
+          Object.assign(btn.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            border: 'none',
+            borderRadius: '20px',
+            background: 'var(--primary-color)',
+            color: 'var(--text-primary-color, #fff)',
+            cursor: 'pointer',
+            fontWeight: '500',
+          });
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            // Toggle menu
+            const existing = addWrap.querySelector('.add-menu');
+            if (existing) {
+              existing.remove();
+              return;
+            }
+            const menu = document.createElement('div');
+            menu.className = 'add-menu';
+            Object.assign(menu.style, {
+              position: 'relative',
+              marginTop: '4px',
+              border: '1px solid var(--divider-color)',
+              borderRadius: '8px',
+              background: 'var(--card-background-color, var(--secondary-background-color))',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            });
+            const options = [
+              { type: 'numeric_state', label: 'Entity numeric state', icon: 'mdi:numeric' },
+              { type: 'state', label: 'Entity state', icon: 'mdi:state-machine' },
+              { type: 'screen', label: 'Screen', icon: 'mdi:monitor' },
+              { type: 'user', label: 'User', icon: 'mdi:account' },
+              { type: 'and', label: 'And', icon: 'mdi:logic-and' },
+              { type: 'or', label: 'Or', icon: 'mdi:logic-or' }
+            ];
+            options.forEach((opt) => {
+              const item = document.createElement('div');
+              item.style.display = 'flex';
+              item.style.alignItems = 'center';
+              item.style.gap = '8px';
+              item.style.padding = '6px 12px';
+              item.style.cursor = 'pointer';
+              item.addEventListener('mouseenter', () => item.style.background = 'var(--hover-color, #444)');
+              item.addEventListener('mouseleave', () => item.style.background = '');
+              item.addEventListener('click', () => {
+                menu.remove();
+                let newCond;
+                if (opt.type === 'and' || opt.type === 'or') {
+                  newCond = { condition: opt.type, conditions: [] };
+                } else if (opt.type === 'state') {
+                  newCond = { condition: 'state', entity: '', state: '' };
+                } else if (opt.type === 'numeric_state') {
+                  newCond = { condition: 'numeric_state', entity: '' };
+                } else if (opt.type === 'screen') {
+                  newCond = { condition: 'screen', media_query: '' };
+                } else if (opt.type === 'user') {
+                  newCond = { condition: 'user', users: [] };
+                }
+                list.push(newCond);
+                visExpansionStates.set(newCond, true);
+                updateConfig();
+                render();
+              });
+              const ic = document.createElement('ha-icon');
+              ic.setAttribute('icon', opt.icon);
+              item.appendChild(ic);
+              const la = document.createElement('span');
+              la.textContent = opt.label;
+              item.appendChild(la);
+              menu.appendChild(item);
+            });
+            addWrap.appendChild(menu);
+          });
+          addWrap.appendChild(btn);
+          container.appendChild(addWrap);
+        };
+        const renderCondition = (cond, parentList, idx, container) => {
+          const type = cond.condition || 'state';
+          let expanded = visExpansionStates.get(cond);
+          if (expanded === undefined) expanded = visList.length === 1;
+          const row = document.createElement('div');
+          // Style the condition container to more closely resemble Home Assistant’s editor cards.
+          Object.assign(row.style, {
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid var(--divider-color)',
+            borderLeft: '3px solid var(--primary-color)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px',
+            background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+            boxShadow: 'var(--ha-card-box-shadow, 0 2px 6px rgba(0, 0, 0, 0.15))'
+          });
+          // Header
+          const header = document.createElement('div');
+          header.style.display = 'flex';
+          header.style.alignItems = 'center';
+          header.style.justifyContent = 'space-between';
+          header.style.marginBottom = '8px';
+          // Subtle bottom border to separate header from fields
+          header.style.borderBottom = '1px solid var(--divider-color)';
+          header.style.paddingBottom = '4px';
+          const left = document.createElement('div');
+          left.style.display = 'flex';
+          left.style.alignItems = 'center';
+          left.style.gap = '6px';
+          const toggle = document.createElement('button');
+          toggle.innerHTML = `<ha-icon icon="${expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}"></ha-icon>`;
+          Object.assign(toggle.style, {
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'inline-flex',
+            alignItems: 'center'
+          });
+          toggle.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            visExpansionStates.set(cond, !expanded);
+            render();
+          });
+          left.appendChild(toggle);
+          // Icon
+          const ic = document.createElement('ha-icon');
+          let iconName = 'mdi:filter';
+          if (type === 'numeric_state') iconName = 'mdi:numeric';
+          else if (type === 'screen') iconName = 'mdi:monitor';
+          else if (type === 'user') iconName = 'mdi:account';
+          else if (type === 'state') iconName = 'mdi:state-machine';
+          else if (type === 'and') iconName = 'mdi:logic-and';
+          else if (type === 'or') iconName = 'mdi:logic-or';
+          ic.setAttribute('icon', iconName);
+          left.appendChild(ic);
+          const lab = document.createElement('span');
+          lab.style.fontWeight = '600';
+          lab.style.fontSize = '0.95rem';
+          lab.style.textTransform = 'capitalize';
+          lab.textContent = (type === 'numeric_state')
+            ? 'Entity numeric state'
+            : (type === 'state'
+                ? 'Entity state'
+                : (type === 'screen'
+                    ? 'Screen'
+                    : (type === 'user'
+                        ? 'User'
+                        : (type === 'and' ? 'And' : 'Or'))));
+          left.appendChild(lab);
+          header.appendChild(left);
+          // Remove button
+          const rm = document.createElement('button');
+          rm.setAttribute('title', 'Remove condition');
+          rm.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+          Object.assign(rm.style, {
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'inline-flex',
+            alignItems: 'center'
+          });
+          rm.addEventListener('click', (ev) => {
+            // Prevent default and stop propagation so the click does not get swallowed
+            ev.preventDefault();
+            ev.stopPropagation();
+            // Locate this condition in its parent list and remove it. Using
+            // indexOf ensures we remove the correct object even if indices
+            // shift due to other operations.
+            const index = parentList.indexOf(cond);
+            if (index > -1) {
+              parentList.splice(index, 1);
+            }
+            updateConfig();
+            render();
+          });
+          header.appendChild(rm);
+          row.appendChild(header);
+          // Leaf
+          if (type !== 'and' && type !== 'or') {
+            if (expanded) {
+              // Omit the type selector row for leaf conditions. Users choose the
+              // condition type when adding a condition. To change types, remove
+              // the condition and add a new one.  This streamlines the UI to
+              // more closely match the native Home Assistant appearance.
+              // Fields container
+              const fields = document.createElement('div');
+              // Arrange input fields in a single column to more closely match the
+              // native Home Assistant editor.  Each field will stack below the
+              // previous one.  Use a consistent vertical gap for breathing room.
+              Object.assign(fields.style, {
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                alignItems: 'stretch'
+              });
+              const addField = (lbl, inputEl) => {
+                const wrap = document.createElement('div');
+                wrap.style.display = 'flex';
+                wrap.style.flexDirection = 'column';
+                wrap.style.gap = '4px';
+                const l = document.createElement('span');
+                l.textContent = lbl;
+                l.style.fontSize = '.75rem';
+                wrap.appendChild(l);
+                wrap.appendChild(inputEl);
+                fields.appendChild(wrap);
+                // Apply dark styling to plain input/select elements for a cohesive look
+                const tn = (inputEl.tagName || '').toLowerCase();
+                if (tn === 'input' || tn === 'select') {
+                  Object.assign(inputEl.style, {
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                    border: '1px solid var(--divider-color)',
+                    color: 'var(--primary-text-color, inherit)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  });
+                }
+              };
+              if (cond.condition === 'state') {
+                // Always attempt to use ha-entity-picker for a consistent user experience.
+                let ent = document.createElement('ha-entity-picker');
+                // Provide initial value and hass as soon as possible.
+                ent.value = cond.entity || '';
+                // In some cases the custom element may not yet be defined. When it
+                // upgrades, assign hass and register event listeners. Until then,
+                // these assignments are harmless no-ops.
+                ent.hass = this.hass;
+                ent.setAttribute('label', 'Select entity');
+                // Listen for changes when the element is ready.  The event
+                // listener will still fire once upgraded.
+                ent.addEventListener('value-changed', (ev) => {
+                  // Update the selected entity.  Stop propagation so the
+                  // condition can be removed cleanly without triggering other
+                  // listeners in the card editor.
+                  ev.stopPropagation();
+                  cond.entity = ev.detail.value || '';
+                  updateConfig();
+                });
+                // If the element is not yet defined, re-render once it is.
+                if (!customElements.get('ha-entity-picker')) {
+                  customElements.whenDefined('ha-entity-picker').then(() => {
+                    // Re-render this condition to upgrade from a plain element to
+                    // the actual picker UI. Preserve expansion state.
+                    render();
+                  }).catch(() => {});
+                }
+                addField('Entity', ent);
+                // Equals / Not equals selector – use ha-select if available for native styling
+                let op;
+                if (customElements.get('ha-select')) {
+                  op = document.createElement('ha-select');
+                  const optEq = document.createElement('mwc-list-item');
+                  optEq.setAttribute('value', 'state');
+                  optEq.textContent = 'State is equal to';
+                  const optNeq = document.createElement('mwc-list-item');
+                  optNeq.setAttribute('value', 'state_not');
+                  optNeq.textContent = 'State is not equal to';
+                  op.appendChild(optEq);
+                  op.appendChild(optNeq);
+                  op.value = cond.state_not != null ? 'state_not' : 'state';
+                  op.addEventListener('selected', (ev) => {
+                    ev.stopPropagation();
+                    const v = cond.state_not != null ? cond.state_not : cond.state;
+                    if (op.value === 'state_not') {
+                      cond.state_not = v;
+                      delete cond.state;
+                    } else {
+                      cond.state = v;
+                      delete cond.state_not;
+                    }
+                    updateConfig();
+                  });
+                } else {
+                  op = document.createElement('select');
+                  op.innerHTML = '<option value="state">State is equal to</option><option value="state_not">State is not equal to</option>';
+                  op.value = cond.state_not != null ? 'state_not' : 'state';
+                  op.addEventListener('change', (ev) => {
+                    ev.stopPropagation();
+                    const v = cond.state_not != null ? cond.state_not : cond.state;
+                    if (op.value === 'state_not') {
+                      cond.state_not = v;
+                      delete cond.state;
+                    } else {
+                      cond.state = v;
+                      delete cond.state_not;
+                    }
+                    updateConfig();
+                  });
+                  // Apply HA-like styling to the fallback select
+                  Object.assign(op.style, {
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                    border: '1px solid var(--divider-color)',
+                    color: 'var(--primary-text-color, inherit)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  });
+                }
+                addField('Match type', op);
+                // State value input – use ha-textfield when available
+                let st;
+                if (customElements.get('ha-textfield')) {
+                st = document.createElement('ha-textfield');
+                  st.value = (cond.state_not != null ? cond.state_not : cond.state) || '';
+                  st.setAttribute('label', '');
+                st.addEventListener('input', (ev) => {
+                    // Mirror numeric state behaviour: update on each keystroke
+                    // and stop propagation so parent controls remain responsive.
+                    ev.stopPropagation();
+                    const key = op.value;
+                    cond[key] = st.value;
+                    updateConfig();
+                  });
+                } else {
+                st = document.createElement('input');
+                  st.value = (cond.state_not != null ? cond.state_not : cond.state) || '';
+                  // Apply HA-like styling to the fallback input
+                  Object.assign(st.style, {
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                    border: '1px solid var(--divider-color)',
+                    color: 'var(--primary-text-color, inherit)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  });
+                  st.addEventListener('input', (ev) => {
+                    // Mirror numeric state behaviour: update immediately on
+                    // input and stop propagation so the event does not bubble.
+                    ev.stopPropagation();
+                    const key = op.value;
+                    cond[key] = st.value;
+                    updateConfig();
+                  });
+                }
+                addField('State', st);
+              } else if (cond.condition === 'numeric_state') {
+                // Always attempt to use ha-entity-picker for numeric state conditions.
+                let ent = document.createElement('ha-entity-picker');
+                // Provide initial value and hass property.
+                ent.value = cond.entity || '';
+                ent.hass = this.hass;
+                ent.setAttribute('label', 'Select entity');
+                // Show clear icon so the user can remove the selected entity
+                ent.removeAttribute('hide-clear-icon');
+                ent.addEventListener('value-changed', (ev) => {
+                  cond.entity = ev.detail.value || '';
+                  updateConfig();
+                });
+                // If the custom element is not yet defined, re-render when it upgrades.
+                if (!customElements.get('ha-entity-picker')) {
+                  customElements.whenDefined('ha-entity-picker').then(() => {
+                    render();
+                  }).catch(() => {});
+                }
+                addField('Entity', ent);
+                // Above threshold – use ha-textfield when available
+                let above;
+                if (customElements.get('ha-textfield')) {
+                  above = document.createElement('ha-textfield');
+                  above.setAttribute('type', 'number');
+                  above.value = cond.above != null ? cond.above : '';
+                above.addEventListener('input', (ev) => {
+                    ev.stopPropagation();
+                    const v = above.value;
+                    if (v === '' || isNaN(Number(v))) delete cond.above;
+                    else cond.above = Number(v);
+                    updateConfig();
+                  });
+                } else {
+                  above = document.createElement('input');
+                  above.type = 'number';
+                  above.value = cond.above != null ? cond.above : '';
+                  // Apply HA-like styling to the fallback numeric input
+                  Object.assign(above.style, {
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                    border: '1px solid var(--divider-color)',
+                    color: 'var(--primary-text-color, inherit)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  });
+                  above.addEventListener('input', () => {
+                    const v = above.value;
+                    if (v === '' || isNaN(Number(v))) delete cond.above;
+                    else cond.above = Number(v);
+                    updateConfig();
+                  });
+                }
+                addField('Above', above);
+                // Below threshold – use ha-textfield when available
+                let below;
+                if (customElements.get('ha-textfield')) {
+                  below = document.createElement('ha-textfield');
+                  below.setAttribute('type', 'number');
+                  below.value = cond.below != null ? cond.below : '';
+                below.addEventListener('input', (ev) => {
+                    ev.stopPropagation();
+                    const v = below.value;
+                    if (v === '' || isNaN(Number(v))) delete cond.below;
+                    else cond.below = Number(v);
+                    updateConfig();
+                  });
+                } else {
+                  below = document.createElement('input');
+                  below.type = 'number';
+                  below.value = cond.below != null ? cond.below : '';
+                  // Apply HA-like styling to the fallback numeric input
+                  Object.assign(below.style, {
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))',
+                    border: '1px solid var(--divider-color)',
+                    color: 'var(--primary-text-color, inherit)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  });
+                  below.addEventListener('input', () => {
+                    const v = below.value;
+                    if (v === '' || isNaN(Number(v))) delete cond.below;
+                    else cond.below = Number(v);
+                    updateConfig();
+                  });
+                }
+                addField('Below', below);
+              } else if (cond.condition === 'screen') {
+                const opts = [
+                  { label: 'Mobile', query: '(max-width: 599px)' },
+                  { label: 'Tablet (min: 768px)', query: '(min-width: 768px)' },
+                  { label: 'Desktop (min: 1024px)', query: '(min-width: 1024px)' },
+                  { label: 'Wide (min: 1280px)', query: '(min-width: 1280px)' }
+                ];
+                if (!Array.isArray(cond.media_query_list)) cond.media_query_list = [];
+                const box = document.createElement('div');
+                box.style.display = 'flex';
+                box.style.flexDirection = 'column';
+                box.style.gap = '4px';
+                opts.forEach((opt) => {
+                  const rowcb = document.createElement('label');
+                  rowcb.style.display = 'flex';
+                  rowcb.style.alignItems = 'center';
+                  rowcb.style.gap = '6px';
+                  const cb = document.createElement('input');
+                  cb.type = 'checkbox';
+                  cb.checked = cond.media_query_list.includes(opt.query);
+                  cb.addEventListener('change', () => {
+                    if (cb.checked) {
+                      cond.media_query_list.push(opt.query);
+                    } else {
+                      cond.media_query_list = cond.media_query_list.filter((q) => q !== opt.query);
+                    }
+                    cond.media_query = cond.media_query_list.join(',');
+                    updateConfig();
+                  });
+                  const sp = document.createElement('span');
+                  sp.textContent = opt.label;
+                  rowcb.appendChild(cb);
+                  rowcb.appendChild(sp);
+                  box.appendChild(rowcb);
+                });
+                addField('Screen sizes', box);
+              } else if (cond.condition === 'user') {
+                let up;
+                if (customElements.get('ha-user-picker')) {
+                  // Use the built‑in user picker when available
+                  up = document.createElement('ha-user-picker');
+                  up.hass = this.hass;
+                  up.setAttribute('label', 'Select user');
+                  up.value = Array.isArray(cond.users) ? cond.users : [];
+                  up.addEventListener('value-changed', (ev) => {
+                    const val = ev.detail.value;
+                    cond.users = Array.isArray(val) ? val : [val];
+                    updateConfig();
+                  });
+                } else {
+                  // Fallback: create a container that will be filled asynchronously
+                  up = document.createElement('div');
+                  up.style.display = 'flex';
+                  up.style.flexDirection = 'column';
+                  up.style.gap = '4px';
+                    // Show a loading indicator while fetching
+                  const loading = document.createElement('span');
+                  loading.style.opacity = '0.7';
+                  loading.style.fontSize = '.85rem';
+                  loading.textContent = 'Loading users…';
+                  up.appendChild(loading);
+                  // Preserve current selection
+                  const selUsers = Array.isArray(cond.users) ? cond.users : [];
+                  fetchUsers().then((uList) => {
+                    up.innerHTML = '';
+                    if (Array.isArray(uList) && uList.length) {
+                      // Build checkbox list for each user
+                      uList.forEach((u) => {
+                        const uid = u.id || u.user_id || u.uid || u.name || '';
+                        const uname = u.name || uid;
+                        const lbl = document.createElement('label');
+                        lbl.style.display = 'flex';
+                        lbl.style.alignItems = 'center';
+                        lbl.style.gap = '6px';
+                        lbl.style.padding = '4px 0';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.checked = selUsers.includes(uid) || selUsers.includes(uname);
+                        cb.addEventListener('change', () => {
+                          let arr = Array.isArray(cond.users) ? cond.users.slice() : [];
+                          if (cb.checked) {
+                            if (!arr.includes(uid)) arr.push(uid);
+                          } else {
+                            arr = arr.filter((x) => x !== uid && x !== uname);
+                          }
+                          cond.users = arr;
+                          updateConfig();
+                        });
+                        const sp = document.createElement('span');
+                        sp.textContent = uname;
+                        lbl.appendChild(cb);
+                        lbl.appendChild(sp);
+                        up.appendChild(lbl);
+                      });
+                    } else {
+                      // Still fallback to simple input if no users found via API
+                      const inp = document.createElement('input');
+                      inp.value = Array.isArray(cond.users) ? cond.users.join(',') : '';
+                      // Style the manual users input for consistency
+                      Object.assign(inp.style, {
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--divider-color)',
+                        background: 'var(--card-background-color, var(--secondary-background-color))',
+                        color: 'var(--primary-text-color, inherit)'
+                      });
+                      const commit = () => {
+                        cond.users = inp.value.split(',').map((s) => s.trim()).filter(Boolean);
+                        updateConfig();
+                      };
+                      inp.addEventListener('change', commit);
+                      inp.addEventListener('blur', commit);
+                      up.appendChild(inp);
+                    }
+                  });
+                }
+                addField('Users', up);
+              }
+              row.appendChild(fields);
+            }
+          } else {
+            // Group
+            if (expanded) {
+              if (!Array.isArray(cond.conditions)) cond.conditions = [];
+              const childContainer = document.createElement('div');
+              childContainer.style.marginLeft = '16px';
+              renderList(cond.conditions, childContainer);
+              row.appendChild(childContainer);
+            }
+          }
+          container.appendChild(row);
+        };
+        // Render top level
+        renderList(visList, visHost);
+      };
+      render();
+    };
+
     const mountPreview = (cfg) => {
       if ((cfg?.type || '') === 'custom_card') {
         __lastPreviewCfgJSON = JSON.stringify(cfg || {});
@@ -4538,9 +6440,13 @@ _applyAutoScale() {
                 try { visualEditor.setConfig?.(currentConfig); } catch {}
                 if (__activeTab !== 'yaml') showTab('visual');
               }
+              // When the card type changes via YAML, rebuild the visibility UI
+              try { buildVisUI(currentConfig); } catch {}
             } else {
               try { visualEditor?.setConfig?.(currentConfig); } catch {}
               mountPreview(currentConfig);
+              // Update the visibility UI when YAML modifies non-type properties
+              try { buildVisUI(currentConfig); } catch {}
             }
 
           } catch (e) {
@@ -4591,8 +6497,24 @@ _applyAutoScale() {
       await raf();
       mountPreview(currentConfig); // debounced version
 
-      // Do not reuse an old editor; a new one will be created on demand when the user clicks “Visual”
-      showTab('yaml');
+      // Rebuild the visibility UI for the selected type/config. This ensures the
+      // visibility editor reflects any conditions stored in the config when a
+      // different card type is selected.
+      try { buildVisUI(currentConfig); } catch {}
+
+      // Do not reuse an old editor; mount the visual editor by default when adding a new card.
+      // Attempt to mount the visual editor for the selected type. If the card does
+      // not support a visual editor, mountVisualEditor will handle showing a
+      // message and fallback to YAML internally.
+      try {
+        // Try mounting visual editor for the current configuration. If the
+        // returned value is false, the card lacks a visual editor.
+        const visReady = await mountVisualEditor(currentConfig);
+        showTab(visReady ? 'visual' : 'yaml');
+      } catch {
+        // On error, fall back to YAML
+        showTab('yaml');
+      }
       enableCommit(true);
 
     };
@@ -4788,6 +6710,10 @@ async _getStubConfigForType(type) {
     this._queueSave('add');
     this._toast('Card added to layout.');
     this._syncEmptyStateUI();
+
+    // After inserting a new card, reevaluate visibility so any conditions
+    // attached to the new card are applied immediately (if not in edit mode).
+    try { this._applyVisibility_(); } catch {}
   }
 
   /* ------------------------------ Selection utils ------------------------------ */
