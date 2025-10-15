@@ -5250,6 +5250,9 @@ _applyAutoScale() {
           del.setAttribute('title','Remove condition');
           del.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
           Object.assign(del.style, { border:'none', background:'transparent', cursor:'pointer', padding:'4px', display:'inline-flex', alignItems:'center' });
+          // Ensure the delete button is positioned above other elements
+          del.style.position = 'relative';
+          del.style.zIndex = '1000';
           del.addEventListener('click', (ev) => {
             // Prevent the click from bubbling to parent elements (which may lock the editor)
             ev.preventDefault();
@@ -5823,6 +5826,8 @@ _applyAutoScale() {
           // Subtle bottom border to separate header from fields
           header.style.borderBottom = '1px solid var(--divider-color)';
           header.style.paddingBottom = '4px';
+          // Ensure the header sits above any overlay elements (e.g. selects)
+          header.style.position = 'relative';
           const left = document.createElement('div');
           left.style.display = 'flex';
           left.style.alignItems = 'center';
@@ -5881,6 +5886,9 @@ _applyAutoScale() {
             display: 'inline-flex',
             alignItems: 'center'
           });
+          // Ensure the remove button stays clickable above other elements
+          rm.style.position = 'relative';
+          rm.style.zIndex = '1000';
           rm.addEventListener('click', (ev) => {
             // Prevent default and stop propagation so the click does not get swallowed
             ev.preventDefault();
