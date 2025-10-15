@@ -814,6 +814,12 @@ static getConfigElement() {
         <ha-checkbox id="autoResize"></ha-checkbox>
       </ha-formfield>
 
+      <div class="label">Animate cards</div>
+      <ha-formfield label="Animate cards on tab switch">
+        <ha-checkbox id="animateCards"></ha-checkbox>
+      </ha-formfield>
+      <div class="helper">If enabled, cards will fly in when switching tabs or on refresh.</div>
+
 
       <div class="row-spacer"></div>
       <div class="section">Container Size</div>
@@ -901,6 +907,11 @@ static getConfigElement() {
     el.querySelector('#noOverlap').checked = !!el._config.disable_overlap;
     el.querySelector('#autoResize').checked = !!el._config.auto_resize_cards;
 
+    // Set the animate cards checkbox based on the incoming config. This
+    // defaults to false when not specified. When true, cards will animate
+    // into view on tab changes or refresh.
+    el.querySelector('#animateCards').checked = !!el._config.animate_cards;
+
 
     el.querySelector('#sizeMode').value = el._config.container_size_mode || 'dynamic';
     el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
@@ -959,6 +970,11 @@ static getConfigElement() {
     base.disable_overlap = !!el.querySelector('#noOverlap').checked;
     base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
 
+    // Reflect the animate cards setting back into the configuration. When
+    // true, cards will perform a fly‑in animation on tab switch. This key
+    // persists in YAML so toggling the option will survive reloads.
+    base.animate_cards = !!el.querySelector('#animateCards').checked;
+
 
     base.container_size_mode = el.querySelector('#sizeMode').value;
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
@@ -989,6 +1005,7 @@ static getConfigElement() {
   on('#containerBg'); on('#cardBg');
   on('#debug', 'change'); on('#noOverlap', 'change');
   on('#autoResize', 'change');
+  on('#animateCards', 'change');
   on('#sizeMode', 'change'); on('#sizeW'); on('#sizeH');
   on('#sizePreset', 'selected'); on('#sizeOrientation', 'selected');
 
@@ -1179,6 +1196,11 @@ _applyGridVars() {
     this.disableOverlap           = !!config.disable_overlap;
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
     this.autoResizeCards         = !!config.auto_resize_cards;
+
+    // Whether to play a fly‑in animation when switching tabs or refreshing
+    // Defaults to false when not specified.  When true, the card wrappers
+    // animate into view the moment a tab becomes active or on initial load.
+    this.animateCards             = !!config.animate_cards;
 
     if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
     this._applyAutoScale?.();
@@ -1912,6 +1934,20 @@ _applyGridVars() {
           }
         }
 
+        /* Fly‑in animation for card wrappers. When the animate_cards
+           configuration option is enabled, card wrappers will animate
+           into view using this keyframe sequence. Cards translate
+           upward while fading in to produce a quick, pleasant fly‑in. */
+        @keyframes ddc-card-fly-in{
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        /* Apply the fly‑in animation to visible cards. The animation
+           duration and easing mirror other UI animations for cohesion. */
+        .card-wrapper.ddc-fly-in{
+          animation: ddc-card-fly-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
       
         </style>
         <div class="ddc-root">
@@ -1935,6 +1971,16 @@ _applyGridVars() {
             <button class="btn secondary" id="importBtn" style="display:none">
               <ha-icon icon="mdi:upload"></ha-icon>
               <span style="margin-left:6px">Import Design</span>
+            </button>
+
+            <!-- Copy and Paste buttons for edit mode -->
+            <button class="btn secondary" id="copyBtn" style="display:none">
+              <ha-icon icon="mdi:content-copy"></ha-icon>
+              <span style="margin-left:6px">Copy</span>
+            </button>
+            <button class="btn secondary" id="pasteBtn" style="display:none">
+              <ha-icon icon="mdi:content-paste"></ha-icon>
+              <span style="margin-left:6px">Paste</span>
             </button>
             <button class="btn" id="applyLayoutBtn" style="display:none">
               <ha-icon icon="mdi:content-save"></ha-icon>
@@ -1965,6 +2011,9 @@ _applyGridVars() {
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
       this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
       this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
+      // Copy and Paste buttons (for edit mode)
+      this.copyBtn      = this.shadowRoot.querySelector('#copyBtn');
+      this.pasteBtn     = this.shadowRoot.querySelector('#pasteBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
       try { this._renderTabs(); this._applyActiveTab(); } catch {}
@@ -1982,6 +2031,10 @@ _applyGridVars() {
       this.exportBtn.addEventListener('click', () => this._exportDesign());
       this.importBtn.addEventListener('click', () => this._importDesign());
       this.applyLayoutBtn.addEventListener('click', () => this._saveLayout(false));
+
+      // Wire up copy/paste handlers. Only enabled in edit mode; see _toggleEditMode.
+      if (this.copyBtn) this.copyBtn.addEventListener('click', () => this._copySelection());
+      if (this.pasteBtn) this.pasteBtn.addEventListener('click', () => this._pasteClipboard());
        // Ctrl/Cmd + S to Apply while in DDC edit mode
        window.addEventListener('keydown', (e) => {
          if (!this.editMode) return;
@@ -2413,6 +2466,61 @@ if (this.__ddcOnWinResize) {
   }
     });
     try { this._clearSelection(); } catch {}
+    // When card animations are enabled, animate visible cards after switching tabs
+    try {
+      if (this.animateCards) {
+        this._animateCards?.();
+      }
+    } catch {}
+  }
+
+  /**
+   * Animate all visible card wrappers. When the animateCards flag is true
+   * this method is invoked after switching tabs or on initial load. It
+   * iterates over each wrapper that is currently displayed and applies
+   * a CSS class that triggers a short fly‑in animation. The class is
+   * removed once the animation completes so subsequent tab switches can
+   * retrigger the animation. Hidden wrappers (display: none) are skipped.
+   */
+  _animateCards() {
+    try {
+      const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+      wraps.forEach((w) => {
+        // Skip hidden cards. If a wrapper is not visible, don't animate it.
+        const style = window.getComputedStyle ? window.getComputedStyle(w) : null;
+        const isHidden = (w.style.display === 'none') || (style && style.display === 'none') || w.classList.contains('ddc-hidden');
+        if (isHidden) return;
+        // Compute the current transform so we can append our fly‑in offset
+        const computed = window.getComputedStyle(w);
+        const initialTransform = (computed && computed.transform && computed.transform !== 'none') ? computed.transform : '';
+        // Build keyframes that animate opacity and translateY without overriding
+        // the existing translate3d applied by the layout. We append our offset
+        // to the current transform so the card flies up from its natural position.
+        const frames = [
+          { opacity: 0, transform: `${initialTransform} translateY(12px)` },
+          { opacity: 1, transform: `${initialTransform}` }
+        ];
+        // Use the Web Animations API to play the animation. The default fill
+        // mode leaves the underlying transform intact once the animation ends.
+        try {
+          w.animate(frames, {
+            duration: 300,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            fill: 'none'
+          });
+        } catch {
+          // Some browsers might not support animate(); if so, fall back to opacity
+          w.style.opacity = '0';
+          requestAnimationFrame(() => {
+            w.style.transition = 'opacity .3s ease';
+            w.style.opacity = '1';
+          });
+        }
+      });
+    } catch (e) {
+      // Suppress errors to avoid breaking the card when animations fail
+      console.warn('[ddc:animate] animation error', e);
+    }
   }
   _addTabSelectorToChip(wrapper, entryTabId = null) {
     if (!this.tabs || !this.tabs.length) return;
@@ -2461,6 +2569,9 @@ if (this.__ddcOnWinResize) {
     this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
     this.storeBadge.style.display  = this.editMode ? 'inline-block' : 'none';
     this.applyLayoutBtn.style.display = this.editMode ? 'inline-block' : 'none';
+    // Show copy/paste only during editing
+    if (this.copyBtn)  this.copyBtn.style.display  = this.editMode ? 'inline-block' : 'none';
+    if (this.pasteBtn) this.pasteBtn.style.display = this.editMode ? 'inline-block' : 'none';
     this._syncEmptyStateUI();
     
     this.cardContainer.classList.toggle('grid-on', this.editMode);
@@ -5256,13 +5367,7 @@ _applyAutoScale() {
           del.addEventListener('click', (ev) => {
             // Prevent the click from bubbling to parent elements (which may lock the editor)
             ev.preventDefault();
-            // Use stopImmediatePropagation to prevent other handlers on the same
-            // element from firing, ensuring this removal logic runs only once.
-            if (typeof ev.stopImmediatePropagation === 'function') {
-              ev.stopImmediatePropagation();
-            } else {
-              ev.stopPropagation();
-            }
+            ev.stopPropagation();
             // Remove the correct condition using indexOf on the current list. This
             // avoids relying on the stale idx value.
             const index = visList.indexOf(cond);
@@ -5270,13 +5375,8 @@ _applyAutoScale() {
               visList.splice(index, 1);
             }
             currentConfig.visibility = visList;
-            // Delay update/render slightly to ensure concurrent input handlers
-            // finish executing before the configuration is mutated.  This
-            // prevents the removed condition from being re-added.
-            setTimeout(() => {
-              render();
-              updateConfig();
-            }, 0);
+            render();
+            updateConfig();
           });
           headerDiv.appendChild(del);
           row.appendChild(headerDiv);
@@ -5907,11 +6007,7 @@ _applyAutoScale() {
           rm.addEventListener('click', (ev) => {
             // Prevent default and stop propagation so the click does not get swallowed
             ev.preventDefault();
-            if (typeof ev.stopImmediatePropagation === 'function') {
-              ev.stopImmediatePropagation();
-            } else {
-              ev.stopPropagation();
-            }
+            ev.stopPropagation();
             // Locate this condition in its parent list and remove it. Using
             // indexOf ensures we remove the correct object even if indices
             // shift due to other operations.
@@ -5919,14 +6015,8 @@ _applyAutoScale() {
             if (index > -1) {
               parentList.splice(index, 1);
             }
-            // Delay update/render to allow other event handlers (e.g. input
-            // changes) to complete.  Without this delay, concurrent
-            // value-changed handlers may re-add the condition before it's
-            // removed.
-            setTimeout(() => {
-              updateConfig();
-              render();
-            }, 0);
+            updateConfig();
+            render();
           });
           header.appendChild(rm);
           row.appendChild(header);
@@ -6763,6 +6853,125 @@ async _getStubConfigForType(type) {
   _clearSelection() {
     for (const w of this._selection) w.classList.remove('selected');
     this._selection.clear();
+  }
+
+  /**
+   * Copy the currently selected cards into a global clipboard. When invoked,
+   * this will capture the configuration and layout of each selected card and
+   * store it on the window object so that it may be pasted into the same
+   * dashboard or a completely different drag-and-drop card instance. The
+   * relative arrangement of cards is preserved based on the top‑leftmost
+   * card in the selection.
+   */
+  _copySelection() {
+    try {
+      // Determine selected wrappers. If nothing is selected, bail early.
+      const wrappers = this._selection ? Array.from(this._selection) : [];
+      if (!wrappers.length) {
+        this._toast?.('Nothing selected to copy.');
+        return;
+      }
+      // Compute the minimum x/y across the selection to preserve relative offsets
+      let minX = Infinity, minY = Infinity;
+      const items = [];
+      for (const w of wrappers) {
+        // skip placeholders
+        if (w.dataset.placeholder) continue;
+        const x = parseFloat(w.getAttribute('data-x')) || 0;
+        const y = parseFloat(w.getAttribute('data-y')) || 0;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+      }
+      for (const w of wrappers) {
+        if (w.dataset.placeholder) continue;
+        const cfg = this._extractCardConfig(w.firstElementChild) || {};
+        const x = parseFloat(w.getAttribute('data-x')) || 0;
+        const y = parseFloat(w.getAttribute('data-y')) || 0;
+        const width  = w.style.width  || `${w.getBoundingClientRect().width}px`;
+        const height = w.style.height || `${w.getBoundingClientRect().height}px`;
+        items.push({ cfg, dx: x - minX, dy: y - minY, width, height });
+      }
+      // Save to global clipboard. Use a namespaced key to avoid collisions.
+      window.__DDC_CLIPBOARD__ = { items };
+      this._toast?.(`Copied ${items.length} card${items.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Copy failed', err);
+      this._toast?.('Copy failed.');
+    }
+  }
+
+  /**
+   * Paste cards from the global clipboard into this drag‑and‑drop card. The
+   * pasted cards will retain their relative arrangement and sizing, and will
+   * be placed into the currently active tab. If no valid clipboard data is
+   * present, the user will be notified. Cards are offset from the top‑left
+   * corner by one grid unit and shifted repeatedly until no collision with
+   * existing cards is detected.
+   */
+  async _pasteClipboard() {
+    try {
+      const clip = window.__DDC_CLIPBOARD__;
+      if (!clip || !Array.isArray(clip.items) || !clip.items.length) {
+        this._toast?.('Clipboard is empty.');
+        return;
+      }
+      const items = clip.items;
+      // Determine a collision‑free base position. We attempt to place the
+      // group starting at one grid unit from the origin and slide further
+      // down/right until no overlap occurs.
+      let shift = 1;
+      let proposedRects;
+      do {
+        const baseX = this.gridSize * shift;
+        const baseY = this.gridSize * shift;
+        proposedRects = items.map((it) => {
+          const w = parseFloat(it.width) || 0;
+          const h = parseFloat(it.height) || 0;
+          return { x: baseX + (it.dx || 0), y: baseY + (it.dy || 0), w, h };
+        });
+        shift += 1;
+        // Break if no collision; ignore nothing (empty set) so all existing cards count
+      } while (this._anyCollisionFor(proposedRects, new Set()));
+      // Use the final baseX/baseY from the previous iteration
+      const baseX = this.gridSize * (shift - 1);
+      const baseY = this.gridSize * (shift - 1);
+      // Create each card, apply sizing and position, and attach to the DOM
+      for (const it of items) {
+        const cfg = it.cfg || {};
+        const cardEl = await this._createCard(cfg);
+        const wrap = this._makeWrapper(cardEl);
+        // Sizing
+        wrap.style.width  = it.width;
+        wrap.style.height = it.height;
+        // Positioning: maintain relative dx/dy within group
+        const x = baseX + (it.dx || 0);
+        const y = baseY + (it.dy || 0);
+        this._setCardPosition(wrap, x, y);
+        // Bring to front
+        wrap.style.zIndex = String(this._highestZ() + 1);
+        // Assign to current tab
+        try {
+          const tid = this._normalizeTabId(this.activeTab || this.defaultTab);
+          if (tid) wrap.dataset.tabId = tid;
+        } catch {}
+        // Append and initialize
+        this.cardContainer.appendChild(wrap);
+        // Do not attach a tab selector when pasting. Pasted cards are assigned
+        // to the current tab automatically and the user does not need to
+        // reassign them immediately.
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+        this._initCardInteract(wrap);
+      }
+      // Ensure the container grows and the active tab filter is applied
+      this._resizeContainer();
+      this._applyActiveTab();
+      // Persist the change
+      this._queueSave?.('paste');
+      this._toast?.(`Pasted ${items.length} card${items.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Paste failed', err);
+      this._toast?.('Paste failed.');
+    }
   }
 
   _installSelectionMarquee() {
