@@ -1423,11 +1423,13 @@ _applyGridVars() {
           /* ---- chip ---- */
         .chip{
             position:absolute;
-            top:8px;
-            right:8px;
+            /* Position the chip horizontally centered above the resize handle */
+            bottom:48px;
+            left:50%;
+            transform:translateX(-50%);
             display:flex;
             gap:6px;
-            flex-wrap:wrap;             /* allow chip buttons to wrap when space is limited */
+            flex-wrap:wrap;
             opacity:0;
             transition:opacity .15s;
             z-index:30;
@@ -1441,17 +1443,48 @@ _applyGridVars() {
             opacity:1;
             pointer-events: auto;
           }
+          /* Action buttons on cards: icons only, colour-coded and consistent sizing */
           .chip .mini{
-            display:inline-flex;align-items:center;gap:6px;
-            background:rgba(28,28,30,.78);color:#fff;border:1px solid rgba(255,255,255,.18);
-            border-radius:999px;padding:6px 10px;font-size:.76rem;cursor:pointer;letter-spacing:.2px;
-            box-shadow:0 2px 6px rgba(0,0,0,.25); transition:transform .08s, background .12s, box-shadow .12s
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            width:32px;
+            height:32px;
+            /* Use a subtle gradient for a more interesting look */
+            background:linear-gradient(135deg, rgba(24,25,27,.7) 0%, rgba(40,41,43,.9) 100%);
+            color:#fff;
+            border:1px solid rgba(255,255,255,.18);
+            border-radius:8px;
+            cursor:pointer;
+            box-shadow:0 2px 4px rgba(0,0,0,.25);
+            /* removed blur for clarity */
+            transition:background .15s, transform .1s, box-shadow .15s;
           }
-          .chip .mini:hover{transform:translateY(-1px); background:rgba(28,28,30,.95); box-shadow:0 3px 10px rgba(0,0,0,.35)}
-          .chip .mini ha-icon{--mdc-icon-size:18px;width:18px;height:18px}
-          .chip .mini.danger{background:rgba(220, 38, 38, .9);border-color:rgba(255,255,255,.22)}
-          .chip .mini.danger:hover{background:rgba(220, 38, 38, 1)}
-          .chip .mini.pill{padding:6px}
+          .chip .mini span{
+            display:none;
+          }
+          .chip .mini:hover{
+            transform:translateY(-1px);
+            background:linear-gradient(135deg, rgba(24,25,27,.85) 0%, rgba(40,41,43,1) 100%);
+            box-shadow:0 3px 8px rgba(0,0,0,.4);
+          }
+          .chip .mini ha-icon{
+            --mdc-icon-size:20px;
+            width:20px;
+            height:20px;
+          }
+          .chip .mini.danger{
+            background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
+            border-color:rgba(255,255,255,.22);
+          }
+          .chip .mini.danger:hover{
+            background:linear-gradient(135deg, rgba(236,72,72,1) 0%, rgba(255,105,97,1) 100%);
+          }
+          /* pill modifier is no longer used, but keep rule for compatibility */
+          .chip .mini.pill{
+            /* no extra padding needed when using icon-only buttons */
+            padding:0;
+          }
 
           /* Edit highlight */
           .card-wrapper.editing{ 
@@ -1470,23 +1503,67 @@ _applyGridVars() {
           .resize-handle{
             display:none;                 /* shown in edit mode via your existing rule */
             position:absolute;
-            bottom:8px;                   /* move INSIDE the wrapper bounds */
-            right:8px;                    /* so it can't be clipped by overflow */
-            width:28px;
-            height:28px;
-            border-radius:50%;
+            bottom:0;
+            right:0;
+            width:40px;
+            height:40px;
             background:var(--primary-color);
             color:#fff;
-            border:1px solid rgba(255,255,255,.25);
+            border-top-left-radius:40px;
+            border-bottom-left-radius:0;
+            border-top-right-radius:0;
+            border-bottom-right-radius:0;
             cursor:se-resize;
             z-index:999;                  /* above the card content */
             box-shadow:0 3px 8px rgba(0,0,0,.28);
+            display:flex;
             align-items:center;
             justify-content:center;
+            transition:background .15s, transform .1s, box-shadow .15s;
           }
-          .resize-handle:hover{transform:scale(1.08);box-shadow:0 6px 16px rgba(0,0,0,.35)}
+          .resize-handle:hover{
+            transform:scale(1.05);
+            box-shadow:0 6px 16px rgba(0,0,0,.35);
+            filter:brightness(1.05);
+          }
           .card-wrapper.editing .resize-handle{display:flex}
-          .resize-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px;pointer-events:none}
+          .resize-handle ha-icon{
+            --mdc-icon-size:20px;
+            width:20px;
+            height:20px;
+            pointer-events:none;
+          }
+
+          /* Delete handle: a quarter‑circle wedge in the top-left corner */
+          .delete-handle{
+            display:none;                 /* shown only in edit mode */
+            position:absolute;
+            top:0;
+            left:0;
+            width:40px;
+            height:40px;
+            background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
+            color:#fff;
+            border-bottom-right-radius:40px;
+            z-index:999;
+            box-shadow:0 3px 8px rgba(0,0,0,.28);
+            cursor:pointer;
+            align-items:center;
+            justify-content:center;
+            transition:background .15s, transform .1s, box-shadow .15s;
+          }
+          .delete-handle:hover{
+            transform:scale(1.05);
+            box-shadow:0 6px 16px rgba(0,0,0,.35);
+            filter:brightness(1.05);
+          }
+          .card-wrapper.editing .delete-handle{display:flex}
+          .delete-handle ha-icon{
+            --mdc-icon-size:20px;
+            width:20px;
+            height:20px;
+            pointer-events:none;
+          }
 
           /* modal */
           .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
@@ -1982,6 +2059,12 @@ _applyGridVars() {
               <ha-icon icon="mdi:content-paste"></ha-icon>
               <span style="margin-left:6px">Paste</span>
             </button>
+
+            <!-- Dashboard Settings button -->
+            <button class="btn secondary" id="settingsBtn" style="display:none">
+              <ha-icon icon="mdi:cog"></ha-icon>
+              <span style="margin-left:6px">Dashboard Settings</span>
+            </button>
             <button class="btn" id="applyLayoutBtn" style="display:none">
               <ha-icon icon="mdi:content-save"></ha-icon>
               <span style="margin-left:6px">Apply</span>
@@ -2014,6 +2097,7 @@ _applyGridVars() {
       // Copy and Paste buttons (for edit mode)
       this.copyBtn      = this.shadowRoot.querySelector('#copyBtn');
       this.pasteBtn     = this.shadowRoot.querySelector('#pasteBtn');
+      this.settingsBtn  = this.shadowRoot.querySelector('#settingsBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
       try { this._renderTabs(); this._applyActiveTab(); } catch {}
@@ -2035,6 +2119,9 @@ _applyGridVars() {
       // Wire up copy/paste handlers. Only enabled in edit mode; see _toggleEditMode.
       if (this.copyBtn) this.copyBtn.addEventListener('click', () => this._copySelection());
       if (this.pasteBtn) this.pasteBtn.addEventListener('click', () => this._pasteClipboard());
+
+      // Open the dashboard settings menu when settings button is clicked
+      if (this.settingsBtn) this.settingsBtn.addEventListener('click', () => this._openDashboardSettings());
        // Ctrl/Cmd + S to Apply while in DDC edit mode
        window.addEventListener('keydown', (e) => {
          if (!this.editMode) return;
@@ -2572,6 +2659,7 @@ if (this.__ddcOnWinResize) {
     // Show copy/paste only during editing
     if (this.copyBtn)  this.copyBtn.style.display  = this.editMode ? 'inline-block' : 'none';
     if (this.pasteBtn) this.pasteBtn.style.display = this.editMode ? 'inline-block' : 'none';
+    if (this.settingsBtn) this.settingsBtn.style.display = this.editMode ? 'inline-block' : 'none';
     this._syncEmptyStateUI();
     
     this.cardContainer.classList.toggle('grid-on', this.editMode);
@@ -3039,7 +3127,8 @@ _syncEmptyStateUI() {
     // selection with clicks
     wrap.addEventListener('mousedown', (e) => {
       if (!this.editMode) return;
-      if (e.target.closest('.resize-handle') || e.target.closest('.chip')) return;
+      // Ignore clicks on controls: resize handle, delete handle, or chip actions
+      if (e.target.closest('.resize-handle') || e.target.closest('.delete-handle') || e.target.closest('.chip')) return;
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
         e.stopPropagation();
         this._toggleSelection(wrap); // toggle in multi
@@ -3097,10 +3186,39 @@ _syncEmptyStateUI() {
       <button class="mini pill" data-act="back" title="Send backward" aria-label="Send backward">
         <ha-icon icon="mdi:arrange-send-backward"></ha-icon>
       </button>
-      <button class="mini danger pill" data-act="delete" title="Delete card" aria-label="Delete card">
-        <ha-icon icon="mdi:close-thick"></ha-icon>
+      <button class="mini pill" data-act="front-most" title="Bring to front" aria-label="Bring to front">
+        <ha-icon icon="mdi:arrange-bring-to-front"></ha-icon>
+      </button>
+      <button class="mini pill" data-act="back-most" title="Send to back" aria-label="Send to back">
+        <ha-icon icon="mdi:arrange-send-to-back"></ha-icon>
       </button>
     `;
+
+    // Create a dedicated delete handle that sits in the top‑left corner. This
+    // replaces the delete button in the chip and mimics the resize handle in
+    // style. Clicking it will remove the card (or multiple cards if a group
+    // selection exists).
+    const delHandle = document.createElement('div');
+    delHandle.className = 'delete-handle';
+    delHandle.innerHTML = `<ha-icon icon="mdi:close-thick"></ha-icon>`;
+    delHandle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // When multiple cards are selected and the current wrapper is among them,
+      // delete all selected cards. Otherwise delete just this wrapper.
+      if (this._selection.size > 1 && this._selection.has(wrap)) {
+        const toDel = Array.from(this._selection);
+        toDel.forEach(w => w.remove());
+        this._clearSelection();
+        this._resizeContainer();
+        this._queueSave('delete-multi');
+        this._ensurePlaceholderIfEmpty?.();
+      } else {
+        wrap.remove();
+        this._resizeContainer();
+        this._queueSave('delete');
+        this._ensurePlaceholderIfEmpty?.();
+      }
+    });
 
     // Tab selector UI
     try { this._addTabSelectorToChip(wrap, wrap.dataset.tabId); } catch {}
@@ -3148,9 +3266,48 @@ _syncEmptyStateUI() {
         this._resizeContainer();
         this._queueSave('duplicate');
       } else if (act === 'front') {
+        // Bring forward by one layer
         this._adjustZ(wrap, +1);
       } else if (act === 'back')  {
+        // Send backward by one layer
         this._adjustZ(wrap, -1);
+      } else if (act === 'front-most') {
+        // Bring selected card(s) to the very front (highest z-index)
+        const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
+        // Sort targets by current z-index ascending so their relative order is maintained when moving to top
+        targets.sort((a, b) => {
+          const za = parseInt(a.style.zIndex || '1', 10);
+          const zb = parseInt(b.style.zIndex || '1', 10);
+          return za - zb;
+        });
+        let base = this._highestZ();
+        for (const w of targets) {
+          base += 1;
+          w.style.zIndex = String(base);
+        }
+        this._queueSave('z-change');
+      } else if (act === 'back-most') {
+        // Send selected card(s) to the very back (lowest z-index)
+        const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
+        // Sort targets by current z-index descending so their relative order is maintained when moving to bottom
+        targets.sort((a, b) => {
+          const za = parseInt(a.style.zIndex || '1', 10);
+          const zb = parseInt(b.style.zIndex || '1', 10);
+          return zb - za;
+        });
+        // Determine the current minimum z-index among all cards
+        let minZ = Infinity;
+        this.cardContainer.querySelectorAll('.card-wrapper').forEach(w => {
+          const z = parseInt(w.style.zIndex || '1', 10);
+          if (z < minZ) minZ = z;
+        });
+        if (!isFinite(minZ)) minZ = 1;
+        let baseMin = minZ;
+        for (const w of targets) {
+          baseMin -= 1;
+          w.style.zIndex = String(Math.max(1, baseMin));
+        }
+        this._queueSave('z-change');
       } else if (act === 'edit') {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
@@ -3213,7 +3370,8 @@ _syncEmptyStateUI() {
       }
     } catch {}
 
-    wrap.append(cardEl, shield, chip, handle);
+    // include the delete handle before the resize handle so it appears beneath it in the DOM
+    wrap.append(cardEl, shield, chip, delHandle, handle);
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
     return wrap;
@@ -7191,6 +7349,404 @@ this._initCardInteract(wrap);
     });
 
     refreshLogs();
+  }
+
+  /* ------------------------ Dashboard Settings ------------------------ */
+  /**
+   * Opens a settings dialog allowing the user to configure dashboard‑wide
+   * options such as grid size, auto resize, animations and HA chrome
+   * visibility. The menu is designed to be simple and intuitive. Changes
+   * are applied when the user clicks Save.
+   */
+  _openDashboardSettings() {
+    // Build modal container
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    // Use the existing .dialog styles for consistent centering and sizing. Limit
+    // the maximum width so the settings sheet doesn't overwhelm the screen.
+    modal.innerHTML = `
+      <div class="dialog" role="dialog" aria-modal="true" style="max-width:600px">
+        <div class="dlg-head" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))">
+          <h3 style="margin:0;font-size:1.2rem">Dashboard Settings</h3>
+          <button class="btn secondary" id="ddc-settings-close" style="margin:0">
+            <ha-icon icon="mdi:close"></ha-icon>
+          </button>
+        </div>
+        <div class="settings-body" style="display:flex;flex-direction:column;gap:18px;padding:16px;overflow-y:auto;max-height:70vh">
+          <!-- Layout options -->
+          <div>
+            <h4 style="margin:0 0 8px 0;font-size:1rem;font-weight:600">Layout</h4>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Grid size (px)</span>
+              <input type="number" id="ddc-setting-gridSize" min="10" max="500" step="1" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-autoResize" />
+              <span>Auto resize cards</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-dragSnap" />
+              <span>Drag live snap</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-autoSave" />
+              <span>Auto save</span>
+            </label>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Auto save delay (ms)</span>
+              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="100" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
+            </label>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Container size mode</span>
+              <select id="ddc-setting-sizeMode" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px">
+                <option value="dynamic">Dynamic</option>
+                <option value="preset">Preset</option>
+                <option value="fixed_custom">Fixed (custom)</option>
+              </select>
+            </label>
+            <!-- Additional inputs for size mode (custom width/height or preset list) will be injected here -->
+            <div id="ddc-setting-sizeExtras"></div>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Container orientation</span>
+              <select id="ddc-setting-orient" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px">
+                <option value="auto">Auto</option>
+                <option value="landscape">Landscape</option>
+                <option value="portrait">Portrait</option>
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-disableOverlap" />
+              <span>Disable overlap</span>
+            </label>
+          </div>
+
+          <!-- Appearance options -->
+          <div>
+            <h4 style="margin:16px 0 8px 0;font-size:1rem;font-weight:600">Appearance</h4>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Container background (CSS)</span>
+              <input type="text" id="ddc-setting-containerBg" placeholder="e.g. transparent or #123456" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
+            </label>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Card background (CSS)</span>
+              <input type="text" id="ddc-setting-cardBg" placeholder="e.g. var(--ha-card-background)" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
+            </label>
+            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
+              <span style="margin-bottom:4px">Background image URL</span>
+              <input type="text" id="ddc-setting-bgImg" placeholder="Image URL" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
+            </label>
+          </div>
+
+          <!-- Behaviour options -->
+          <div>
+            <h4 style="margin:16px 0 8px 0;font-size:1rem;font-weight:600">Behaviour</h4>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-animate" />
+              <span>Animate cards</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-debug" />
+              <span>Enable debug logging</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-hideHdr" />
+              <span>Hide HA Header</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
+              <input type="checkbox" id="ddc-setting-hideSbar" />
+              <span>Hide HA Sidebar</span>
+            </label>
+          </div>
+
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid var(--divider-color,rgba(0,0,0,.12))">
+          <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
+          <button class="btn" id="ddc-settings-save">Save</button>
+        </div>
+      </div>
+    `;
+    // Only allow one modal at a time across the card. If any modal exists in
+    // the shadow root (including other DDC modals), remove it before
+    // opening the settings. This prevents overlapping dialog layers.
+    const existingModal = this.shadowRoot.querySelector('.modal');
+    if (existingModal) {
+      try { existingModal.remove(); } catch {}
+      // clear any stored references
+      if (this.__settingsModal === existingModal) this.__settingsModal = null;
+    }
+
+    // If a previous settings modal specifically exists, remove it as well
+    if (this.__settingsModal) {
+      try { this.__settingsModal.remove(); } catch {}
+      this.__settingsModal = null;
+    }
+    // Append to our own shadow root so built-in .modal styles apply and centering works
+    this.__settingsModal = modal;
+    this.shadowRoot.appendChild(modal);
+
+    // Prepopulate current settings
+    const chkAuto    = modal.querySelector('#ddc-setting-autoResize');
+    const inpGrid    = modal.querySelector('#ddc-setting-gridSize');
+    const chkAnim    = modal.querySelector('#ddc-setting-animate');
+    const chkHdr     = modal.querySelector('#ddc-setting-hideHdr');
+    const chkBar     = modal.querySelector('#ddc-setting-hideSbar');
+    const chkSnap    = modal.querySelector('#ddc-setting-dragSnap');
+    const chkASave   = modal.querySelector('#ddc-setting-autoSave');
+    const inpDeb     = modal.querySelector('#ddc-setting-autoSaveDebounce');
+    const selSize    = modal.querySelector('#ddc-setting-sizeMode');
+    const selOrient  = modal.querySelector('#ddc-setting-orient');
+    const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
+    const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
+    const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
+    const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
+    const chkDebug   = modal.querySelector('#ddc-setting-debug');
+    // hero image and tabs position are intentionally omitted from the settings UI
+
+    if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
+    if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
+    if (chkAnim)    chkAnim.checked    = !!this.animateCards;
+    if (chkHdr)     chkHdr.checked     = !!this.hideHaHeader;
+    if (chkBar)     chkBar.checked     = !!this.hideHaSidebar;
+    if (chkSnap)    chkSnap.checked    = !!this.dragLiveSnap;
+    if (chkASave)   chkASave.checked   = !!this.autoSave;
+    if (inpDeb)     inpDeb.value       = String(this.autoSaveDebounce ?? 800);
+    if (selSize)    selSize.value      = String(this.containerSizeMode || 'dynamic');
+    if (selOrient)  selOrient.value    = String(this.containerPresetOrient || 'auto');
+    if (chkOverlap) chkOverlap.checked = !!this.disableOverlap;
+    if (inpCBg)     inpCBg.value       = String(this.containerBackground || '');
+    if (inpCardBg)  inpCardBg.value    = String(this.cardBackground || '');
+    if (inpBgImg)   {
+      const bgObj = (this._config?.background_image ?? this._config?.bg_image) || {};
+      inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
+    }
+    if (chkDebug)   chkDebug.checked   = !!this.debug;
+
+    // Build extra inputs for container size mode (custom dimensions or preset list)
+    try {
+      const extrasDiv = modal.querySelector('#ddc-setting-sizeExtras');
+      const updateSizeExtras = () => {
+        if (!extrasDiv) return;
+        extrasDiv.innerHTML = '';
+        const modeVal = selSize?.value || 'dynamic';
+        if (modeVal === 'fixed_custom') {
+          // Custom width and height inputs
+          const wrapW = document.createElement('label');
+          wrapW.style.display = 'flex';
+          wrapW.style.flexDirection = 'column';
+          wrapW.style.fontSize = '.95rem';
+          wrapW.style.marginBottom = '10px';
+          const spanW = document.createElement('span');
+          spanW.textContent = 'Custom width (px)';
+          spanW.style.marginBottom = '4px';
+          const inpW = document.createElement('input');
+          inpW.type = 'number';
+          inpW.id = 'ddc-setting-custW';
+          inpW.min = '100';
+          inpW.max = '10000';
+          inpW.step = '10';
+          inpW.style.padding = '6px';
+          inpW.style.border = '1px solid var(--divider-color,rgba(0,0,0,.3))';
+          inpW.style.borderRadius = '6px';
+          inpW.value = String(this.containerFixedWidth ?? 800);
+          wrapW.appendChild(spanW);
+          wrapW.appendChild(inpW);
+          const wrapH = document.createElement('label');
+          wrapH.style.display = 'flex';
+          wrapH.style.flexDirection = 'column';
+          wrapH.style.fontSize = '.95rem';
+          wrapH.style.marginBottom = '10px';
+          const spanH = document.createElement('span');
+          spanH.textContent = 'Custom height (px)';
+          spanH.style.marginBottom = '4px';
+          const inpH = document.createElement('input');
+          inpH.type = 'number';
+          inpH.id = 'ddc-setting-custH';
+          inpH.min = '100';
+          inpH.max = '10000';
+          inpH.step = '10';
+          inpH.style.padding = '6px';
+          inpH.style.border = '1px solid var(--divider-color,rgba(0,0,0,.3))';
+          inpH.style.borderRadius = '6px';
+          inpH.value = String(this.containerFixedHeight ?? 600);
+          wrapH.appendChild(spanH);
+          wrapH.appendChild(inpH);
+          extrasDiv.appendChild(wrapW);
+          extrasDiv.appendChild(wrapH);
+        } else if (modeVal === 'preset') {
+          // Preset list select
+          const wrap = document.createElement('label');
+          wrap.style.display = 'flex';
+          wrap.style.flexDirection = 'column';
+          wrap.style.fontSize = '.95rem';
+          wrap.style.marginBottom = '10px';
+          const span = document.createElement('span');
+          span.textContent = 'Preset size';
+          span.style.marginBottom = '4px';
+          const select = document.createElement('select');
+          select.id = 'ddc-setting-preset';
+          select.style.padding = '6px';
+          select.style.border = '1px solid var(--divider-color,rgba(0,0,0,.3))';
+          select.style.borderRadius = '6px';
+          // Populate options from size presets
+          const presets = (typeof DragAndDropCard !== 'undefined' && DragAndDropCard._sizePresets) ? DragAndDropCard._sizePresets() : [];
+          presets.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.key;
+            opt.textContent = `${p.label || p.key} (${p.w}×${p.h})`;
+            select.appendChild(opt);
+          });
+          // Preselect current preset if available
+          select.value = String(this.containerPreset || 'fhd');
+          wrap.appendChild(span);
+          wrap.appendChild(select);
+          extrasDiv.appendChild(wrap);
+        }
+      };
+      // initial call
+      updateSizeExtras();
+      // update when size mode changes
+      selSize?.addEventListener('change', updateSizeExtras);
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Failed to build container size extras', err);
+    }
+
+    // Remove modal helper
+    const closeModal = () => {
+      try { modal.remove(); } catch {}
+      if (this.__settingsModal === modal) this.__settingsModal = null;
+    };
+    // Close handlers
+    modal.querySelector('#ddc-settings-close')?.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); });
+    modal.querySelector('#ddc-settings-cancel')?.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); });
+    // Save handler
+    modal.querySelector('#ddc-settings-save')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Read values
+      const newAuto      = !!chkAuto?.checked;
+      const newGrid      = parseInt(inpGrid?.value || '0', 10);
+      const newAnim      = !!chkAnim?.checked;
+      const newHideHdr   = !!chkHdr?.checked;
+      const newHideBar   = !!chkBar?.checked;
+      const newSnap      = !!chkSnap?.checked;
+      const newASave     = !!chkASave?.checked;
+      const newDeb       = parseInt(inpDeb?.value || '0', 10);
+      const newSize      = selSize?.value || 'dynamic';
+      const newOrient    = selOrient?.value || 'auto';
+      const newOverlap   = !!chkOverlap?.checked;
+      const newCBg       = (inpCBg?.value || '').trim();
+      const newCardBg    = (inpCardBg?.value || '').trim();
+      const newBgImg     = (inpBgImg?.value || '').trim();
+      const newDebug     = !!chkDebug?.checked;
+      // hero and tabs position not exposed to user
+      try {
+        // Auto resize cards
+        this.autoResizeCards = newAuto;
+        if (this.autoResizeCards) this._startScaleWatch?.();
+        else this._stopScaleWatch?.();
+        // Grid size
+        if (!isNaN(newGrid) && newGrid > 0 && newGrid !== this.gridSize) {
+          this.gridSize = newGrid;
+          this._applyGridVars?.();
+          this._resizeContainer?.();
+        }
+        // Drag live snap
+        const snapChanged = newSnap !== this.dragLiveSnap;
+        this.dragLiveSnap = newSnap;
+        if (snapChanged) {
+          // Re-init interact on all cards so the snap modifiers take effect
+          this._initInteract?.();
+        }
+        // Auto save
+        this.autoSave = newASave;
+        // Auto save debounce
+        if (!isNaN(newDeb) && newDeb > 0) this.autoSaveDebounce = newDeb;
+        // Container size mode
+        const sizeChanged = newSize !== this.containerSizeMode;
+        this.containerSizeMode = newSize;
+        // Container orientation
+        const orientChanged = newOrient !== this.containerPresetOrient;
+        this.containerPresetOrient = newOrient;
+        if (sizeChanged || orientChanged) {
+          // When size or orientation changes, recalc container
+          this._resizeContainer?.();
+        }
+
+        // Apply fixed custom or preset dimensions
+        if (newSize === 'fixed_custom') {
+          // Read custom width & height from inputs and apply immediately
+          const wVal = parseInt(modal.querySelector('#ddc-setting-custW')?.value || '0', 10);
+          const hVal = parseInt(modal.querySelector('#ddc-setting-custH')?.value || '0', 10);
+          if (!isNaN(wVal) && wVal > 0) this.containerFixedWidth  = wVal;
+          if (!isNaN(hVal) && hVal > 0) this.containerFixedHeight = hVal;
+          // Recompute container size after updating custom dims
+          this._resizeContainer?.();
+        } else if (newSize === 'preset') {
+          const presetVal = modal.querySelector('#ddc-setting-preset')?.value;
+          if (presetVal) this.containerPreset = presetVal;
+          // Recompute container size after updating preset
+          this._resizeContainer?.();
+        }
+        // Disable overlap
+        this.disableOverlap = newOverlap;
+        // Container background
+        if (newCBg) {
+          this.containerBackground = newCBg;
+          this.style.setProperty('--ddc-bg', this.containerBackground);
+        }
+        // Card background
+        if (newCardBg) {
+          this.cardBackground = newCardBg;
+          this.style.setProperty('--ddc-card-bg', this.cardBackground);
+        }
+        // Background image (only src)
+        if (newBgImg) {
+          if (!this._config) this._config = {};
+          if (!this._config.background_image) this._config.background_image = {};
+          this._config.background_image.src = newBgImg;
+        }
+        // Debug
+        this.debug = newDebug;
+        // Animate cards
+        this.animateCards = newAnim;
+        // Hide HA chrome
+        this.hideHaHeader  = newHideHdr;
+        this.hideHaSidebar = newHideBar;
+        this._applyHaChromeVisibility_?.();
+        // Apply background image (if changed)
+        if (newBgImg) {
+          this._applyBackgroundImageFromConfig?.();
+        }
+        // Update underlying config so changes persist in YAML/storage
+        try {
+          if (!this._config) this._config = {};
+          this._config.grid                    = this.gridSize;
+          this._config.auto_resize_cards       = !!this.autoResizeCards;
+          this._config.drag_live_snap          = !!this.dragLiveSnap;
+          this._config.auto_save               = !!this.autoSave;
+          this._config.auto_save_debounce      = this.autoSaveDebounce;
+          this._config.container_size_mode     = this.containerSizeMode;
+          this._config.container_preset_orientation = this.containerPresetOrient;
+          this._config.container_fixed_width   = this.containerFixedWidth;
+          this._config.container_fixed_height  = this.containerFixedHeight;
+          this._config.container_preset        = this.containerPreset;
+          this._config.disable_overlap         = !!this.disableOverlap;
+          this._config.container_background    = this.containerBackground;
+          this._config.card_background         = this.cardBackground;
+          this._config.debug                   = !!this.debug;
+          this._config.animate_cards           = !!this.animateCards;
+          this._config.hide_HA_Header          = !!this.hideHaHeader;
+          this._config.hide_HA_Sidebar         = !!this.hideHaSidebar;
+          // Background image src is already updated in this._config.background_image above
+        } catch (cfgErr) {
+          console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
+        }
+        // Persist changes
+        this._queueSave?.('settings');
+      } catch (err) {
+        console.warn('[drag-and-drop-card] Failed to apply settings', err);
+      }
+      closeModal();
+    });
   }
 
   
