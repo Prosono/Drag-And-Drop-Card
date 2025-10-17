@@ -68,6 +68,133 @@ class DragAndDropCard extends HTMLElement {
 }
 
 
+// ---------------- Dashboard URL helpers ----------------
+_getCurrentDashboardUrlPath_() {
+  // e.g. "/", "/lovelace/0", "/myboard/0", "/lovelace-myboard/0"
+  const path = (window.location.pathname || "/").replace(/^\/+/, "");
+  const first = path.split("/")[0] || "lovelace";
+
+  // Primary dashboard uses "/lovelace"
+  if (first === "lovelace") return null;
+
+  // Additional dashboards: first segment is the url_path (works for "/myboard" and "/lovelace-myboard")
+  return first;
+}
+
+// ---------------- Storage-mode persistence (Visual Editor path) ----------------
+
+// Ensure this card has a persistent id in its config (stored in Lovelace)
+async _ensureCardIdSeededInStorage_() {
+  if (this.config?.id) return this.config.id;
+
+  const id = (crypto?.randomUUID ? crypto.randomUUID() : ("ddc_" + Math.random().toString(36).slice(2)));
+  this.config = { ...this.config, id }; // in-memory immediately
+
+  try {
+    const url_path = this._getCurrentDashboardUrlPath_();
+    const ll = await this.hass.callWS(url_path ? { type: "lovelace/config", url_path } : { type: "lovelace/config" });
+
+    const hit = this._findThisCardPathRecursive_(ll, (c) =>
+      c?.type === "custom:drag-and-drop-card" && (!c.id || c.id === id)
+    );
+    if (!hit) return id;
+
+    const { viewIndex, cardIndex, parentPath } = hit;
+    const view = ll.views[viewIndex];
+    const curr = this._getCardByPath_(view, parentPath, cardIndex);
+    const updated = { ...curr, id };
+    this._setCardByPath_(view, parentPath, cardIndex, updated);
+
+    // SAVE with url_path when present
+    await this.hass.callWS(
+      url_path
+        ? { type: "lovelace/config/save", url_path, config: ll }
+        : { type: "lovelace/config/save", config: ll }
+    );
+  } catch (_) {
+    // YAML dashboards or permission issues: ignore; we still keep the in-memory id
+  }
+  return id;
+}
+
+// Persist this._config back into the stored card (Storage dashboards)
+async _persistThisCardConfigToStorage_() {
+  await this._ensureCardIdSeededInStorage_();
+
+  // Build what we want to merge (like Visual Editor does at top-level)
+  const partial = {
+    type: "custom:drag-and-drop-card",
+    id: this.config?.id,
+    ...this._config,
+  };
+
+  const url_path = this._getCurrentDashboardUrlPath_();
+
+  // LOAD
+  const ll = await this.hass.callWS(url_path ? { type: "lovelace/config", url_path } : { type: "lovelace/config" });
+
+  // FIND our card by type + id (supports nesting)
+  const hit = this._findThisCardPathRecursive_(ll, (c) =>
+    c?.type === "custom:drag-and-drop-card" && c?.id === this.config?.id
+  );
+  if (!hit) throw new Error("Card not found in Lovelace config");
+
+  const { viewIndex, cardIndex, parentPath } = hit;
+  const view = ll.views[viewIndex];
+
+  // MERGE + WRITE
+  const currentCard = this._getCardByPath_(view, parentPath, cardIndex);
+  const merged = { ...currentCard, ...partial };
+  this._setCardByPath_(view, parentPath, cardIndex, merged);
+
+  // SAVE (respect url_path)
+  await this.hass.callWS(
+    url_path
+      ? { type: "lovelace/config/save", url_path, config: ll }
+      : { type: "lovelace/config/save", config: ll }
+  );
+
+  // Apply locally
+  this.config = merged;
+  this.requestUpdate?.();
+}
+
+// ---- Tree helpers (unchanged) ----
+_findThisCardPathRecursive_(llConfig, predicate) {
+  const views = llConfig?.views || [];
+  for (let vi = 0; vi < views.length; vi++) {
+    const hit = this._findInCardTree_(views[vi], predicate);
+    if (hit) return { viewIndex: vi, ...hit };
+  }
+  return null;
+}
+
+_findInCardTree_(node, predicate, parentPath = []) {
+  const cards = node?.cards || [];
+  for (let ci = 0; ci < cards.length; ci++) {
+    const c = cards[ci];
+    if (predicate(c)) return { cardIndex: ci, parentPath };
+    if (c?.cards?.length) {
+      const sub = this._findInCardTree_(c, predicate, parentPath.concat(ci));
+      if (sub) return sub;
+    }
+  }
+  return null;
+}
+
+_getCardByPath_(view, parentPath, cardIndex) {
+  let container = view;
+  for (const idx of (parentPath || [])) container = container.cards[idx];
+  return container.cards[cardIndex];
+}
+
+_setCardByPath_(view, parentPath, cardIndex, value) {
+  let container = view;
+  for (const idx of (parentPath || [])) container = container.cards[idx];
+  container.cards[cardIndex] = value;
+}
+
+
   /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
 /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
 _setHeaderVisible_(show = true) {
@@ -210,6 +337,7 @@ _applyHaChromeVisibility_() {
 
   } catch {}
 }
+
 
 
 
@@ -7735,10 +7863,13 @@ this._initCardInteract(wrap);
           this.style.setProperty('--ddc-card-bg', this.cardBackground);
         }
         // Background image (only src)
+        // Background image (only src) — immutable update (avoids "read-only" error)
         if (newBgImg) {
-          if (!this._config) this._config = {};
-          if (!this._config.background_image) this._config.background_image = {};
-          this._config.background_image.src = newBgImg;
+          const prevBg = (this._config && this._config.background_image) || {};
+          this._config = { ...this._config, background_image: { ...prevBg, src: newBgImg } };
+        } else {
+          const { background_image, ...rest } = this._config || {};
+          this._config = rest;
         }
         // Debug
         this.debug = newDebug;
@@ -7777,7 +7908,13 @@ this._initCardInteract(wrap);
           console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
         }
         // Persist changes
-        this._queueSave?.('settings');
+        // Persist changes exactly like the Visual Editor (Storage dashboards)
+        this._persistThisCardConfigToStorage_()
+          .catch((e) => {
+            console.warn('[drag-and-drop-card] Storage save failed (is this a YAML dashboard?)', e);
+            // Optional: toast for the user:
+            // this._showToast_?.('Could not save to dashboard storage. Is this a YAML dashboard?');
+          });
       } catch (err) {
         console.warn('[drag-and-drop-card] Failed to apply settings', err);
       }
