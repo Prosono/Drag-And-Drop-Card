@@ -195,7 +195,44 @@ _setCardByPath_(view, parentPath, cardIndex, value) {
 }
 
 
-  /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
+  /* -------------------- Settings Dashboard styling -------------------- */
+
+
+_ensureSettingsStyles_() {
+  if (this.shadowRoot.querySelector('#ddc-settings-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'ddc-settings-styles';
+  style.textContent = `
+  .dialog.modern { max-width: 720px; width: min(92vw, 720px); border-radius: 14px; overflow: hidden; }
+  .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--primary-color); color:#fff; }
+  .dlg-head h3 { margin:0; font-size:1.1rem; font-weight:700; }
+  .icon-btn { border:0; background:transparent; color:inherit; cursor:pointer; display:grid; place-items:center; }
+  .settings-body { display:grid; gap:16px; padding:16px; max-height:70vh; overflow:auto; grid-template-columns: 1fr; }
+  @media (min-width: 720px){ .settings-body { grid-template-columns: 1fr 1fr; } }
+  .card { background:var(--ha-card-background, #fff); border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .card h4 { margin:0; font-size:1rem; font-weight:700; color:var(--primary-text-color); }
+  .row { display:flex; align-items:center; gap:12px; }
+  .row label { flex:1; font-size:.95rem; }
+  .row input[type="text"], .row input[type="number"], .row select { flex:1; padding:8px; border:1px solid var(--divider-color, rgba(0,0,0,.2)); border-radius:8px; background:var(--card-background-color, #fff); }
+  .range-wrap { display:flex; align-items:center; gap:12px; }
+  .range-wrap input[type="range"] { flex:1; }
+  .range-wrap output { width:64px; text-align:right; color:var(--secondary-text-color); font-weight:600; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { border:1px solid var(--divider-color, rgba(0,0,0,.25)); padding:6px 10px; border-radius:999px; background:transparent; cursor:pointer; font-size:.9rem; }
+  .chip[aria-pressed="true"] { background:var(--primary-color); color:#fff; border-color:transparent; }
+  .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
+  .grid-demo { --g: 100; background: repeating-linear-gradient( to right, transparent 0, transparent calc(var(--g) - 1px), rgba(0,0,0,.06) calc(var(--g) - 1px), rgba(0,0,0,.06) var(--g) ),
+                                repeating-linear-gradient( to bottom, transparent 0, transparent calc(var(--g) - 1px), rgba(0,0,0,.06) calc(var(--g) - 1px), rgba(0,0,0,.06) var(--g) );
+                height: 140px; border-radius:8px; }
+  .color-pair { display:flex; gap:8px; }
+  .color-pair input[type="color"] { width:44px; height:36px; border:0; background:transparent; padding:0; }
+  .footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  .btn.primary { background:var(--primary-color); color:#fff; border:0; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; }
+  .btn.secondary { background:transparent; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; padding:8px 16px; cursor:pointer; }
+  `;
+  this.shadowRoot.appendChild(style);
+}
+
 /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
 _setHeaderVisible_(show = true) {
   try {
@@ -7528,104 +7565,139 @@ this._initCardInteract(wrap);
     modal.className = 'modal';
     // Use the existing .dialog styles for consistent centering and sizing. Limit
     // the maximum width so the settings sheet doesn't overwhelm the screen.
+    this._ensureSettingsStyles_();
+
     modal.innerHTML = `
-      <div class="dialog" role="dialog" aria-modal="true" style="max-width:600px">
-        <div class="dlg-head" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))">
-          <h3 style="margin:0;font-size:1.2rem">Dashboard Settings</h3>
-          <button class="btn secondary" id="ddc-settings-close" style="margin:0">
-            <ha-icon icon="mdi:close"></ha-icon>
-          </button>
+      <div class="dialog modern" role="dialog" aria-modal="true">
+        <div class="dlg-head">
+          <h3>Dashboard Settings</h3>
+          <button class="icon-btn" id="ddc-settings-close" title="Close"><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
-        <div class="settings-body" style="display:flex;flex-direction:column;gap:18px;padding:16px;overflow-y:auto;max-height:70vh">
-          <!-- Layout options -->
-          <div>
-            <h4 style="margin:0 0 8px 0;font-size:1rem;font-weight:600">Layout</h4>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Grid size (px)</span>
-              <input type="number" id="ddc-setting-gridSize" min="10" max="500" step="1" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-autoResize" />
-              <span>Auto resize cards</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-dragSnap" />
-              <span>Drag live snap</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-autoSave" />
-              <span>Auto save</span>
-            </label>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Auto save delay (ms)</span>
-              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="100" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
-            </label>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Container size mode</span>
-              <select id="ddc-setting-sizeMode" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px">
+
+        <div class="settings-body">
+          <!-- Layout -->
+          <section class="card">
+            <h4>Layout</h4>
+
+            <div class="row">
+              <label for="ddc-setting-gridSize">Grid size</label>
+              <div class="range-wrap" style="flex:1">
+                <input type="range" id="ddc-setting-gridSize" min="50" max="400" step="10" />
+                <output id="ddc-grid-out">100 px</output>
+              </div>
+            </div>
+
+            <div class="preview">
+              <div class="grid-demo" id="ddc-grid-demo"></div>
+            </div>
+
+            <div class="chips" role="group" aria-label="Quick sizes">
+              <button class="chip" data-w="1280" data-h="720">Tablet (1280×720)</button>
+              <button class="chip" data-w="1920" data-h="1080" aria-pressed="true">Desktop (1920×1080)</button>
+              <button class="chip" data-w="2560" data-h="1440">WQHD (2560×1440)</button>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-autoResize"></ha-switch>
+              <label for="ddc-setting-autoResize">Auto resize cards</label>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-dragSnap"></ha-switch>
+              <label for="ddc-setting-dragSnap">Live snap while dragging</label>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-disableOverlap"></ha-switch>
+              <label for="ddc-setting-disableOverlap">Prevent overlap</label>
+            </div>
+
+            <div class="row">
+              <label for="ddc-setting-sizeMode">Container size mode</label>
+              <select id="ddc-setting-sizeMode">
                 <option value="dynamic">Dynamic</option>
                 <option value="preset">Preset</option>
                 <option value="fixed_custom">Fixed (custom)</option>
               </select>
-            </label>
-            <!-- Additional inputs for size mode (custom width/height or preset list) will be injected here -->
+            </div>
+
             <div id="ddc-setting-sizeExtras"></div>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Container orientation</span>
-              <select id="ddc-setting-orient" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px">
+
+            <div class="row">
+              <label for="ddc-setting-orient">Orientation</label>
+              <select id="ddc-setting-orient">
                 <option value="auto">Auto</option>
                 <option value="landscape">Landscape</option>
                 <option value="portrait">Portrait</option>
               </select>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-disableOverlap" />
-              <span>Disable overlap</span>
-            </label>
-          </div>
+            </div>
 
-          <!-- Appearance options -->
-          <div>
-            <h4 style="margin:16px 0 8px 0;font-size:1rem;font-weight:600">Appearance</h4>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Container background (CSS)</span>
-              <input type="text" id="ddc-setting-containerBg" placeholder="e.g. transparent or #123456" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
-            </label>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Card background (CSS)</span>
-              <input type="text" id="ddc-setting-cardBg" placeholder="e.g. var(--ha-card-background)" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
-            </label>
-            <label style="display:flex;flex-direction:column;font-size:.95rem;margin-bottom:10px">
-              <span style="margin-bottom:4px">Background image URL</span>
-              <input type="text" id="ddc-setting-bgImg" placeholder="Image URL" style="padding:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));border-radius:6px" />
-            </label>
-          </div>
+            <div class="row">
+              <ha-switch id="ddc-setting-autoSave"></ha-switch>
+              <label for="ddc-setting-autoSave">Auto save</label>
+            </div>
 
-          <!-- Behaviour options -->
-          <div>
-            <h4 style="margin:16px 0 8px 0;font-size:1rem;font-weight:600">Behaviour</h4>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-animate" />
-              <span>Animate cards</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-debug" />
-              <span>Enable debug logging</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-hideHdr" />
-              <span>Hide HA Header</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.95rem;margin-bottom:8px">
-              <input type="checkbox" id="ddc-setting-hideSbar" />
-              <span>Hide HA Sidebar</span>
-            </label>
-          </div>
+            <div class="row">
+              <label for="ddc-setting-autoSaveDebounce">Auto save delay (ms)</label>
+              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="100" />
+            </div>
+          </section>
 
+          <!-- Appearance -->
+          <section class="card">
+            <h4>Appearance</h4>
+
+            <div class="row">
+              <label for="ddc-setting-containerBg">Container background</label>
+              <div class="color-pair">
+                <input type="color" id="ddc-color-containerBg" />
+                <input type="text" id="ddc-setting-containerBg" placeholder="e.g. transparent or var(--ha-card-background)" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label for="ddc-setting-cardBg">Card background</label>
+              <div class="color-pair">
+                <input type="color" id="ddc-color-cardBg" />
+                <input type="text" id="ddc-setting-cardBg" placeholder="e.g. #121212 or var(--ha-card-background)" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label for="ddc-setting-bgImg">Background image URL</label>
+              <input type="text" id="ddc-setting-bgImg" placeholder="https://…" />
+            </div>
+          </section>
+
+          <!-- Behaviour -->
+          <section class="card">
+            <h4>Behaviour</h4>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-animate"></ha-switch>
+              <label for="ddc-setting-animate">Animate cards</label>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-debug"></ha-switch>
+              <label for="ddc-setting-debug">Enable debug logging</label>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-hideHdr"></ha-switch>
+              <label for="ddc-setting-hideHdr">Hide HA Header</label>
+            </div>
+
+            <div class="row">
+              <ha-switch id="ddc-setting-hideSbar"></ha-switch>
+              <label for="ddc-setting-hideSbar">Hide HA Sidebar</label>
+            </div>
+          </section>
         </div>
-        <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid var(--divider-color,rgba(0,0,0,.12))">
+
+        <div class="footer">
           <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
-          <button class="btn" id="ddc-settings-save">Save</button>
+          <button class="btn primary" id="ddc-settings-save">Save</button>
         </div>
       </div>
     `;
@@ -7684,6 +7756,69 @@ this._initCardInteract(wrap);
       inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
     }
     if (chkDebug)   chkDebug.checked   = !!this.debug;
+
+    // === polish hooks ===
+    const gridSlider = modal.querySelector('#ddc-setting-gridSize');
+    const gridOut = modal.querySelector('#ddc-grid-out');
+    const gridDemo = modal.querySelector('#ddc-grid-demo');
+
+    const syncGrid = () => {
+      const v = parseInt(gridSlider.value || '100', 10);
+      gridOut.textContent = `${v} px`;
+      if (gridDemo) gridDemo.style.setProperty('--g', `${v}px`);
+    };
+    if (gridSlider) {
+      // If value was prepopulated above, respect it; otherwise set from this.gridSize
+      if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100);
+      gridSlider.addEventListener('input', syncGrid);
+      syncGrid();
+    }
+
+    // Quick size chips (set container preset width/height instantly)
+    modal.querySelectorAll('.chip').forEach(ch => {
+      ch.addEventListener('click', () => {
+        modal.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed','false'));
+        ch.setAttribute('aria-pressed','true');
+
+        // If you run sizeMode=preset, we keep that flow; here we apply fixed_custom dims quickly
+        const w = parseInt(ch.dataset.w, 10);
+        const h = parseInt(ch.dataset.h, 10);
+        const extrasDiv = modal.querySelector('#ddc-setting-sizeExtras');
+        const sizeSel = modal.querySelector('#ddc-setting-sizeMode');
+        if (sizeSel) sizeSel.value = 'fixed_custom';
+        if (extrasDiv) {
+          // Rebuild extras to show custom width/height inputs, then set values
+          if (typeof selSize !== 'undefined' && selSize) selSize.dispatchEvent(new Event('change'));
+          setTimeout(() => {
+            const inpW = modal.querySelector('#ddc-setting-custW');
+            const inpH = modal.querySelector('#ddc-setting-custH');
+            if (inpW) inpW.value = String(w);
+            if (inpH) inpH.value = String(h);
+          }, 0);
+        }
+      });
+    });
+
+    // Color helpers: keep the text input authoritative but allow picking via <input type="color">
+    const colorPairs = [
+      ['#ddc-color-containerBg', '#ddc-setting-containerBg'],
+      ['#ddc-color-cardBg', '#ddc-setting-cardBg'],
+    ];
+    colorPairs.forEach(([pickerSel, textSel]) => {
+      const picker = modal.querySelector(pickerSel);
+      const text = modal.querySelector(textSel);
+      if (picker && text) {
+        // Initialize picker when the text value looks like a hex color
+        const hex = (String(text.value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
+        if (hex) picker.value = hex;
+
+        picker.addEventListener('input', () => { text.value = picker.value; });
+        text.addEventListener('change', () => {
+          const h = (String(text.value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
+          if (h) picker.value = h;
+        });
+      }
+    });
 
     // Build extra inputs for container size mode (custom dimensions or preset list)
     try {
