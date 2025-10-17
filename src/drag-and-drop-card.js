@@ -69,10 +69,13 @@ class DragAndDropCard extends HTMLElement {
 
 
   /* -------------------- HA chrome (header/sidebar) visibility -------------------- */
-_setHeaderVisible_(show=true) {
+/* -------------------- HA chrome (header/sidebar) visibility -------------------- */
+_setHeaderVisible_(show = true) {
   try {
-    // Hide common HA headers (covers various builds)
-    const headers = this._deepQueryAll?.('app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar') || [];
+    // 1) Hide the header containers across HA variants
+    const headers = this._deepQueryAll?.(
+      'app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar, ha-toolbar'
+    ) || [];
     headers.forEach(el => {
       if (!el) return;
       if (el.dataset.ddcPrevDisplayHeader === undefined) {
@@ -96,19 +99,45 @@ _setHeaderVisible_(show=true) {
       }
     });
 
-    // Adjust CSS variables so layout doesn't reserve header space
+    // 2) Explicitly hide the action items (Search / Assist / Edit menu)
+    //    Belt & suspenders: catch both slot-based and direct buttons/menus.
+    const actionNodes = this._deepQueryAll?.(
+      '[slot="actionItems"], ha-icon-button, ha-button-menu, assist-button, search-input, ha-quick-bar, ha-mwc-menu'
+    ) || [];
+    actionNodes.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayAction === undefined) {
+        el.dataset.ddcPrevDisplayAction = el.style.display || '';
+        el.dataset.ddcPrevVisAction = el.style.visibility || '';
+      }
+      if (show) {
+        el.style.display = el.dataset.ddcPrevDisplayAction || '';
+        el.style.visibility = el.dataset.ddcPrevVisAction || '';
+      } else {
+        el.style.display = 'none';
+        el.style.visibility = 'hidden';
+      }
+    });
+
+    // 3) Adjust CSS variables so layout doesn't reserve header space
+    //    Include an extra var some themes use, and collapse content padding.
     const containers = [
-      ... (this._deepQueryAll?.('home-assistant-main') || []),
-      ... (this._deepQueryAll?.('ha-panel-lovelace') || []),
-      ... (this._deepQueryAll?.('hui-root') || [])
-    ];
+      // common layout hosts that own the header height vars/padding
+      ...(this._deepQueryAll?.('ha-app-layout') || []),
+      ...(this._deepQueryAll?.('home-assistant-main') || []),
+      document.documentElement,
+      document.body
+    ].filter(Boolean);
+
     containers.forEach(host => {
       if (!host) return;
       if (host.dataset.ddcPrevHdrVars === undefined) {
         host.dataset.ddcPrevHdrVars = JSON.stringify({
           mdc: host.style.getPropertyValue('--mdc-top-app-bar-height') || '',
           app: host.style.getPropertyValue('--app-header-height') || '',
-          hdr: host.style.getPropertyValue('--header-height') || ''
+          hdr: host.style.getPropertyValue('--header-height') || '',
+          hah: host.style.getPropertyValue('--ha-header-height') || '',
+          pad: (host.style && (host.style.paddingTop || '')) || ''
         });
       }
       if (show) {
@@ -117,23 +146,29 @@ _setHeaderVisible_(show=true) {
           host.style.setProperty('--mdc-top-app-bar-height', prev.mdc || '');
           host.style.setProperty('--app-header-height', prev.app || '');
           host.style.setProperty('--header-height', prev.hdr || '');
+          host.style.setProperty('--ha-header-height', prev.hah || '');
+          if (prev.pad !== undefined) host.style.paddingTop = prev.pad || '';
         } catch {}
       } else {
         host.style.setProperty('--mdc-top-app-bar-height', '0px');
         host.style.setProperty('--app-header-height', '0px');
         host.style.setProperty('--header-height', '0px');
+        host.style.setProperty('--ha-header-height', '0px');
+        // collapse any padding that might be applied because of header height
+        try { host.style.paddingTop = '0px'; } catch {}
       }
     });
 
-    // Some themes place header inside hui-root; ensure it's hidden too
-    const extra = this._deepQueryAll?.('hui-root app-header, hui-root ha-top-app-bar, hui-root mwc-top-app-bar-fixed, hui-root ha-header-bar') || [];
-    extra.forEach(el => {
-      if (!el) return;
-      if (el.dataset.ddcPrevDisplayHeader2 === undefined) {
-        el.dataset.ddcPrevDisplayHeader2 = el.style.display || '';
+    // 4) Some builds keep content under a #contentContainer; collapse its padding too
+    const contentContainers = this._deepQueryAll?.('#contentContainer') || [];
+    contentContainers.forEach(cc => {
+      if (!cc) return;
+      if (cc.dataset.ddcPrevContentPadTop === undefined) {
+        cc.dataset.ddcPrevContentPadTop = (cc.style && (cc.style.paddingTop || '')) || '';
       }
-      el.style.display = show ? (el.dataset.ddcPrevDisplayHeader2 || '') : 'none';
+      cc.style.paddingTop = show ? (cc.dataset.ddcPrevContentPadTop || '') : '0px';
     });
+
   } catch {}
 }
 
@@ -172,6 +207,7 @@ _applyHaChromeVisibility_() {
     // sidebar
     if (showAll || !this.hideHaSidebar) this._setSidebarVisible_(true);
     else this._setSidebarVisible_(false);
+
   } catch {}
 }
 
