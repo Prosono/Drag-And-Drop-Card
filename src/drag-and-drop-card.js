@@ -2226,7 +2226,50 @@ _applyGridVars() {
           animation: ddc-card-fly-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-      
+        /* --- NEW nicer headers / captions / swatches / tooltips --- */
+
+        .caption { margin:0 0 8px 0; color:var(--secondary-text-color); font-size:.9rem; }
+
+        .swatches { display:flex; gap:8px; flex-wrap:wrap; }
+        .swatch { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+        .swatch[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:8px; }
+
+        .inline-help { display:inline-flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:.9rem; }
+        .inline-help ha-icon { opacity:.8; }
+
+        .input-file { display:flex; gap:10px; align-items:center; }
+        .input-file input[type="file"] { display:none; }
+        .input-file .file-btn { border:1px solid var(--divider-color,rgba(0,0,0,.25)); border-radius:8px; padding:8px 12px; cursor:pointer; background:var(--ha-card-background,#fff); }
+        .thumb { width:64px; height:42px; border-radius:6px; background-size:cover; background-position:center; border:1px solid rgba(0,0,0,.12); }
+
+        .divider { height:1px; background:var(--divider-color, rgba(0,0,0,.12)); margin:8px 0; opacity:.7; }
+
+        .section-head { display:flex; align-items:center; gap:8px; margin:0 0 8px 0; padding-bottom:6px; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12)); }
+        .section-head ha-icon { opacity:.9; }
+        .setting { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+        .setting .row { display:flex; align-items:center; gap:12px; }
+        .setting .title { display:flex; align-items:center; gap:8px; min-width:220px; }
+        .setting .title ha-icon { opacity:.9; }
+        .setting .control { display:flex; align-items:center; gap:10px; flex:1; }
+        .setting .hint { margin-left:32px; color:var(--secondary-text-color); font-size:.88rem; line-height:1.35; }
+        .setting .suffix { opacity:.6; margin-left:4px; }
+        .range-wrap { display:flex; align-items:center; gap:12px; flex:1; }
+        .range-wrap output { width:64px; text-align:right; color:var(--secondary-text-color); font-weight:600; }
+
+        /* --- Tabs manager UI --- */
+        .tabs-card .tab-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.08)); }
+        .tabs-card .tab-row:last-child { border-bottom:0; }
+        .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
+        .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
+        .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+        .icon-btn.danger { color: var(--error-color, #b00020); }
+
+        /* gradient swatches */
+        .gradients { display:flex; gap:8px; flex-wrap:wrap; }
+        .gradient { width:44px; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+        .gradient[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:10px; }
+
+              
         </style>
         <div class="ddc-root">
           <div class="toolbar">
@@ -7514,8 +7557,8 @@ async _getStubConfigForType(type) {
                 wrap.style.height= `${conf.size?.height||100}px`;
                 this.cardContainer.appendChild(wrap);
                 
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-this._initCardInteract(wrap);
+          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+          this._initCardInteract(wrap);
               }
             }
           } else {
@@ -7567,140 +7610,351 @@ this._initCardInteract(wrap);
     // the maximum width so the settings sheet doesn't overwhelm the screen.
     this._ensureSettingsStyles_();
 
-    modal.innerHTML = `
-      <div class="dialog modern" role="dialog" aria-modal="true">
-        <div class="dlg-head">
-          <h3>Dashboard Settings</h3>
-          <button class="icon-btn" id="ddc-settings-close" title="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+    
+modal.innerHTML = `
+  <div class="dialog modern" role="dialog" aria-modal="true">
+    <div class="dlg-head">
+      <h3>Dashboard Settings</h3>
+      <button class="icon-btn" id="ddc-settings-close" title="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+    </div>
+
+    <div class="settings-body">
+
+      <!-- Layout -->
+      <section class="card">
+        <div class="section-head">
+          <ha-icon icon="mdi:view-grid-plus-outline"></ha-icon>
+          <h4>Layout</h4>
         </div>
+        <p class="caption">Control grid density, canvas sizing, and card behavior.</p>
 
-        <div class="settings-body">
-          <!-- Layout -->
-          <section class="card">
-            <h4>Layout</h4>
-
-            <div class="row">
+        <!-- GRID SIZE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:grid"></ha-icon>
               <label for="ddc-setting-gridSize">Grid size</label>
-              <div class="range-wrap" style="flex:1">
-                <input type="range" id="ddc-setting-gridSize" min="50" max="400" step="10" />
+            </div>
+            <div class="control">
+              <div class="range-wrap">
+                <input type="range" id="ddc-setting-gridSize" min="1" max="400" step="1" />
                 <output id="ddc-grid-out">100 px</output>
               </div>
             </div>
+          </div>
+          <div class="hint">Cards snap every <b>N</b> pixels. Lower values give a denser grid for finer placement.</div>
+        </div>
 
-            <div class="preview">
-              <div class="grid-demo" id="ddc-grid-demo"></div>
+        <div class="preview" style="margin-top:6px">
+          <div class="grid-demo" id="ddc-grid-demo"></div>
+        </div>
+
+        <!-- QUICK CANVAS SIZES -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:move-resize"></ha-icon>
+              <span>Quick canvas sizes</span>
             </div>
-
-            <div class="chips" role="group" aria-label="Quick sizes">
+            <div class="control chips" role="group" aria-label="Quick sizes">
               <button class="chip" data-w="1280" data-h="720">Tablet (1280×720)</button>
               <button class="chip" data-w="1920" data-h="1080" aria-pressed="true">Desktop (1920×1080)</button>
               <button class="chip" data-w="2560" data-h="1440">WQHD (2560×1440)</button>
             </div>
+          </div>
+          <div class="hint">Applies a fixed custom canvas size instantly. Switch back to Dynamic or Preset below if needed.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-autoResize"></ha-switch>
+        <!-- AUTO RESIZE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:resize"></ha-icon>
               <label for="ddc-setting-autoResize">Auto resize cards</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-autoResize"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Scale the layout with the viewport. Off = fixed canvas size.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-dragSnap"></ha-switch>
+        <!-- LIVE SNAP -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:drag-variant"></ha-icon>
               <label for="ddc-setting-dragSnap">Live snap while dragging</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-dragSnap"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">While dragging, cards snap to the nearest grid lines in real time.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-disableOverlap"></ha-switch>
+        <!-- OVERLAP -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:animation"></ha-icon>
               <label for="ddc-setting-disableOverlap">Prevent overlap</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-disableOverlap"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Blocks placements that would overlap another card.</div>
+        </div>
 
-            <div class="row">
+        <div class="divider"></div>
+
+        <!-- SIZE MODE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:move-resize"></ha-icon>
               <label for="ddc-setting-sizeMode">Container size mode</label>
+            </div>
+            <div class="control">
               <select id="ddc-setting-sizeMode">
                 <option value="dynamic">Dynamic</option>
                 <option value="preset">Preset</option>
                 <option value="fixed_custom">Fixed (custom)</option>
               </select>
             </div>
+          </div>
+          <div class="hint">Dynamic fits the available space. Preset uses common screen sizes. Fixed lets you specify width & height.</div>
+        </div>
 
-            <div id="ddc-setting-sizeExtras"></div>
+        <!-- SIZE EXTRAS (injected) -->
+        <div id="ddc-setting-sizeExtras"></div>
 
-            <div class="row">
+        <!-- ORIENTATION -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:phone-rotate-landscape"></ha-icon>
               <label for="ddc-setting-orient">Orientation</label>
+            </div>
+            <div class="control">
               <select id="ddc-setting-orient">
                 <option value="auto">Auto</option>
                 <option value="landscape">Landscape</option>
                 <option value="portrait">Portrait</option>
               </select>
             </div>
+          </div>
+          <div class="hint">For presets and fixed sizes, choose a preferred orientation. Auto adapts to the screen.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-autoSave"></ha-switch>
+        <div class="divider"></div>
+
+        <!-- AUTOSAVE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:content-save"></ha-icon>
               <label for="ddc-setting-autoSave">Auto save</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-autoSave"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Automatically persist layout changes after you drag or edit.</div>
+        </div>
 
-            <div class="row">
+        <!-- AUTOSAVE DELAY -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:timer-outline"></ha-icon>
               <label for="ddc-setting-autoSaveDebounce">Auto save delay (ms)</label>
-              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="100" />
             </div>
-          </section>
+            <div class="control">
+              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="50" />
+            </div>
+          </div>
+          <div class="hint">Wait time after the last change before saving. Lower = more frequent saves.</div>
+        </div>
+      </section>
 
-          <!-- Appearance -->
-          <section class="card">
-            <h4>Appearance</h4>
+      <!-- Appearance -->
+      <section class="card">
+        <div class="section-head">
+          <ha-icon icon="mdi:palette-swatch"></ha-icon>
+          <h4>Appearance</h4>
+        </div>
+        <p class="caption">Choose backgrounds and colors. Use theme vars like <code>var(--ha-card-background)</code>.</p>
 
-            <div class="row">
+        <!-- CONTAINER BG -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:palette-swatch"></ha-icon>
               <label for="ddc-setting-containerBg">Container background</label>
-              <div class="color-pair">
+            </div>
+            <div class="control" style="flex:1">
+              <div class="color-pair" style="margin-bottom:8px">
                 <input type="color" id="ddc-color-containerBg" />
-                <input type="text" id="ddc-setting-containerBg" placeholder="e.g. transparent or var(--ha-card-background)" />
+                <input type="text" id="ddc-setting-containerBg" placeholder="transparent · #123456 · var(--ha-card-background)" />
               </div>
             </div>
+          </div>
+          <div class="swatches" id="ddc-swatches-containerBg"></div>
+          <div class="gradients" id="ddc-gradients-containerBg" style="margin-top:6px"></div>
+          <div class="hint">Accepts plain colors or theme variables.</div>
+        </div>
 
-            <div class="row">
+        <!-- CARD BG -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:palette-swatch"></ha-icon>
               <label for="ddc-setting-cardBg">Card background</label>
-              <div class="color-pair">
+            </div>
+            <div class="control" style="flex:1">
+              <div class="color-pair" style="margin-bottom:8px">
                 <input type="color" id="ddc-color-cardBg" />
-                <input type="text" id="ddc-setting-cardBg" placeholder="e.g. #121212 or var(--ha-card-background)" />
+                <input type="text" id="ddc-setting-cardBg" placeholder="#121212 · var(--ha-card-background)" />
               </div>
             </div>
+          </div>
+          <div class="swatches" id="ddc-swatches-cardBg"></div>
+          <div class="gradients" id="ddc-gradients-containerBg" style="margin-top:6px"></div>
+          <div class="hint">Affects the background of each draggable card container.</div>
+        </div>
 
-            <div class="row">
-              <label for="ddc-setting-bgImg">Background image URL</label>
-              <input type="text" id="ddc-setting-bgImg" placeholder="https://…" />
+        <div class="divider"></div>
+
+        <!-- BACKGROUND IMAGE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:image-outline"></ha-icon>
+              <label for="ddc-setting-bgImg">Background image</label>
             </div>
-          </section>
+            <div class="control" style="flex:1; flex-direction:column; align-items:flex-start">
+              <div class="input-file">
+                <label class="file-btn" for="ddc-file-bg">Upload image</label>
+                <input id="ddc-file-bg" type="file" accept="image/*" />
+                <div class="thumb" id="ddc-bg-thumb"></div>
+                <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
+              </div>
+              <div class="row" style="margin-top:8px; width:100%">
+                <label style="flex:0 0 auto" for="ddc-setting-bgImg">or URL</label>
+                <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" style="flex:1"/>
+              </div>
+            </div>
+          </div>
+          <div class="hint">Uploads are saved inline as data-URLs. For large files, host under <code>/local/</code> and paste the URL.</div>
+        </div>
+      </section>
 
-          <!-- Behaviour -->
-          <section class="card">
-            <h4>Behaviour</h4>
+      <!-- Behaviour -->
+      <section class="card">
+        <div class="section-head">
+          <ha-icon icon="mdi:tune"></ha-icon>
+          <h4>Behaviour</h4>
+        </div>
+        <p class="caption">Animation, logging, and Home Assistant chrome visibility.</p>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-animate"></ha-switch>
+        <!-- ANIMATE -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:play-box"></ha-icon>
               <label for="ddc-setting-animate">Animate cards</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-animate"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Smooth transitions when moving and resizing cards.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-debug"></ha-switch>
+        <!-- DEBUG -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:bug-play-outline"></ha-icon>
               <label for="ddc-setting-debug">Enable debug logging</label>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-debug"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Extra console logs for troubleshooting layout issues.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-hideHdr"></ha-switch>
+        <!-- HIDE HEADER -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:page-layout-header"></ha-icon>
               <label for="ddc-setting-hideHdr">Hide HA Header</label>
+              <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference"></ha-icon>
             </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-hideHdr"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Removes the top app bar (Search / Assist / Edit). It auto-shows in Edit mode.</div>
+        </div>
 
-            <div class="row">
-              <ha-switch id="ddc-setting-hideSbar"></ha-switch>
+        <!-- HIDE SIDEBAR -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:page-layout-sidebar-left"></ha-icon>
               <label for="ddc-setting-hideSbar">Hide HA Sidebar</label>
+              <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference"></ha-icon>
             </div>
-          </section>
+            <div class="control">
+              <ha-switch id="ddc-setting-hideSbar"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Hides the left navigation drawer to maximize canvas space.</div>
         </div>
+      </section>
 
-        <div class="footer">
-          <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
-          <button class="btn primary" id="ddc-settings-save">Save</button>
-        </div>
+
+      <!-- Tabs -->
+    <section class="card tabs-card">
+      <div class="section-head">
+        <ha-icon icon="mdi:tab"></ha-icon>
+        <h4>Tabs</h4>
       </div>
-    `;
+      <p class="caption">Create, rename, delete, and choose the default tab. Cards use <code>tabId</code> to decide where they appear.</p>
+
+      <!-- Current tabs list -->
+      <div id="ddc-tabs-list"></div>
+
+      <!-- Add new tab -->
+      <div class="setting" style="margin-top:8px">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:tab-plus"></ha-icon>
+            <label for="ddc-new-tab-name">Add tab</label>
+          </div>
+          <div class="control" style="flex:1">
+            <input type="text" id="ddc-new-tab-name" placeholder="e.g. Lights" />
+            <button class="btn primary" id="ddc-add-tab-btn">Add</button>
+          </div>
+        </div>
+        <div class="hint">Tab IDs must be unique. The label defaults to the ID if left empty.</div>
+      </div>
+    </section>
+
+    </div>
+
+    <div class="footer">
+      <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
+      <button class="btn primary" id="ddc-settings-save">Save</button>
+    </div>
+  </div>
+`;
+
     // Only allow one modal at a time across the card. If any modal exists in
     // the shadow root (including other DDC modals), remove it before
     // opening the settings. This prevents overlapping dialog layers.
@@ -7757,68 +8011,105 @@ this._initCardInteract(wrap);
     }
     if (chkDebug)   chkDebug.checked   = !!this.debug;
 
-    // === polish hooks ===
+    // ===== UI polish hooks =====
     const gridSlider = modal.querySelector('#ddc-setting-gridSize');
     const gridOut = modal.querySelector('#ddc-grid-out');
     const gridDemo = modal.querySelector('#ddc-grid-demo');
-
     const syncGrid = () => {
       const v = parseInt(gridSlider.value || '100', 10);
       gridOut.textContent = `${v} px`;
-      if (gridDemo) gridDemo.style.setProperty('--g', `${v}px`);
+      gridDemo?.style.setProperty('--g', `${v}px`);
     };
-    if (gridSlider) {
-      // If value was prepopulated above, respect it; otherwise set from this.gridSize
-      if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100);
-      gridSlider.addEventListener('input', syncGrid);
-      syncGrid();
-    }
+    if (gridSlider) { if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100); gridSlider.addEventListener('input', syncGrid); syncGrid(); }
 
-    // Quick size chips (set container preset width/height instantly)
+    // Quick size chips
     modal.querySelectorAll('.chip').forEach(ch => {
       ch.addEventListener('click', () => {
         modal.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed','false'));
         ch.setAttribute('aria-pressed','true');
-
-        // If you run sizeMode=preset, we keep that flow; here we apply fixed_custom dims quickly
         const w = parseInt(ch.dataset.w, 10);
         const h = parseInt(ch.dataset.h, 10);
-        const extrasDiv = modal.querySelector('#ddc-setting-sizeExtras');
         const sizeSel = modal.querySelector('#ddc-setting-sizeMode');
-        if (sizeSel) sizeSel.value = 'fixed_custom';
-        if (extrasDiv) {
-          // Rebuild extras to show custom width/height inputs, then set values
-          if (typeof selSize !== 'undefined' && selSize) selSize.dispatchEvent(new Event('change'));
-          setTimeout(() => {
-            const inpW = modal.querySelector('#ddc-setting-custW');
-            const inpH = modal.querySelector('#ddc-setting-custH');
-            if (inpW) inpW.value = String(w);
-            if (inpH) inpH.value = String(h);
-          }, 0);
-        }
+        sizeSel.value = 'fixed_custom';
+      (typeof selSize !== 'undefined' && selSize)?.dispatchEvent?.(new Event('change'));
+        setTimeout(() => {
+          modal.querySelector('#ddc-setting-custW')?.setAttribute('value', String(w));
+          modal.querySelector('#ddc-setting-custW')?.dispatchEvent?.(new Event('change'));
+          const inpW = modal.querySelector('#ddc-setting-custW'); if (inpW) inpW.value = String(w);
+          const inpH = modal.querySelector('#ddc-setting-custH'); if (inpH) inpH.value = String(h);
+        }, 0);
       });
     });
 
-    // Color helpers: keep the text input authoritative but allow picking via <input type="color">
-    const colorPairs = [
-      ['#ddc-color-containerBg', '#ddc-setting-containerBg'],
-      ['#ddc-color-cardBg', '#ddc-setting-cardBg'],
-    ];
-    colorPairs.forEach(([pickerSel, textSel]) => {
-      const picker = modal.querySelector(pickerSel);
-      const text = modal.querySelector(textSel);
-      if (picker && text) {
-        // Initialize picker when the text value looks like a hex color
-        const hex = (String(text.value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
-        if (hex) picker.value = hex;
-
-        picker.addEventListener('input', () => { text.value = picker.value; });
-        text.addEventListener('change', () => {
-          const h = (String(text.value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
-          if (h) picker.value = h;
+    // Swatches (theme-friendly set; tweak as you like)
+    const SWATCHES = ['#ffffff','#f5f7fa','#ebeff5','#121212','#1f2937','#334155',
+                      'var(--card-background-color)','var(--ha-card-background)','transparent'];
+    const buildSwatches = (containerSel, targetInputSel, targetPickerSel) => {
+      const wrap = modal.querySelector(containerSel);
+      const target = modal.querySelector(targetInputSel);
+      const picker = modal.querySelector(targetPickerSel);
+      if (!wrap || !target) return;
+      wrap.innerHTML = '';
+      SWATCHES.forEach((val, i) => {
+        const s = document.createElement('button');
+        s.type = 'button';
+        s.className = 'swatch';
+        s.title = val;
+        s.style.background = val.startsWith('var(') ? getComputedStyle(this).getPropertyValue(val.slice(4,-1)).trim() || '#fff' : val;
+        s.setAttribute('aria-pressed','false');
+        s.addEventListener('click', () => {
+          wrap.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-pressed','false'));
+          s.setAttribute('aria-pressed','true');
+          target.value = val;
+          if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val) && picker) picker.value = val;
         });
-      }
+        wrap.appendChild(s);
+        // preselect current value if matches
+        if (String(target.value).trim() === val) s.setAttribute('aria-pressed','true');
+      });
+    };
+    buildSwatches('#ddc-swatches-containerBg', '#ddc-setting-containerBg', '#ddc-color-containerBg');
+    buildSwatches('#ddc-swatches-cardBg', '#ddc-setting-cardBg', '#ddc-color-cardBg');
+
+    // Color pickers keep in sync with text inputs
+    [['#ddc-color-containerBg','#ddc-setting-containerBg'], ['#ddc-color-cardBg','#ddc-setting-cardBg']]
+      .forEach(([pickSel, textSel]) => {
+        const pick = modal.querySelector(pickSel), text = modal.querySelector(textSel);
+        if (!pick || !text) return;
+        const hex = (String(text.value||'').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)||[])[0];
+        if (hex) pick.value = hex;
+        pick.addEventListener('input', () => { text.value = pick.value; });
+        text.addEventListener('change', () => {
+          const h = (String(text.value||'').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)||[])[0];
+          if (h) pick.value = h;
+        });
+      });
+
+    // Background image: upload -> data URL -> fill URL input + preview thumb
+    const fileInput = modal.querySelector('#ddc-file-bg');
+    const urlInput  = modal.querySelector('#ddc-setting-bgImg');
+    const thumb     = modal.querySelector('#ddc-bg-thumb');
+    const updateThumb = (src) => { if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none'; };
+    if (urlInput?.value) updateThumb(urlInput.value);
+
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;      // data:image/...;base64,....
+        urlInput.value = String(dataUrl || '');
+        updateThumb(urlInput.value);
+      };
+      reader.readAsDataURL(file);
     });
+
+    // Close quality improvements
+    modal.addEventListener('click', (evt) => { if (evt.target === modal) { evt.stopPropagation(); closeModal(); } });
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeModal(); } };
+    document.addEventListener('keydown', onKey, { once: true });
+    setTimeout(() => modal.querySelector('#ddc-setting-gridSize')?.focus(), 0);
+
 
     // Build extra inputs for container size mode (custom dimensions or preset list)
     try {
@@ -7908,6 +8199,180 @@ this._initCardInteract(wrap);
     } catch (err) {
       console.warn('[drag-and-drop-card] Failed to build container size extras', err);
     }
+
+    // ===== TABS MANAGER =====
+    const readTabs = () => {
+      // Support both shapes: options.tabs (objects) or tabs (strings/objects)
+      const optTabs = this._config?.options?.tabs ?? this._config?.tabs ?? [];
+      return optTabs.map(t => {
+        if (typeof t === 'string') return { id: t, label: t };
+        return { id: t.id ?? t.key ?? t.label ?? 'Tab', label: t.label ?? t.id ?? 'Tab' };
+      });
+    };
+    const writeTabs = async (tabs, defaultId) => {
+      // Write back to options.tabs (preferred), else _config.tabs
+      const target = this._config?.options ? (this._config.options) : (this._config ||= {});
+      target.tabs = tabs.map(t => ({ id: t.id, label: t.label }));
+      if (defaultId) target.default_tab = defaultId;
+      // persist like visual editor
+      try { await this._persistThisCardConfigToStorage_(); }
+      catch (e) { console.warn('[drag-and-drop-card] Could not persist tabs', e); }
+      this.requestUpdate?.();
+    };
+    const defaultTabId = () => (this._config?.options?.default_tab) || this._config?.default_tab || (readTabs()[0]?.id);
+
+    const tabsListEl = modal.querySelector('#ddc-tabs-list');
+    const renderTabs = () => {
+      const tabs = readTabs();
+      const def = defaultTabId();
+      tabsListEl.innerHTML = '';
+      if (!tabs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'hint';
+        empty.textContent = 'No tabs yet. Add one below.';
+        tabsListEl.appendChild(empty);
+        return;
+      }
+      tabs.forEach((t, idx) => {
+        const row = document.createElement('div');
+        row.className = 'tab-row';
+
+        // default radio
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'ddc-default-tab';
+        radio.value = t.id;
+        radio.checked = (t.id === def);
+        radio.title = 'Set as default tab';
+
+        radio.addEventListener('change', async () => {
+          await writeTabs(tabs, t.id);
+        });
+
+        // name editor (id == label by default; id changes when renamed unless you lock it – here we tie id to label)
+        const nameWrap = document.createElement('div');
+        nameWrap.className = 'tab-name';
+        const nameIcon = document.createElement('ha-icon');
+        nameIcon.setAttribute('icon', 'mdi:tab');
+        const nameInput = document.createElement('input');
+        nameInput.value = t.label;
+        nameInput.placeholder = 'Tab name';
+        nameInput.addEventListener('change', async () => {
+          const newLabel = nameInput.value.trim() || t.id;
+          // keep ids stable unless empty; if you want id=label always, uncomment next line:
+          // t.id = newLabel;
+          t.label = newLabel;
+          tabs[idx] = t;
+          await writeTabs(tabs, def);
+          renderTabs();
+        });
+        nameWrap.appendChild(nameIcon);
+        nameWrap.appendChild(nameInput);
+
+        // delete
+        const actions = document.createElement('div');
+        actions.className = 'tab-actions';
+        const delBtn = document.createElement('button');
+        delBtn.className = 'icon-btn danger';
+        delBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+        delBtn.title = 'Delete tab';
+        delBtn.addEventListener('click', async () => {
+          const nextTabs = readTabs().filter(x => x.id !== t.id);
+          let nextDefault = def;
+          if (t.id === def) nextDefault = nextTabs[0]?.id;
+          await writeTabs(nextTabs, nextDefault);
+          // Optional: reassign any cards pointing to the deleted tab
+          try { this._reassignCardsToTab_?.(t.id, nextDefault); } catch {}
+          renderTabs();
+        });
+
+        actions.appendChild(delBtn);
+
+        row.appendChild(radio);
+        row.appendChild(nameWrap);
+        row.appendChild(actions);
+        tabsListEl.appendChild(row);
+      });
+    };
+    renderTabs();
+
+    // Add tab
+    modal.querySelector('#ddc-add-tab-btn')?.addEventListener('click', async () => {
+      const inp = modal.querySelector('#ddc-new-tab-name');
+      const raw = (inp?.value || '').trim();
+      if (!raw) return;
+      const tabs = readTabs();
+      // ensure unique id
+      let id = raw;
+      let i = 2;
+      while (tabs.some(t => (t.id === id))) id = `${raw}-${i++}`;
+      tabs.push({ id, label: raw });
+      await writeTabs(tabs, defaultTabId());
+      inp.value = '';
+      renderTabs();
+    });
+
+    // ===== BACKGROUND IMAGE: DELETE BUTTON =====
+    const clearBtn = modal.querySelector('#ddc-clear-bg');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        const urlInput  = modal.querySelector('#ddc-setting-bgImg');
+        const thumb     = modal.querySelector('#ddc-bg-thumb');
+        if (urlInput) urlInput.value = '';
+        if (thumb) thumb.style.backgroundImage = 'none';
+        // clear from config immediately
+        try {
+          if (this._config?.background_image) {
+            const { background_image, ...rest } = this._config;
+            this._config = rest;
+          }
+          this._applyBackgroundImageFromConfig?.();
+          this._persistThisCardConfigToStorage_?.();
+        } catch (e) {
+          console.warn('[drag-and-drop-card] Failed to clear background image', e);
+        }
+      });
+    }
+
+    // ===== GRADIENT PRESETS for Container Background =====
+    const GRADIENTS = [
+      'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+      'linear-gradient(135deg, #111827, #1f2937)',
+      'linear-gradient(135deg, #0f766e, #22c55e)',
+      'linear-gradient(135deg, #7c3aed, #06b6d4)',
+      'linear-gradient(135deg, #f97316, #f43f5e)',
+      'linear-gradient(135deg, #eab308, #22d3ee)',
+      'radial-gradient(circle at 30% 20%, #2dd4bf, #1e293b)',
+      'radial-gradient(circle at 70% 80%, #f59e0b, #7c3aed)',
+    ];
+    const buildGradients = (containerSel, targetInputSel) => {
+      const wrap = modal.querySelector(containerSel);
+      const target = modal.querySelector(targetInputSel);
+      if (!wrap || !target) return;
+      wrap.innerHTML = '';
+      GRADIENTS.forEach(g => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'gradient';
+        b.style.background = g;
+        b.setAttribute('aria-pressed','false');
+        b.title = g;
+        b.addEventListener('click', () => {
+          wrap.querySelectorAll('.gradient').forEach(x => x.setAttribute('aria-pressed','false'));
+          b.setAttribute('aria-pressed','true');
+          target.value = g;                          // write into the same input your save handler already reads
+          // Live apply for preview:
+          try {
+            this.containerBackground = g;
+            this.style.setProperty('--ddc-bg', g);
+          } catch {}
+        });
+        wrap.appendChild(b);
+        if (String(target.value).trim() === g) b.setAttribute('aria-pressed','true');
+      });
+    };
+    buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
+
 
     // Remove modal helper
     const closeModal = () => {
