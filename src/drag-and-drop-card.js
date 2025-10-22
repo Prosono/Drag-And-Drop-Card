@@ -195,6 +195,89 @@ _setCardByPath_(view, parentPath, cardIndex, value) {
 }
 
 
+_ensureToolbarStyles_() {
+  try {
+    const has = this.shadowRoot.querySelector('#ddc-toolbar-styles');
+    if (has) return;
+    const s = document.createElement('style');
+    s.id = 'ddc-toolbar-styles';
+    s.textContent = `/* ===== Edit toolbar ===== */
+  .ddc-toolbar{
+    position: sticky; top:0; z-index: 50;
+    display:grid; grid-template-columns: 1fr auto 1fr; align-items:center;
+    gap: 12px; padding: 10px 14px;
+    backdrop-filter: blur(8px);
+    background: color-mix(in oklab, var(--card-background-color, rgba(0,0,0,.45)) 80%, transparent);
+    border-bottom: 1px solid var(--divider-color, rgba(255,255,255,.08));
+    box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  }
+  .ddc-t-group{ display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
+  .ddc-toolbar > .ddc-t-group:first-child{ justify-self: start; }
+  .ddc-toolbar > .ddc-t-group:nth-child(3){ justify-self: center; }
+  .ddc-toolbar > .ddc-t-group:last-child{ justify-self: end; }
+
+  .ddc-t-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    height:34px; padding:0 12px; border-radius:10px;
+    font: inherit; line-height: 1; cursor:pointer;
+    background: var(--ha-card-background, rgba(255,255,255,.06));
+    border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+    color: var(--primary-text-color, #e5e7eb);
+    transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  }
+  .ddc-t-btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.1); }
+  .ddc-t-btn:active{ transform: translateY(0); }
+  .ddc-t-btn ha-icon{ --mdc-icon-size:18px; }
+  .ddc-t-btn .label{ white-space:nowrap; }
+
+  .ddc-t-btn.primary{
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+    border-color: color-mix(in oklab, var(--primary-color) 75%, #000);
+  }
+  .ddc-t-btn.danger{
+    background: var(--error-color, #ef4444);
+    color:#fff;
+    border-color: color-mix(in oklab, var(--error-color) 75%, #000);
+  }
+  .ddc-t-btn.ghost{
+    background: transparent;
+    border-color: transparent;
+    color: var(--secondary-text-color, #cbd5e1);
+  }
+
+  .ddc-t-sep{ width:1px; height:28px; background: var(--divider-color, rgba(255,255,255,.12)); }
+
+  .ddc-t-status{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 12px; border-radius:999px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+    font-size:.875rem;
+  }
+  .ddc-t-dot{ width:10px; height:10px; border-radius:50%; background:#22c55e; }
+  .ddc-t-dot.dirty{ background:#f59e0b; animation: ddc-pulse 1.5s ease-in-out infinite; }
+  .ddc-t-dot.error{ background:#ef4444; }
+  @keyframes ddc-pulse{ 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.4)} }
+
+  /* Compact (icon-only) when narrow */
+  .ddc-toolbar.compact .ddc-t-btn .label{ display:none; }
+  /* Super-narrow: stack rows */
+  @media (max-width: 840px){
+    .ddc-toolbar{ grid-template-columns: 1fr; row-gap: 10px; }
+    .ddc-toolbar .ddc-t-sep{ display:none; }
+    .ddc-toolbar > .ddc-t-group{ justify-self: stretch; }
+  }`;
+    this.shadowRoot.appendChild(s);
+  } catch (e) {
+    console.warn('Toolbar style inject failed', e);
+  }
+}
+
+
+
+
+
   /* -------------------- Settings Dashboard styling -------------------- */
 
 
@@ -203,7 +286,7 @@ _ensureSettingsStyles_() {
   const style = document.createElement('style');
   style.id = 'ddc-settings-styles';
   style.textContent = `
-  .dialog.modern { max-width: 720px; width: min(92vw, 720px); border-radius: 14px; overflow: hidden; }
+  .dialog.modern { max-width: 1920px; width: min(92vw, 1080px); border-radius: 14px; overflow: hidden; }
   .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--primary-color); color:#fff; }
   .dlg-head h3 { margin:0; font-size:1.1rem; font-weight:700; }
   .icon-btn { border:0; background:transparent; color:inherit; cursor:pointer; display:grid; place-items:center; }
@@ -221,9 +304,277 @@ _ensureSettingsStyles_() {
   .chip { border:1px solid var(--divider-color, rgba(0,0,0,.25)); padding:6px 10px; border-radius:999px; background:transparent; cursor:pointer; font-size:.9rem; }
   .chip[aria-pressed="true"] { background:var(--primary-color); color:#fff; border-color:transparent; }
   .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
-  .grid-demo { --g: 100; background: repeating-linear-gradient( to right, transparent 0, transparent calc(var(--g) - 1px), rgba(0,0,0,.06) calc(var(--g) - 1px), rgba(0,0,0,.06) var(--g) ),
-                                repeating-linear-gradient( to bottom, transparent 0, transparent calc(var(--g) - 1px), rgba(0,0,0,.06) calc(var(--g) - 1px), rgba(0,0,0,.06) var(--g) );
-                height: 140px; border-radius:8px; }
+  /* ---- Grid demo ---- */
+  .grid-demo{
+    --g: 100px;                               /* cell size injected via JS */
+    --line-minor: rgba(255,255,255,.10);
+    --line-major: rgba(255,255,255,.22);
+    --bg-fade   : linear-gradient(180deg, transparent 0%, rgba(0,0,0,.04) 100%);
+
+    position: relative;
+    height: 180px;
+    border-radius: 14px;
+    border: 1px solid var(--divider-color, rgba(0,0,0,.18));
+    overflow: hidden;
+    background:
+      /* subtle base */
+      var(--bg-fade),
+      /* major lines every 5 cells (thicker) - horizontal */
+      repeating-linear-gradient(
+        to bottom,
+        var(--line-major) 0 2px,
+        transparent 2px calc(var(--g) * 5)
+      ),
+      /* major lines every 5 cells (thicker) - vertical */
+      repeating-linear-gradient(
+        to right,
+        var(--line-major) 0 2px,
+        transparent 2px calc(var(--g) * 5)
+      ),
+      /* minor lines each cell - horizontal */
+      repeating-linear-gradient(
+        to bottom,
+        var(--line-minor) 0 1px,
+        transparent 1px var(--g)
+      ),
+      /* minor lines each cell - vertical */
+      repeating-linear-gradient(
+        to right,
+        var(--line-minor) 0 1px,
+        transparent 1px var(--g)
+      );
+    background-color: rgba(0,0,0,.02);
+  }
+
+  .grid-meta-badge{
+    position: absolute; top: 8px; right: 8px;
+    padding: 6px 10px;
+    background: color-mix(in oklab, var(--ha-card-background, #111) 80%, transparent);
+    border: 1px solid var(--divider-color, rgba(0,0,0,.24));
+    border-radius: 999px;
+    font-size: .86rem;
+    letter-spacing:.2px;
+    display:flex; align-items:center; gap:8px;
+    backdrop-filter: blur(4px);
+    pointer-events:none;
+  }
+
+    /* --- NEW nicer headers / captions / swatches / tooltips --- */
+
+    .caption { margin:0 0 8px 0; color:var(--secondary-text-color); font-size:.9rem; }
+
+    .swatches { display:flex; gap:8px; flex-wrap:wrap; }
+    .swatch { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+    .swatch[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:8px; }
+
+    .inline-help { display:inline-flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:.9rem; }
+    .inline-help ha-icon { opacity:.8; }
+
+    .input-file { display:flex; gap:10px; align-items:center; }
+    .input-file input[type="file"] { display:none; }
+    .input-file .file-btn { border:1px solid var(--divider-color,rgba(0,0,0,.25)); border-radius:8px; padding:8px 12px; cursor:pointer; background:var(--ha-card-background,#fff); }
+    .thumb { width:64px; height:42px; border-radius:6px; background-size:cover; background-position:center; border:1px solid rgba(0,0,0,.12); }
+
+    .divider { height:1px; background:var(--divider-color, rgba(0,0,0,.12)); margin:8px 0; opacity:.7; }
+
+    .section-head { display:flex; align-items:center; gap:8px; margin:0 0 8px 0; padding-bottom:6px; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12)); }
+    .section-head ha-icon { opacity:.9; }
+    .setting { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+    .setting .row { display:flex; align-items:center; gap:12px; }
+    .setting .title { display:flex; align-items:center; gap:8px; min-width:220px; }
+    .setting .title ha-icon { opacity:.9; }
+    .setting .control { display:flex; align-items:center; gap:10px; flex:1; }
+    .setting .hint { margin-left:32px; color:var(--secondary-text-color); font-size:.88rem; line-height:1.35; }
+    .setting .suffix { opacity:.6; margin-left:4px; }
+    .range-wrap { display:flex; align-items:center; gap:12px; flex:1; }
+    .range-wrap output { width:64px; text-align:right; color:var(--secondary-text-color); font-weight:600; }
+
+    /* --- Tabs manager UI --- */
+    .tabs-card .tab-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.08)); }
+    .tabs-card .tab-row:last-child { border-bottom:0; }
+    .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
+    .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
+    .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+    .icon-btn.danger { color: var(--error-color, #b00020); }
+
+    /* gradient swatches */
+    .gradients { display:flex; gap:8px; flex-wrap:wrap; }
+    .gradient { width:44px; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+    .gradient[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:10px; }
+
+    /* Section hierarchy */
+    .section-head {
+      display:flex; align-items:center; gap:10px; margin:6px 0 6px;
+    }
+    .section-head ha-icon { opacity:.85; }
+    .section-head h4 {
+      margin:0;
+      font-size:1.1rem;          /* larger than setting labels */
+      font-weight:700;
+      letter-spacing:.2px;
+    }
+
+    /* Setting rows */
+    .setting { padding:10px 0; }
+    .setting .row {
+      display:flex; align-items:center; gap:14px;
+    }
+    .setting .title {
+      flex:0 0 240px;            /* left column width */
+      display:flex; align-items:center; gap:8px;
+      font-weight:600;
+    }
+    .setting .title label, .setting .title span { font-size:.98rem; }
+    .setting .control { flex:1; display:flex; align-items:center; gap:10px; }
+
+    /* Hints and captions */
+    .caption { margin:0 0 4px; color:var(--secondary-text-color); font-size:.92rem; }
+    .hint    { margin:6px 0 0;  color:var(--secondary-text-color); font-size:.88rem; }
+
+    /* Dividers */
+    .divider {
+      height:1px;
+      background:linear-gradient(
+        to right,
+        transparent,
+        var(--divider-color, rgba(0,0,0,.12)),
+        transparent
+      );
+      margin:12px 0;
+    }
+
+    /* Inputs */
+    .modern select,
+    .modern input[type="text"],
+    .modern input[type="number"] {
+      padding:8px 10px;
+      border:1px solid var(--divider-color,rgba(0,0,0,.25));
+      border-radius:10px;
+      background:var(--ha-card-background,#fff);
+    }
+
+    /* Slider + output */
+    .range-wrap { display:flex; align-items:center; gap:10px; width:100%; }
+    .range-wrap input[type="range"] { flex:1; }
+    .range-wrap output {
+      min-width:64px; text-align:right; font-variant-numeric:tabular-nums;
+      color:var(--secondary-text-color);
+    }
+
+    /* Chips row spacing */
+    .chips { display:flex; gap:8px; flex-wrap:wrap; }
+
+    /* ----- Hard category separators ----- */
+    section.card {
+      border-bottom: 2px solid var(--divider-strong, rgba(255,255,255,.15));
+      margin-bottom: 20px;
+      padding-bottom: 24px;
+    }
+
+    section.card:last-of-type {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    section.card:hover > .section-head h4 {
+      color: var(--accent-color, var(--primary-color));
+      transition: color .25s ease;
+    }
+
+    .section-head {
+      background: linear-gradient(90deg, var(--accent-color, #2563eb) 0%, transparent 70%);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .section-head h4 {
+      color: #fff;
+    }
+
+    /* Tighten the empty space after Background image and between sections */
+    section.card .setting:last-child { margin-bottom: 0; padding-bottom: 0; }
+    section.card { margin-bottom: 16px; padding-bottom: 20px; }
+    .section-head { margin-top: 4px; }
+
+    /* Place Tabs section right after Appearance without big gaps */
+    .tabs-card { margin-top: 8px; }
+
+    /* File inputs: clearer Upload/Delete buttons */
+    .input-file { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .file-btn, #ddc-clear-bg {
+      height: 36px; padding: 0 14px; border-radius: 10px; font-weight: 700;
+      border: 1px solid transparent; cursor: pointer;
+    }
+    .file-btn {
+      background: var(--primary-color); color: var(--text-primary-color, #fff);
+    }
+    #ddc-clear-bg {
+      background: var(--error-color, #ef4444); color:#fff;
+    }
+    #ddc-clear-bg:hover { filter: brightness(1.05); }
+    .file-btn:hover { filter: brightness(1.05); }
+
+    /* BG option controls */
+    .bg-opts { display:grid; grid-template-columns: 220px 1fr; gap:10px 12px; margin-top:8px; }
+    .bg-opts label { display:flex; align-items:center; gap:8px; font-weight:600; }
+    .bg-opts select, .bg-opts input[type="range"] {
+      width: 100%; padding:8px 10px; border:1px solid var(--divider-color,rgba(0,0,0,.25));
+      border-radius:10px; background:var(--ha-card-background,#1e1e1e);
+    }
+    .bg-opts output { min-width:52px; text-align:right; color:var(--secondary-text-color); }
+
+    /* Background image preview thumb */
+    .thumb {
+      width: 72px; height: 42px; border-radius: 8px;
+      background-size: cover; background-position: center center;
+      border: 1px solid var(--divider-color, rgba(0,0,0,.25));
+    }
+
+    /* ---- Render the background image via a pseudo element so opacity doesn't fade content ---- */
+    .ddc-canvas { position: relative; z-index: 0; }
+    .ddc-canvas::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image: var(--ddc-bg-image, none);
+      background-repeat: var(--ddc-bg-repeat, no-repeat);
+      background-size: var(--ddc-bg-size, cover);
+      background-position: var(--ddc-bg-position, center center);
+      background-attachment: var(--ddc-bg-attachment, scroll);
+      opacity: var(--ddc-bg-opacity, 1);
+    }
+    .ddc-canvas > * { position: relative; z-index: 1; }
+
+    /* Tabs manager polish */
+    .tab-row {
+      display:flex; align-items:center; gap:10px;
+      margin-bottom:10px; padding:8px;
+      border:1px solid var(--divider-color, rgba(255,255,255,.12));
+      border-radius:8px; background:var(--ha-card-background, rgba(255,255,255,.04));
+    }
+    .tab-row:hover { background: var(--ha-card-background, rgba(255,255,255,.08)); }
+
+    .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
+    .tab-name input {
+      background: var(--ha-card-background, #1f1f1f);
+      border:1px solid var(--divider-color, rgba(255,255,255,.12));
+      color: var(--primary-text-color);
+      padding:6px 8px; border-radius:6px;
+    }
+
+    .tab-icon-wrap { position:relative; display:flex; align-items:center; gap:6px; }
+    .tab-icon-wrap ha-icon { opacity:.9; }
+
+    .mode-chips {
+      display:flex; gap:6px;
+    }
+    .mode-chips .chip {
+      border-radius:10px; padding:4px 8px; font-weight:600;
+      background: var(--ha-card-background, #222); border:1px solid var(--divider-color, rgba(255,255,255,.12));
+    }
+    .mode-chips .chip[aria-pressed="true"] {
+      background: var(--primary-color); color: #fff; border-color: transparent;
+    }
+
+  .grid-meta-badge ha-icon{ opacity:.9; }
   .color-pair { display:flex; gap:8px; }
   .color-pair input[type="color"] { width:44px; height:36px; border:0; background:transparent; padding:0; }
   .footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid var(--divider-color, rgba(0,0,0,.12)); }
@@ -669,6 +1020,9 @@ _applyVisibility_() {
   try { this._queueSave?.('nudge'); } catch {}
 }
 
+
+
+
   /**
    * Synchronise the width of the tabs bar with the visible width of the card
    * container. When the auto-scaling logic shrinks the canvas, the tabs
@@ -678,6 +1032,9 @@ _applyVisibility_() {
    * directly to the tabs bar. For vertical (left) tabs we reset any
    * widths to allow the rail to size naturally.
    */
+
+
+
   _syncTabsWidth_() {
     try {
       const bar = this.tabsBar;
@@ -783,8 +1140,159 @@ _applyVisibility_() {
     try { window.addEventListener('pointercancel', this.__onDDCPointerUp, { passive: true }); } catch {}
   }
 
+_renderEditToolbar_() {
+  // Remove any existing
+  this.shadowRoot.querySelectorAll('.ddc-toolbar').forEach(n => n.remove());
 
-_ensureScaleWrapper() {
+  // 🔹 ensure styles exist
+  this._ensureToolbarStyles_();  // <— ADD THIS LINE
+
+  const bar = document.createElement('div');
+  bar.className = 'ddc-toolbar';
+
+  // --- Left: Build
+  const gBuild = document.createElement('div'); gBuild.className = 'ddc-t-group';
+  gBuild.append(
+    this._mkBtn_('add_card', 'mdi:plus-box', 'Add card (A)', 'primary'),
+    this._mkBtn_('snap_toggle', 'mdi:magnet', 'Toggle snap (G)'),
+    this._mkBtn_('align_grid', 'mdi:grid', 'Align to grid')
+  );
+
+  // --- Middle: Status
+  const gStatus = document.createElement('div'); gStatus.className = 'ddc-t-group';
+  const pill = document.createElement('div'); pill.className = 'ddc-t-status';
+  const dot  = document.createElement('div'); dot.className = 'ddc-t-dot' + (this.__dirty ? ' dirty' : '');
+  const txt  = document.createElement('span');
+  txt.textContent = this.__dirty ? 'Unsaved changes' : `Saved${this.__lastSavedAt ? ' · ' + this.__lastSavedAt : ''}`;
+  pill.append(dot, txt);
+  gStatus.appendChild(pill);
+
+  // --- Right: System
+  const gSys = document.createElement('div'); gSys.className = 'ddc-t-group';
+  gSys.append(
+    this._mkBtn_('reload',    'mdi:refresh',             'Reload (R)', 'ghost'),          // ← make subtle
+    this._mkBtn_('open_hads', 'mdi:alpha-h-box-outline', 'Open HACS/HADS', 'ghost'),      // ← make subtle
+    this._mkBtn_('apply',     'mdi:content-save',        'Apply / Save (S)', 'primary'),
+    this._mkBtn_('exit_edit', 'mdi:logout-variant',      'Exit edit (Esc)', 'danger')
+  );
+
+  // Layout rows (wrap on narrow)
+  const rowL = document.createElement('div'); rowL.className = 'ddc-t-group ddc-t-row'; rowL.append(gBuild);
+  const rowM = document.createElement('div'); rowM.className = 'ddc-t-group ddc-t-row'; rowM.append(gStatus);
+  const rowR = document.createElement('div'); rowR.className = 'ddc-t-group ddc-t-row'; rowR.append(gSys);
+
+  bar.append(rowL, document.createElement('div')).lastChild.className = 'ddc-t-sep';
+  bar.append(rowM, document.createElement('div')).lastChild.className = 'ddc-t-sep';
+  bar.append(rowR);
+
+  // Click handling (single delegate)
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-action]'); if (!b) return;
+    this._onToolbarAction_(b.dataset.action, { button: b, bar, dot, txt });
+  });
+
+  // Attach to shadowRoot
+  this.shadowRoot.appendChild(bar);
+
+  // 🔹 Responsive: collapse labels when narrow
+  try {
+    if (this.__toolbarRO) this.__toolbarRO.disconnect();
+    this.__toolbarRO = new ResizeObserver(entries => {
+      for (const e of entries) {
+        bar.classList.toggle('compact', e.contentRect.width < 980);
+      }
+    });
+    this.__toolbarRO.observe(bar);
+  } catch {}
+
+  // Keys while editing (unchanged)
+  this.__toolbarKeyHandler = (ev) => {
+    if (!this.editMode && !this.isEditing) return;
+    if (ev.key === 'a' || ev.key === 'A') return this._onToolbarAction_('add_card');
+    if (ev.key === 's' || ev.key === 'S') return this._onToolbarAction_('apply');
+    if (ev.key === 'r' || ev.key === 'R') return this._onToolbarAction_('reload');
+    if (ev.key === 'g' || ev.key === 'G') return this._onToolbarAction_('snap_toggle');
+    if (ev.key === 'Escape')             return this._onToolbarAction_('exit_edit');
+  };
+  window.addEventListener('keydown', this.__toolbarKeyHandler);
+}
+
+
+// Make it async so we can await inside
+async _onToolbarAction_(action, ctx = {}) {
+
+
+  
+  switch (action) {
+    
+    case 'add_card':
+      (this._openAddCardDialog_?.() || this._addNewCard_?.() || this._openEntityPicker_?.());
+      break;
+
+    case 'snap_toggle': {
+      this.dragLiveSnap = !this.dragLiveSnap;
+      this._initInteract?.();
+      this._toast_?.(`Live snap ${this.dragLiveSnap ? 'ON' : 'OFF'}`);
+      break;
+    }
+
+    case 'align_grid':
+      this._alignAllToGrid_?.(this.gridSize);
+      break;
+
+    case 'reload':
+      this._reloadLayout_?.();
+      break;
+
+    case 'open_hads':
+      (this._openHACS_?.() ||
+       window.open('/hacs', '_blank') ||
+       window.open('/hacsfiles', '_blank'));
+      break;
+
+    case 'apply': {
+      // No need for 'async' on done()
+      const done = () => {
+        this._setDirty_(false);
+        if (ctx?.txt) ctx.txt.textContent = `Saved · ${this.__lastSavedAt}`;
+        if (ctx?.dot) ctx.dot.classList.remove('dirty','error');
+      };
+      const fail = () => { if (ctx?.dot) ctx.dot.classList.add('error'); };
+
+      try {
+        if (this._saveLayoutNow_) {
+          await this._saveLayoutNow_();
+        } else if (this._persistThisCardConfigToStorage_) {
+          await this._persistThisCardConfigToStorage_();
+        } else {
+          this._queueSave?.('toolbar-apply', true);
+        }
+        this.__lastSavedAt = new Date().toLocaleTimeString();
+        done();
+      } catch (e) {
+        console.warn(e);
+        fail();
+      }
+      break;
+    }
+
+    case 'exit_edit':
+      (this._toggleEditMode?.(false) || this._exitEditMode_?.() || (this.isEditing = false));
+      // Clean up hotkeys when leaving
+      if (this.__toolbarKeyHandler) {
+        window.removeEventListener('keydown', this.__toolbarKeyHandler);
+        this.__toolbarKeyHandler = null;
+      }
+      // 🔹 Clean up the resize observer
+      if (this.__toolbarRO) { try { this.__toolbarRO.disconnect(); } catch{} this.__toolbarRO = null; }
+
+      // Optionally remove toolbar
+      this.shadowRoot.querySelectorAll('.ddc-toolbar').forEach(n => n.remove());
+      break;
+  }
+}
+
+  _ensureScaleWrapper() {
   const c = this.cardContainer;
   if (!c) return;
   if (this.__scaleOuter && this.__scaleOuter.contains(c)) return;
@@ -922,6 +1430,11 @@ _ensureScaleWrapper() {
         "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
     };
   }
+
+
+
+
+
 
   /* ------------------------- Mini config editor (HA) ------------------------- */
 // Replace your existing static getConfigElement() with the version below.
@@ -1480,307 +1993,418 @@ _applyGridVars() {
       this._built = true;
       this.shadowRoot.innerHTML = `
         <style>
-          .ddc-root{
-            position:relative;
-            /* JS will keep this in sync with your “Grid (px)” */
-            --ddc-grid-size: 10px;
-            /* Good contrast on light/dark themes */
-            --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
-          }
-          .toolbar{display:flex;gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap}
-          .btn{
-            background:var(--primary-color);color:#fff;border:none;padding:8px 12px;border-radius:10px;
-            cursor:pointer;font:inherit;box-shadow:0 2px 6px rgba(0,0,0,.12)
-          }
-          .btn.secondary{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}
-          .btn.ghost{background:transparent;color:var(--primary-text-color);border:1px dashed var(--divider-color)}
-          .store-badge {
-            margin-left: auto;
-            border: 1px solid var(--divider-color);
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: .85rem;
-            background: rgba(255,193,7,.15);
-            display: none; /* hidden by default, shown only in edit mode */
-          }
+.ddc-root{
+  position:relative;
+  /* JS will keep this in sync with your “Grid (px)” */
+  --ddc-grid-size: 10px;
+  /* Good contrast on light/dark themes */
+  --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
+}
 
-          .card-container{
-            position: relative;
-            transform-origin: top left;
-            padding: 10px;
-            border: 1px solid var(--divider-color);
-            background: var(--ddc-bg, transparent);
-            width: auto; height: auto; border-radius: 12px; overflow: hidden;
-            isolation: isolate; z-index: 0; -webkit-touch-callout: none;
-            user-select: none;
-          }
-          /* make the grid only on the background, aligned to the same origin as cards */
-          .card-container::before{
-            content:'';
-            position:absolute; inset:0;                 /* same origin as absolutely positioned children */
-            background-image:
-              linear-gradient(var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
-              linear-gradient(90deg, var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px);
-            background-size: var(--ddc-grid-size) var(--ddc-grid-size);
-            background-origin: content-box;              /* align pattern to the content/padding edge */
-            background-clip: content-box;
-            pointer-events:none;
-            opacity:0;
-            transition: opacity .15s;
-            z-index:1;
-          }
-          .card-container.grid-on::before{
-            opacity:.28;
-          }
-          /* background image layer (always behind grid and cards) */
-          .card-container::after{
-            content:'';
-            position:absolute; inset:0;
-            pointer-events:none;
-            z-index:0;
-            opacity: var(--ddc-bg-opacity, 1);
-            background-image: var(--ddc-bg-image, none);
-            background-repeat: var(--ddc-bg-repeat, no-repeat);
-            background-size: var(--ddc-bg-size, cover);
-            background-position: var(--ddc-bg-position, center center);
-            background-attachment: var(--ddc-bg-attachment, scroll);
-            filter: var(--ddc-bg-filter, none);
-          }
-    
+/* ===== Drag & Drop Card — Toolbar v2 (with L-shaped quarter-arc caps) ===== */
+.ddc-toolbar.streamlined.v2{
+  /* section accent colors */
+  --sec-primary: #3b82f6; /* Add & Save */
+  --sec-clip:    #a855f7; /* Clipboard   */
+  --sec-share:   #4fb6ff; /* Import&Share (HADS) */
+  --sec-utils:   #10b981; /* Utilities   */
+  --sec-status:  #ef4444; /* Status      */
 
-          .card-wrapper{
-            position:absolute;
-            left: 0;                     /* <<< important: unify origin with the grid */
-            top:  0;                     /* <<< important: unify origin with the grid */
-            box-sizing: border-box;      /* include the 2px border in the set width/height */
-            border:2px solid transparent;
-            background:var(--ddc-card-bg, var(--card-background-color));
-            cursor:grab;
-            /* ensure buttons and resize handles remain visible on very small cards */
-            overflow:auto;
-            border-radius:14px;
-            box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
-            will-change:transform,width,height,box-shadow; touch-action:auto;
-            z-index:2;
-          }
-          .card-wrapper.dragging{
-            cursor:grabbing;
-            touch-action: none;
-            }
-          .card-wrapper.editing.selected{
-            border-color:var(--primary-color,#03a9f4);
-            box-shadow:0 0 0 2px var(--primary-color,#03a9f4)!important;
-          }
+  --bg: color-mix(in oklab, var(--card-background-color, #111) 90%, transparent);
+  --border: var(--divider-color, rgba(255,255,255,.14));
 
-          /* ---- empty-state of the card---- */
-          .btn.cta-empty{
-            position:relative;
-            padding:12px 16px;
-            font-weight:600;
-            border-radius:14px;
-            display:inline-flex !important;
-            align-items:center;
-            gap:8px;
-            box-shadow:0 6px 18px rgba(3,169,244,.25);
-          }
-          .btn.cta-empty::after{
-            content:"";
-            position:absolute; inset:-4px;
-            border-radius:16px;
-            border:2px solid rgba(3,169,244,.35);
-            animation: ddc-cta-pulse 1.8s ease-out infinite;
-            pointer-events:none;
-          }
-          @keyframes ddc-cta-pulse{
-            0%   { opacity:.85; transform:scale(.98); }
-            70%  { opacity:0;   transform:scale(1.12); }
-            100% { opacity:0;   transform:scale(1.18); }
-          }    
-            
-          /* pleasant buttons: info (light blue) & warning (orange) */
-          .btn.info{
-            background: var(--ddc-info,#4db6ff);
-            color:#0b2537;
-            border:1px solid color-mix(in srgb, var(--ddc-info,#4db6ff) 55%, #000 15%);
-          }
-          .btn.info:hover{ filter: brightness(1.06); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
-          .btn.info:active{ transform: translateY(0) }
+  position: sticky; top:0; z-index:50;
+  display: grid;
+  /* full-width: 4 equal sections + free space + compact status */
+  grid-template-columns: minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 1fr auto;
+  grid-template-areas:
+    "primary vsep1 clip vsep2 share vsep3 utils spacer status"
+    "layouts layouts layouts layouts layouts layouts layouts layouts layouts";
+  align-items: start;
+  column-gap: 14px;
+  row-gap: 10px;
+  padding: 10px 12px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
 
-          .btn.warning{
-            background: var(--ddc-warning,#ff9800);
-            color:#210b00;
-            border:1px solid color-mix(in srgb, var(--ddc-warning,#ff9800) 55%, #000 15%);
-          }
-          .btn.warning:hover{ filter: brightness(1.07); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
-          .btn.warning:active{ transform: translateY(0) }
+/* grid areas */
+.ddc-toolbar.streamlined.v2 .sec-primary{ grid-area: primary; }
+.ddc-toolbar.streamlined.v2 .sec-clip   { grid-area: clip; }
+.ddc-toolbar.streamlined.v2 .sec-share  { grid-area: share; }
+.ddc-toolbar.streamlined.v2 .sec-utils  { grid-area: utils; }
+.ddc-toolbar.streamlined.v2 .sec-status { grid-area: status; }
+.ddc-toolbar.streamlined.v2 .sec-layouts{ grid-area: layouts; }
+.ddc-toolbar.streamlined.v2 .ddc-spacer { grid-area: spacer; }
+.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(1){ grid-area: vsep1; }
+.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(2){ grid-area: vsep2; }
+.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(3){ grid-area: vsep3; }
 
-          /* small quality-of-life for all .btn */
-          .btn{
-            display:inline-flex; align-items:center; gap:8px;
-            border-radius:12px; transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
-          }
-          .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px }
+/* sections */
+.ddc-toolbar.streamlined.v2 .ddc-sec{
+  display:grid; grid-template-rows:auto auto; gap:8px; min-width:0;
+}
 
-          /* ---- chip ---- */
-        .chip{
-            position:absolute;
-            /* Position the chip horizontally centered above the resize handle */
-            bottom:48px;
-            left:50%;
-            transform:translateX(-50%);
-            display:flex;
-            gap:6px;
-            flex-wrap:wrap;
-            opacity:0;
-            transition:opacity .15s;
-            z-index:30;
-            pointer-events: none;
-          }
-          .card-wrapper.editing .chip{
-            opacity:1;
-            pointer-events: auto;
-          }
-          .card-wrapper.editing .chip{
-            opacity:1;
-            pointer-events: auto;
-          }
-          /* Action buttons on cards: icons only, colour-coded and consistent sizing */
-          .chip .mini{
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            width:32px;
-            height:32px;
-            /* Use a subtle gradient for a more interesting look */
-            background:linear-gradient(135deg, rgba(24,25,27,.7) 0%, rgba(40,41,43,.9) 100%);
-            color:#fff;
-            border:1px solid rgba(255,255,255,.18);
-            border-radius:8px;
-            cursor:pointer;
-            box-shadow:0 2px 4px rgba(0,0,0,.25);
-            /* removed blur for clarity */
-            transition:background .15s, transform .1s, box-shadow .15s;
-          }
-          .chip .mini span{
-            display:none;
-          }
-          .chip .mini:hover{
-            transform:translateY(-1px);
-            background:linear-gradient(135deg, rgba(24,25,27,.85) 0%, rgba(40,41,43,1) 100%);
-            box-shadow:0 3px 8px rgba(0,0,0,.4);
-          }
-          .chip .mini ha-icon{
-            --mdc-icon-size:20px;
-            width:20px;
-            height:20px;
-          }
-          .chip .mini.danger{
-            background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
-            border-color:rgba(255,255,255,.22);
-          }
-          .chip .mini.danger:hover{
-            background:linear-gradient(135deg, rgba(236,72,72,1) 0%, rgba(255,105,97,1) 100%);
-          }
-          /* pill modifier is no longer used, but keep rule for compatibility */
-          .chip .mini.pill{
-            /* no extra padding needed when using icon-only buttons */
-            padding:0;
-          }
+/* section headlines with L-curve end-cap */
+.ddc-toolbar.streamlined.v2 .ddc-sec-head{
+  /* curve tuning */
+  --line-thickness: 2px;  /* underline thickness (match ::after height) */
+  --curve-length: 60px;   /* horizontal run of the L */
+  --curve-drop: 18px;     /* vertical height; also radius for perfect quarter-arc */
+  --curve-nudge-y: 19px; 
+  --curve-nudge-x: 20px; /* positive = push right */
 
-          /* Edit highlight */
-          .card-wrapper.editing{ 
-            border-color:var(--primary-color,#03a9f4);
-            touch-action: none;
-          }
-          .card-wrapper.editing::after{
-            content:"";position:absolute;inset:0;border:1px dashed var(--primary-color,#03a9f4);
-            border-radius:12px;pointer-events:none;opacity:.35;z-index:5;box-sizing:border-box
-          }
+  display:flex; align-items:center; gap:8px;
+  font-weight:600; font-size:.9rem; letter-spacing:.2px; line-height:1;
+  position:relative; padding-bottom:10px; /* room for underline */
+}
+.ddc-toolbar.streamlined.v2 .ddc-sec-dot{ width:8px; height:8px; border-radius:999px; opacity:.9; }
 
-          .shield{position:absolute;inset:0;z-index:10;background:transparent;pointer-events:none}
-          .card-wrapper.editing .shield,
-          .card-wrapper.dragging .shield{pointer-events:auto;cursor:grab}
+/* colored dots */
+.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-dot{ background: var(--sec-primary); }
+.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-dot{ background: var(--sec-clip); }
+.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-dot{ background: var(--sec-share); }
+.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-dot{ background: var(--sec-utils); }
+.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-dot{ background: var(--sec-status); }
 
-          .resize-handle{
-            display:none;                 /* shown in edit mode via your existing rule */
-            position:absolute;
-            bottom:0;
-            right:0;
-            width:40px;
-            height:40px;
-            background:var(--primary-color);
-            color:#fff;
-            border-top-left-radius:40px;
-            border-bottom-left-radius:0;
-            border-top-right-radius:0;
-            border-bottom-right-radius:0;
-            cursor:se-resize;
-            z-index:999;                  /* above the card content */
-            box-shadow:0 3px 8px rgba(0,0,0,.28);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            transition:background .15s, transform .1s, box-shadow .15s;
-          }
-          .resize-handle:hover{
-            transform:scale(1.05);
-            box-shadow:0 6px 16px rgba(0,0,0,.35);
-            filter:brightness(1.05);
-          }
-          .card-wrapper.editing .resize-handle{display:flex}
-          .resize-handle ha-icon{
-            --mdc-icon-size:20px;
-            width:20px;
-            height:20px;
-            pointer-events:none;
-          }
+/* straight underline */
+.ddc-toolbar.streamlined.v2 .ddc-sec-head::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; opacity:.85;
+}
+.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head::after{ background: var(--sec-primary); }
+.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head::after{ background: var(--sec-clip); }
+.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-head::after{ background: var(--sec-share); }
+.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-head::after{ background: var(--sec-utils); }
+.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-head::after{ background: var(--sec-status); }
 
-          /* Delete handle: a quarter‑circle wedge in the top-left corner */
-          .delete-handle{
-            display:none;                 /* shown only in edit mode */
-            position:absolute;
-            top:0;
-            left:0;
-            width:40px;
-            height:40px;
-            background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
-            color:#fff;
-            border-bottom-right-radius:40px;
-            z-index:999;
-            box-shadow:0 3px 8px rgba(0,0,0,.28);
-            cursor:pointer;
-            align-items:center;
-            justify-content:center;
-            transition:background .15s, transform .1s, box-shadow .15s;
-          }
-          .delete-handle:hover{
-            transform:scale(1.05);
-            box-shadow:0 6px 16px rgba(0,0,0,.35);
-            filter:brightness(1.05);
-          }
-          .card-wrapper.editing .delete-handle{display:flex}
-          .delete-handle ha-icon{
-            --mdc-icon-size:20px;
-            width:20px;
-            height:20px;
-            pointer-events:none;
-          }
+/* NEW: L-shaped quarter-arc at the right end of each headline line */
+.ddc-toolbar.streamlined.v2 .ddc-sec-head::before{
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--curve-length);
+  height: var(--curve-drop);
 
-          /* modal */
-          .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000}
-          .dialog{
-            width:min(1220px,96%);max-height:min(90vh, 900px);display:flex;flex-direction:column;
-            background:var(--card-background-color);border-radius:20px;padding:0;border:1px solid var(--divider-color);overflow:visible
-          }
-          .dlg-head{
-            display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--divider-color);
-            background:
-              radial-gradient(1200px 120px at 20% -40px, rgba(3,169,244,.21), transparent 60%),
-              radial-gradient(900px 110px at 80% -40px, rgba(0,150,136,.18), transparent 60%);
-          }
-          .dlg-head h3{margin:0;font-size:1.1rem;letter-spacing:.2px}
-          .dlg-foot{display:flex;gap:10px;justify-content:flex-end;padding:12px;border-top:1px solid var(--divider-color);background:var(--primary-background-color)}
-          .btn:disabled{opacity:.6;cursor:not-allowed}
+  /* the “L” */
+  border-top: var(--line-thickness) solid currentColor;
+  border-right: var(--line-thickness) solid currentColor;
+
+  /* make the 90° corner a quarter circle */
+  border-top-right-radius: var(--curve-drop);
+
+  /* visuals */
+  background: transparent;
+  transform: none;
+  transform-origin: 0% 50%;
+  opacity: .95;
+
+  /* move the L-curve down by --curve-nudge-y */
+  bottom: calc(0px - var(--curve-nudge-y));
+  right: calc(0px - var(--curve-nudge-x));
+}
+
+/* set currentColor so the cap matches the underline */
+.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head{ color: var(--sec-primary); }
+.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head{ color: var(--sec-clip); }
+.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-head{ color: var(--sec-share); }
+.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-head{ color: var(--sec-utils); }
+.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-head{ color: var(--sec-status); }
+
+/* inner rows */
+.ddc-toolbar.streamlined.v2 .ddc-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+/* vertical separators */
+.ddc-toolbar.streamlined.v2 .ddc-vsep{
+  width:1px; height:auto; align-self:stretch; background:var(--border); opacity:.55; border-radius:1px;
+}
+
+/* ----- Buttons (labels ALWAYS visible) ----- */
+.ddc-toolbar.streamlined.v2 .btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; height:36px; white-space:nowrap;
+  background: color-mix(in oklab, var(--primary-background-color) 10%, transparent);
+  color: var(--primary-text-color);
+  border: 1px solid color-mix(in oklab, currentColor 14%, transparent);
+  border-radius:12px; cursor:pointer; font:inherit;
+  transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
+}
+.ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px; }
+.ddc-toolbar.streamlined.v2 .btn:hover{
+  background: color-mix(in oklab, var(--primary-background-color) 18%, transparent);
+  transform: translateY(-1px);
+}
+.ddc-toolbar.streamlined.v2 .btn:active{ transform: translateY(0); }
+.ddc-toolbar.streamlined.v2 .btn:focus-visible{
+  outline:none; box-shadow:0 0 0 2px color-mix(in oklab, var(--primary-color) 55%, transparent);
+}
+.ddc-toolbar.streamlined.v2 .btn.secondary{ background:transparent; border-color:var(--border); }
+.ddc-toolbar.streamlined.v2 .btn.info{ background: color-mix(in oklab, #4db6ff 90%, transparent); color:#0b2537; }
+.ddc-toolbar.streamlined.v2 .btn.danger{ background: color-mix(in oklab, #ff5d5d 90%, transparent); color:#2b0b0b; }
+
+/* standout Add Card */
+.ddc-toolbar.streamlined.v2 .btn.cta-add{
+  position:relative; font-weight:700;
+  background: linear-gradient(135deg, var(--sec-primary), color-mix(in oklab, var(--sec-primary) 60%, #fff 0%));
+  color:#fff; border-color: color-mix(in oklab, var(--sec-primary) 60%, #000);
+  box-shadow: 0 6px 16px rgba(59,130,246,.25);
+}
+.ddc-toolbar.streamlined.v2 .btn.cta-add::after{
+  content:""; position:absolute; inset:-3px; border-radius:14px;
+  border:2px solid color-mix(in oklab, var(--sec-primary) 55%, transparent);
+  opacity:.55; pointer-events:none;
+}
+
+/* ----- Status pill ----- */
+.ddc-toolbar.streamlined.v2 .ddc-t-status{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 10px; border-radius:999px;
+  background: color-mix(in oklab, var(--primary-background-color) 16%, transparent);
+  border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+  font-size:.85rem; line-height:1; max-width:42vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ddc-toolbar.streamlined.v2 .ddc-t-dot{ width:10px; height:10px; border-radius:50%; background:#22c55e; }
+.ddc-toolbar.streamlined.v2 .ddc-t-dot.dirty{ background:#f59e0b; animation: ddc-pulse 1.4s ease-in-out infinite; }
+.ddc-toolbar.streamlined.v2 .ddc-t-dot.error{ background:#ef4444; }
+@keyframes ddc-pulse{ 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.35)} }
+
+.ddc-toolbar.streamlined.v2 .store-badge{
+  border:1px solid var(--border); border-radius:999px;
+  padding:6px 10px; font-size:.82rem;
+  background: color-mix(in oklab, #ffc107 20%, transparent);
+}
+
+/* ----- Layouts + Exit: center Exit; hide layout host ----- */
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{
+  display:flex; align-items:center; justify-content:center; gap:16px; padding-top:6px;
+}
+.ddc-toolbar.streamlined.v2 .sec-layouts .layout-host{ display:none !important; } /* hide "Layout: —" */
+
+/* keep injected dropdown tidy (if you bring it back later) */
+.ddc-toolbar.streamlined.v2 .sec-layouts select,
+.ddc-toolbar.streamlined.v2 .sec-layouts ha-select{
+  max-width: clamp(160px, 24vw, 360px);
+}
+
+/* tooltips */
+.ddc-toolbar.streamlined.v2 .btn[data-tooltip]{ position:relative; }
+.ddc-toolbar.streamlined.v2 .btn[data-tooltip]::after{
+  content: attr(data-tooltip);
+  position:absolute; bottom:calc(100% + 8px); left:50%;
+  transform:translateX(-50%) translateY(2px);
+  background:rgba(0,0,0,.75); color:#fff; font-size:.72rem; line-height:1;
+  padding:6px 8px; border-radius:8px; white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .15s, transform .15s;
+}
+.ddc-toolbar.streamlined.v2 .btn[data-tooltip]:hover::after,
+.ddc-toolbar.streamlined.v2 .btn[data-tooltip]:focus-visible::after{
+  opacity:1; transform:translateX(-50%) translateY(0);
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 760px){
+  .ddc-toolbar.streamlined.v2{
+    display:block; padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  .ddc-toolbar.streamlined.v2 .ddc-vsep{ display:none; }
+  .ddc-toolbar.streamlined.v2 .ddc-sec{
+    padding:10px; margin-bottom:8px;
+    background: color-mix(in oklab, var(--primary-background-color) 10%, transparent);
+    border:1px solid var(--border); border-radius:12px;
+  }
+  .ddc-toolbar.streamlined.v2 .ddc-row{
+    margin-top:10px; display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px;
+  }
+  .ddc-toolbar.streamlined.v2 .btn{ height:44px; padding:10px 12px; }
+  .ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; }
+
+  /* scale the L-curve down on mobile */
+  .ddc-toolbar.streamlined.v2 .ddc-sec-head{
+    --curve-length: 28px;
+    --curve-drop: 14px;
+  }
+}
+
+
+
+
+      /* ------- Rest of your styles remain unchanged ------- */
+
+      .card-container{
+        position: relative;
+        transform-origin: top left;
+        padding: 10px;
+        border: 1px solid var(--divider-color);
+        background: var(--ddc-bg, transparent);
+        width: auto; height: auto; border-radius: 12px; overflow: hidden;
+        isolation: isolate; z-index: 0; -webkit-touch-callout: none;
+        user-select: none;
+      }
+      .card-container::before{
+        content:'';
+        position:absolute; inset:0;
+        background-image:
+          linear-gradient(var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
+          linear-gradient(90deg, var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px);
+        background-size: var(--ddc-grid-size) var(--ddc-grid-size);
+        background-origin: content-box;
+        background-clip: content-box;
+        pointer-events:none;
+        opacity:0;
+        transition: opacity .15s;
+        z-index:1;
+      }
+      .card-container.grid-on::before{ opacity:.28; }
+
+      .card-container::after{
+        content:'';
+        position:absolute; inset:0;
+        pointer-events:none;
+        z-index:0;
+        opacity: var(--ddc-bg-opacity, 1);
+        background-image: var(--ddc-bg-image, none);
+        background-repeat: var(--ddc-bg-repeat, no-repeat);
+        background-size: var(--ddc-bg-size, cover);
+        background-position: var(--ddc-bg-position, center center);
+        background-attachment: var(--ddc-bg-attachment, scroll);
+        filter: var(--ddc-bg-filter, none);
+      }
+
+      .card-wrapper{
+        position:absolute;
+        left: 0; top: 0;
+        box-sizing: border-box;
+        border:2px solid transparent;
+        background:var(--ddc-card-bg, var(--card-background-color));
+        cursor:grab;
+        overflow:auto;
+        border-radius:14px;
+        box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
+        will-change:transform,width,height,box-shadow; touch-action:auto;
+        z-index:2;
+      }
+      .card-wrapper.dragging{ cursor:grabbing; touch-action: none; }
+      .card-wrapper.editing.selected{
+        border-color:var(--primary-color,#03a9f4);
+        box-shadow:0 0 0 2px var(--primary-color,#03a9f4)!important;
+      }
+
+      /* ---- empty-state of the card ---- */
+      .btn.cta-empty{
+        position:relative;
+        padding:12px 16px;
+        font-weight:600;
+        border-radius:14px;
+        display:inline-flex !important;
+        align-items:center;
+        gap:8px;
+        box-shadow:0 6px 18px rgba(3,169,244,.25);
+      }
+      .btn.cta-empty::after{
+        content:"";
+        position:absolute; inset:-4px;
+        border-radius:16px;
+        border:2px solid rgba(3,169,244,.35);
+        animation: ddc-cta-pulse 1.8s ease-out infinite;
+        pointer-events:none;
+      }
+      @keyframes ddc-cta-pulse{
+        0%   { opacity:.85; transform:scale(.98); }
+        70%  { opacity:0;   transform:scale(1.12); }
+        100% { opacity:0;   transform:scale(1.18); }
+      }
+
+      /* pleasant buttons: info (light blue) & warning (orange) */
+      .btn.info:hover{ filter: brightness(1.06); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
+      .btn.info:active{ transform: translateY(0) }
+      .btn.warning:hover{ filter: brightness(1.07); transform: translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.18) }
+      .btn.warning:active{ transform: translateY(0) }
+
+      /* ---- chip ---- */
+      .chip{
+        position:absolute;
+        bottom:48px; left:50%; transform:translateX(-50%);
+        display:flex; gap:6px; flex-wrap:wrap;
+        opacity:0; transition:opacity .15s;
+        z-index:30; pointer-events: none;
+      }
+      .card-wrapper.editing .chip{ opacity:1; pointer-events: auto; }
+      .chip .mini{
+        display:flex; align-items:center; justify-content:center;
+        width:32px; height:32px;
+        background:linear-gradient(135deg, rgba(24,25,27,.7) 0%, rgba(40,41,43,.9) 100%);
+        color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:8px; cursor:pointer;
+        box-shadow:0 2px 4px rgba(0,0,0,.25);
+        transition:background .15s, transform .1s, box-shadow .15s;
+      }
+      .chip .mini span{ display:none; }
+      .chip .mini:hover{
+        transform:translateY(-1px);
+        background:linear-gradient(135deg, rgba(24,25,27,.85) 0%, rgba(40,41,43,1) 100%);
+        box-shadow:0 3px 8px rgba(0,0,0,.4);
+      }
+      .chip .mini ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; }
+      .chip .mini.danger{
+        background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
+        border-color:rgba(255,255,255,.22);
+      }
+      .chip .mini.danger:hover{
+        background:linear-gradient(135deg, rgba(236,72,72,1) 0%, rgba(255,105,97,1) 100%);
+      }
+      .chip .mini.pill{ padding:0; }
+
+      /* Edit highlight */
+      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; }
+      .card-wrapper.editing::after{
+        content:""; position:absolute; inset:0; border:1px dashed var(--primary-color,#03a9f4);
+        border-radius:12px; pointer-events:none; opacity:.35; z-index:5; box-sizing:border-box;
+      }
+
+      .shield{position:absolute; inset:0; z-index:10; background:transparent; pointer-events:none}
+      .card-wrapper.editing .shield, .card-wrapper.dragging .shield{pointer-events:auto; cursor:grab}
+
+      .resize-handle{
+        display:none; position:absolute; bottom:0; right:0; width:40px; height:40px;
+        background:var(--primary-color); color:#fff; border-top-left-radius:40px;
+        cursor:se-resize; z-index:999; box-shadow:0 3px 8px rgba(0,0,0,.28);
+        display:flex; align-items:center; justify-content:center;
+        transition:background .15s, transform .1s, box-shadow .15s;
+      }
+      .resize-handle:hover{ transform:scale(1.05); box-shadow:0 6px 16px rgba(0,0,0,.35); filter:brightness(1.05); }
+      .card-wrapper.editing .resize-handle{ display:flex }
+      .resize-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; }
+
+      /* Delete handle */
+      .delete-handle{
+        display:none; position:absolute; top:0; left:0; width:40px; height:40px;
+        background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
+        color:#fff; border-bottom-right-radius:40px; z-index:999;
+        box-shadow:0 3px 8px rgba(0,0,0,.28); cursor:pointer; align-items:center; justify-content:center;
+        transition:background .15s, transform .1s, box-shadow .15s;
+      }
+      .delete-handle:hover{ transform:scale(1.05); box-shadow:0 6px 16px rgba(0,0,0,.35); filter:brightness(1.05); }
+      .card-wrapper.editing .delete-handle{ display:flex }
+      .delete-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; }
+
+      /* modal */
+      .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:9000 }
+      .dialog{
+        width:min(1220px,96%); max-height:min(90vh, 900px); display:flex; flex-direction:column;
+        background:var(--card-background-color); border-radius:20px; padding:0; border:1px solid var(--divider-color); overflow:visible;
+      }
+      .dlg-head{
+        display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--divider-color);
+        background:
+          radial-gradient(1200px 120px at 20% -40px, rgba(3,169,244,.21), transparent 60%),
+          radial-gradient(900px 110px at 80% -40px, rgba(0,150,136,.18), transparent 60%);
+      }
+      .dlg-head h3{ margin:0; font-size:1.1rem; letter-spacing:.2px }
+      .dlg-foot{ display:flex; gap:10px; justify-content:flex-end; padding:12px; border-top:1px solid var(--divider-color); background:var(--primary-background-color) }
+      .btn:disabled{ opacity:.6; cursor:not-allowed }
+
+      .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
@@ -2225,107 +2849,132 @@ _applyGridVars() {
         .card-wrapper.ddc-fly-in{
           animation: ddc-card-fly-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        /* --- NEW nicer headers / captions / swatches / tooltips --- */
-
-        .caption { margin:0 0 8px 0; color:var(--secondary-text-color); font-size:.9rem; }
-
-        .swatches { display:flex; gap:8px; flex-wrap:wrap; }
-        .swatch { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
-        .swatch[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:8px; }
-
-        .inline-help { display:inline-flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:.9rem; }
-        .inline-help ha-icon { opacity:.8; }
-
-        .input-file { display:flex; gap:10px; align-items:center; }
-        .input-file input[type="file"] { display:none; }
-        .input-file .file-btn { border:1px solid var(--divider-color,rgba(0,0,0,.25)); border-radius:8px; padding:8px 12px; cursor:pointer; background:var(--ha-card-background,#fff); }
-        .thumb { width:64px; height:42px; border-radius:6px; background-size:cover; background-position:center; border:1px solid rgba(0,0,0,.12); }
-
-        .divider { height:1px; background:var(--divider-color, rgba(0,0,0,.12)); margin:8px 0; opacity:.7; }
-
-        .section-head { display:flex; align-items:center; gap:8px; margin:0 0 8px 0; padding-bottom:6px; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12)); }
-        .section-head ha-icon { opacity:.9; }
-        .setting { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
-        .setting .row { display:flex; align-items:center; gap:12px; }
-        .setting .title { display:flex; align-items:center; gap:8px; min-width:220px; }
-        .setting .title ha-icon { opacity:.9; }
-        .setting .control { display:flex; align-items:center; gap:10px; flex:1; }
-        .setting .hint { margin-left:32px; color:var(--secondary-text-color); font-size:.88rem; line-height:1.35; }
-        .setting .suffix { opacity:.6; margin-left:4px; }
-        .range-wrap { display:flex; align-items:center; gap:12px; flex:1; }
-        .range-wrap output { width:64px; text-align:right; color:var(--secondary-text-color); font-weight:600; }
-
-        /* --- Tabs manager UI --- */
-        .tabs-card .tab-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--divider-color, rgba(0,0,0,.08)); }
-        .tabs-card .tab-row:last-child { border-bottom:0; }
-        .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
-        .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
-        .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
-        .icon-btn.danger { color: var(--error-color, #b00020); }
-
-        /* gradient swatches */
-        .gradients { display:flex; gap:8px; flex-wrap:wrap; }
-        .gradient { width:44px; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
-        .gradient[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:10px; }
-
               
+
         </style>
         <div class="ddc-root">
-          <div class="toolbar">
-            <button class="btn" id="addCardBtn" style="display:none">
-              <ha-icon icon="mdi:plus"></ha-icon>
-              <span style="margin-left:6px">Add Card</span>
-            </button>
-            <button class="btn secondary" id="reloadBtn" style="display:none">
-              <ha-icon icon="mdi:refresh"></ha-icon>
-              <span style="margin-left:6px">Reload</span>
-            </button>
-            <button class="btn secondary" id="diagBtn" style="display:none">
-              <ha-icon icon="mdi:play-circle-outline"></ha-icon>
-              <span style="margin-left:6px">Diagnostics</span>
-            </button>
-            <button class="btn secondary" id="exportBtn" style="display:none">
-              <ha-icon icon="mdi:download"></ha-icon>
-              <span style="margin-left:6px">Export Design</span>
-            </button>
-            <button class="btn secondary" id="importBtn" style="display:none">
-              <ha-icon icon="mdi:upload"></ha-icon>
-              <span style="margin-left:6px">Import Design</span>
-            </button>
+        
+<div class="toolbar ddc-toolbar streamlined v2" role="toolbar" aria-label="Layout editor">
 
-            <!-- Copy and Paste buttons for edit mode -->
-            <button class="btn secondary" id="copyBtn" style="display:none">
-              <ha-icon icon="mdi:content-copy"></ha-icon>
-              <span style="margin-left:6px">Copy</span>
-            </button>
-            <button class="btn secondary" id="pasteBtn" style="display:none">
-              <ha-icon icon="mdi:content-paste"></ha-icon>
-              <span style="margin-left:6px">Paste</span>
-            </button>
+  <!-- ░ Add & Save -->
+  <section class="ddc-sec sec-primary" aria-label="Add & Save">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Add &amp; Save</span>
+    </header>
+    <div class="ddc-row">
+      <!-- standout CTA -->
+      <button class="btn primary cta-add" id="addCardBtn" style="display:none" data-tooltip="Add card">
+        <ha-icon icon="mdi:plus"></ha-icon><span class="label">Add Card</span>
+      </button>
+      <!-- make Apply standard/neutral -->
+      <button class="btn secondary" id="applyLayoutBtn" style="display:none" data-tooltip="Apply / Save">
+        <ha-icon icon="mdi:content-save"></ha-icon><span class="label">Apply</span>
+      </button>
+    </div>
+  </section>
 
-            <!-- Dashboard Settings button -->
-            <button class="btn secondary" id="settingsBtn" style="display:none">
-              <ha-icon icon="mdi:cog"></ha-icon>
-              <span style="margin-left:6px">Dashboard Settings</span>
-            </button>
-            <button class="btn" id="applyLayoutBtn" style="display:none">
-              <ha-icon icon="mdi:content-save"></ha-icon>
-              <span style="margin-left:6px">Apply</span>
-            </button>
-            <button class="btn info" id="exploreBtn" style="display:none" title="Open HADS (Home Assistant Dashboard Store)">
-              <ha-icon icon="mdi:storefront-outline"></ha-icon>
-              <span>Open HADS</span>
-            </button>
-            <button class="btn warning" id="exitEditBtn" style="display:none">
-              <ha-icon icon="mdi:exit-run"></ha-icon>
-              <span>Exit edit mode</span>
-            </button>
-            <span class="store-badge" id="storeBadge" title="where layout is persisted">storage: local</span>
-          </div>
+  <div class="ddc-vsep" aria-hidden="true"></div>
+
+  <!-- ░ Clipboard -->
+  <section class="ddc-sec sec-clip" aria-label="Clipboard">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Clipboard</span>
+    </header>
+    <div class="ddc-row">
+      <button class="btn secondary" id="copyBtn" style="display:none" data-tooltip="Copy">
+        <ha-icon icon="mdi:content-copy"></ha-icon><span class="label">Copy</span>
+      </button>
+      <button class="btn secondary" id="pasteBtn" style="display:none" data-tooltip="Paste">
+        <ha-icon icon="mdi:content-paste"></ha-icon><span class="label">Paste</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="ddc-vsep" aria-hidden="true"></div>
+
+  <!-- ░ Import & Share (HADS here too) -->
+  <section class="ddc-sec sec-share" aria-label="Import & Share">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Import &amp; Share</span>
+    </header>
+    <div class="ddc-row">
+      <button class="btn secondary" id="importBtn" style="display:none" data-tooltip="Import YAML">
+        <ha-icon icon="mdi:upload"></ha-icon><span class="label">Import</span>
+      </button>
+      <button class="btn secondary" id="exportBtn" style="display:none" data-tooltip="Export YAML">
+        <ha-icon icon="mdi:download"></ha-icon><span class="label">Export</span>
+      </button>
+      <button class="btn info hads" id="exploreBtn" style="display:none" data-tooltip="Open HADS">
+        <ha-icon icon="mdi:storefront-outline"></ha-icon><span class="label">Open HADS</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="ddc-vsep" aria-hidden="true"></div>
+
+  <!-- ░ Utilities -->
+  <section class="ddc-sec sec-utils" aria-label="Utilities">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Utilities</span>
+    </header>
+    <div class="ddc-row">
+      <button class="btn secondary" id="reloadBtn" style="display:none" data-tooltip="Reload">
+        <ha-icon icon="mdi:refresh"></ha-icon><span class="label">Reload</span>
+      </button>
+      <button class="btn secondary" id="diagBtn" style="display:none" data-tooltip="Diagnostics">
+        <ha-icon icon="mdi:play-circle-outline"></ha-icon><span class="label">Diag</span>
+      </button>
+      <button class="btn secondary" id="settingsBtn" style="display:none" data-tooltip="Settings">
+        <ha-icon icon="mdi:cog"></ha-icon><span class="label">Settings</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- spacer keeps the right side airy -->
+  <div class="ddc-spacer" aria-hidden="true"></div>
+
+  <!-- ░ Status -->
+  <section class="ddc-sec sec-status" aria-label="Status">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Status</span>
+    </header>
+    <div class="ddc-row">
+      <span class="ddc-t-status" id="ddcStatus" style="display:none" aria-live="polite">
+        <span class="ddc-t-dot" id="ddcDot" aria-hidden="true"></span>
+        <span class="ddc-t-text" id="ddcStatusText">Ready</span>
+      </span>
+      <span class="store-badge" id="storeBadge" title="Where layout is persisted" style="display:none">storage: local</span>
+    </div>
+  </section>
+
+<!-- ░ Layouts + Exit — centered second row -->
+<section class="ddc-sec sec-layouts" aria-label="Layouts & Exit">
+  <div class="ddc-row center">
+    <span id="ddcLayoutHost" class="layout-host">
+      <span class="layout-label">Layout:</span>
+      <!-- inject your <select> / dropdown here -->
+      <span class="layout-name" id="layoutName">—</span>
+    </span>
+
+    <button class="btn danger" id="exitEditBtn" style="display:none" data-tooltip="Exit edit mode">
+      <ha-icon icon="mdi:exit-run"></ha-icon><span class="label">Exit Edit Mode</span>
+    </button>
+  </div>
+</section>
+</div>
+
+
+          <!-- Tabs & card container -->
           <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
           <div class="card-container" id="cardContainer"></div>
         </div>
+
+
       `;
       this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
       try { this._applyBackgroundImageFromConfig?.(); } catch {}
@@ -2881,6 +3530,7 @@ if (this.__ddcOnWinResize) {
       try { this._queueSave('tab-change'); } catch {}
     };
   }
+  
 /* ------------------------------ Edit mode ------------------------------ */
   _toggleEditMode(force=null) {
     // NEW: kill any in-flight “enter edit” timer 
@@ -3019,6 +3669,8 @@ _installLongPressToEnterEdit() {
     };
   };  
 
+
+  
   // ---- state --------------------------------------------------------------
   let timer = null;
   let ring  = null;
@@ -7595,6 +8247,7 @@ async _getStubConfigForType(type) {
     refreshLogs();
   }
 
+
   /* ------------------------ Dashboard Settings ------------------------ */
   /**
    * Opens a settings dialog allowing the user to configure dashboard‑wide
@@ -7610,6 +8263,8 @@ async _getStubConfigForType(type) {
     // the maximum width so the settings sheet doesn't overwhelm the screen.
     this._ensureSettingsStyles_();
 
+
+    
     
 modal.innerHTML = `
   <div class="dialog modern" role="dialog" aria-modal="true">
@@ -7645,9 +8300,12 @@ modal.innerHTML = `
           <div class="hint">Cards snap every <b>N</b> pixels. Lower values give a denser grid for finer placement.</div>
         </div>
 
-        <div class="preview" style="margin-top:6px">
-          <div class="grid-demo" id="ddc-grid-demo"></div>
+      <div class="preview" style="margin-top:6px">
+        <div class="grid-demo" id="ddc-grid-demo">
+          <div class="grid-meta-badge" id="ddc-grid-meta"></div>
         </div>
+      </div>
+
 
         <!-- QUICK CANVAS SIZES -->
         <div class="setting">
@@ -7821,34 +8479,79 @@ modal.innerHTML = `
             </div>
           </div>
           <div class="swatches" id="ddc-swatches-cardBg"></div>
-          <div class="gradients" id="ddc-gradients-containerBg" style="margin-top:6px"></div>
+          <div class="gradients" id="ddc-gradients-cardBg" style="margin-top:6px"></div>
           <div class="hint">Affects the background of each draggable card container.</div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- BACKGROUND IMAGE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:image-outline"></ha-icon>
-              <label for="ddc-setting-bgImg">Background image</label>
+      <!-- BACKGROUND IMAGE -->
+      <div class="setting">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:image-outline"></ha-icon>
+            <label for="ddc-setting-bgImg">Background image</label>
+          </div>
+          <div class="control" style="flex:1; flex-direction:column; align-items:flex-start">
+            <div class="input-file">
+              <label class="file-btn" for="ddc-file-bg">Upload image</label>
+              <input id="ddc-file-bg" type="file" accept="image/*" />
+              <div class="thumb" id="ddc-bg-thumb"></div>
+              <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
             </div>
-            <div class="control" style="flex:1; flex-direction:column; align-items:flex-start">
-              <div class="input-file">
-                <label class="file-btn" for="ddc-file-bg">Upload image</label>
-                <input id="ddc-file-bg" type="file" accept="image/*" />
-                <div class="thumb" id="ddc-bg-thumb"></div>
-                <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
-              </div>
-              <div class="row" style="margin-top:8px; width:100%">
-                <label style="flex:0 0 auto" for="ddc-setting-bgImg">or URL</label>
-                <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" style="flex:1"/>
+
+            <div class="row" style="margin-top:8px; width:100%">
+              <label style="flex:0 0 auto" for="ddc-setting-bgImg">or URL</label>
+              <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" style="flex:1"/>
+            </div>
+
+            <!-- NEW: options -->
+            <div class="bg-opts" style="width:100%">
+              <label for="ddc-bg-repeat"><ha-icon icon="mdi:repeat"></ha-icon> Repeat</label>
+              <select id="ddc-bg-repeat">
+                <option value="no-repeat">No repeat</option>
+                <option value="repeat">Repeat</option>
+                <option value="repeat-x">Repeat X</option>
+                <option value="repeat-y">Repeat Y</option>
+              </select>
+
+              <label for="ddc-bg-size"><ha-icon icon="mdi:arrow-expand-all"></ha-icon> Size</label>
+              <select id="ddc-bg-size">
+                <option value="cover">Cover</option>
+                <option value="contain">Contain</option>
+                <option value="auto">Auto</option>
+                <option value="100% 100%">Fill (stretch)</option>
+              </select>
+
+              <label for="ddc-bg-position"><ha-icon icon="mdi:crosshairs-gps"></ha-icon> Position</label>
+              <select id="ddc-bg-position">
+                <option value="center center">Center</option>
+                <option value="top center">Top</option>
+                <option value="bottom center">Bottom</option>
+                <option value="left center">Left</option>
+                <option value="right center">Right</option>
+                <option value="top left">Top left</option>
+                <option value="top right">Top right</option>
+                <option value="bottom left">Bottom left</option>
+                <option value="bottom right">Bottom right</option>
+              </select>
+
+              <label for="ddc-bg-attachment"><ha-icon icon="mdi:pin"></ha-icon> Attachment</label>
+              <select id="ddc-bg-attachment">
+                <option value="scroll">Scroll</option>
+                <option value="fixed">Fixed</option>
+              </select>
+
+              <label for="ddc-bg-opacity"><ha-icon icon="mdi:opacity"></ha-icon> Opacity</label>
+              <div style="display:flex; align-items:center; gap:10px">
+                <input type="range" id="ddc-bg-opacity" min="0" max="100" step="1" style="width:220px" />
+                <output id="ddc-bg-opacity-out">100%</output>
               </div>
             </div>
           </div>
-          <div class="hint">Uploads are saved inline as data-URLs. For large files, host under <code>/local/</code> and paste the URL.</div>
         </div>
+        <div class="hint">Uploads are saved inline as data-URLs. For large files, host under <code>/local/</code> and paste the URL.</div>
+      </div>
       </section>
 
       <!-- Behaviour -->
@@ -7989,8 +8692,16 @@ modal.innerHTML = `
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
+    const selBgRepeat     = modal.querySelector('#ddc-bg-repeat');
+    const selBgSize       = modal.querySelector('#ddc-bg-size');
+    const selBgPosition   = modal.querySelector('#ddc-bg-position');
+    const selBgAttachment = modal.querySelector('#ddc-bg-attachment');
+    const rngBgOpacity    = modal.querySelector('#ddc-bg-opacity');
+    const outBgOpacity    = modal.querySelector('#ddc-bg-opacity-out');
     const chkDebug   = modal.querySelector('#ddc-setting-debug');
     // hero image and tabs position are intentionally omitted from the settings UI
+
+    const bgCfg = (this._config?.background_image) || {};
 
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
@@ -8010,17 +8721,61 @@ modal.innerHTML = `
       inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
     }
     if (chkDebug)   chkDebug.checked   = !!this.debug;
-
+    if (selBgRepeat)     selBgRepeat.value     = String(bgCfg.repeat     || 'no-repeat');
+    if (selBgSize)       selBgSize.value       = String(bgCfg.size       || 'cover');
+    if (selBgPosition)   selBgPosition.value   = String(bgCfg.position   || 'center center');
+    if (selBgAttachment) selBgAttachment.value = String(bgCfg.attachment || 'scroll');
+    if (rngBgOpacity) {
+      const pct = Math.round((bgCfg.opacity != null ? bgCfg.opacity : 1) * 100);
+      rngBgOpacity.value = String(pct);
+      if (outBgOpacity) outBgOpacity.textContent = `${pct}%`;
+      rngBgOpacity.addEventListener('input', () => {
+        const v = Math.max(0, Math.min(100, parseInt(rngBgOpacity.value || '100', 10)));
+        outBgOpacity.textContent = `${v}%`;
+        // Live preview without waiting for Save
+        this.style.setProperty('--ddc-bg-opacity', String(v/100));
+      });
+    }
     // ===== UI polish hooks =====
     const gridSlider = modal.querySelector('#ddc-setting-gridSize');
-    const gridOut = modal.querySelector('#ddc-grid-out');
-    const gridDemo = modal.querySelector('#ddc-grid-demo');
-    const syncGrid = () => {
-      const v = parseInt(gridSlider.value || '100', 10);
-      gridOut.textContent = `${v} px`;
-      gridDemo?.style.setProperty('--g', `${v}px`);
+    const gridOut    = modal.querySelector('#ddc-grid-out');
+    const gridDemo   = modal.querySelector('#ddc-grid-demo');
+    const gridMeta   = modal.querySelector('#ddc-grid-meta');
+
+    const renderMeta = () => {
+      if (!gridDemo || !gridMeta) return;
+      const rect = gridDemo.getBoundingClientRect();
+      const cell = Math.max(1, parseInt(gridSlider.value || '100', 10));
+      const cols = Math.max(1, Math.floor(rect.width  / cell));
+      const rows = Math.max(1, Math.floor(rect.height / cell));
+      gridMeta.innerHTML = `
+        <ha-icon icon="mdi:grid"></ha-icon>
+        <span>${cell}px · ${cols}×${rows}</span>
+      `;
     };
-    if (gridSlider) { if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100); gridSlider.addEventListener('input', syncGrid); syncGrid(); }
+
+    const syncGrid = () => {
+      const v = Math.max(1, parseInt(gridSlider.value || '100', 10));
+      if (gridOut)  gridOut.textContent = `${v} px`;
+      if (gridDemo) gridDemo.style.setProperty('--g', `${v}px`);
+      renderMeta();
+    };
+
+    // Init + live update on input
+    if (gridSlider) {
+      if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100);
+      gridSlider.addEventListener('input', syncGrid);
+      syncGrid();
+    }
+
+    // Recompute rows×cols when the demo box changes size (responsive dialog)
+    if (gridDemo) {
+      const ro = new ResizeObserver(() => renderMeta());
+      ro.observe(gridDemo);
+      // remember to clean up when the modal closes
+      this.__ddcGridRO?.disconnect?.();
+      this.__ddcGridRO = ro;
+    }
 
     // Quick size chips
     modal.querySelectorAll('.chip').forEach(ch => {
@@ -8085,23 +8840,34 @@ modal.innerHTML = `
         });
       });
 
-    // Background image: upload -> data URL -> fill URL input + preview thumb
     const fileInput = modal.querySelector('#ddc-file-bg');
     const urlInput  = modal.querySelector('#ddc-setting-bgImg');
     const thumb     = modal.querySelector('#ddc-bg-thumb');
     const updateThumb = (src) => { if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none'; };
+
     if (urlInput?.value) updateThumb(urlInput.value);
 
     fileInput?.addEventListener('change', async () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
+      const file = fileInput.files?.[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        const dataUrl = reader.result;      // data:image/...;base64,....
-        urlInput.value = String(dataUrl || '');
+        urlInput.value = String(reader.result || '');
         updateThumb(urlInput.value);
+        // live preview
+        this.style.setProperty('--ddc-bg-image', `url("${urlInput.value}")`);
       };
       reader.readAsDataURL(file);
+    });
+
+    modal.querySelector('#ddc-clear-bg')?.addEventListener('click', () => {
+      if (urlInput) urlInput.value = '';
+      updateThumb('');
+      // clear config & live preview
+      const { background_image, ...rest } = this._config || {};
+      this._config = rest;
+      this.style.setProperty('--ddc-bg-image', 'none');
+      this._applyBackgroundImageFromConfig_?.();
+      this._persistThisCardConfigToStorage_?.();
     });
 
     // Close quality improvements
@@ -8200,32 +8966,53 @@ modal.innerHTML = `
       console.warn('[drag-and-drop-card] Failed to build container size extras', err);
     }
 
-    // ===== TABS MANAGER =====
+    // ===== TABS MANAGER (with icon + label mode) =====
+
+    // read current tabs; preserve existing shape and unknown fields
     const readTabs = () => {
-      // Support both shapes: options.tabs (objects) or tabs (strings/objects)
-      const optTabs = this._config?.options?.tabs ?? this._config?.tabs ?? [];
-      return optTabs.map(t => {
-        if (typeof t === 'string') return { id: t, label: t };
-        return { id: t.id ?? t.key ?? t.label ?? 'Tab', label: t.label ?? t.id ?? 'Tab' };
+      const raw = this._config?.options?.tabs ?? this._config?.tabs ?? [];
+      return raw.map((t) => {
+        if (typeof t === 'string') return { id: t, label: t, icon: '', label_mode: 'both', __raw: { id: t, label: t } };
+        return {
+          id: t.id ?? t.key ?? t.label ?? 'tab',
+          label: t.label ?? t.id ?? 'Tab',
+          icon: t.icon ?? '',
+          label_mode: t.label_mode ?? 'both', // 'icon' | 'text' | 'both' (optional)
+          __raw: t                               // keep full object to avoid dropping fields
+        };
       });
     };
+
+    // write back without dropping unknown fields (merge)
     const writeTabs = async (tabs, defaultId) => {
-      // Write back to options.tabs (preferred), else _config.tabs
-      const target = this._config?.options ? (this._config.options) : (this._config ||= {});
-      target.tabs = tabs.map(t => ({ id: t.id, label: t.label }));
-      if (defaultId) target.default_tab = defaultId;
-      // persist like visual editor
-      try { await this._persistThisCardConfigToStorage_(); }
-      catch (e) { console.warn('[drag-and-drop-card] Could not persist tabs', e); }
+      const out = tabs.map((t) => ({
+        ...t.__raw,
+        id: t.id,
+        label: t.label,
+        icon: t.icon || '',
+        label_mode: t.label_mode || 'both'
+      }));
+
+      if (this._config?.options) {
+        this._config.options = { ...(this._config.options || {}), tabs: out, default_tab: defaultId ?? (this._config.options?.default_tab) };
+      } else {
+        this._config.tabs = out;
+        if (defaultId) this._config.default_tab = defaultId;
+      }
+      try { await this._persistThisCardConfigToStorage_(); } catch (e) { console.warn('[drag-and-drop-card] Could not persist tabs', e); }
       this.requestUpdate?.();
     };
-    const defaultTabId = () => (this._config?.options?.default_tab) || this._config?.default_tab || (readTabs()[0]?.id);
+
+    const defaultTabId = () =>
+      (this._config?.options?.default_tab) || this._config?.default_tab || (readTabs()[0]?.id);
 
     const tabsListEl = modal.querySelector('#ddc-tabs-list');
+
     const renderTabs = () => {
       const tabs = readTabs();
       const def = defaultTabId();
       tabsListEl.innerHTML = '';
+
       if (!tabs.length) {
         const empty = document.createElement('div');
         empty.className = 'hint';
@@ -8233,43 +9020,83 @@ modal.innerHTML = `
         tabsListEl.appendChild(empty);
         return;
       }
+
       tabs.forEach((t, idx) => {
         const row = document.createElement('div');
         row.className = 'tab-row';
 
-        // default radio
+        // default selector
         const radio = document.createElement('input');
         radio.type = 'radio';
         radio.name = 'ddc-default-tab';
         radio.value = t.id;
         radio.checked = (t.id === def);
         radio.title = 'Set as default tab';
+        radio.addEventListener('change', async () => { await writeTabs(tabs, t.id); });
 
-        radio.addEventListener('change', async () => {
-          await writeTabs(tabs, t.id);
-        });
-
-        // name editor (id == label by default; id changes when renamed unless you lock it – here we tie id to label)
+        // icon + label editors
         const nameWrap = document.createElement('div');
         nameWrap.className = 'tab-name';
-        const nameIcon = document.createElement('ha-icon');
-        nameIcon.setAttribute('icon', 'mdi:tab');
+
+        // live icon preview
+        const preview = document.createElement('ha-icon');
+        preview.setAttribute('icon', t.icon || 'mdi:tab');
+
+        // icon input
+        const iconInput = document.createElement('input');
+        iconInput.value = t.icon || '';
+        iconInput.placeholder = 'mdi:home';
+        iconInput.title = 'Tab icon (mdi:...)';
+        iconInput.style.width = '160px';
+        iconInput.addEventListener('change', async () => {
+          t.icon = iconInput.value.trim();
+          preview.setAttribute('icon', t.icon || 'mdi:tab');
+          tabs[idx] = t;
+          await writeTabs(tabs, def);
+        });
+
+        // label input
         const nameInput = document.createElement('input');
         nameInput.value = t.label;
         nameInput.placeholder = 'Tab name';
+        nameInput.style.flex = '1';
         nameInput.addEventListener('change', async () => {
-          const newLabel = nameInput.value.trim() || t.id;
-          // keep ids stable unless empty; if you want id=label always, uncomment next line:
-          // t.id = newLabel;
-          t.label = newLabel;
+          t.label = nameInput.value.trim() || t.id;
           tabs[idx] = t;
           await writeTabs(tabs, def);
-          renderTabs();
         });
-        nameWrap.appendChild(nameIcon);
+
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'tab-icon-wrap';
+        iconWrap.appendChild(preview);
+        iconWrap.appendChild(iconInput);
+
+        nameWrap.appendChild(iconWrap);
         nameWrap.appendChild(nameInput);
 
-        // delete
+        // label mode chips (icon / text / both)
+        const modes = document.createElement('div');
+        modes.className = 'mode-chips';
+        const mkMode = (val, text) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'chip';
+          b.textContent = text;
+          b.setAttribute('aria-pressed', String((t.label_mode || 'both') === val));
+          b.addEventListener('click', async () => {
+            modes.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed','false'));
+            b.setAttribute('aria-pressed','true');
+            t.label_mode = val;              // store preference
+            tabs[idx] = t;
+            await writeTabs(tabs, def);
+          });
+          return b;
+        };
+        modes.appendChild(mkMode('icon', 'Icon'));
+        modes.appendChild(mkMode('text', 'Text'));
+        modes.appendChild(mkMode('both', 'Both'));
+
+        // actions (delete)
         const actions = document.createElement('div');
         actions.className = 'tab-actions';
         const delBtn = document.createElement('button');
@@ -8281,11 +9108,11 @@ modal.innerHTML = `
           let nextDefault = def;
           if (t.id === def) nextDefault = nextTabs[0]?.id;
           await writeTabs(nextTabs, nextDefault);
-          // Optional: reassign any cards pointing to the deleted tab
           try { this._reassignCardsToTab_?.(t.id, nextDefault); } catch {}
           renderTabs();
         });
 
+        actions.appendChild(modes);
         actions.appendChild(delBtn);
 
         row.appendChild(radio);
@@ -8302,15 +9129,16 @@ modal.innerHTML = `
       const raw = (inp?.value || '').trim();
       if (!raw) return;
       const tabs = readTabs();
-      // ensure unique id
-      let id = raw;
+      // unique id
+      let id = raw.replace(/\s+/g, '-').toLowerCase();
       let i = 2;
-      while (tabs.some(t => (t.id === id))) id = `${raw}-${i++}`;
-      tabs.push({ id, label: raw });
+      while (tabs.some(t => t.id === id)) id = `${id}-${i++}`;
+      tabs.push({ id, label: raw, icon: '', label_mode: 'both', __raw: { id, label: raw } });
       await writeTabs(tabs, defaultTabId());
       inp.value = '';
       renderTabs();
     });
+
 
     // ===== BACKGROUND IMAGE: DELETE BUTTON =====
     const clearBtn = modal.querySelector('#ddc-clear-bg');
@@ -8372,10 +9200,12 @@ modal.innerHTML = `
       });
     };
     buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
+    buildGradients('#ddc-gradients-cardBg',      '#ddc-setting-cardBg');
 
 
     // Remove modal helper
     const closeModal = () => {
+      try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
       try { modal.remove(); } catch {}
       if (this.__settingsModal === modal) this.__settingsModal = null;
     };
@@ -8479,10 +9309,34 @@ modal.innerHTML = `
         this.hideHaHeader  = newHideHdr;
         this.hideHaSidebar = newHideBar;
         this._applyHaChromeVisibility_?.();
+
         // Apply background image (if changed)
+        // ---- Background image (immutable update) ----
+        const prevBg = (this._config && this._config.background_image) || {};
+        const rep    = selBgRepeat?.value     || 'no-repeat';
+        const sz     = selBgSize?.value       || 'cover';
+        const pos    = selBgPosition?.value   || 'center center';
+        const att    = selBgAttachment?.value || 'scroll';
+        const op     = rngBgOpacity ? Math.max(0, Math.min(100, parseInt(rngBgOpacity.value || '100', 10))) / 100 : 1;
+
         if (newBgImg) {
-          this._applyBackgroundImageFromConfig?.();
+          this._config = {
+            ...this._config,
+            background_image: { ...prevBg, src: newBgImg, repeat: rep, size: sz, position: pos, attachment: att, opacity: op }
+          };
+        } else if (prevBg.src) {
+          this._config = {
+            ...this._config,
+            background_image: { ...prevBg, repeat: rep, size: sz, position: pos, attachment: att, opacity: op }
+          };
+        } else {
+          const { background_image, ...rest } = this._config || {};
+          this._config = rest;
         }
+
+        // Apply immediately (preview)
+        this._applyBackgroundImageFromConfig_?.();
+
         // Update underlying config so changes persist in YAML/storage
         try {
           if (!this._config) this._config = {};
