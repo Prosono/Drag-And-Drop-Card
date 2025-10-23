@@ -1992,6 +1992,8 @@ _applyGridVars() {
       this._built = true;
       this.shadowRoot.innerHTML = `
         <style>
+
+
 .ddc-root{
   position:relative;
   /* JS will keep this in sync with your “Grid (px)” */
@@ -2005,6 +2007,7 @@ _applyGridVars() {
 }
 
 /* ===== DDC Toolbar — Minimal Redesign (pills with accent tint) ===== */
+
 
 /* scope to either version */
 .ddc-toolbar.streamlined.v2,
@@ -2253,10 +2256,16 @@ _applyGridVars() {
 @container ddc-root (max-width: 900px){
   .ddc-toolbar.streamlined.v2,
   .ddc-toolbar.streamlined.v3{
-    /* when narrow, just stack pills under each other */
-    display: block;
-    padding: 10px;
+    position: static !important;     /* turn off sticky */
+    top: auto !important;
+    inset: auto !important;
+    z-index: auto !important;
+
+    max-width: 100%;                  /* never exceed .ddc-root */
+    margin: 8px 0 12px 0;             /* breathing room above card */
+    box-shadow: 0 4px 12px rgba(0,0,0,.18); /* lighter shadow on mobile */
   }
+}
 
   .ddc-toolbar.streamlined.v2 > .ddc-sec,
   .ddc-toolbar.streamlined.v3 > .ddc-sec{
@@ -2289,11 +2298,13 @@ _applyGridVars() {
 }
 
 @container ddc-root (max-width: 560px){
-  .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
-  .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
-  .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
-  .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
-    flex: 1 1 100%;
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    position: static !important;
+    top: auto !important;
+    inset: auto !important;
+    z-index: auto !important;
+    max-width: 100%;
   }
 }
 
@@ -2334,8 +2345,51 @@ _applyGridVars() {
 .ddc-toolbar.streamlined.v2 * ,
 .ddc-toolbar.streamlined.v3 * { box-sizing: border-box; }
 
+/* === SIMPLE RESPONSIVE STACKING FOR MOBILE (NO CONTAINER Q) === */
+/* ===== FORCE STACK ON NARROW — driven by .ddc-root width ============ */
+/* At <= 900px root width: stack pills; inside each pill use 2-up buttons */
+@container ddc-root (max-width: 900px){
+  /* stack the pills */
+  .ddc-toolbar.streamlined.v2:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v2:has(.store-badge[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3:has(.store-badge[style*="inline-block"]){
+    display: block !important;  /* kill grid to force stacking */
+    padding: 10px;
+  }
 
+  .ddc-toolbar.streamlined.v2:has(.btn[style*="inline-block"]) > .ddc-sec,
+  .ddc-toolbar.streamlined.v3:has(.btn[style*="inline-block"]) > .ddc-sec,
+  .ddc-toolbar.streamlined.v2:has(.store-badge[style*="inline-block"]) > .ddc-sec,
+  .ddc-toolbar.streamlined.v3:has(.store-badge[style*="inline-block"]) > .ddc-sec{
+    display:block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 12px 0;
+    grid-area: auto !important; /* neutralize named areas */
+  }
 
+  /* equal buttons: hard 2-up */
+  .ddc-toolbar.streamlined.v2 .ddc-row,
+  .ddc-toolbar.streamlined.v3  .ddc-row{
+    --btn-min: 0px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* bigger touch targets */
+  .ddc-toolbar.streamlined.v2 .btn,
+  .ddc-toolbar.streamlined.v3  .btn{ height: 44px; }
+}
+
+/* At <= 560px root width: buttons full-width (1 per row) */
+@container ddc-root (max-width: 560px){
+  .ddc-toolbar.streamlined.v2 .ddc-row,
+  .ddc-toolbar.streamlined.v3  .ddc-row{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== DDC Toolbar — END ===== */
 
 
 
@@ -2759,193 +2813,228 @@ _applyGridVars() {
             100% { transform:scale(1.06) rotate(2deg); opacity:0 }
           }
 
-                /* --- Tabs bar (DDC) --- */
-          /* --- WILD DDC Tabs (drop in and replace your block) --- */
 
-          /* --- DDC Tabs — Chrome-style, no backdrop, mobile-friendly --- */
+/* ===== DDC TABS — Minimal Redesign (pills with accent tint) ===== */
+    
 
-          /* --- DDC Tabs — Chrome-style, fills width, steady hover (no bounce), stronger active shadow --- */
+/* --- Ensure .ddc-root drives responsive behavior for tabs too --- */
+.ddc-root{
+  position: relative;
+  /* JS will keep this in sync with your “Grid (px)” */
+  --ddc-grid-size: 10px;
+  /* Good contrast on light/dark themes */
+  --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
 
-          /* Tabs bar (transparent, no backdrop) */
- /* --- DDC Tabs — Chrome-style, centered content, smooth tab-change, faint inactive outline --- */
+  /* NEW: make .ddc-root a named container for container queries */
+  container-type: inline-size;
+  container-name: ddc-root;
+}
 
-        /* Tabs bar (transparent, no backdrop; fills width) */
-        .ddc-tabs{
-          position: relative;
-          display: flex; flex-wrap: wrap;
-          align-items: flex-end; /* Chrome-like baseline */
-          gap: 6px;
-          padding: 6px 10px;
-          width: 100%;
-          overflow-x: hidden;
-          overflow-y: hidden;
-          -webkit-overflow-scrolling: touch;
-          scroll-snap-type: x proximity;
-          background: transparent;
-          border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
-          scrollbar-width: thin;
-          scrollbar-color: color-mix(in oklab, var(--primary-text-color) 35%, transparent) transparent;
-        }
-        .ddc-tabs::-webkit-scrollbar { height: 8px; }
-        .ddc-tabs::-webkit-scrollbar-thumb {
-          background: color-mix(in oklab, var(--primary-text-color) 35%, transparent);
-          border-radius: 9999px;
-        }
-        .ddc-tabs::-webkit-scrollbar-track { background: transparent; }
+/* --- DDC Tabs — Chrome-style, centered content, smooth tab-change, faint inactive outline --- */
 
-        /* Tab: fills available width, centered icon+text, no hover bounce */
-        .ddc-tab{
-          -webkit-tap-highlight-color: transparent;
-          position: relative;
-          z-index: 0;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;             /* 1) center content */
-          text-align: center;                  /* 1) center label text */
-          gap: 8px;
-          padding: 8px 12px;
-          font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-          letter-spacing: .2px;
-          color: color-mix(in oklab, var(--primary-text-color) 75%, #000 0%);
-          cursor: pointer;
+/* Tabs bar (transparent, no backdrop; fills root width) */
+.ddc-tabs{
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;               /* Chrome-like baseline */
+  gap: 6px;
+  padding: 6px 10px;
 
-          /* fill width but remain scrollable when crowded */
-          flex: 1 1 clamp(120px, 18%, 280px);
-          min-width: clamp(120px, 18%, 280px);
-          max-width: 100%;
-          scroll-snap-align: start;
+  width: 100%;
+  max-width: 100%;                    /* never exceed .ddc-root */
+  margin: 0 auto;
 
-          margin: 0;                           /* no overlap for steady layout */
-          border: 0;
-          background: transparent;
+  overflow-x: auto;                   /* allow horizontal scroll when crowded */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 
-          /* 2&3) keep motion minimal; animate only color/shadow/line */
-          transition: color .18s ease, filter .18s ease, box-shadow .18s ease, border-color .18s ease;
-        }
-        .ddc-tab ha-icon{ --mdc-icon-size:18px; }
-        .ddc-tab .ddc-tab-label{ max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  background: transparent;
+  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
 
-        /* 3) Inactive tabs have a faint outline */
-        .ddc-tab::before{
-          content:"";
-          position:absolute;
-          inset: 0;
-          border-top-left-radius: 14px;
-          border-top-right-radius: 14px;
-          border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent); /* faint */
-          border-bottom: none;
-          background: transparent;
-          pointer-events: none;
-          z-index: -1;
-        }
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--primary-text-color) 35%, transparent) transparent;
+}
+.ddc-tabs::-webkit-scrollbar { height: 8px; }
+.ddc-tabs::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--primary-text-color) 35%, transparent);
+  border-radius: 9999px;
+}
+.ddc-tabs::-webkit-scrollbar-track { background: transparent; }
 
-        /* Subtle hover: clearer text only (no movement) */
-        .ddc-tab:hover{
-          color: var(--primary-text-color);
-          filter: saturate(1.05);
-        }
+/* Tab: fills available width, centered icon+text, no hover bounce */
+.ddc-tab{
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;           /* center content */
+  text-align: center;                /* center label text */
+  gap: 8px;
+  padding: 8px 12px;
+  font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+  letter-spacing: .2px;
+  color: color-mix(in oklab, var(--primary-text-color) 75%, #000 0%);
+  cursor: pointer;
 
-        /* Active tab: elevated, stronger shadow */
-        .ddc-tab.active{
-          color: var(--primary-text-color);
-          z-index: 2;
-        }
-        .ddc-tab.active::before{
-          background: var(--card-background-color, #fff);
-          border-color: var(--divider-color, rgba(0,0,0,.18));
-          box-shadow:
-            0 10px 24px rgba(0,0,0,.16),
-            0 4px 10px rgba(0,0,0,.10),
-            0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
-          animation: ddc-pop .18s ease-out;  /* quick, pleasing shadow pop */
-        }
+  /* fill width but remain scrollable when crowded */
+  flex: 1 1 clamp(120px, 18%, 280px);
+  min-width: clamp(120px, 18%, 280px);
+  max-width: 100%;
+  scroll-snap-align: start;
 
-        /* 2) Animated TOP line – appears quickly when tab becomes active */
-        .ddc-tab::after{
-          content:"";
-          position:absolute;
-          top: -2px; left: 10px; right: 10px;
-          height: 0;                            /* hidden by default */
-          border-radius: 3px 3px 0 0;
-          background: linear-gradient(90deg, var(--primary-color), #ff4ecd, #00e0ff, var(--primary-color));
-          background-size: 300% 100%;
-          opacity: 0;
-          transform: scaleX(0);                  /* prepare for quick reveal */
-          transform-origin: 50% 50%;
-          transition: transform .16s ease-out, height .16s ease-out, opacity .16s ease-out;
-          pointer-events: none;
-        }
-        .ddc-tab.active::after{
-          height: 3px;
-          opacity: 1;
-          transform: scaleX(1);
-          animation: ddc-rainbow 4s linear infinite;
-        }
+  margin: 0;
+  border: 0;
+  background: transparent;
 
-        /* Pressed: keep still (no bounce) */
-        .ddc-tab:active{ box-shadow: 0 1px 0 rgba(0,0,0,0); }
+  /* keep motion minimal; animate only color/shadow/line */
+  transition: color .18s ease, filter .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.ddc-tab ha-icon{ --mdc-icon-size:18px; }
+.ddc-tab .ddc-tab-label{ max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-        /* Focus ring without motion */
-        .ddc-tab:focus-visible{
-          outline: none;
-          box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-color) 45%, transparent);
-        }
+/* Inactive tabs get a faint outline */
+.ddc-tab::before{
+  content:"";
+  position:absolute;
+  inset: 0;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
+  border-bottom: none;
+  background: transparent;
+  pointer-events: none;
+  z-index: -1;
+}
 
-        /* Mobile scaling — smaller min width & tighter paddings */
-        @media (max-width: 640px){
-          .ddc-tabs{ gap: 4px; padding: 6px 8px; }
-          .ddc-tab{
-            flex: 1 1 clamp(96px, 34%, 200px);
-            min-width: clamp(96px, 34%, 200px);
-            padding: 6px 10px;
-            font-size: 12px;
-          }
-          .ddc-tab::after{ left: 8px; right: 8px; }
-        }
+/* Subtle hover: clearer text only (no movement) */
+.ddc-tab:hover{
+  color: var(--primary-text-color);
+  filter: saturate(1.05);
+}
 
-        /* Vertical tabs rail (transparent) — centered content too */
-        .ddc-tabs-left{
-          display:flex;
-          flex-direction:column;
-          align-items: stretch;
-          width: clamp(150px, 28%, 220px);
-          padding: 8px 6px;
-          gap: 6px;
-          overflow-y: auto;
-          overflow-x: hidden;
-          border-right: 1px solid var(--divider-color, rgba(0,0,0,.12));
-          border-bottom: none;
-          background: transparent;
-        }
-        .ddc-tabs-left .ddc-tab{
-          justify-content: center;             /* 1) center in vertical list as well */
-          margin: 0;
-          border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
-          border-radius: 10px;
-          padding: 8px 10px;
-          flex: 0 0 auto;
-        }
-        .ddc-tabs-left .ddc-tab::before{ display:none; }
-        .ddc-tabs-left .ddc-tab.active{
-          background: var(--card-background-color, #fff);
-          box-shadow: 0 4px 12px rgba(0,0,0,.12);
-        }
-        .ddc-tabs-left .ddc-tab.active::after{ display:none; } /* top line is only for horizontal */
+/* Active tab: elevated, stronger shadow */
+.ddc-tab.active{
+  color: var(--primary-text-color);
+  z-index: 2;
+}
+.ddc-tab.active::before{
+  background: var(--card-background-color, #fff);
+  border-color: var(--divider-color, rgba(0,0,0,.18));
+  box-shadow:
+    0 10px 24px rgba(0,0,0,.16),
+    0 4px 10px rgba(0,0,0,.10),
+    0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
+  animation: ddc-pop .18s ease-out;
+}
 
-        /* Animations */
-        @keyframes ddc-rainbow{
-          0% { background-position: 0% 50%; }
-          100% { background-position: 300% 50%; }
-        }
-        @keyframes ddc-pop{
-          0% { box-shadow: 0 0 0 rgba(0,0,0,0); }
-          100% {
-            box-shadow:
-              0 10px 24px rgba(0,0,0,.16),
-              0 4px 10px rgba(0,0,0,.10),
-              0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
-          }
-        }
+/* Animated TOP line – appears quickly when tab becomes active */
+.ddc-tab::after{
+  content:"";
+  position:absolute;
+  top: -2px; left: 10px; right: 10px;
+  height: 0;                            /* hidden by default */
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, var(--primary-color), #ff4ecd, #00e0ff, var(--primary-color));
+  background-size: 300% 100%;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+  transition: transform .16s ease-out, height .16s ease-out, opacity .16s ease-out;
+  pointer-events: none;
+}
+.ddc-tab.active::after{
+  height: 3px;
+  opacity: 1;
+  transform: scaleX(1);
+  animation: ddc-rainbow 4s linear infinite;
+}
+
+/* Pressed: keep still (no bounce) */
+.ddc-tab:active{ box-shadow: 0 1px 0 rgba(0,0,0,0); }
+
+/* Focus ring without motion */
+.ddc-tab:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-color) 45%, transparent);
+}
+
+/* ---------- CONTAINER-DRIVEN RESPONSIVE (by .ddc-root width) ---------- */
+
+/* Compact tabs at <= 900px root width */
+@container ddc-root (max-width: 900px){
+  .ddc-tabs{ gap: 5px; padding: 6px 8px; }
+  .ddc-tab{
+    flex: 1 1 clamp(104px, 28%, 220px);
+    min-width: clamp(104px, 28%, 220px);
+    padding: 7px 10px;
+    font-size: 12.5px;
+  }
+  .ddc-tab::after{ left: 8px; right: 8px; }
+}
+
+/* Extra compact at <= 640px root width */
+@container ddc-root (max-width: 640px){
+  .ddc-tabs{ gap: 4px; padding: 6px 6px; }
+  .ddc-tab{
+    flex: 1 1 clamp(96px, 34%, 200px);
+    min-width: clamp(96px, 34%, 200px);
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .ddc-tab::after{ left: 8px; right: 8px; }
+}
+
+/* ---------- Optional vertical rail (also respects root width) ---------- */
+.ddc-tabs-left{
+  display:flex;
+  flex-direction:column;
+  align-items: stretch;
+  width: clamp(150px, 28%, 220px);
+  padding: 8px 6px;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--divider-color, rgba(0,0,0,.12));
+  border-bottom: none;
+  background: transparent;
+}
+.ddc-tabs-left .ddc-tab{
+  justify-content: center;
+  margin: 0;
+  border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  flex: 0 0 auto;
+}
+.ddc-tabs-left .ddc-tab::before{ display:none; }
+.ddc-tabs-left .ddc-tab.active{
+  background: var(--card-background-color, #fff);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+.ddc-tabs-left .ddc-tab.active::after{ display:none; } /* top line is only for horizontal */
+
+/* Animations */
+@keyframes ddc-rainbow{
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes ddc-pop{
+  0% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  100% {
+    box-shadow:
+      0 10px 24px rgba(0,0,0,.16),
+      0 4px 10px rgba(0,0,0,.10),
+      0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
+  }
+}
+
+
+
+/* ===== DDC Tabs —END ==================== */
+
 
         /* Fly‑in animation for card wrappers. When the animate_cards
            configuration option is enabled, card wrappers will animate
