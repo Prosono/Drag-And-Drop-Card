@@ -277,7 +277,6 @@ _ensureToolbarStyles_() {
 
 
 
-
   /* -------------------- Settings Dashboard styling -------------------- */
 
 
@@ -1999,233 +1998,345 @@ _applyGridVars() {
   --ddc-grid-size: 10px;
   /* Good contrast on light/dark themes */
   --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
+
+  /* Container we query for width */
+  container-type: inline-size;
+  container-name: ddc-root;
 }
 
-/* ===== Drag & Drop Card — Toolbar v2 (with L-shaped quarter-arc caps) ===== */
-.ddc-toolbar.streamlined.v2{
+/* ===== DDC Toolbar — Minimal Redesign (pills with accent tint) ===== */
+
+/* scope to either version */
+.ddc-toolbar.streamlined.v2,
+.ddc-toolbar.streamlined.v3{
+  --ddc-bg: color-mix(in oklab, var(--card-background-color, #0d0f12) 88%, transparent);
+  --ddc-border: color-mix(in oklab, #fff 14%, transparent);
+  --ddc-soft: color-mix(in oklab, #fff 7%, transparent);
+  --ddc-shadow: 0 10px 30px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.22);
+
   /* section accent colors */
-  --sec-primary: #3b82f6; /* Add & Save */
-  --sec-clip:    #a855f7; /* Clipboard   */
-  --sec-share:   #4fb6ff; /* Import&Share (HADS) */
-  --sec-utils:   #10b981; /* Utilities   */
-  --sec-status:  #ef4444; /* Status      */
+  --sec-primary: #3b82f6;
+  --sec-clip:    #a855f7;
+  --sec-share:   #4fb6ff;
+  --sec-utils:   #10b981;
+  --sec-status:  #ef4444;
 
-  --bg: color-mix(in oklab, var(--card-background-color, #111) 90%, transparent);
-  --border: var(--divider-color, rgba(255,255,255,.14));
+  --btn-h: 36px;
+  --btn-r: 12px;
+  --btn-gap: 8px;
 
-  position: sticky; top:0; z-index:50;
-  display: grid;
-  /* full-width: 4 equal sections + free space + compact status */
-  grid-template-columns: minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 1fr auto;
-  grid-template-areas:
-    "primary vsep1 clip vsep2 share vsep3 utils spacer status"
-    "layouts layouts layouts layouts layouts layouts layouts layouts layouts";
-  align-items: start;
-  column-gap: 14px;
-  row-gap: 10px;
-  padding: 10px 12px;
+  /* animation vars */
+  --ddc-ease: cubic-bezier(.2,.7,.2,1);
+  --ddc-dur: 260ms;
+  --open-h: 0px; /* JS sets this to scrollHeight */
+
+  position: sticky; top: 0; z-index: 50;
+  background: var(--ddc-bg);
+  border-bottom: 1px solid var(--ddc-border);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  box-shadow: var(--ddc-shadow);
+  padding: 12px 14px 10px;
+
+  /* never exceed the root’s width */
+  max-width: 100%;
+
+  /* GRID (kept ready) */
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr)) auto; /* Status at the end */
+  grid-template-areas:
+    "primary clip share utils status"
+    "layouts layouts layouts layouts status";
+  column-gap: 18px;
+  row-gap: 10px;
+  align-items: start;
+
+  /* Visibility is animated — NOT display */
+  opacity: 0;
+  transform: translateY(-6px);
+  max-height: 0;              /* collapse when closed */
+  overflow: clip;             /* avoid scrollbars during anim */
+  pointer-events: none;       /* inert when closed */
+  visibility: hidden;         /* keep out of a11y focus when closed */
+
+  transition:
+    opacity var(--ddc-dur) var(--ddc-ease),
+    transform var(--ddc-dur) var(--ddc-ease),
+    max-height var(--ddc-dur) var(--ddc-ease),
+    visibility 0s linear var(--ddc-dur); /* becomes hidden after fade-out */
+
+  /* make this element respond to its own width, too */
+  container-type: inline-size;
+  container-name: ddc;
 }
 
-/* grid areas */
+/* OPEN state (set by JS) */
+.ddc-toolbar.streamlined.v2.is-open,
+.ddc-toolbar.streamlined.v3.is-open{
+  opacity: 1;
+  transform: translateY(0);
+  max-height: var(--open-h);  /* expand to measured height */
+  pointer-events: auto;
+  visibility: visible;
+  transition:
+    opacity var(--ddc-dur) var(--ddc-ease),
+    transform var(--ddc-dur) var(--ddc-ease),
+    max-height var(--ddc-dur) var(--ddc-ease),
+    visibility 0s; /* visible immediately */
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    transition: none;
+  }
+}
+
+/* map areas (HTML unchanged) */
 .ddc-toolbar.streamlined.v2 .sec-primary{ grid-area: primary; }
 .ddc-toolbar.streamlined.v2 .sec-clip   { grid-area: clip; }
 .ddc-toolbar.streamlined.v2 .sec-share  { grid-area: share; }
 .ddc-toolbar.streamlined.v2 .sec-utils  { grid-area: utils; }
 .ddc-toolbar.streamlined.v2 .sec-status { grid-area: status; }
 .ddc-toolbar.streamlined.v2 .sec-layouts{ grid-area: layouts; }
-.ddc-toolbar.streamlined.v2 .ddc-spacer { grid-area: spacer; }
-.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(1){ grid-area: vsep1; }
-.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(2){ grid-area: vsep2; }
-.ddc-toolbar.streamlined.v2 .ddc-vsep:nth-of-type(3){ grid-area: vsep3; }
+.ddc-toolbar.streamlined.v2 .ddc-spacer,
+.ddc-toolbar.streamlined.v2 .ddc-vsep{ display:none; }
 
-/* sections */
-.ddc-toolbar.streamlined.v2 .ddc-sec{
-  display:grid; grid-template-rows:auto auto; gap:8px; min-width:0;
+/* === ONE-PILL PER SECTION: header + buttons inside === */
+.ddc-toolbar.streamlined.v2 .ddc-sec,
+.ddc-toolbar.streamlined.v3 .ddc-sec{
+  --pill-accent: #6b7280;            /* default; overridden per-section below */
+
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+
+  /* accent-tinted background & border */
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--pill-accent) 12%, transparent),
+      transparent),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--pill-accent) 26%, transparent);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.04);
 }
 
-/* section headlines with L-curve end-cap */
+/* per-section tint */
+.ddc-toolbar.streamlined.v2 .sec-primary{ --pill-accent: var(--sec-primary); }
+.ddc-toolbar.streamlined.v2 .sec-clip   { --pill-accent: var(--sec-clip); }
+.ddc-toolbar.streamlined.v2 .sec-share  { --pill-accent: var(--sec-share); }
+.ddc-toolbar.streamlined.v2 .sec-utils  { --pill-accent: var(--sec-utils); }
+.ddc-toolbar.streamlined.v2 .sec-status { --pill-accent: var(--sec-status); }
+.ddc-toolbar.streamlined.v2 .sec-layouts{ --pill-accent: var(--sec-clip); } /* layouts gets a gentle purple tint */
+
+/* header inside the pill */
 .ddc-toolbar.streamlined.v2 .ddc-sec-head{
-  /* curve tuning */
-  --line-thickness: 2px;  /* underline thickness (match ::after height) */
-  --curve-length: 60px;   /* horizontal run of the L */
-  --curve-drop: 18px;     /* vertical height; also radius for perfect quarter-arc */
-  --curve-nudge-y: 19px; 
-  --curve-nudge-x: 20px; /* positive = push right */
-
-  display:flex; align-items:center; gap:8px;
-  font-weight:600; font-size:.9rem; letter-spacing:.2px; line-height:1;
-  position:relative; padding-bottom:10px; /* room for underline */
+  background: transparent; border: 0; padding: 0; border-radius: 0;
+  color: var(--accent, #9aa0a6);
+  display: inline-flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: .92rem; letter-spacing: .2px;
 }
-.ddc-toolbar.streamlined.v2 .ddc-sec-dot{ width:8px; height:8px; border-radius:999px; opacity:.9; }
+.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head{ --accent: var(--sec-primary); color: var(--sec-primary); }
+.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head{ --accent: var(--sec-clip);    color: var(--sec-clip); }
+.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-head{ --accent: var(--sec-share);   color: var(--sec-share); }
+.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-head{ --accent: var(--sec-utils);   color: var(--sec-utils); }
+.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-head{ --accent: var(--sec-status);  color: var(--sec-status); }
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-sec-head{ --accent: var(--sec-clip);    color: var(--sec-clip); }
 
-/* colored dots */
-.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-dot{ background: var(--sec-primary); }
-.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-dot{ background: var(--sec-clip); }
-.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-dot{ background: var(--sec-share); }
-.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-dot{ background: var(--sec-utils); }
-.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-dot{ background: var(--sec-status); }
-
-/* straight underline */
-.ddc-toolbar.streamlined.v2 .ddc-sec-head::after{
-  content:""; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; opacity:.85;
-}
-.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head::after{ background: var(--sec-primary); }
-.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head::after{ background: var(--sec-clip); }
-.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-head::after{ background: var(--sec-share); }
-.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-head::after{ background: var(--sec-utils); }
-.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-head::after{ background: var(--sec-status); }
-
-/* NEW: L-shaped quarter-arc at the right end of each headline line */
-.ddc-toolbar.streamlined.v2 .ddc-sec-head::before{
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: var(--curve-length);
-  height: var(--curve-drop);
-
-  /* the “L” */
-  border-top: var(--line-thickness) solid currentColor;
-  border-right: var(--line-thickness) solid currentColor;
-
-  /* make the 90° corner a quarter circle */
-  border-top-right-radius: var(--curve-drop);
-
-  /* visuals */
-  background: transparent;
-  transform: none;
-  transform-origin: 0% 50%;
-  opacity: .95;
-
-  /* move the L-curve down by --curve-nudge-y */
-  bottom: calc(0px - var(--curve-nudge-y));
-  right: calc(0px - var(--curve-nudge-x));
+.ddc-toolbar.streamlined.v2 .ddc-sec-dot{
+  width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .95;
 }
 
-/* set currentColor so the cap matches the underline */
-.ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head{ color: var(--sec-primary); }
-.ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head{ color: var(--sec-clip); }
-.ddc-toolbar.streamlined.v2 .sec-share   .ddc-sec-head{ color: var(--sec-share); }
-.ddc-toolbar.streamlined.v2 .sec-utils   .ddc-sec-head{ color: var(--sec-utils); }
-.ddc-toolbar.streamlined.v2 .sec-status  .ddc-sec-head{ color: var(--sec-status); }
+/* row of actions inside the pill */
+.ddc-toolbar.streamlined.v2 .ddc-row{ display: flex; flex-wrap: wrap; align-items: center; gap: var(--btn-gap); margin: 0; }
 
-/* inner rows */
-.ddc-toolbar.streamlined.v2 .ddc-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-
-/* vertical separators */
-.ddc-toolbar.streamlined.v2 .ddc-vsep{
-  width:1px; height:auto; align-self:stretch; background:var(--border); opacity:.55; border-radius:1px;
-}
-
-/* ----- Buttons (labels ALWAYS visible) ----- */
+/* buttons (reset native look + style) */
 .ddc-toolbar.streamlined.v2 .btn{
+  appearance:none; -webkit-appearance:none;
   display:inline-flex; align-items:center; gap:8px;
-  padding:8px 12px; height:36px; white-space:nowrap;
-  background: color-mix(in oklab, var(--primary-background-color) 10%, transparent);
-  color: var(--primary-text-color);
-  border: 1px solid color-mix(in oklab, currentColor 14%, transparent);
-  border-radius:12px; cursor:pointer; font:inherit;
+  height:var(--btn-h); padding:8px 12px; border-radius:var(--btn-r);
+  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 14%, transparent);
+  border:1px solid var(--ddc-border);
+  color: var(--primary-text-color, #e5e7eb);
+  cursor:pointer; font:inherit; white-space:nowrap;
   transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
+  flex: 1 1 220px;           /* equal-ish width buttons and wrap nicely */
+  min-width: 160px;
 }
-.ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px; }
-.ddc-toolbar.streamlined.v2 .btn:hover{
-  background: color-mix(in oklab, var(--primary-background-color) 18%, transparent);
-  transform: translateY(-1px);
-}
+.ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px; display:inline-block; }
+.ddc-toolbar.streamlined.v2 .btn:hover{ transform: translateY(-1px); background: color-mix(in oklab, var(--primary-background-color) 22%, transparent); }
 .ddc-toolbar.streamlined.v2 .btn:active{ transform: translateY(0); }
-.ddc-toolbar.streamlined.v2 .btn:focus-visible{
-  outline:none; box-shadow:0 0 0 2px color-mix(in oklab, var(--primary-color) 55%, transparent);
+.ddc-toolbar.streamlined.v2 .btn:focus-visible{ outline:none; box-shadow:0 0 0 2px color-mix(in oklab, #fff 15%, transparent); }
+.ddc-toolbar.streamlined.v2 .btn.secondary{ background:transparent; }
+.ddc-toolbar.streamlined.v2 .btn.info{
+  background: color-mix(in oklab, var(--sec-share) 92%, transparent); color:#0b2537;
+  border-color: color-mix(in oklab, var(--sec-share) 55%, transparent);
 }
-.ddc-toolbar.streamlined.v2 .btn.secondary{ background:transparent; border-color:var(--border); }
-.ddc-toolbar.streamlined.v2 .btn.info{ background: color-mix(in oklab, #4db6ff 90%, transparent); color:#0b2537; }
-.ddc-toolbar.streamlined.v2 .btn.danger{ background: color-mix(in oklab, #ff5d5d 90%, transparent); color:#2b0b0b; }
+.ddc-toolbar.streamlined.v2 .btn.danger{
+  background: color-mix(in oklab, #ff5d5d 92%, transparent); color:#2b0b0b;
+  border-color: color-mix(in oklab, #ff5d5d 55%, transparent);
+}
 
-/* standout Add Card */
+/* >>> Make "Add Card" extra prominent */
 .ddc-toolbar.streamlined.v2 .btn.cta-add{
-  position:relative; font-weight:700;
+  --glow: color-mix(in oklab, var(--sec-primary) 65%, #fff 0%);
+  height: 40px; padding: 10px 14px; border-radius: 14px;
+  font-weight: 800; letter-spacing: .2px;
   background: linear-gradient(135deg, var(--sec-primary), color-mix(in oklab, var(--sec-primary) 60%, #fff 0%));
-  color:#fff; border-color: color-mix(in oklab, var(--sec-primary) 60%, #000);
-  box-shadow: 0 6px 16px rgba(59,130,246,.25);
+  color:#fff;
+  border-color: color-mix(in oklab, var(--sec-primary) 55%, #000);
+  box-shadow: 0 10px 24px rgba(59,130,246,.34), 0 0 0 2px color-mix(in oklab, var(--sec-primary) 22%, transparent) inset;
+  flex-basis: 100%;  /* spans full row when wrapping */
 }
 .ddc-toolbar.streamlined.v2 .btn.cta-add::after{
-  content:""; position:absolute; inset:-3px; border-radius:14px;
-  border:2px solid color-mix(in oklab, var(--sec-primary) 55%, transparent);
-  opacity:.55; pointer-events:none;
+  content:""; position:absolute; inset:-4px; border-radius:16px;
+  border:2px solid color-mix(in oklab, var(--sec-primary) 45%, transparent);
+  opacity:.6; pointer-events:none;
 }
 
-/* ----- Status pill ----- */
+/* status: dot above text, HIGH-CONTRAST text */
 .ddc-toolbar.streamlined.v2 .ddc-t-status{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:6px 10px; border-radius:999px;
-  background: color-mix(in oklab, var(--primary-background-color) 16%, transparent);
-  border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
-  font-size:.85rem; line-height:1; max-width:42vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  display:flex; flex-direction: column; align-items:center; justify-content:center;
+  gap: 4px; text-align: center;
+  min-width: 120px; height: auto; padding: 10px 12px; border-radius: 999px;
+  background: color-mix(in oklab, var(--primary-background-color, #0b0d10) 28%, transparent);
+  border: 1px solid color-mix(in oklab, #ffffff 28%, transparent);
+  color: #f8fbff;  /* brighter default */
+  font-size: .9rem; line-height: 1.25; font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0,0,0,.45);
 }
-.ddc-toolbar.streamlined.v2 .ddc-t-dot{ width:10px; height:10px; border-radius:50%; background:#22c55e; }
-.ddc-toolbar.streamlined.v2 .ddc-t-dot.dirty{ background:#f59e0b; animation: ddc-pulse 1.4s ease-in-out infinite; }
-.ddc-toolbar.streamlined.v2 .ddc-t-dot.error{ background:#ef4444; }
+.ddc-toolbar.streamlined.v2 .ddc-t-status .ddc-t-text{ color: #f8fbff; }
+.ddc-toolbar.streamlined.v2 .ddc-t-dot{ width: 12px; height: 12px; border-radius:50%; background:#22c55e; }
+.ddc-toolbar.streamlined.v2 .ddc-t-status.warn  .ddc-t-dot{ background:#f59e0b; }
+.ddc-toolbar.streamlined.v2 .ddc-t-status.error .ddc-t-dot{ background:#ef4444; }
 @keyframes ddc-pulse{ 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.35)} }
 
+/* store badge (optional) */
 .ddc-toolbar.streamlined.v2 .store-badge{
-  border:1px solid var(--border); border-radius:999px;
-  padding:6px 10px; font-size:.82rem;
-  background: color-mix(in oklab, #ffc107 20%, transparent);
+  display:inline-flex; align-items:center; height:var(--btn-h);
+  border:1px solid var(--ddc-border); border-radius:999px; padding:6px 10px; font-size:.85rem;
+  background: color-mix(in oklab, #ffc107 22%, transparent); color:#1a1200;
+  flex: 1 1 220px; min-width: 160px;
 }
 
-/* ----- Layouts + Exit: center Exit; hide layout host ----- */
-.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{
-  display:flex; align-items:center; justify-content:center; gap:16px; padding-top:6px;
+/* Layouts: inline switcher styling */
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{ display:flex; justify-content:center; gap:12px; flex-wrap: wrap; }
+.ddc-toolbar.streamlined.v2 .sec-layouts .layout-host{ display:inline-flex; align-items:center; gap:10px; color:#cfd6de; }
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline{
+  display:inline-flex; align-items:center; gap:10px; flex-wrap: wrap;
+  padding:8px 10px; border-radius:12px;
+  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 14%, transparent);
+  border: 1px solid color-mix(in oklab, #ffffff 14%, transparent);
 }
-.ddc-toolbar.streamlined.v2 .sec-layouts .layout-host{ display:none !important; } /* hide "Layout: —" */
-
-/* keep injected dropdown tidy (if you bring it back later) */
-.ddc-toolbar.streamlined.v2 .sec-layouts select,
-.ddc-toolbar.streamlined.v2 .sec-layouts ha-select{
-  max-width: clamp(160px, 24vw, 360px);
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline .label{
+  color:#cfd6de; font-size:.9rem; letter-spacing:.2px;
 }
-
-/* tooltips */
-.ddc-toolbar.streamlined.v2 .btn[data-tooltip]{ position:relative; }
-.ddc-toolbar.streamlined.v2 .btn[data-tooltip]::after{
-  content: attr(data-tooltip);
-  position:absolute; bottom:calc(100% + 8px); left:50%;
-  transform:translateX(-50%) translateY(2px);
-  background:rgba(0,0,0,.75); color:#fff; font-size:.72rem; line-height:1;
-  padding:6px 8px; border-radius:8px; white-space:nowrap; opacity:0; pointer-events:none;
-  transition:opacity .15s, transform .15s;
-}
-.ddc-toolbar.streamlined.v2 .btn[data-tooltip]:hover::after,
-.ddc-toolbar.streamlined.v2 .btn[data-tooltip]:focus-visible::after{
-  opacity:1; transform:translateX(-50%) translateY(0);
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline button,
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline .btn{
+  appearance:none; -webkit-appearance:none;
+  display:inline-flex; align-items:center; gap:8px;
+  height:32px; padding:6px 10px; border-radius:10px;
+  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 10%, transparent);
+  border:1px solid color-mix(in oklab, #ffffff 12%, transparent);
+  color: var(--primary-text-color, #e5e7eb);
+  cursor:pointer; font:inherit; white-space:nowrap;
+  transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
 }
 
-/* ---------- Mobile ---------- */
-@media (max-width: 760px){
-  .ddc-toolbar.streamlined.v2{
-    display:block; padding:8px 10px; border-bottom:1px solid var(--border);
+/* JS shim to override default hidden state purely for measuring/animating */
+.ddc-toolbar.streamlined.v2[data-force-open="1"],
+.ddc-toolbar.streamlined.v3[data-force-open="1"]{
+  display: grid !important;
+}
+
+/* ===== STACK WHEN ROOT IS NARROW (uses .ddc-root width) ===== */
+@container ddc-root (max-width: 900px){
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    /* when narrow, just stack pills under each other */
+    display: block;
+    padding: 10px;
   }
-  .ddc-toolbar.streamlined.v2 .ddc-vsep{ display:none; }
-  .ddc-toolbar.streamlined.v2 .ddc-sec{
-    padding:10px; margin-bottom:8px;
-    background: color-mix(in oklab, var(--primary-background-color) 10%, transparent);
-    border:1px solid var(--border); border-radius:12px;
-  }
-  .ddc-toolbar.streamlined.v2 .ddc-row{
-    margin-top:10px; display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px;
-  }
-  .ddc-toolbar.streamlined.v2 .btn{ height:44px; padding:10px 12px; }
-  .ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; }
 
-  /* scale the L-curve down on mobile */
-  .ddc-toolbar.streamlined.v2 .ddc-sec-head{
-    --curve-length: 28px;
-    --curve-drop: 14px;
+  .ddc-toolbar.streamlined.v2 > .ddc-sec,
+  .ddc-toolbar.streamlined.v3 > .ddc-sec{
+    display: block;
+    width: 100%;
+    margin: 0 0 12px 0;
+    grid-area: auto !important;  /* neutralize named areas */
+  }
+
+  .ddc-toolbar.streamlined.v2 .ddc-row,
+  .ddc-toolbar.streamlined.v3 .ddc-row{
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; width: 100%;
+  }
+
+  .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
+  .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
+  .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
+  .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
+    flex: 1 1 calc(50% - 8px);
+    min-width: 160px;
+  }
+
+  .ddc-toolbar.streamlined.v2 .ddc-row > .btn.cta-add,
+  .ddc-toolbar.streamlined.v3 .ddc-row > .btn.cta-add{
+    flex-basis: 100%;
+  }
+
+  .ddc-toolbar.streamlined.v2 .btn,
+  .ddc-toolbar.streamlined.v3 .btn{ height: 44px; }
+}
+
+@container ddc-root (max-width: 560px){
+  .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
+  .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
+  .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
+  .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
+    flex: 1 1 100%;
   }
 }
+
+/* Fallback for environments without container queries */
+@supports not (container-type: inline-size){
+  @media (max-width: 900px){
+    .ddc-toolbar.streamlined.v2,
+    .ddc-toolbar.streamlined.v3{
+      display: block;
+      padding: 10px;
+    }
+    .ddc-toolbar.streamlined.v2 > .ddc-sec,
+    .ddc-toolbar.streamlined.v3 > .ddc-sec{
+      display: block; width: 100%; margin: 0 0 12px 0; grid-area: auto !important;
+    }
+    .ddc-toolbar.streamlined.v2 .ddc-row,
+    .ddc-toolbar.streamlined.v3 .ddc-row{
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; width: 100%;
+    }
+    .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
+    .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
+    .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
+    .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
+      flex: 1 1 calc(50% - 8px); min-width: 160px;
+    }
+    @media (max-width: 560px){
+      .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
+      .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
+      .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
+      .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
+        flex: 1 1 100%;
+      }
+    }
+  }
+}
+
+/* Optional: make sure all children use border-box inside the toolbar */
+.ddc-toolbar.streamlined.v2 * ,
+.ddc-toolbar.streamlined.v3 * { box-sizing: border-box; }
+
+
+
+
 
 
 
@@ -2856,27 +2967,23 @@ _applyGridVars() {
         
 <div class="toolbar ddc-toolbar streamlined v2" role="toolbar" aria-label="Layout editor">
 
-  <!-- ░ Add & Save -->
+  <!-- Add & Save -->
   <section class="ddc-sec sec-primary" aria-label="Add & Save">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
       <span class="ddc-sec-title">Add &amp; Save</span>
     </header>
     <div class="ddc-row">
-      <!-- standout CTA -->
       <button class="btn primary cta-add" id="addCardBtn" style="display:none" data-tooltip="Add card">
         <ha-icon icon="mdi:plus"></ha-icon><span class="label">Add Card</span>
       </button>
-      <!-- make Apply standard/neutral -->
-      <button class="btn secondary" id="applyLayoutBtn" style="display:none" data-tooltip="Apply / Save">
-        <ha-icon icon="mdi:content-save"></ha-icon><span class="label">Apply</span>
+      <button class="btn secondary" id="applyLayoutBtn" style="display:none" data-tooltip="Save">
+        <ha-icon icon="mdi:content-save"></ha-icon><span class="label">Save</span>
       </button>
     </div>
   </section>
 
-  <div class="ddc-vsep" aria-hidden="true"></div>
-
-  <!-- ░ Clipboard -->
+  <!-- Clipboard -->
   <section class="ddc-sec sec-clip" aria-label="Clipboard">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
@@ -2892,9 +2999,7 @@ _applyGridVars() {
     </div>
   </section>
 
-  <div class="ddc-vsep" aria-hidden="true"></div>
-
-  <!-- ░ Import & Share (HADS here too) -->
+  <!-- Import & Share -->
   <section class="ddc-sec sec-share" aria-label="Import & Share">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
@@ -2910,12 +3015,13 @@ _applyGridVars() {
       <button class="btn info hads" id="exploreBtn" style="display:none" data-tooltip="Open HADS">
         <ha-icon icon="mdi:storefront-outline"></ha-icon><span class="label">Open HADS</span>
       </button>
+      <button class="btn danger" id="exitEditBtn" style="display:none" data-tooltip="Exit edit mode">
+        <ha-icon icon="mdi:exit-run"></ha-icon><span class="label">Exit Edit Mode</span>
+      </button>
     </div>
   </section>
 
-  <div class="ddc-vsep" aria-hidden="true"></div>
-
-  <!-- ░ Utilities -->
+  <!-- Utilities -->
   <section class="ddc-sec sec-utils" aria-label="Utilities">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
@@ -2926,46 +3032,29 @@ _applyGridVars() {
         <ha-icon icon="mdi:refresh"></ha-icon><span class="label">Reload</span>
       </button>
       <button class="btn secondary" id="diagBtn" style="display:none" data-tooltip="Diagnostics">
-        <ha-icon icon="mdi:play-circle-outline"></ha-icon><span class="label">Diag</span>
+        <ha-icon icon="mdi:play-circle-outline"></ha-icon><span class="label">Diagnostics</span>
       </button>
-      <button class="btn secondary" id="settingsBtn" style="display:none" data-tooltip="Settings">
-        <ha-icon icon="mdi:cog"></ha-icon><span class="label">Settings</span>
+      <button class="btn secondary" id="settingsBtn" style="display:none" data-tooltip="Card Settings">
+        <ha-icon icon="mdi:cog"></ha-icon><span class="label">Card Settings</span>
       </button>
     </div>
   </section>
 
-  <!-- spacer keeps the right side airy -->
-  <div class="ddc-spacer" aria-hidden="true"></div>
-
-  <!-- ░ Status -->
+  <!-- Status -->
   <section class="ddc-sec sec-status" aria-label="Status">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
       <span class="ddc-sec-title">Status</span>
     </header>
     <div class="ddc-row">
-      <span class="ddc-t-status" id="ddcStatus" style="display:none" aria-live="polite">
+      <span class="ddc-t-status ok" id="ddcStatus" style="display:none" aria-live="polite">
         <span class="ddc-t-dot" id="ddcDot" aria-hidden="true"></span>
-        <span class="ddc-t-text" id="ddcStatusText">Ready</span>
+        <span class="ddc-t-text" id="ddcStatusText">storage: backend · OK</span>
       </span>
-      <span class="store-badge" id="storeBadge" title="Where layout is persisted" style="display:none">storage: local</span>
+      <span class="store-badge" id="storeBadge" title="Where layout is persisted" style="display:none">storage: backend · OK</span>
     </div>
   </section>
 
-<!-- ░ Layouts + Exit — centered second row -->
-<section class="ddc-sec sec-layouts" aria-label="Layouts & Exit">
-  <div class="ddc-row center">
-    <span id="ddcLayoutHost" class="layout-host">
-      <span class="layout-label">Layout:</span>
-      <!-- inject your <select> / dropdown here -->
-      <span class="layout-name" id="layoutName">—</span>
-    </span>
-
-    <button class="btn danger" id="exitEditBtn" style="display:none" data-tooltip="Exit edit mode">
-      <ha-icon icon="mdi:exit-run"></ha-icon><span class="label">Exit Edit Mode</span>
-    </button>
-  </div>
-</section>
 </div>
 
 
@@ -3532,60 +3621,127 @@ if (this.__ddcOnWinResize) {
   }
   
 /* ------------------------------ Edit mode ------------------------------ */
-  _toggleEditMode(force=null) {
-    // NEW: kill any in-flight “enter edit” timer 
-    try { this.__clearPressTimer?.(); } catch {}
-    const entering = (force === null) ? !this.editMode : !!force;
-    const wasOff = !this.editMode && entering;
-  
-    this.editMode = entering;
+_toggleEditMode(force = null) {
+  try { this.__clearPressTimer?.(); } catch {}
 
-    this.editMode = entering;
-    this.addButton.style.display   = this.editMode ? 'inline-block' : 'none';
-    this.reloadBtn.style.display   = this.editMode ? 'inline-block' : 'none';
-    this.diagBtn.style.display     = this.editMode ? 'inline-block' : 'none';
-    this.exitEditBtn.style.display = this.editMode ? 'inline-block' : 'none';
-    this.exportBtn.style.display   = this.editMode ? 'inline-block' : 'none';
-    this.importBtn.style.display   = this.editMode ? 'inline-block' : 'none';
-    this.exploreBtn.style.display  = this.editMode ? 'inline-block' : 'none';
-    this.storeBadge.style.display  = this.editMode ? 'inline-block' : 'none';
-    this.applyLayoutBtn.style.display = this.editMode ? 'inline-block' : 'none';
-    // Show copy/paste only during editing
-    if (this.copyBtn)  this.copyBtn.style.display  = this.editMode ? 'inline-block' : 'none';
-    if (this.pasteBtn) this.pasteBtn.style.display = this.editMode ? 'inline-block' : 'none';
-    if (this.settingsBtn) this.settingsBtn.style.display = this.editMode ? 'inline-block' : 'none';
-    this._syncEmptyStateUI();
-    
-    this.cardContainer.classList.toggle('grid-on', this.editMode);
+  const entering = (force === null) ? !this.editMode : !!force;
+  const wasOff   = !this.editMode && entering;
 
-    const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
-    wraps.forEach((w) => {
-      w.classList.toggle('editing', this.editMode);
-      const handle = w.querySelector('.resize-handle');
-      if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
-      if (!w.dataset.placeholder && window.interact) {
-        window.interact(w).draggable(this.editMode).resizable(this.editMode);
-      }
-      w.style.touchAction = this.editMode ? 'none' : 'auto';
-    });
-    if (!this.editMode) this._clearSelection();
+  // Find toolbar in a robust way (no early return)
+  const host = this.renderRoot || this.shadowRoot || this;
+  const toolbar = host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
 
-    if (!this.editMode) {
-      // clear any stale dragging classes
-      this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
-        .forEach(w => w.classList.remove('dragging'));
+  // Helpers that are null-safe
+  const setDisplay = (el, val) => { try { if (el) el.style.display = val; } catch {} };
+  const on  = 'inline-block';
+  const off = 'none';
+
+  const showButtons = () => {
+    setDisplay(this.addButton, on);
+    setDisplay(this.reloadBtn, on);
+    setDisplay(this.diagBtn, on);
+    setDisplay(this.exitEditBtn, on);
+    setDisplay(this.exportBtn, on);
+    setDisplay(this.importBtn, on);
+    setDisplay(this.exploreBtn, on);
+    setDisplay(this.storeBadge, on);
+    setDisplay(this.applyLayoutBtn, on);
+    setDisplay(this.copyBtn, on);
+    setDisplay(this.pasteBtn, on);
+    setDisplay(this.settingsBtn, on);
+  };
+
+  const hideButtons = () => {
+    setDisplay(this.addButton, off);
+    setDisplay(this.reloadBtn, off);
+    setDisplay(this.diagBtn, off);
+    setDisplay(this.exitEditBtn, off);
+    setDisplay(this.exportBtn, off);
+    setDisplay(this.importBtn, off);
+    setDisplay(this.exploreBtn, off);
+    setDisplay(this.storeBadge, off);
+    setDisplay(this.applyLayoutBtn, off);
+    setDisplay(this.copyBtn, off);
+    setDisplay(this.pasteBtn, off);
+    setDisplay(this.settingsBtn, off);
+  };
+
+  // === Animate only if we actually found a toolbar ===
+  if (toolbar) {
+    const DUR = 260; // keep in sync with CSS --ddc-dur
+
+    if (entering) {
+      // Make sure it can be measured even if CSS says display:none !important
+      toolbar.setAttribute('data-force-open', '1');
+      // also hard-force as an ultimate fallback
+      toolbar.style.display = 'grid';
+
+      // Reveal buttons first so height is real
+      showButtons();
+
+      // Let layout settle, then measure & open
+      requestAnimationFrame(() => {
+        const h = toolbar.scrollHeight || 0;
+        toolbar.style.setProperty('--open-h', h + 'px');
+        toolbar.classList.add('is-open');
+        // keep data-force-open; :has() + buttons will keep it visible
+      });
+
+    } else {
+      // Ensure it’s visible while we animate out
+      toolbar.setAttribute('data-force-open', '1');
+      toolbar.style.display = 'grid';
+
+      // Lock current height as start, then collapse next frame
+      const h = toolbar.scrollHeight || 0;
+      toolbar.style.setProperty('--open-h', h + 'px');
+
+      requestAnimationFrame(() => {
+        toolbar.classList.remove('is-open');
+      });
+
+      // After the CSS transition ends, actually hide buttons and release shim
+      setTimeout(() => {
+        hideButtons();
+        toolbar.removeAttribute('data-force-open');
+        // Let your existing CSS take over (display:none when not in edit)
+      }, DUR);
     }
-
-    // Play ripple when switching ON
-    if (wasOff) {
-      // center by default, unless last hold coords known
-      const ox = this.__lastHoldX ?? null;
-      const oy = this.__lastHoldY ?? null;
-      this._playEditRipple(ox, oy);
-    }
-  
-    try { this._applyHaChromeVisibility_?.(); } catch {}
+  } else {
+    // No toolbar found; still flip mode & show/hide buttons so app logic continues
+    entering ? showButtons() : hideButtons();
   }
+
+  // === Your existing non-visual logic unchanged ===
+  this.editMode = entering;
+  this._syncEmptyStateUI?.();
+  this.cardContainer?.classList.toggle('grid-on', this.editMode);
+
+  const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+  wraps.forEach((w) => {
+    w.classList.toggle('editing', this.editMode);
+    const handle = w.querySelector('.resize-handle');
+    if (handle) handle.style.display = this.editMode ? 'flex' : 'none';
+    if (!w.dataset.placeholder && window.interact) {
+      window.interact(w).draggable(this.editMode).resizable(this.editMode);
+    }
+    w.style.touchAction = this.editMode ? 'none' : 'auto';
+  });
+  if (!this.editMode) this._clearSelection?.();
+
+  if (!this.editMode) {
+    this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
+      .forEach(w => w.classList.remove('dragging'));
+  }
+
+  if (wasOff) {
+    const ox = this.__lastHoldX ?? null;
+    const oy = this.__lastHoldY ?? null;
+    this._playEditRipple?.(ox, oy);
+  }
+
+  try { this._applyHaChromeVisibility_?.(); } catch {}
+}
 
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
