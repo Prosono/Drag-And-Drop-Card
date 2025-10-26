@@ -1898,6 +1898,7 @@ _applyGridVars() {
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
     this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
+    this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
     this.containerBackground      = config.container_background ?? 'transparent';
     this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
 
@@ -2033,7 +2034,7 @@ _applyGridVars() {
   --ddc-dur: 260ms;
   --open-h: 0px; /* JS sets this to scrollHeight */
 
-  position: sticky; top: 0; z-index: 50;
+  position: sticky; top: 0; z-index: 3;
   background: var(--ddc-bg);
   border-bottom: 1px solid var(--ddc-border);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -2044,7 +2045,7 @@ _applyGridVars() {
   max-width: 100%;
 
   /* GRID (kept ready) */
-  display: grid;
+  display: none;
   grid-template-columns: repeat(4, minmax(0,1fr)) auto; /* Status at the end */
   grid-template-areas:
     "primary clip share utils status"
@@ -2057,7 +2058,7 @@ _applyGridVars() {
   opacity: 0;
   transform: translateY(-6px);
   max-height: 0;              /* collapse when closed */
-  overflow: clip;             /* avoid scrollbars during anim */
+  overflow: hidden;             /* avoid scrollbars during anim */
   pointer-events: none;       /* inert when closed */
   visibility: hidden;         /* keep out of a11y focus when closed */
 
@@ -2085,6 +2086,12 @@ _applyGridVars() {
     transform var(--ddc-dur) var(--ddc-ease),
     max-height var(--ddc-dur) var(--ddc-ease),
     visibility 0s; /* visible immediately */
+}
+
+/* Always hide when closed, no matter what other rules say */
+.ddc-toolbar.streamlined.v2:not(.is-open):not([data-force-open="1"]),
+.ddc-toolbar.streamlined.v3:not(.is-open):not([data-force-open="1"]) {
+  display: none !important;
 }
 
 /* Respect reduced motion */
@@ -2267,6 +2274,8 @@ _applyGridVars() {
   }
 }
 
+
+
   .ddc-toolbar.streamlined.v2 > .ddc-sec,
   .ddc-toolbar.streamlined.v3 > .ddc-sec{
     display: block;
@@ -2349,14 +2358,18 @@ _applyGridVars() {
 /* ===== FORCE STACK ON NARROW — driven by .ddc-root width ============ */
 /* At <= 900px root width: stack pills; inside each pill use 2-up buttons */
 @container ddc-root (max-width: 900px){
-  /* stack the pills */
-  .ddc-toolbar.streamlined.v2:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v2:has(.store-badge[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3:has(.store-badge[style*="inline-block"]){
-    display: block !important;  /* kill grid to force stacking */
-    padding: 10px;
+  .ddc-toolbar.streamlined.v2.is-open:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3.is-open:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v2[data-force-open="1"]:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3[data-force-open="1"]:has(.btn[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v2.is-open:has(.store-badge[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3.is-open:has(.store-badge[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v2[data-force-open="1"]:has(.store-badge[style*="inline-block"]),
+  .ddc-toolbar.streamlined.v3[data-force-open="1"]:has(.store-badge[style*="inline-block"]) {
+    display: block !important; /* only when open/measuring */
   }
+}
+
 
   .ddc-toolbar.streamlined.v2:has(.btn[style*="inline-block"]) > .ddc-sec,
   .ddc-toolbar.streamlined.v3:has(.btn[style*="inline-block"]) > .ddc-sec,
@@ -2816,220 +2829,246 @@ _applyGridVars() {
 
 /* ===== DDC TABS — Minimal Redesign (pills with accent tint) ===== */
     
+/* ====================================================================
+   CHROME-LIKE TABS • spaced + concave bottoms (sticky, CSS-only)
+   ==================================================================== */
 
-/* --- Ensure .ddc-root drives responsive behavior for tabs too --- */
-.ddc-root{
-  position: relative;
-  /* JS will keep this in sync with your “Grid (px)” */
-  --ddc-grid-size: 10px;
-  /* Good contrast on light/dark themes */
-  --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
+.ddc-tabs {
+  --bg: var(--card-background-color, #16181c);
+  --fg: var(--primary-text-color, #e6e8ea);
+  --accent: var(--primary-color, #6aa4ff);
+  --hair: color-mix(in oklab, var(--fg) 16%, transparent);
 
-  /* NEW: make .ddc-root a named container for container queries */
-  container-type: inline-size;
-  container-name: ddc-root;
-}
+  --h: 42px;
+  --gap: 16px;
+  --r-top: 14px;
+  --padX: 18px;
 
-/* --- DDC Tabs — Chrome-style, centered content, smooth tab-change, faint inactive outline --- */
+  position: sticky;
+  top: max(env(safe-area-inset-top, 0px), 0px);
+  z-index: 100;
 
-/* Tabs bar (transparent, no backdrop; fills root width) */
-.ddc-tabs{
-  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;               /* Chrome-like baseline */
-  gap: 6px;
-  padding: 6px 10px;
-
+  align-items: flex-end;
+  column-gap: var(--gap);
+  padding: 0 12px;
   width: 100%;
-  max-width: 100%;                    /* never exceed .ddc-root */
-  margin: 0 auto;
+  box-sizing: border-box;
 
-  overflow-x: auto;                   /* allow horizontal scroll when crowded */
+  background: var(--bg);
+  border-bottom: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+
+  overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
+  scrollbar-gutter: stable;
 
-  background: transparent;
-  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
-
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--primary-text-color) 35%, transparent) transparent;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
 }
-.ddc-tabs::-webkit-scrollbar { height: 8px; }
+
+.ddc-tabs::-webkit-scrollbar {
+  height: 8px;
+}
 .ddc-tabs::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--primary-text-color) 35%, transparent);
-  border-radius: 9999px;
+  background: color-mix(in oklab, var(--fg) 30%, transparent);
+  border-radius: 999px;
 }
-.ddc-tabs::-webkit-scrollbar-track { background: transparent; }
+.ddc-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-/* Tab: fills available width, centered icon+text, no hover bounce */
+/* ---------- TAB (Chrome-like shape) ---------- */
+/* ====================================================================
+   CHROME-LIKE TABS • centered + concave bottoms (sticky, CSS-only)
+   ==================================================================== */
+/* ====================================================================
+   CHROME-LIKE TABS • centered • concave bottoms • light active
+   Markup stays: <div class="ddc-tabs"> … .ddc-tab(.active) … </div>
+   ==================================================================== */
+
+/* ---------- BAR (sticky baseline) ---------- */
+.ddc-tabs{
+  /* Theme tokens (HA-aware) */
+  --bg: var(--card-background-color, #16181c);
+  --fg: var(--primary-text-color, #e6e8ea);
+  --accent: var(--primary-color, #6aa4ff);
+  --hair: color-mix(in oklab, var(--fg) 16%, transparent);
+
+  /* Geometry knobs */
+  --h: 42px;       /* tab height */
+  --gap: 18px;     /* space between tabs */
+  --r-top: 14px;   /* top radius */
+  --cut: 22px;     /* concave cut depth at bottom corners (18–26 good) */
+  --padX: 18px;    /* horizontal padding */
+
+  position: sticky;
+  top: max(env(safe-area-inset-top,0px), 0px);
+  z-index: 100;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;          /* center when there’s room */
+  column-gap: var(--gap);
+  padding: 0 12px;
+  width: 100%;
+  box-sizing: border-box;
+
+  background: var(--bg);
+  border-bottom: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-gutter: stable;
+
+  /* discoverable overflow edges */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+.ddc-tabs::-webkit-scrollbar{ height: 8px; }
+.ddc-tabs::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--fg) 30%, transparent); border-radius: 999px; }
+.ddc-tabs::-webkit-scrollbar-track{ background: transparent; }
+
+/* ---------- TAB (concave corners painted; no masks required) ---------- */
 .ddc-tab{
   -webkit-tap-highlight-color: transparent;
   position: relative;
-  z-index: 0;
+  flex: 0 0 auto;
+  align-self: flex-end;
   display: inline-flex;
   align-items: center;
-  justify-content: center;           /* center content */
-  text-align: center;                /* center label text */
+  justify-content: center;
   gap: 8px;
-  padding: 8px 12px;
-  font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-  letter-spacing: .2px;
-  color: color-mix(in oklab, var(--primary-text-color) 75%, #000 0%);
-  cursor: pointer;
 
-  /* fill width but remain scrollable when crowded */
-  flex: 1 1 clamp(120px, 18%, 280px);
-  min-width: clamp(120px, 18%, 280px);
-  max-width: 100%;
+  height: var(--h);
+  min-width: clamp(120px, 18ch, 280px);
+  padding: 0 var(--padX);
   scroll-snap-align: start;
 
-  margin: 0;
-  border: 0;
-  background: transparent;
+  font: 600 13.5px/1 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+  letter-spacing: .2px;
+  color: color-mix(in oklab, var(--fg) 92%, transparent);
+  cursor: pointer;
+  user-select: none;
 
-  /* keep motion minimal; animate only color/shadow/line */
-  transition: color .18s ease, filter .18s ease, box-shadow .18s ease, border-color .18s ease;
-}
-.ddc-tab ha-icon{ --mdc-icon-size:18px; }
-.ddc-tab .ddc-tab-label{ max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Fill with “carved” concave bottom corners:
+     we paint the BAR color into the corner arcs, which visually cuts inward */
+  background:
+    radial-gradient(120% 140% at 0 100%,     var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) left  bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
+    radial-gradient(120% 140% at 100% 100%,  var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) right bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
 
-/* Inactive tabs get a faint outline */
-.ddc-tab::before{
-  content:"";
-  position:absolute;
-  inset: 0;
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
-  border-bottom: none;
-  background: transparent;
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Subtle hover: clearer text only (no movement) */
-.ddc-tab:hover{
-  color: var(--primary-text-color);
-  filter: saturate(1.05);
-}
-
-/* Active tab: elevated, stronger shadow */
-.ddc-tab.active{
-  color: var(--primary-text-color);
-  z-index: 2;
-}
-.ddc-tab.active::before{
-  background: var(--card-background-color, #fff);
-  border-color: var(--divider-color, rgba(0,0,0,.18));
+  /* Border drawn as inset so it follows the carve perfectly */
   box-shadow:
-    0 10px 24px rgba(0,0,0,.16),
-    0 4px 10px rgba(0,0,0,.10),
-    0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
-  animation: ddc-pop .18s ease-out;
+    0 0 0 1px var(--hair) inset,
+    0 2px 8px rgba(0,0,0,.22);
+
+  border: none;
+  border-top-left-radius: var(--r-top);
+  border-top-right-radius: var(--r-top);
+
+  /* sit slightly above the baseline so the concave is visible */
+  transform: translateY(4px);
+  transition:
+    transform .16s cubic-bezier(.2,.6,.2,1),
+    box-shadow .18s ease,
+    color .16s ease,
+    background-color .18s ease,
+    filter .18s ease;
 }
 
-/* Animated TOP line – appears quickly when tab becomes active */
-.ddc-tab::after{
-  content:"";
-  position:absolute;
-  top: -2px; left: 10px; right: 10px;
-  height: 0;                            /* hidden by default */
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(90deg, var(--primary-color), #ff4ecd, #00e0ff, var(--primary-color));
-  background-size: 300% 100%;
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: 50% 50%;
-  transition: transform .16s ease-out, height .16s ease-out, opacity .16s ease-out;
-  pointer-events: none;
-}
-.ddc-tab.active::after{
-  height: 3px;
-  opacity: 1;
-  transform: scaleX(1);
-  animation: ddc-rainbow 4s linear infinite;
+/* icon + label */
+.ddc-tab ha-icon{ --mdc-icon-size: 18px; opacity: .95; }
+.ddc-tab .ddc-tab-label{ max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* Hover: gentle raise and slightly clearer edge */
+.ddc-tab:hover{
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--fg) 24%, transparent) inset,
+    0 6px 12px rgba(0,0,0,.18);
 }
 
-/* Pressed: keep still (no bounce) */
-.ddc-tab:active{ box-shadow: 0 1px 0 rgba(0,0,0,0); }
+/* Pressed */
+.ddc-tab:active{ transform: translateY(4px) scale(.99); }
 
-/* Focus ring without motion */
+/* Focus ring */
 .ddc-tab:focus-visible{
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-color) 45%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 60%, transparent),
+    0 0 0 6px color-mix(in oklab, var(--fg) 18%, transparent),
+    0 2px 8px rgba(0,0,0,.22);
 }
 
-/* ---------- CONTAINER-DRIVEN RESPONSIVE (by .ddc-root width) ---------- */
+/* ---------- ACTIVE (lighter background, connected to bar) ---------- */
+.ddc-tab.active{
+  z-index: 2;
+  transform: translateY(0);
+  color: var(--fg);
 
-/* Compact tabs at <= 900px root width */
-@container ddc-root (max-width: 900px){
-  .ddc-tabs{ gap: 5px; padding: 6px 8px; }
-  .ddc-tab{
-    flex: 1 1 clamp(104px, 28%, 220px);
-    min-width: clamp(104px, 28%, 220px);
-    padding: 7px 10px;
-    font-size: 12.5px;
-  }
-  .ddc-tab::after{ left: 8px; right: 8px; }
-}
-
-/* Extra compact at <= 640px root width */
-@container ddc-root (max-width: 640px){
-  .ddc-tabs{ gap: 4px; padding: 6px 6px; }
-  .ddc-tab{
-    flex: 1 1 clamp(96px, 34%, 200px);
-    min-width: clamp(96px, 34%, 200px);
-    padding: 6px 10px;
-    font-size: 12px;
-  }
-  .ddc-tab::after{ left: 8px; right: 8px; }
+  /* lighter body like your reference */
+  background:
+    radial-gradient(120% 140% at 0 100%,     var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) left  bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
+    radial-gradient(120% 140% at 100% 100%,  var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) right bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
+    linear-gradient(180deg,
+      color-mix(in oklab, #fff 20%, var(--bg) 80%),
+      color-mix(in oklab, #fff 10%, var(--bg) 90%));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--fg) 26%, transparent) inset,
+    0 10px 16px rgba(0,0,0,.16),
+    0 2px 0 0 var(--bg);   /* hide the blue baseline under the active tab */
 }
 
-/* ---------- Optional vertical rail (also respects root width) ---------- */
-.ddc-tabs-left{
-  display:flex;
-  flex-direction:column;
-  align-items: stretch;
-  width: clamp(150px, 28%, 220px);
-  padding: 8px 6px;
-  gap: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  border-right: 1px solid var(--divider-color, rgba(0,0,0,.12));
-  border-bottom: none;
-  background: transparent;
+/* Optional small accent tick under the active tab */
+.ddc-tab::after{
+  content:"";
+  position:absolute; left: 24px; right: 24px; bottom: -2px;
+  height: 2px; border-radius: 2px;
+  background: color-mix(in oklab, var(--accent) 72%, transparent);
+  opacity: 0; transition: opacity .18s ease;
 }
-.ddc-tabs-left .ddc-tab{
-  justify-content: center;
-  margin: 0;
-  border: 1px solid color-mix(in oklab, var(--primary-text-color) 12%, transparent);
-  border-radius: 10px;
-  padding: 8px 10px;
-  flex: 0 0 auto;
-}
-.ddc-tabs-left .ddc-tab::before{ display:none; }
-.ddc-tabs-left .ddc-tab.active{
-  background: var(--card-background-color, #fff);
-  box-shadow: 0 4px 12px rgba(0,0,0,.12);
-}
-.ddc-tabs-left .ddc-tab.active::after{ display:none; } /* top line is only for horizontal */
+.ddc-tab.active::after{ opacity: 1; }
 
-/* Animations */
-@keyframes ddc-rainbow{
-  0% { background-position: 0% 50%; }
-  100% { background-position: 300% 50%; }
+/* Disabled */
+.ddc-tab[disabled], .ddc-tab[aria-disabled="true"]{
+  opacity:.55; cursor:not-allowed; filter: saturate(.75);
 }
-@keyframes ddc-pop{
-  0% { box-shadow: 0 0 0 rgba(0,0,0,0); }
-  100% {
-    box-shadow:
-      0 10px 24px rgba(0,0,0,.16),
-      0 4px 10px rgba(0,0,0,.10),
-      0 0 0 1px color-mix(in oklab, var(--primary-text-color) 10%, transparent);
+
+/* Dark-mode base (kept HA-aware) */
+@media (prefers-color-scheme: dark){
+  .ddc-tabs{
+    --bg: var(--card-background-color, #0f1216);
+    --fg: var(--primary-text-color, #e6e8ea);
   }
 }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .ddc-tab{ transition: none !important; }
+}
+
+/* Fallback for older engines */
+@supports not (scrollbar-gutter: stable){
+  .ddc-tabs{ padding-inline-end: 16px; }
+}
+
+
 
 
 
@@ -3640,46 +3679,104 @@ if (this.__ddcOnWinResize) {
    * removed once the animation completes so subsequent tab switches can
    * retrigger the animation. Hidden wrappers (display: none) are skipped.
    */
-  _animateCards() {
-    try {
-      const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
-      wraps.forEach((w) => {
-        // Skip hidden cards. If a wrapper is not visible, don't animate it.
-        const style = window.getComputedStyle ? window.getComputedStyle(w) : null;
-        const isHidden = (w.style.display === 'none') || (style && style.display === 'none') || w.classList.contains('ddc-hidden');
-        if (isHidden) return;
-        // Compute the current transform so we can append our fly‑in offset
-        const computed = window.getComputedStyle(w);
-        const initialTransform = (computed && computed.transform && computed.transform !== 'none') ? computed.transform : '';
-        // Build keyframes that animate opacity and translateY without overriding
-        // the existing translate3d applied by the layout. We append our offset
-        // to the current transform so the card flies up from its natural position.
-        const frames = [
-          { opacity: 0, transform: `${initialTransform} translateY(12px)` },
-          { opacity: 1, transform: `${initialTransform}` }
-        ];
-        // Use the Web Animations API to play the animation. The default fill
-        // mode leaves the underlying transform intact once the animation ends.
+_animateCards() {
+  try {
+    const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    // 🎚️ Master controls
+    const totalAnimationTime = 800;   // Total sequence time (ms)
+    const animationIntensity = 0.8;    // 1 = default, 2 = more dramatic, 0.5 = subtle
+
+    // Derived timing values
+    const durationRatio = 0.3; // Portion of total time used for each card’s animation
+    const duration = totalAnimationTime * durationRatio;
+    const maxDelay = totalAnimationTime - duration;
+
+    wraps.forEach((w) => {
+      // Skip hidden cards
+      const cs = window.getComputedStyle?.(w);
+      const isHidden =
+        (w.style.display === 'none') ||
+        (cs && cs.display === 'none') ||
+        w.classList.contains('ddc-hidden');
+      if (isHidden) return;
+
+      // Preserve any existing transform from layout
+      const base = (cs && cs.transform && cs.transform !== 'none') ? cs.transform : '';
+
+      // 🪄 Fly-in distance increases with intensity
+      const offsetY = 100 * animationIntensity; // % of element height
+      const fromT = `${base} translate3d(0, ${offsetY}%, 0)`;
+      const toT   = `${base} translate3d(0, 0, 0)`;
+
+      // 🎲 Random delay spread scales with intensity
+      const delay = Math.random() * (maxDelay * Math.min(animationIntensity, 2)); // cap at 2× spread
+
+      if (reduceMotion) {
         try {
-          w.animate(frames, {
-            duration: 300,
-            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-            fill: 'none'
+          w.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: totalAnimationTime * 0.15,
+            delay,
+            easing: 'linear',
+            fill: 'backwards'
           });
         } catch {
-          // Some browsers might not support animate(); if so, fall back to opacity
           w.style.opacity = '0';
-          requestAnimationFrame(() => {
-            w.style.transition = 'opacity .3s ease';
+          setTimeout(() => {
+            w.style.transition = `opacity ${totalAnimationTime * 0.15}ms linear`;
             w.style.opacity = '1';
-          });
+          }, delay);
         }
-      });
-    } catch (e) {
-      // Suppress errors to avoid breaking the card when animations fail
-      console.warn('[ddc:animate] animation error', e);
-    }
+        return;
+      }
+
+      try {
+        w.style.willChange = 'opacity, transform';
+
+        const motionEase = 'cubic-bezier(0.4, 0, 0.2, 1)';
+        const opacityEase = 'linear';
+
+        // Opacity fade
+        w.animate(
+          [{ opacity: 0 }, { opacity: 1 }],
+          { duration, delay, easing: opacityEase, fill: 'backwards' }
+        );
+
+        // Transform upward flight
+        w.animate(
+          [{ transform: fromT }, { transform: toT }],
+          { duration, delay, easing: motionEase, fill: 'backwards' }
+        ).addEventListener?.('finish', () => {
+          w.style.willChange = '';
+        });
+      } catch {
+        // Fallback without Web Animations API
+        w.style.opacity = '0';
+        w.style.transform = fromT;
+        w.style.willChange = 'opacity, transform';
+        setTimeout(() => {
+          w.style.transition = `opacity ${duration}ms linear, transform ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+          w.style.opacity = '1';
+          w.style.transform = toT;
+          setTimeout(() => {
+            w.style.transition = '';
+            w.style.willChange = '';
+          }, duration + 60);
+        }, delay);
+      }
+    });
+  } catch (e) {
+    console.warn('[ddc:animate] animation error', e);
   }
+}
+
+
+
+
+
+
+
   _addTabSelectorToChip(wrapper, entryTabId = null) {
     if (!this.tabs || !this.tabs.length) return;
     const chip = wrapper.querySelector('.chip'); if (!chip) return;
@@ -3715,6 +3812,19 @@ _toggleEditMode(force = null) {
 
   const entering = (force === null) ? !this.editMode : !!force;
   const wasOff   = !this.editMode && entering;
+  // EDIT MODE PIN gate
+  try {
+    const cfgPin = (this.config && this.config.edit_mode_pin != null) ? String(this.config.edit_mode_pin) : '';
+    const runtimePin = (this.editModePin != null) ? String(this.editModePin) : '';
+    const pin = (runtimePin || cfgPin).trim();
+    if (entering && !this.editMode && pin) {
+      const entered = window.prompt('Enter PIN / password to open Edit Mode:');
+      if (entered === null) return;
+      if (String(entered).trim() !== pin) { this._toast?.('Incorrect PIN/password.'); return; }
+    }
+
+  } catch (e) {}
+
 
   // Find toolbar in a robust way (no early return)
   const host = this.renderRoot || this.shadowRoot || this;
@@ -8682,6 +8792,21 @@ modal.innerHTML = `
         </div>
       </section>
 
+        <!-- EDIT MODE PIN/PASSWORD -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:lock-outline"></ha-icon>
+              <label for="ddc-setting-editPin">Edit mode PIN / password</label>
+            </div>
+            <div class="control">
+              <input type="password" id="ddc-setting-editPin" placeholder="Leave blank to disable" />
+            </div>
+          </div>
+          <div class="hint">If set, this code is required to enter Edit Mode.</div>
+        </div>
+
+
       <!-- Appearance -->
       <section class="card">
         <div class="section-head">
@@ -8925,6 +9050,7 @@ modal.innerHTML = `
     // Prepopulate current settings
     const chkAuto    = modal.querySelector('#ddc-setting-autoResize');
     const inpGrid    = modal.querySelector('#ddc-setting-gridSize');
+
     const chkAnim    = modal.querySelector('#ddc-setting-animate');
     const chkHdr     = modal.querySelector('#ddc-setting-hideHdr');
     const chkBar     = modal.querySelector('#ddc-setting-hideSbar');
@@ -8934,6 +9060,7 @@ modal.innerHTML = `
     const selSize    = modal.querySelector('#ddc-setting-sizeMode');
     const selOrient  = modal.querySelector('#ddc-setting-orient');
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
+    const inpEditPin = modal.querySelector('#ddc-setting-editPin');
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
@@ -8982,6 +9109,19 @@ modal.innerHTML = `
       });
     }
     // ===== UI polish hooks =====
+  
+    // Prepopulate Edit PIN — UI value always wins over YAML
+    // Prepopulate Edit PIN — UI value wins for display too
+    try {
+      if (inpEditPin) {
+        const yamlPin = (this.config && this.config.edit_mode_pin != null) ? String(this.config.edit_mode_pin) : '';
+        const uiPin   = (this.editModePin != null) ? String(this.editModePin) : '';
+        inpEditPin.value = uiPin || yamlPin || '';
+        inpEditPin.disabled = false;   // ensure editable
+        inpEditPin.readOnly = false;   // ensure editable
+      }
+    } catch {}
+
     const gridSlider = modal.querySelector('#ddc-setting-gridSize');
     const gridOut    = modal.querySelector('#ddc-grid-out');
     const gridDemo   = modal.querySelector('#ddc-grid-demo');
@@ -9476,6 +9616,7 @@ modal.innerHTML = `
       const newCardBg    = (inpCardBg?.value || '').trim();
       const newBgImg     = (inpBgImg?.value || '').trim();
       const newDebug     = !!chkDebug?.checked;
+      const newEditPin  = (inpEditPin?.value || '').trim();
       // hero and tabs position not exposed to user
       try {
         // Auto resize cards
@@ -9488,6 +9629,10 @@ modal.innerHTML = `
           this._applyGridVars?.();
           this._resizeContainer?.();
         }
+        // Edit mode PIN
+        this.editModePin = newEditPin;
+        // make sure the persisted config also carries it
+        this._config = { ...(this._config || {}), edit_mode_pin: newEditPin };
         // Drag live snap
         const snapChanged = newSnap !== this.dragLiveSnap;
         this.dragLiveSnap = newSnap;
@@ -9638,6 +9783,7 @@ modal.innerHTML = `
       drag_live_snap: !!this.dragLiveSnap,
       auto_save: !!this.autoSave,
       auto_save_debounce: this.autoSaveDebounce,
+      edit_mode_pin: (this.editModePin || undefined),
       debug: !!this.debug,
       container_size_mode: this.containerSizeMode,
       container_preset_orientation: this.containerPresetOrient,
