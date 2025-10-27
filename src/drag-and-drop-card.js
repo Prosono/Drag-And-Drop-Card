@@ -763,6 +763,469 @@ _applyBackgroundImageFromConfig() {
   }
 }
 
+/* ========================================================================== */
+/* Unified background driver (image | particles | youtube | none)             */
+/* ========================================================================== */
+
+_applyBackgroundFromConfig() {
+  try {
+    const mode = (this._config?.background_mode)
+      || (this._config?.background_image?.src ? 'image' : 'none');
+
+    // Always clear dynamic layers first
+    this._destroyParticles_?.();
+    this._destroyYouTube_?.();
+
+    // Clear CSS image if we’re not in image mode
+    if (mode !== 'image') {
+      const cont = this.cardContainer;
+      if (cont) {
+        cont.style.removeProperty('--ddc-bg-image');
+        cont.style.removeProperty('--ddc-bg-repeat');
+        cont.style.removeProperty('--ddc-bg-opacity');
+        cont.style.removeProperty('--ddc-bg-size');
+        cont.style.removeProperty('--ddc-bg-position');
+        cont.style.removeProperty('--ddc-bg-attachment');
+        cont.style.removeProperty('--ddc-bg-filter');
+        cont.classList.remove('has-bg-image');
+      }
+    }
+
+    // Route to the correct backend
+    if (mode === 'image') {
+      this._applyBackgroundImageFromConfig?.();
+      return;
+    }
+
+    if (mode === 'particles') {
+      const cfg = this._config?.background_particles || {};
+      this._attachParticlesBackground_(cfg);
+      return;
+    }
+
+    if (mode === 'youtube') {
+      const cfg = this._config?.background_youtube || {};
+      this._attachYouTubeBackground_(cfg);
+      return;
+    }
+
+    // mode === 'none'
+    // nothing to do
+
+  } catch (e) {
+    console.warn('[drag-and-drop-card] _applyBackgroundFromConfig failed:', e);
+  }
+}
+
+_ensureBgHost_() {
+  const cont = this.cardContainer;
+  if (!cont) return null;
+  let host = cont.querySelector('#ddcBgHost');
+  if (!host) {
+    host = document.createElement('div');
+    host.className = 'ddc-bg-host';
+    host.id = 'ddcBgHost';
+    host.setAttribute('aria-hidden','true');
+    cont.prepend(host);
+  } else {
+    // clear any previous dynamic children
+    host.innerHTML = '';
+  }
+  return host;
+}
+
+/* ---------- tiny loader with cache ---------- */
+async _loadScriptOnce_(src) {
+  if (!src) throw new Error('script src required');
+  if (!this.__scriptCache) this.__scriptCache = new Map();
+  if (this.__scriptCache.has(src)) return this.__scriptCache.get(src);
+
+  const p = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => reject(new Error('failed to load ' + src));
+    document.head.appendChild(s);
+  });
+  this.__scriptCache.set(src, p);
+  return p;
+}
+
+/* ========================================================================== */
+/* Particles.js                                                               */
+/* ========================================================================== */
+
+// Pick the right root for queries (Lit's renderRoot > shadowRoot > self)
+_getRenderRoot_() {
+  return this.renderRoot || this.shadowRoot || this;
+}
+
+// Temporarily make document.getElementById look into our shadow root
+_withScopedDocument_(fn) {
+  const root = this._getRenderRoot_();
+  // If we’re not in shadow, nothing to scope
+  if (!root || root === document || !root.querySelector) return fn();
+
+  const d = document;
+  const originalGetById = d.getElementById.bind(d);
+  const originalQuerySelector = d.querySelector ? d.querySelector.bind(d) : null;
+
+  d.getElementById = (id) => {
+    try {
+      const safe = (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id);
+      return root.querySelector('#' + safe) || originalGetById(id);
+    } catch { return originalGetById(id); }
+  };
+  if (originalQuerySelector) {
+    d.querySelector = (sel) => {
+      try { return root.querySelector(sel) || originalQuerySelector(sel); }
+      catch { return originalQuerySelector(sel); }
+    };
+  }
+  try { return fn(); }
+  finally {
+    d.getElementById = originalGetById;
+    if (originalQuerySelector) d.querySelector = originalQuerySelector;
+  }
+}
+
+
+
+async _ensureParticles_() {
+  if (window.particlesJS) return true;
+  if (!this.__particlesLoadPromise) {
+    const loadScript = (src) => new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+    this.__particlesLoadPromise = loadScript('/local/particles.min.js')
+      .catch(() => loadScript('https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js'))
+      .then(() => !!window.particlesJS)
+      .catch(() => false);
+  }
+  return this.__particlesLoadPromise;
+}
+
+_attachParticlesBackground_(cfg = {}) {
+  const host = this._ensureBgHost_?.();
+  if (!host) return;
+
+  // Destroy any existing instance and ensure an empty mount each time
+  try { this._destroyParticles_?.(); } catch {}
+  host.innerHTML = '';
+  const el = document.createElement('div');
+  el.id = 'ddcParticles';
+  el.className = 'particles-js';
+  el.style.position = 'absolute';
+  el.style.inset = '0';
+  host.appendChild(el);
+
+  const DEFAULTS = {
+    particles: {
+      number: { value: 70, density: { enable: true, value_area: 900 } },
+      color: { value: '#ffffff' },
+      shape: { type: 'circle' },
+      opacity: { value: 0.4 },
+      size: { value: 3, random: true },
+      line_linked: { enable: true, distance: 150, color: '#ffffff', opacity: 0.3, width: 1 },
+      move: { enable: true, speed: 2, out_mode: 'out' }
+    },
+    interactivity: {
+      detect_on: 'canvas',
+      events: { onhover: { enable: false }, onclick: { enable: false }, resize: true },
+      modes: { repulse: { distance: 100 }, push: { particles_nb: 4 } }
+    },
+    retina_detect: true
+  };
+
+  const allowPointer = !!cfg.pointer_events;
+  const conf = cfg.config || JSON.parse(JSON.stringify(DEFAULTS)); // clone defaults
+
+  if (allowPointer) {
+    conf.interactivity.events.onhover = { enable: true, mode: 'repulse' };
+    conf.interactivity.events.onclick = { enable: true, mode: 'push' };
+    host.style.pointerEvents = 'auto';
+  } else {
+    host.style.pointerEvents = 'none';
+  }
+
+  const apply = async () => {
+    const ok = await this._ensureParticles_?.();
+    if (!ok || !window.particlesJS) return;
+
+    // Wait a frame to ensure <div id="ddcParticles"> is fully in the shadow DOM
+    await (typeof requestAnimationFrame === 'function'
+      ? new Promise(r => requestAnimationFrame(() => r()))
+      : Promise.resolve());
+
+    await (typeof requestAnimationFrame === 'function'
+      ? new Promise(r => requestAnimationFrame(() => r()))
+      : Promise.resolve());
+
+    // If a config URL is provided, fetch it ourselves and call the synchronous init.
+    // Using .load() breaks in Shadow DOM because it resolves later (outside our scoped document).
+    // If a config URL is provided, fetch it ourselves and init synchronously.
+    // Using .load() breaks in Shadow DOM because it resolves later (outside our scoped document).
+    let finalConf = conf;
+    if (cfg.config_url) {
+      try {
+        const res = await fetch(cfg.config_url, { cache: 'no-store' });
+        finalConf = await res.json();
+      } catch (err) {
+        console.warn('[drag-and-drop-card] Failed to fetch particles config; falling back to defaults', err);
+        finalConf = conf;
+      }
+    }
+
+
+    // Scope getElementById to the shadow root just for the *synchronous* init call.
+    this._withScopedDocument_(() => {
+      if (!Array.isArray(window.pJSDom)) { try { window.pJSDom = []; } catch {} }
+      window.particlesJS('ddcParticles', finalConf);
+    });
+
+    // Keep a handle for cleanup
+    if (Array.isArray(window.pJSDom) && window.pJSDom.length) {
+      this.__particlesInst = window.pJSDom[window.pJSDom.length - 1];
+    }
+  };
+
+  apply();
+  this.__particlesHost = host;
+}
+
+
+_destroyParticles_() {
+  try {
+    if (!Array.isArray(window.pJSDom)) {
+      window.pJSDom = [];
+    }
+    if (window.pJSDom.length) {
+      window.pJSDom.forEach(inst => {
+        try { inst.pJS?.fn?.vendors?.destroy?.(); } catch {}
+        try { inst.pJS?.fn?.vendors?.destroypJS?.(); } catch {}
+      });
+      window.pJSDom.length = 0;
+    }
+  } catch {}
+  if (this.__particlesHost) this.__particlesHost.innerHTML = '';
+  this.__particlesHost = null;
+  this.__particlesInst = null;
+}
+
+/* ========================================================================== */
+/* YouTube video background (muted, looping, “cover”)                         */
+/* ========================================================================== */
+
+_parseYouTubeId_(input) {
+  if (!input) return null;
+  const s = String(input).trim();
+  const m =
+    s.match(/(?:youtube\.com\/.*[?&]v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/) ||
+    s.match(/^([A-Za-z0-9_-]{11})$/);
+  return m ? m[1] : null;
+}
+
+async _ensureYouTube_() {
+  if (window.YT?.Player) return true;
+  if (!this.__ytReadyPromise) {
+    this.__ytReadyPromise = new Promise((resolve) => {
+      const ready = () => resolve(true);
+      if (window.YT?.Player) return ready();
+      window.onYouTubeIframeAPIReady = ready;
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.async = true; s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+  }
+  return this.__ytReadyPromise;
+}
+
+_attachYouTubeIframeDirect_(wrap, videoId, { start, end, mute = true, loop = true } = {}) {
+  const params = new URLSearchParams({
+    autoplay: '1',
+    mute: mute ? '1' : '0',
+    controls: '0',
+    playsinline: '1',
+    rel: '0',
+    modestbranding: '1',
+    iv_load_policy: '3',
+    loop: loop ? '1' : '0'
+  });
+  if (loop) params.set('playlist', videoId);
+  if (Number.isFinite(start)) params.set('start', String(start));
+  if (Number.isFinite(end))   params.set('end',   String(end));
+
+  const src = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+
+  const iframe = document.createElement('iframe');
+  iframe.src = src;
+  iframe.setAttribute('frameborder', '0');
+  iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+  iframe.setAttribute('allowfullscreen', 'true');
+  iframe.style.position = 'absolute';
+  iframe.style.inset = '0';
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+
+  wrap.appendChild(iframe);
+  this.__ytWrap = wrap;
+  this._layoutYtBackground_?.();
+}
+
+_attachYouTubeBackground_(cfg = {}) {
+  const host = this._ensureBgHost_();
+  if (!host) return;
+
+  const videoId = this._parseYouTubeId_(cfg.video_id || cfg.url);
+  if (!videoId) { console.warn('[drag-and-drop-card] No YouTube video id'); return; }
+
+  // wrapper we can size/center for “cover”
+  const wrap = document.createElement('div');
+  wrap.className = 'yt-bg';
+  wrap.style.position = 'absolute';
+  wrap.style.inset = '0';
+  wrap.style.pointerEvents = 'none';  // don’t swallow drags
+  host.appendChild(wrap);
+
+  const frame = document.createElement('div');
+  frame.id = 'ddcYtFrame';
+  frame.style.position = 'absolute';
+  frame.style.left = '0';
+  frame.style.top  = '0';
+  frame.style.width = '100%';
+  frame.style.height= '100%';
+  wrap.appendChild(frame);
+
+  const start = Number.isFinite(cfg.start) ? Number(cfg.start) : undefined;
+  const end   = Number.isFinite(cfg.end)   ? Number(cfg.end)   : undefined;
+  const mute  = cfg.mute !== false;  // default true
+  const loop  = cfg.loop !== false;  // default true
+
+  const init = async () => {
+    const ok = await this._ensureYouTube_();
+    if (!ok || !(window.YT && window.YT.Player)) {
+      this._attachYouTubeIframeDirect_(wrap, videoId, { start, end, mute, loop });
+      if (!this.__ytResizeObs) {
+        this.__ytResizeObs = new ResizeObserver(() => this._layoutYtBackground_?.());
+        try { this.__ytResizeObs.observe(this.cardContainer); } catch {}
+        window.addEventListener('resize', this.__ytOnWinResize = () => this._layoutYtBackground_?.());
+      }
+      return;
+    }
+
+
+    // API path (keep your existing code)
+      this.__ytPlayer = new window.YT.Player(frame, {
+        width: '100%',
+        height: '100%',
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+          loop: loop ? 1 : 0,
+          playlist: loop ? videoId : undefined,
+          start: start,
+          end: end
+        },
+      events: {
+        onReady: (e) => {
+          try {
+            if (mute) e.target.mute();
+            e.target.playVideo();
+          } catch {}
+          this._layoutYtBackground_?.();
+        },
+        onStateChange: (e) => {
+          if (e.data === window.YT.PlayerState.ENDED && loop) {
+            try {
+              const s = Number.isFinite(start) ? start : 0;
+              const now = (window.performance && performance.now) ? performance.now() : Date.now();
+              if (!this.__ytLastLoopAt || (now - this.__ytLastLoopAt) > 1500) {
+                this.__ytLastLoopAt = now;
+                e.target.seekTo(s, true);
+                e.target.playVideo();
+              }
+            } catch {}
+          }
+        }
+      }
+    });
+
+    if (!this.__ytResizeObs) {
+      this.__ytResizeObs = new ResizeObserver(() => this._layoutYtBackground_?.());
+      try { this.__ytResizeObs.observe(this.cardContainer); } catch {}
+      window.addEventListener('resize', this.__ytOnWinResize = () => this._layoutYtBackground_?.());
+    }
+  };
+
+  init();
+
+  this.__ytWrap = wrap;
+}
+
+_layoutYtBackground_() {
+  // Fit a 16:9 iframe to cover the container (simple, fast)
+  try {
+    if (!this.__ytWrap) return;
+    const r = this.cardContainer.getBoundingClientRect();
+    const cw = r.width, ch = r.height;
+    if (!cw || !ch) return;
+
+    const videoAR = 16/9;
+    const contAR  = cw / ch;
+
+    let w, h, left, top;
+    if (contAR > videoAR) {
+      // container wider than 16:9 -> match width, expand height
+      w = cw; h = cw / videoAR;
+      left = 0; top = (ch - h)/2;
+    } else {
+      // container taller -> match height, expand width
+      h = ch; w = ch * videoAR;
+      top = 0; left = (cw - w)/2;
+    }
+
+    this.__ytWrap.style.overflow = 'hidden';
+    const el = this.__ytWrap.querySelector('iframe') || this.__ytWrap;
+    el.style.width  = `${w}px`;
+    el.style.height = `${h}px`;
+    el.style.left   = `${left}px`;
+    el.style.top    = `${top}px`;
+  } catch {}
+}
+
+_destroyYouTube_() {
+  try { this.__ytPlayer?.destroy?.(); } catch {}
+  this.__ytPlayer = null;
+
+  if (this.__ytResizeObs) {
+    try { this.__ytResizeObs.disconnect(); } catch {}
+    this.__ytResizeObs = null;
+  }
+  if (this.__ytOnWinResize) {
+    window.removeEventListener('resize', this.__ytOnWinResize);
+    this.__ytOnWinResize = null;
+  }
+
+  if (this.__ytWrap?.parentNode) this.__ytWrap.parentNode.removeChild(this.__ytWrap);
+  this.__ytWrap = null;
+}
+
+
+
+
 /**
  * Evaluate an array of visibility conditions against the current hass state.
  * Returns true if the card should be shown. Conditions follow the same
@@ -2450,6 +2913,27 @@ _applyGridVars() {
         filter: var(--ddc-bg-filter, none);
       }
 
+      /* Dynamic background host (particles.js / YouTube) */
+      .card-container .ddc-bg-host{
+        position: absolute;
+        inset: 0;
+        z-index: 0;               /* under grid (::before, z=1) and cards (z=2) */
+        overflow: hidden;
+        pointer-events: none;     /* don’t block card drag/drop */
+        opacity: var(--ddc-bg-opacity, 1);
+      }
+
+      .card-container .ddc-bg-host > *{
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      /* When an image background is active, we don’t need the dynamic host */
+      .card-container.has-bg-image .ddc-bg-host{ display: none; }
+
       .card-wrapper{
         position:absolute;
         left: 0; top: 0;
@@ -3148,6 +3632,7 @@ _applyGridVars() {
       </button>
     </div>
   </section>
+  
 
   <!-- Utilities -->
   <section class="ddc-sec sec-utils" aria-label="Utilities">
@@ -3188,13 +3673,16 @@ _applyGridVars() {
 
           <!-- Tabs & card container -->
           <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
-          <div class="card-container" id="cardContainer"></div>
-        </div>
+          <div class="card-container" id="cardContainer">
+            <!-- host for particles.js / YouTube backgrounds -->
+            <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
+          </div>
+
 
 
       `;
       this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
-      try { this._applyBackgroundImageFromConfig?.(); } catch {}
+      try { this._applyBackgroundFromConfig?.(); } catch {}
       this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
       this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
       this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
@@ -3347,6 +3835,8 @@ window.addEventListener('resize', this.__ddcOnWinResize);
     try { this._applyHaChromeVisibility_?.(); } catch {}
     if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
     if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
+    try { this._destroyParticles_?.(); } catch {}
+    try { this._destroyYouTube_?.(); } catch {}
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
@@ -3586,6 +4076,10 @@ if (this.__ddcOnWinResize) {
       // Reevaluate visibility after the layout has been built. Cards with
       // visibility conditions will hide themselves when not in edit mode.
       try { this._applyVisibility_(); } catch {}
+      try {
+        const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+        if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+      } catch {}
     }
   }
 
@@ -3623,6 +4117,10 @@ if (this.__ddcOnWinResize) {
           // evaluated after switching tabs so cards with conditions are
           // properly hidden when the tab becomes active.
           try { this._applyVisibility_(); } catch {}
+      try {
+        const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+        if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+      } catch {}
         }
       });
       bar.appendChild(btn);
@@ -3802,6 +4300,10 @@ _animateCards() {
       this._applyActiveTab();
       // Reapply visibility so conditions evaluate in the new tab context.
       try { this._applyVisibility_(); } catch {}
+      try {
+        const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+        if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+      } catch {}
       try { this._queueSave('tab-change'); } catch {}
     };
   }
@@ -8855,8 +9357,27 @@ modal.innerHTML = `
 
         <div class="divider"></div>
 
-      <!-- BACKGROUND IMAGE -->
+        <!-- BACKGROUND MODE -->
       <div class="setting">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:layers-triple"></ha-icon>
+            <label for="ddc-bg-mode">Background type</label>
+          </div>
+          <div class="control">
+            <select id="ddc-bg-mode">
+              <option value="none">None</option>
+              <option value="image">Image</option>
+              <option value="particles">Animated (particles.js)</option>
+              <option value="youtube">YouTube video</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Choose what renders behind your cards.</div>
+      </div>
+
+      <!-- BACKGROUND IMAGE -->
+      <div class="setting" data-bg-section="image">
         <div class="row">
           <div class="title">
             <ha-icon icon="mdi:image-outline"></ha-icon>
@@ -8922,6 +9443,65 @@ modal.innerHTML = `
         </div>
         <div class="hint">Uploads are saved inline as data-URLs. For large files, host under <code>/local/</code> and paste the URL.</div>
       </div>
+
+      <!-- BACKGROUND: PARTICLES -->
+      <div class="setting" data-bg-section="particles" style="display:none">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:blur"></ha-icon>
+            <label>Particles.js</label>
+          </div>
+          <div class="control" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <label for="ddc-particles-url">Config JSON URL (optional)</label>
+            <input type="text" id="ddc-particles-url" placeholder="/local/particles.json or https://…">
+            <div class="hint">If empty, a sensible default is used. For HACS, prefer hosting the library + JSON under <code>/config/www</code> (served as <code>/local/…</code>).</div>
+
+            <label style="display:flex;align-items:center;gap:8px;">
+              <ha-switch id="ddc-particles-pointer"></ha-switch>
+              Enable pointer interactivity (hover/click)
+            </label>
+            <div class="hint">Leave off if you want guaranteed unobstructed dragging.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BACKGROUND: YOUTUBE -->
+      <div class="setting" data-bg-section="youtube" style="display:none">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:youtube"></ha-icon>
+            <label>YouTube background</label>
+          </div>
+          <div class="control" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <label for="ddc-youtube-url">YouTube URL or video ID</label>
+            <input type="text" id="ddc-youtube-url" placeholder="https://youtu.be/… or dQw4w9WgXcQ">
+
+            <div style="display:flex; gap:12px; width:100%; max-width:420px;">
+              <label style="flex:1;">
+                <span>Start (s)</span>
+                <input type="number" id="ddc-youtube-start" min="0" step="1" style="width:100%">
+              </label>
+              <label style="flex:1;">
+                <span>End (s)</span>
+                <input type="number" id="ddc-youtube-end" min="1" step="1" style="width:100%">
+              </label>
+            </div>
+
+            <div style="display:flex; gap:18px; align-items:center;">
+              <label style="display:flex;align-items:center;gap:8px;">
+                <ha-switch id="ddc-youtube-mute" checked></ha-switch> Mute
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;">
+                <ha-switch id="ddc-youtube-loop" checked></ha-switch> Loop
+              </label>
+            </div>
+
+            <div class="hint">Video plays muted, fills the canvas (“cover”), sits under the grid and cards, and ignores pointer events so dragging remains smooth.</div>
+          </div>
+        </div>
+      </div>
+
+
       </section>
 
       <!-- Behaviour -->
@@ -9071,9 +9651,47 @@ modal.innerHTML = `
     const rngBgOpacity    = modal.querySelector('#ddc-bg-opacity');
     const outBgOpacity    = modal.querySelector('#ddc-bg-opacity-out');
     const chkDebug   = modal.querySelector('#ddc-setting-debug');
+
+    const selBgMode           = modal.querySelector('#ddc-bg-mode');
+    const secImg              = modal.querySelector('[data-bg-section="image"]');
+    const secParticles        = modal.querySelector('[data-bg-section="particles"]');
+    const secYoutube          = modal.querySelector('[data-bg-section="youtube"]');
+    const inpParticlesUrl     = modal.querySelector('#ddc-particles-url');
+    const chkParticlesPointer = modal.querySelector('#ddc-particles-pointer');
+    const inpYtUrl            = modal.querySelector('#ddc-youtube-url');
+    const inpYtStart          = modal.querySelector('#ddc-youtube-start');
+    const inpYtEnd            = modal.querySelector('#ddc-youtube-end');
+    const chkYtMute           = modal.querySelector('#ddc-youtube-mute');
+    const chkYtLoop           = modal.querySelector('#ddc-youtube-loop');
     // hero image and tabs position are intentionally omitted from the settings UI
 
     const bgCfg = (this._config?.background_image) || {};
+
+    const bgMode = (this._config?.background_mode)
+      || (this._config?.background_image?.src ? 'image' : 'none');
+    if (selBgMode) selBgMode.value = String(bgMode);
+
+    const pCfg = this._config?.background_particles || {};
+    if (inpParticlesUrl)     inpParticlesUrl.value = pCfg.config_url || '';
+    if (chkParticlesPointer) chkParticlesPointer.checked = !!pCfg.pointer_events;
+
+    const yCfg = this._config?.background_youtube || {};
+    const ytStr = yCfg.url || yCfg.video_id || '';
+    if (inpYtUrl)   inpYtUrl.value = ytStr;
+    if (inpYtStart) inpYtStart.value = (yCfg.start ?? '');
+    if (inpYtEnd)   inpYtEnd.value   = (yCfg.end   ?? '');
+    if (chkYtMute)  chkYtMute.checked = (yCfg.mute !== false);
+    if (chkYtLoop)  chkYtLoop.checked = (yCfg.loop !== false);
+
+    // show/hide sections based on mode
+    const showBgSections = () => {
+      const m = selBgMode?.value || 'none';
+      if (secImg)       secImg.style.display       = (m === 'image')     ? '' : 'none';
+      if (secParticles) secParticles.style.display = (m === 'particles') ? '' : 'none';
+      if (secYoutube)   secYoutube.style.display   = (m === 'youtube')   ? '' : 'none';
+    };
+    selBgMode?.addEventListener('change', showBgSections);
+    showBgSections();
 
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
@@ -9108,6 +9726,8 @@ modal.innerHTML = `
         this.style.setProperty('--ddc-bg-opacity', String(v/100));
       });
     }
+
+
     // ===== UI polish hooks =====
   
     // Prepopulate Edit PIN — UI value always wins over YAML
@@ -9251,7 +9871,7 @@ modal.innerHTML = `
       const { background_image, ...rest } = this._config || {};
       this._config = rest;
       this.style.setProperty('--ddc-bg-image', 'none');
-      this._applyBackgroundImageFromConfig_?.();
+      this._applyBackgroundFromConfig?.();
       this._persistThisCardConfigToStorage_?.();
     });
 
@@ -9617,6 +10237,14 @@ modal.innerHTML = `
       const newBgImg     = (inpBgImg?.value || '').trim();
       const newDebug     = !!chkDebug?.checked;
       const newEditPin  = (inpEditPin?.value || '').trim();
+      const newBgMode = selBgMode?.value || 'none';
+      const newParticlesUrl = (inpParticlesUrl?.value || '').trim();
+      const newParticlesPtr = !!chkParticlesPointer?.checked;
+      const newYtUrl   = (inpYtUrl?.value || '').trim();
+      const newYtStart = parseInt(inpYtStart?.value || '', 10);
+      const newYtEnd   = parseInt(inpYtEnd?.value   || '', 10);
+      const newYtMute  = !!chkYtMute?.checked;
+      const newYtLoop  = !!chkYtLoop?.checked;
       // hero and tabs position not exposed to user
       try {
         // Auto resize cards
@@ -9709,6 +10337,42 @@ modal.innerHTML = `
         const att    = selBgAttachment?.value || 'scroll';
         const op     = rngBgOpacity ? Math.max(0, Math.min(100, parseInt(rngBgOpacity.value || '100', 10))) / 100 : 1;
 
+        // ---- Background mode + dynamic configs ----
+        this._config = this._config || {};
+        this._config.background_mode = newBgMode;
+
+        // keep image settings only if mode is 'image' or you’ve set a src
+        if (newBgMode !== 'image' && !newBgImg) {
+          const { background_image, ...rest } = this._config || {};
+          this._config = rest;
+        }
+
+        // particles
+        if (newBgMode === 'particles') {
+          this._config.background_particles = {
+            config_url: newParticlesUrl || undefined,
+            pointer_events: newParticlesPtr || undefined,
+          };
+        } else {
+          const { background_particles, ...rest } = this._config || {};
+          this._config = rest;
+        }
+
+        // youtube
+        if (newBgMode === 'youtube') {
+          this._config.background_youtube = {
+            url: newYtUrl || undefined,
+            start: Number.isFinite(newYtStart) ? newYtStart : undefined,
+            end:   Number.isFinite(newYtEnd)   ? newYtEnd   : undefined,
+            mute:  newYtMute !== true ? newYtMute : undefined,  // defaults true
+            loop:  newYtLoop !== true ? newYtLoop : undefined   // defaults true
+          };
+        } else {
+          const { background_youtube, ...rest } = this._config || {};
+          this._config = rest;
+        }
+
+
         if (newBgImg) {
           this._config = {
             ...this._config,
@@ -9725,7 +10389,7 @@ modal.innerHTML = `
         }
 
         // Apply immediately (preview)
-        this._applyBackgroundImageFromConfig_?.();
+        this._applyBackgroundFromConfig?.();
 
         // Update underlying config so changes persist in YAML/storage
         try {
