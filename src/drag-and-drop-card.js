@@ -729,6 +729,15 @@ _applyHaChromeVisibility_() {
 
 
 _applyBackgroundImageFromConfig() {
+// iOS safety: skip applying huge data URLs that can crash WKWebView
+try {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+  if (isIOS && bg && typeof bg.src === 'string' && bg.src.startsWith('data:') && bg.src.length > 300000) {
+    console.warn('[drag-and-drop-card] Skipping large inline background on iOS for stability.');
+    return;
+  }
+} catch (_) {}
   const cfg = this._config || {};
   const bg = cfg.background_image || cfg.bg_image || null;
   const cont = this.cardContainer;
@@ -1079,6 +1088,20 @@ _attachYouTubeIframeDirect_(wrap, videoId, { start, end, mute = true, loop = tru
 }
 
 _attachYouTubeBackground_(cfg = {}) {
+  this.__ytSize = (cfg.size || 'cover');
+  this.__ytPosition = (cfg.position || 'center');
+  this.__ytOpacity = (cfg.opacity != null ? Math.max(0, Math.min(1, Number(cfg.opacity))) : 1);
+  this.__ytAttachment = (cfg.attachment || 'scroll');
+  // map position keywords to anchors
+  const posStr = String(this.__ytPosition).toLowerCase();
+  let ax = 0.5, ay = 0.5;
+  if (posStr.includes('left')) ax = 0.0;
+  else if (posStr.includes('right')) ax = 1.0;
+  if (posStr.includes('top')) ay = 0.0;
+  else if (posStr.includes('bottom')) ay = 1.0;
+  if (posStr === 'center' || posStr === 'centre' || posStr === 'middle') { ax = 0.5; ay = 0.5; }
+  this.__ytAx = ax; this.__ytAy = ay;
+
   const host = this._ensureBgHost_();
   if (!host) return;
 
@@ -1088,8 +1111,23 @@ _attachYouTubeBackground_(cfg = {}) {
   // wrapper we can size/center for “cover”
   const wrap = document.createElement('div');
   wrap.className = 'yt-bg';
-  wrap.style.position = 'absolute';
-  wrap.style.inset = '0';
+  // Honour the attachment setting: when "fixed" the video should stay put
+  // relative to the viewport rather than scrolling with the card.  For
+  // other values we fall back to absolute positioning within the card
+  // container.  Positioning and sizing of the actual iframe will still
+  // be handled in _layoutYtBackground_.
+  if (this.__ytAttachment === 'fixed') {
+    wrap.style.position = 'fixed';
+    wrap.style.left = '0';
+    wrap.style.top = '0';
+    wrap.style.width = '100%';
+    wrap.style.height = '100%';
+  } else {
+    wrap.style.position = 'absolute';
+    wrap.style.inset = '0';
+  }
+  wrap.style.opacity = String(this.__ytOpacity);
+  wrap.style.filter = 'none';
   wrap.style.pointerEvents = 'none';  // don’t swallow drags
   host.appendChild(wrap);
 
@@ -1175,36 +1213,55 @@ _attachYouTubeBackground_(cfg = {}) {
   this.__ytWrap = wrap;
 }
 
-_layoutYtBackground_() {
-  // Fit a 16:9 iframe to cover the container (simple, fast)
+_layoutYtBackground_() {  // Fit a 16:9 iframe according to selected size
   try {
     if (!this.__ytWrap) return;
     const r = this.cardContainer.getBoundingClientRect();
     const cw = r.width, ch = r.height;
+    const fixedAttach = (this.__ytAttachment === 'fixed');
+    const vw = fixedAttach ? (window.innerWidth  || cw) : cw;
+    const vh = fixedAttach ? (window.innerHeight || ch) : ch;
+
     if (!cw || !ch) return;
 
+    const size = this.__ytSize || 'cover';
     const videoAR = 16/9;
-    const contAR  = cw / ch;
+    const contAR  = (fixedAttach ? (vw / vh) : (cw / ch));
 
-    let w, h, left, top;
-    if (contAR > videoAR) {
-      // container wider than 16:9 -> match width, expand height
-      w = cw; h = cw / videoAR;
-      left = 0; top = (ch - h)/2;
-    } else {
-      // container taller -> match height, expand width
-      h = ch; w = ch * videoAR;
-      top = 0; left = (cw - w)/2;
+    let w, h, left = 0, top = 0;
+
+    if (size === '100% 100%' || size === 'fill' || size === 'stretch'){
+      w = (fixedAttach ? vw : cw); h = (fixedAttach ? vh : ch); left = 0; top = 0;
+    } else if (size === 'contain'){
+      if (contAR > videoAR){
+        h = (fixedAttach ? vh : ch); w = (fixedAttach ? vh : ch) * videoAR;
+        top = 0; left = (cw - w)/2;
+      } else {
+        w = (fixedAttach ? vw : cw); h = (fixedAttach ? vw : cw) / videoAR;
+        left = 0; top = (ch - h)/2;
+      }
+    } else { // default 'cover' or 'auto'
+      if (contAR > videoAR){
+        w = (fixedAttach ? vw : cw); h = (fixedAttach ? vw : cw) / videoAR;
+        left = 0; top = (ch - h)/2;
+      } else {
+        h = (fixedAttach ? vh : ch); w = (fixedAttach ? vh : ch) * videoAR;
+        top = 0; left = (cw - w)/2;
+      }
     }
 
     this.__ytWrap.style.overflow = 'hidden';
+    const ax = (this.__ytAx != null) ? this.__ytAx : 0.5;
+    const ay = (this.__ytAy != null) ? this.__ytAy : 0.5;
+    left = ((fixedAttach ? vw : cw) - w) * ax;
+    top  = ((fixedAttach ? vh : ch) - h) * ay;
     const el = this.__ytWrap.querySelector('iframe') || this.__ytWrap;
     el.style.width  = `${w}px`;
     el.style.height = `${h}px`;
     el.style.left   = `${left}px`;
     el.style.top    = `${top}px`;
   } catch {}
-}
+    }
 
 _destroyYouTube_() {
   try { this.__ytPlayer?.destroy?.(); } catch {}
@@ -1499,6 +1556,13 @@ _applyVisibility_() {
 
   _syncTabsWidth_() {
     try {
+      // In auto size mode the tabs bar spans the viewport width and
+      // should not be recalculated based on the card canvas.  Exit early
+      // so we don't inadvertently clamp or expand the bar on tab changes.
+      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (mode === 'auto') {
+        return;
+      }
       const bar = this.tabsBar;
       if (!bar) return;
       // For left-side tabs the width should not be clamped; reset and bail.
@@ -1554,7 +1618,7 @@ _applyVisibility_() {
           this._resizeContainer?.(); // recompute content extents so d.h grows live
         }
       } catch {}
-      try { this._applyAutoScale?.(); } catch {}
+      try { const __m = String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase(); (__m==='auto'?this._applyAutoFillNoScale?.():this._applyAutoScale?.()); } catch {}
     });
   }
 
@@ -1592,7 +1656,7 @@ _applyVisibility_() {
         this.__ddcDragging = false;
         if (this.__scaleOuter) this.__scaleOuter.style.overflow = this.__prevOverflow || '';
         // Final settle
-        try { this._applyAutoScale?.(); } catch {}
+        try { const __m = String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase(); (__m==='auto'?this._applyAutoFillNoScale?.():this._applyAutoScale?.()); } catch {}
       } catch {}
     };
     // Attach listeners
@@ -2044,7 +2108,7 @@ static getConfigElement() {
   };
 
   const toggleSizeControls = () => {
-    const mode = el.querySelector('#sizeMode').value;
+    const mode = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode').value;
     el.querySelector('#sizeCustom').style.display = mode === 'fixed_custom' ? 'inline-flex' : 'none';
     el.querySelector('#sizePresetWrap').style.display = mode === 'preset' ? 'inline-flex' : 'none';
   };
@@ -2089,7 +2153,8 @@ static getConfigElement() {
     el.querySelector('#animateCards').checked = !!el._config.animate_cards;
 
 
-    el.querySelector('#sizeMode').value = el._config.container_size_mode || 'dynamic';
+    const sizeModeEl = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode');
+    if (sizeModeEl) sizeModeEl.value = el._config.container_size_mode || 'dynamic';
     el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
     el.querySelector('#sizeH').value = el._config.container_fixed_height ?? '';
     el.querySelector('#sizeOrientation').value = el._config.container_preset_orientation || 'auto';
@@ -2152,7 +2217,7 @@ static getConfigElement() {
     base.animate_cards = !!el.querySelector('#animateCards').checked;
 
 
-    base.container_size_mode = el.querySelector('#sizeMode').value;
+    base.container_size_mode = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode').value;
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
     base.container_fixed_height = Number(el.querySelector('#sizeH').value || 0) || undefined;
     base.container_preset = el.querySelector('#sizePreset').value || undefined;
@@ -2182,7 +2247,7 @@ static getConfigElement() {
   on('#debug', 'change'); on('#noOverlap', 'change');
   on('#autoResize', 'change');
   on('#animateCards', 'change');
-  on('#sizeMode', 'change'); on('#sizeW'); on('#sizeH');
+  on('#sizeMode', 'change'); on('#ddc-setting-sizeMode', 'change'); on('#sizeW'); on('#sizeH');
   on('#sizePreset', 'selected'); on('#sizeOrientation', 'selected');
 
   applyBtn?.addEventListener('click', () => {
@@ -2224,7 +2289,7 @@ static _sizePresets() {
   ];
 }
 
-_isContainerFixed() { return this.containerSizeMode !== 'dynamic'; }
+_isContainerFixed() { return (this.containerSizeMode === 'fixed_custom' || this.containerSizeMode === 'preset' || this.containerSizeMode === 'fixed'); }
 
 _resolveFixedSize() {
   if (this.containerSizeMode === 'fixed_custom') {
@@ -2379,7 +2444,13 @@ _applyGridVars() {
     // animate into view the moment a tab becomes active or on initial load.
     this.animateCards             = !!config.animate_cards;
 
-    if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+    // Screen saver options
+    this.screenSaverEnabled = !!(config.screen_saver_enabled ?? false);
+    // Delay stored in ms; default to 5 minutes if not provided
+    const ssDelay = Number(config.screen_saver_delay);
+    this.screenSaverDelay = Number.isFinite(ssDelay) && ssDelay > 0 ? ssDelay : (5 * 60000);
+
+    if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
     this._applyAutoScale?.();
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
@@ -2415,6 +2486,11 @@ _applyGridVars() {
     try { this._applyHaChromeVisibility_?.(); } catch {}
 // Overlay fix for UI based cards
     this._ensureOverlayZFix();
+
+    // Apply screensaver settings after config assignment
+    try {
+      this._updateScreensaverSettings?.();
+    } catch {}
 
     // selection state
     this._selection = new Set();
@@ -3317,6 +3393,16 @@ _applyGridVars() {
    CHROME-LIKE TABS • spaced + concave bottoms (sticky, CSS-only)
    ==================================================================== */
 
+/*
+ * Tabs bar: stick below the toolbar when edit mode is active.
+ * The top offset uses a CSS custom property --ddc-toolbar-height set via
+ * JavaScript when toggling edit mode.  This ensures that in both
+ * dynamic and auto modes the tabs bar always sits directly beneath
+ * the toolbar whenever it is visible.  When the toolbar is hidden,
+ * --ddc-toolbar-height defaults to 0 so the tabs bar sticks to the
+ * very top of the viewport.  We also include env(safe-area-inset-top)
+ * to respect devices with notches/safe areas.
+ */
 .ddc-tabs {
   --bg: var(--card-background-color, #16181c);
   --fg: var(--primary-text-color, #e6e8ea);
@@ -3329,7 +3415,7 @@ _applyGridVars() {
   --padX: 18px;
 
   position: sticky;
-  top: max(env(safe-area-inset-top, 0px), 0px);
+  top: calc(max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
   z-index: 100;
 
   display: flex;
@@ -3400,7 +3486,7 @@ _applyGridVars() {
   --padX: 18px;    /* horizontal padding */
 
   position: sticky;
-  top: max(env(safe-area-inset-top,0px), 0px);
+  top: calc(max(env(safe-area-inset-top,0px), 0px) + var(--ddc-toolbar-height, 0px));
   z-index: 100;
 
   display: flex;
@@ -3683,6 +3769,10 @@ _applyGridVars() {
       `;
       this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
       try { this._applyBackgroundFromConfig?.(); } catch {}
+
+      // Reapply screensaver settings now that the card container exists. This ensures
+      // the idle timer starts immediately and the overlay is appended correctly.
+      try { this._updateScreensaverSettings?.(); } catch {}
       this.addButton     = this.shadowRoot.querySelector('#addCardBtn');
       this.reloadBtn     = this.shadowRoot.querySelector('#reloadBtn');
       this.diagBtn       = this.shadowRoot.querySelector('#diagBtn');
@@ -3796,16 +3886,85 @@ _applyGridVars() {
     }
   }
 
-  connectedCallback() {
-    try { this._applyHaChromeVisibility_?.(); } catch {}
-    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
+  
+// === Initial autosize kick (view-mode safe) ===
+_startInitialAutosize() {
+  try {
+    if (this.__autoInitStarted) return;
+    this.__autoInitStarted = true;
+    const apply = () => { try { this._applyAutoScale?.(); } catch {} };
+    // Run on next frames to ensure layout is ready
+    requestAnimationFrame(() => {
+      apply();
+      requestAnimationFrame(apply);
+    });
+    // Also after microtasks and when fonts are ready
+    setTimeout(apply, 0);
+    try { document.fonts && document.fonts.ready && document.fonts.ready.then(apply); } catch {}
+    // Observe early DOM churn (e.g., cards mounting) for a brief window
+    try {
+      const inner = this.cardContainer || this.querySelector('#cardContainer');
+      if (inner) {
+        const mo = new MutationObserver(() => apply());
+        mo.observe(inner, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
+        this.__autoInitMO = mo;
+        setTimeout(() => { try { mo.disconnect(); } catch {}; this.__autoInitMO = null; }, 2000);
+      }
+    } catch {}
+  } catch {}
+}
+
+connectedCallback() {
+    this._startInitialAutosize?.();
+    try { this._applyHaChromeVisibility_?.(); 
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+    // Setup screen saver styles and timers
+    try {
+      this._ensureScreenSaverStyles?.();
+      this._updateScreensaverSettings?.();
+    } catch {}
+} catch {
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+}
+    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; 
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+}
     if (!this.__boundExitEdit) {
       this.__boundExitEdit = () => this._toggleEditMode(false);
-    }
+    
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+}
     window.addEventListener('pagehide', this.__boundExitEdit);
     window.addEventListener('beforeunload', this.__boundExitEdit);
   
-    this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); };
+    this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); 
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+};
     document.addEventListener('visibilitychange', this.__onVis);
   
     // NEW: ensure we never boot in edit mode
@@ -3816,18 +3975,48 @@ _applyGridVars() {
 if (!this.__visObs) {
   const io = new IntersectionObserver((entries) => {
     if (entries.some(e => e.isIntersecting)) {
-      requestAnimationFrame(() => this._applyAutoScale && this._applyAutoScale());
+      requestAnimationFrame(() => this._applyAutoScale && this._applyAutoScale()); 
+
+
+      io.observe(this);
+      this.__visObs = io;
     }
-  }, { root: null, threshold: 0 });
-  io.observe(this);
-  this.__visObs = io;
+    });
+
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
 }
 
 // Also respond to window resizes
 this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
 window.addEventListener('resize', this.__ddcOnWinResize);
 
-    try { this.__ddcBindPointerListeners?.(); } catch {}
+    try { this.__ddcBindPointerListeners?.(); 
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+} catch {
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
+}
+
+// After any card drop, re-apply auto fill (no-scale) when in Auto mode
+this.addEventListener('ddc:dragend', () => {
+  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+});
+
 }
   
   disconnectedCallback() {
@@ -3840,6 +4029,22 @@ window.addEventListener('resize', this.__ddcOnWinResize);
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
+
+    // Clean up screensaver timers and listeners
+    try {
+      if (this._screensaverTimer) { clearTimeout(this._screensaverTimer); this._screensaverTimer = null; }
+      if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+      if (this._screensaverActivityHandler) {
+        const _evs = this._screensaverEvents || [];
+        _evs.forEach(ev => {
+          document.removeEventListener(ev, this._screensaverActivityHandler, true);
+        });
+      }
+      // Remove overlay element if present
+      if (this.screenSaverOverlay && this.screenSaverOverlay.parentNode) {
+        this.screenSaverOverlay.parentNode.removeChild(this.screenSaverOverlay);
+      }
+    } catch {}
 
     // cleanup observers
     try { this.__ddcResizeObs?.disconnect(); } catch {}
@@ -4101,6 +4306,21 @@ if (this.__ddcOnWinResize) {
     bar.style.display = '';
     bar.className = 'ddc-tabs ' + (this.tabsPosition === 'left' ? 'ddc-tabs-left' : '');
     bar.innerHTML = '';
+
+    // In auto size mode the tabs bar should always span the viewport width.
+    // Reset any previously calculated width/maxWidth values (from dynamic mode
+    // or earlier interactions) back to 100% so that when switching between
+    // tabs with different card widths, the bar is guaranteed to stretch
+    // across the entire viewport and allow full horizontal scrolling.  Without
+    // this reset the bar may retain the width from the prior tab and clip
+    // the newly selected tab’s content until the page is refreshed.
+    try {
+      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (mode === 'auto') {
+        bar.style.width = '100%';
+        bar.style.maxWidth = '100%';
+      }
+    } catch {}
     for (const t of tabs) {
       const btn = document.createElement('button');
       btn.className = 'ddc-tab' + (t.id === this.activeTab ? ' active' : '');
@@ -4134,6 +4354,21 @@ if (this.__ddcOnWinResize) {
     // the tabs could stretch to the full page width instead of aligning
     // with the drag-and-drop container.
     try { this._syncTabsWidth_?.(); } catch {}
+
+    // On narrow viewports the tabs bar becomes horizontally scrollable.  When
+    // switching to a tab that lies outside the current viewport, the scroll
+    // position should update so that the newly active tab is brought into
+    // view.  Without this the bar may snap back to an arbitrary midpoint,
+    // particularly on mobile devices.  We only scroll when the content
+    // actually overflows to avoid unnecessary jitter on wide screens.
+    try {
+      const activeBtn = bar.querySelector?.('.ddc-tab.active');
+      if (activeBtn && bar.scrollWidth > bar.clientWidth) {
+        // Use nearest scrolling so the element becomes visible but does not
+        // forcibly center itself if there’s already sufficient whitespace.
+        activeBtn.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+      }
+    } catch {}
   }
   _applyActiveTab() {
     const current = this._normalizeTabId(this.activeTab);
@@ -4155,11 +4390,19 @@ if (this.__ddcOnWinResize) {
         w.inert = true;
         w.classList.add('ddc-hidden');
         w.classList.remove('ddc-selected');
-      
-    // apply or clear scaling per mode
-    this._applyAutoScale?.();
-  }
+      }
     });
+
+    // After switching tabs, reapply sizing based on the current container mode.
+    try {
+      const __m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (__m === 'auto') {
+        this._applyAutoFillNoScale?.();
+      } else {
+        this._applyAutoScale?.();
+      }
+    } catch {}
+
     try { this._clearSelection(); } catch {}
     // When card animations are enabled, animate visible cards after switching tabs
     try {
@@ -4442,6 +4685,24 @@ _toggleEditMode(force = null) {
   }
 
   try { this._applyHaChromeVisibility_?.(); } catch {}
+
+  // === Update CSS variable for toolbar height on the root so the tabs bar
+  // can offset itself when the toolbar is visible.  When entering edit
+  // mode, measure the toolbar height and assign it to --ddc-toolbar-height
+  // on the root element.  When leaving edit mode, reset the value to 0.
+  try {
+    const root = this.shadowRoot?.querySelector?.('.ddc-root') || this.renderRoot?.querySelector?.('.ddc-root') || null;
+    if (root) {
+      let h = 0;
+      // If we are entering edit mode and have a toolbar element, read its
+      // scrollHeight to include all buttons and margins.  If leaving edit
+      // mode, h remains 0.
+      if (entering && toolbar) {
+        try { h = toolbar.scrollHeight || toolbar.offsetHeight || 0; } catch {}
+      }
+      root.style.setProperty('--ddc-toolbar-height', h + 'px');
+    }
+  } catch {}
 }
 
   _isInHaEditorPreview() {
@@ -5309,7 +5570,7 @@ _syncEmptyStateUI() {
       const w = Math.max(1, rect.width || 0);
       if (w !== this.__lastScaleW) {
         this.__lastScaleW = w;
-        this._applyAutoScale?.();
+        const __m = String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase(); (__m==='auto'?this._applyAutoFillNoScale?.():this._applyAutoScale?.());
       }
       this.__scaleRAF = requestAnimationFrame(tick);
     };
@@ -5323,6 +5584,19 @@ _syncEmptyStateUI() {
     }
   }
 _applyAutoScale() {
+  // When the containerSizeMode is set to "auto" we do not perform a
+  // proportional scaling of the drag‑and‑drop canvas.  Instead, we
+  // delegate to the strict fill logic (_applyAutoFillNoScale) and bail
+  // early.  This ensures the canvas fills the available space
+  // immediately on load without requiring a resize or edit toggle.
+  try {
+    const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+    if (mode === 'auto') {
+      this._applyAutoFillNoScale?.();
+      return;
+    }
+  } catch {}
+
   const c = this.cardContainer; if (!c) return;
 
   // Keep the wrapper in place
@@ -5385,6 +5659,126 @@ _applyAutoScale() {
   // After scaling, synchronise the tabs width with the new visual size.
   try { this._syncTabsWidth_?.(); } catch {}
 }
+
+// AUTO (strict): behave like dynamic, but only "fill" when viewport > natural content; never scale.
+_applyAutoFillNoScale() {
+  if (this.__applyingAutoFill) return;
+  this.__applyingAutoFill = true;
+  try {
+    // Ensure the card container is wrapped in a scale wrapper so that
+    // horizontal scrolling is isolated to the wrapper. In dynamic mode
+    // this wrapper is created by _ensureScaleWrapper(); replicate that
+    // behavior here so toolbar and tabs remain outside of the scrolling
+    // region but can still track horizontal movement.  If the wrapper
+    // already exists, this call is a no-op.
+    try { this._ensureScaleWrapper?.(); } catch {}
+    const outer = this.__scaleOuter || this.shadowRoot?.querySelector?.('.ddc-scale-outer') || this;
+    const inner = this.cardContainer || this.shadowRoot?.querySelector?.('#cardContainer');
+    if (!outer || !inner) return;
+
+    // Enable scrolling within the scale wrapper when the card
+    // content exceeds the viewport.  We set overflow to "auto" to
+    // produce a single scrollbar for both axes; however, we compute
+    // the wrapper’s height such that vertical scrolling happens within
+    // the wrapper rather than the page.  This ensures the toolbar and
+    // tabs remain fixed while the user scrolls the canvas.
+    // In auto mode we want horizontal scrolling within the outer wrapper
+    // but vertical scrolling should happen at the page level (not within
+    // the wrapper).  Mimic dynamic mode by hiding vertical overflow and
+    // enabling horizontal overflow.  Setting overflow to hidden first
+    // establishes the default, then overflowX is overridden below.
+    outer.style.overflow = 'hidden';
+    outer.style.overflowX = 'auto';
+    outer.style.overflowY = 'hidden';
+    outer.style.width = '100%';
+
+    // If HA gives us a tiny height, expand to remaining viewport height (not to trigger loops).
+    let vb = outer.getBoundingClientRect();
+    let availW = Math.max(1, Math.round(vb.width  || 0));
+    let availH = Math.max(1, Math.round(vb.height || 0));
+    if (availH < 150) {
+      const top = Math.max(0, Math.round(vb.top || 0));
+      const viewportH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 0);
+      const remaining = Math.max(1, viewportH - top - 8);
+      if (Math.abs(remaining - availH) > 4) {
+        outer.style.height = remaining + 'px';
+        // re-measure
+        vb = outer.getBoundingClientRect();
+        availW = Math.max(1, Math.round(vb.width  || 0));
+        availH = Math.max(1, Math.round(vb.height || 0));
+      }
+    }
+
+    // Compute natural content extents just like dynamic
+    let maxX = 0, maxY = 0;
+    const cards = Array.from(inner.querySelectorAll('.card-wrapper'));
+    if (cards.length) {
+      const cr = inner.getBoundingClientRect();
+      for (const w of cards) {
+        const r = w.getBoundingClientRect();
+        const right  = r.left - cr.left + r.width;
+        const bottom = r.top  - cr.top  + r.height;
+        if (right  > maxX) maxX = right;
+        if (bottom > maxY) maxY = bottom;
+      }
+    } else {
+      maxX = inner.scrollWidth  || inner.offsetWidth  || availW;
+      maxY = inner.scrollHeight || inner.offsetHeight || availH;
+    }
+
+    const gs = Number(this.gridSize || 1) || 1;
+    const natW = Math.max(1, Math.round(Math.ceil(maxX/gs) * gs));
+    const natH = Math.max(1, Math.round(Math.ceil(maxY/gs) * gs));
+
+    // Strict rule:
+    // - If viewport > natural size, expand inner to viewport (fills space).
+    // - Else, inner stays at natural size (so user can scroll to reach overflow).
+    const targetW = (availW > natW) ? availW : natW;
+    const targetH = (availH > natH) ? availH : natH;
+
+    // Apply: NO SCALE. Keep 1:1 pixels so positions are exact.
+    inner.style.transform = 'none';
+    inner.style.transformOrigin = 'left top';
+    inner.style.width  = `${targetW}px`;
+    inner.style.height = `${targetH}px`;
+    // In strict auto mode, update the outer container height so that
+    // vertical scrolling is isolated to the wrapper rather than the page.
+    // We calculate the height available beneath the wrapper's top edge and
+    // clamp the wrapper height to that value.  This prevents the wrapper
+    // from growing taller than the viewport and avoids a secondary page
+    // scrollbar.  When the natural content height exceeds this height,
+    // overflow:auto on the wrapper will provide scrollbars.
+    if (outer) {
+      let topOffset = 0;
+      try {
+        const vb2 = outer.getBoundingClientRect();
+        topOffset = Math.max(0, Math.round(vb2.top || 0));
+      } catch {}
+      const vpH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 0);
+      // Reserve space for the bottom margin and ensure at least 1px height
+      const availViewH = Math.max(1, vpH - topOffset - 8);
+      // Set the wrapper height to the natural target height.  This allows
+      // the page to scroll vertically while the wrapper itself only
+      // scrolls horizontally.  Using the natural content height prevents
+      // clipping of cards and avoids nested vertical scrollbars.
+      outer.style.height = `${targetH}px`;
+    }
+    inner.style.position = inner.style.position || 'absolute';
+    inner.style.top = inner.style.top || '0';
+    inner.style.left = inner.style.left || '0';
+
+    // In auto mode, the tabs bar should span the viewport width (not the full card width).
+    const tb = this.tabsBar;
+    if (tb && this.tabsPosition !== 'left') {
+      tb.style.width = '100%';
+      tb.style.maxWidth = '100%';
+    }
+  } finally {
+    requestAnimationFrame(() => { this.__applyingAutoFill = false; });
+  }
+}
+
+
 
 
 
@@ -8934,7 +9328,7 @@ async _getStubConfigForType(type) {
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
     cont.addEventListener('touchstart', (e)=>{ if (!this.editMode) return; if (e.target.closest('.card-wrapper')) return; down(e); }, {passive:false});
-    window.addEventListener('touchmove', (e)=>{ move(e); }, {passive:false});
+    window.addEventListener('touchmove', (e)=>{ move(e); }, {passive:true});
     window.addEventListener('touchend', up);
     window.addEventListener('touchcancel', up);
   }
@@ -9235,11 +9629,12 @@ modal.innerHTML = `
               <select id="ddc-setting-sizeMode">
                 <option value="dynamic">Dynamic</option>
                 <option value="preset">Preset</option>
+                <option value="auto">Auto</option>
                 <option value="fixed_custom">Fixed (custom)</option>
               </select>
             </div>
           </div>
-          <div class="hint">Dynamic fits the available space. Preset uses common screen sizes. Fixed lets you specify width & height.</div>
+          <div class="hint">Dynamic fits the available space (reflows grid). Auto scales the whole grid to fit, preserving positions. Preset uses common screen sizes. Fixed lets you specify width & height.</div>
         </div>
 
         <!-- SIZE EXTRAS (injected) -->
@@ -9494,7 +9889,43 @@ modal.innerHTML = `
               <label style="display:flex;align-items:center;gap:8px;">
                 <ha-switch id="ddc-youtube-loop" checked></ha-switch> Loop
               </label>
+            
+
+            <label for="ddc-youtube-size"><ha-icon icon="mdi:arrow-expand-all"></ha-icon> Size</label>
+            <select id="ddc-youtube-size">
+              <option value="cover">Cover</option>
+              <option value="contain">Contain</option>
+              <option value="auto">Auto</option>
+              <option value="100% 100%">Fill (stretch)</option>
+            </select>
+            
+            <label for="ddc-youtube-position"><ha-icon icon="mdi:crosshairs-gps"></ha-icon> Position</label>
+            <select id="ddc-youtube-position">
+              <option value="top left">Top left</option>
+              <option value="top">Top</option>
+              <option value="top right">Top right</option>
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+              <option value="bottom left">Bottom left</option>
+              <option value="bottom">Bottom</option>
+              <option value="bottom right">Bottom right</option>
+            </select>
+
+            <label for="ddc-youtube-attachment"><ha-icon icon="mdi:image-lock"></ha-icon> Attachment</label>
+            <select id="ddc-youtube-attachment">
+              <option value="scroll">Scroll</option>
+              <option value="fixed">Fixed</option>
+            </select>
+
+
+            <label for="ddc-youtube-opacity"><ha-icon icon="mdi:opacity"></ha-icon> Opacity</label>
+            <div style="display:flex;align-items:center;gap:8px;width:100%;max-width:420px;">
+              <input type="range" id="ddc-youtube-opacity" min="0" max="100" step="1" value="100" style="flex:1;">
+              <output id="ddc-youtube-opacity-out" style="min-width:48px;text-align:right;">100%</output>
             </div>
+
+</div>
 
             <div class="hint">Video plays muted, fills the canvas (“cover”), sits under the grid and cards, and ignores pointer events so dragging remains smooth.</div>
           </div>
@@ -9571,6 +10002,46 @@ modal.innerHTML = `
         </div>
       </section>
 
+
+      <!-- Screen Saver -->
+      <section class="card">
+        <div class="section-head">
+          <ha-icon icon="mdi:clock-outline"></ha-icon>
+          <h4>Screen saver</h4>
+        </div>
+        <p class="caption">Show a digital clock after inactivity.</p>
+
+        <!-- Enable Screen Saver -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:power"></ha-icon>
+              <label for="ddc-setting-screenSaverEnabled">Enable screen saver</label>
+            </div>
+            <div class="control">
+              <ha-switch id="ddc-setting-screenSaverEnabled"></ha-switch>
+            </div>
+          </div>
+          <div class="hint">Activate a screen saver overlay with time and date.</div>
+        </div>
+
+        <!-- Screen Saver Delay -->
+        <div class="setting">
+          <div class="row">
+            <div class="title">
+              <ha-icon icon="mdi:timer-outline"></ha-icon>
+              <label for="ddc-setting-screenSaverDelay">Activation delay</label>
+            </div>
+            <div class="control">
+              <div class="range-wrap">
+                <input type="range" id="ddc-setting-screenSaverDelay" min="1" max="20" step="1" />
+                <output id="ddc-screenSaverDelayOut">5 min</output>
+              </div>
+            </div>
+          </div>
+          <div class="hint">Delay (in minutes) before the screen saver activates.</div>
+        </div>
+      </section>
 
       <!-- Tabs -->
     <section class="card tabs-card">
@@ -9652,6 +10123,11 @@ modal.innerHTML = `
     const outBgOpacity    = modal.querySelector('#ddc-bg-opacity-out');
     const chkDebug   = modal.querySelector('#ddc-setting-debug');
 
+    // Screen saver controls
+    const chkScreenSaver   = modal.querySelector('#ddc-setting-screenSaverEnabled');
+    const rngScreenDelay   = modal.querySelector('#ddc-setting-screenSaverDelay');
+    const outScreenDelay   = modal.querySelector('#ddc-screenSaverDelayOut');
+
     const selBgMode           = modal.querySelector('#ddc-bg-mode');
     const secImg              = modal.querySelector('[data-bg-section="image"]');
     const secParticles        = modal.querySelector('[data-bg-section="particles"]');
@@ -9663,6 +10139,12 @@ modal.innerHTML = `
     const inpYtEnd            = modal.querySelector('#ddc-youtube-end');
     const chkYtMute           = modal.querySelector('#ddc-youtube-mute');
     const chkYtLoop           = modal.querySelector('#ddc-youtube-loop');
+    const selYtSize           = modal.querySelector('#ddc-youtube-size');
+    const selYtPosition       = modal.querySelector('#ddc-youtube-position');
+    const selYtAttachment     = modal.querySelector('#ddc-youtube-attachment');
+    const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
+    const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
+
     // hero image and tabs position are intentionally omitted from the settings UI
 
     const bgCfg = (this._config?.background_image) || {};
@@ -9682,6 +10164,19 @@ modal.innerHTML = `
     if (inpYtEnd)   inpYtEnd.value   = (yCfg.end   ?? '');
     if (chkYtMute)  chkYtMute.checked = (yCfg.mute !== false);
     if (chkYtLoop)  chkYtLoop.checked = (yCfg.loop !== false);
+    if (selYtSize) selYtSize.value = String(yCfg.size || 'cover');
+    if (selYtPosition) selYtPosition.value = String(yCfg.position || 'center');
+    if (selYtAttachment) selYtAttachment.value = String(yCfg.attachment || 'scroll');
+    if (rngYtOpacity) {
+      const ypct = Math.round((yCfg.opacity != null ? yCfg.opacity : 1) * 100);
+      rngYtOpacity.value = String(ypct);
+      if (outYtOpacity) outYtOpacity.textContent = ypct + '%';
+      rngYtOpacity.addEventListener('input', () => {
+        const v = Math.max(0, Math.min(100, parseInt(rngYtOpacity.value || '100', 10)));
+        if (outYtOpacity) outYtOpacity.textContent = v + '%';
+      });
+    }
+
 
     // show/hide sections based on mode
     const showBgSections = () => {
@@ -9724,6 +10219,32 @@ modal.innerHTML = `
         outBgOpacity.textContent = `${v}%`;
         // Live preview without waiting for Save
         this.style.setProperty('--ddc-bg-opacity', String(v/100));
+      });
+    }
+
+    // ===== Screen saver UI =====
+    // Prepopulate current value and bind live changes
+    if (chkScreenSaver) {
+      chkScreenSaver.checked = !!this.screenSaverEnabled;
+      chkScreenSaver.addEventListener('change', () => {
+        this.screenSaverEnabled = chkScreenSaver.checked;
+        if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
+      });
+    }
+    if (rngScreenDelay) {
+      // determine minutes from current delay (ms)
+      const ms = this.screenSaverDelay != null ? Number(this.screenSaverDelay) : (5 * 60000);
+      let mins = Math.round(ms / 60000);
+      if (!Number.isFinite(mins) || mins < 1) mins = 5;
+      if (mins > 20) mins = 20;
+      rngScreenDelay.value = String(mins);
+      if (outScreenDelay) outScreenDelay.textContent = `${mins} min`;
+      rngScreenDelay.addEventListener('input', () => {
+        const v = parseInt(rngScreenDelay.value || '1', 10);
+        const m = Math.max(1, Math.min(20, isNaN(v) ? 1 : v));
+        if (outScreenDelay) outScreenDelay.textContent = `${m} min`;
+        this.screenSaverDelay = m * 60000;
+        if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
       });
     }
 
@@ -9854,15 +10375,37 @@ modal.innerHTML = `
 
     fileInput?.addEventListener('change', async () => {
       const file = fileInput.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        urlInput.value = String(reader.result || '');
-        updateThumb(urlInput.value);
-        // live preview
-        this.style.setProperty('--ddc-bg-image', `url("${urlInput.value}")`);
-      };
-      reader.readAsDataURL(file);
-    });
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const objectUrl = URL.createObjectURL(file);
+// Live preview using an object URL (avoids huge base64 in memory/config)
+updateThumb(objectUrl);
+this.style.setProperty('--ddc-bg-image', `url("${objectUrl}")`);
+// Do not persist base64 by default; keep input empty unless small and non-iOS
+if (urlInput) urlInput.value = '';
+(async () => {
+  if (!isIOS) {
+    try {
+      const img = new Image();
+      img.src = objectUrl;
+      await img.decode();
+      const scale = Math.min(1920 / img.naturalWidth, 1080 / img.naturalHeight, 1);
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      if (dataUrl && dataUrl.length < 300000) {
+        // only store if reasonably small
+        if (urlInput) urlInput.value = dataUrl;
+      }
+    } catch (e) {
+      // ignore compression errors; preview still works
+    }
+  }
+})();
+});
 
     modal.querySelector('#ddc-clear-bg')?.addEventListener('click', () => {
       if (urlInput) urlInput.value = '';
@@ -10245,12 +10788,21 @@ modal.innerHTML = `
       const newYtEnd   = parseInt(inpYtEnd?.value   || '', 10);
       const newYtMute  = !!chkYtMute?.checked;
       const newYtLoop  = !!chkYtLoop?.checked;
+      const newYtSize  = (selYtSize?.value || 'cover');
+      const newYtPosition = (selYtPosition?.value || 'center');
+      const newYtOpacity  = rngYtOpacity ? Math.max(0, Math.min(100, parseInt(rngYtOpacity.value || '100', 10))) / 100 : 1;
+      const newYtAttachment = (selYtAttachment?.value || 'scroll');
+
+      // Screen saver values
+      const newScreenSaverEnabled   = !!chkScreenSaver?.checked;
+      const newScreenSaverDelayMin  = parseInt(rngScreenDelay?.value || '1', 10);
+      const newScreenSaverDelayMs   = (Number.isFinite(newScreenSaverDelayMin) ? newScreenSaverDelayMin : 1) * 60000;
+
       // hero and tabs position not exposed to user
       try {
         // Auto resize cards
         this.autoResizeCards = newAuto;
-        if (this.autoResizeCards) this._startScaleWatch?.();
-        else this._stopScaleWatch?.();
+        if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
         // Grid size
         if (!isNaN(newGrid) && newGrid > 0 && newGrid !== this.gridSize) {
           this.gridSize = newGrid;
@@ -10366,11 +10918,21 @@ modal.innerHTML = `
             end:   Number.isFinite(newYtEnd)   ? newYtEnd   : undefined,
             mute:  newYtMute !== true ? newYtMute : undefined,  // defaults true
             loop:  newYtLoop !== true ? newYtLoop : undefined   // defaults true
+          ,
+            size:  newYtSize && newYtSize != 'cover' ? newYtSize : undefined,
+            position: newYtPosition || undefined,
+            attachment: (newYtAttachment && newYtAttachment !== 'scroll') ? newYtAttachment : undefined,
+            opacity: (newYtOpacity != null && newYtOpacity !== 1) ? newYtOpacity : undefined
           };
         } else {
           const { background_youtube, ...rest } = this._config || {};
           this._config = rest;
         }
+
+        // Screen saver settings
+        this.screenSaverEnabled = newScreenSaverEnabled;
+        this.screenSaverDelay   = newScreenSaverDelayMs;
+        this._updateScreensaverSettings?.();
 
 
         if (newBgImg) {
@@ -10411,6 +10973,9 @@ modal.innerHTML = `
           this._config.animate_cards           = !!this.animateCards;
           this._config.hide_HA_Header          = !!this.hideHaHeader;
           this._config.hide_HA_Sidebar         = !!this.hideHaSidebar;
+          // Screen saver config
+          this._config.screen_saver_enabled    = !!this.screenSaverEnabled;
+          this._config.screen_saver_delay      = this.screenSaverDelay;
           // Background image src is already updated in this._config.background_image above
         } catch (cfgErr) {
           console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
@@ -10459,6 +11024,8 @@ modal.innerHTML = `
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
           auto_resize_cards: !!this.autoResizeCards,
+      screen_saver_enabled: !!this.screenSaverEnabled,
+      screen_saver_delay: this.screenSaverDelay,
 };
     // strip undefined to keep files tidy
     Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
@@ -10503,8 +11070,20 @@ modal.innerHTML = `
     
     if ('auto_resize_cards' in opts) {
       this.autoResizeCards = !!opts.auto_resize_cards;
-      if (this.autoResizeCards) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+      if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
       this._applyAutoScale?.();
+    }
+
+    // Screen saver: apply imported values
+    if ('screen_saver_enabled' in opts) {
+      this.screenSaverEnabled = !!opts.screen_saver_enabled;
+    }
+    if ('screen_saver_delay' in opts) {
+      const ms = Number(opts.screen_saver_delay);
+      this.screenSaverDelay = Number.isFinite(ms) && ms > 0 ? ms : this.screenSaverDelay;
+    }
+    if ('screen_saver_enabled' in opts || 'screen_saver_delay' in opts) {
+      if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
     }
 
 
@@ -11039,6 +11618,495 @@ _importDesign() {
   }
 
   /* ----------------------------- Utilities ----------------------------- */
+
+  /* =========================== Screen saver =========================== */
+
+  /**
+   * Ensure styles for the screen saver overlay are injected once into
+   * the component's shadow root. This creates a dark overlay with a
+   * centered digital clock and date. The overlay is hidden until
+   * activated.
+   */
+  _ensureScreenSaverStyles() {
+    if (this.shadowRoot?.querySelector('#ddc-screensaver-styles')) return;
+    try {
+      const style = document.createElement('style');
+      style.id = 'ddc-screensaver-styles';
+      style.textContent = `
+        .screensaver-overlay {
+          /* Cover the entire viewport, not just the card container */
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.92);
+          color: #fff;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.8s ease-in;
+          z-index: 100000; /* extremely high to overlay everything */
+        }
+        .screensaver-overlay.active {
+          opacity: 1;
+          pointer-events: auto;
+          transition: opacity 0.3s ease-out;
+        }
+        /* Wrapper to center content nicely in the viewport */
+        .screensaver-overlay .screensaver-content {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .screensaver-overlay .screensaver-clock {
+          font-size: 5rem;
+          font-family: monospace;
+          letter-spacing: 0.1em;
+          font-weight: 700;
+          line-height: 1.2;
+          margin: 0;
+          text-align: center;
+          text-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+        .screensaver-overlay .screensaver-date {
+          font-size: 2rem;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-weight: 400;
+          margin-top: 0.8rem;
+          text-align: center;
+          opacity: 0.9;
+        }
+
+        /* Calendar styles */
+        .screensaver-overlay .screensaver-calendar {
+          margin-top: 1.5rem;
+          width: 100%;
+          max-width: 600px;
+          color: #fff;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-header {
+          font-size: 2.2rem;
+          font-weight: 600;
+          text-align: center;
+          margin-bottom: 0.7rem;
+          padding-bottom: 0.3rem;
+          border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 0.3rem;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div {
+          text-align: center;
+          padding: 0.35rem 0;
+          font-size: 1.0rem;
+          border-radius: 4px;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.header {
+          font-weight: 600;
+          opacity: 0.8;
+          text-transform: uppercase;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.today {
+          background: rgba(255, 255, 255, 0.3);
+          font-weight: 700;
+          color: #000;
+          border-radius: 6px;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.other-month {
+          opacity: 0.4;
+        }
+
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.weekend {
+          /* Slightly accent weekends */
+          color: #ffb074;
+        }
+      `;
+      this.shadowRoot.appendChild(style);
+    } catch (e) {
+      console.warn('[drag-and-drop-card] Failed to inject screensaver styles', e);
+    }
+  }
+
+  /**
+   * Ensure global styles for the screen saver overlay are injected into the
+   * document <head>. These styles are necessary when the screensaver
+   * overlay is attached to document.body to ensure proper layout and
+   * positioning outside of any transformed containers. Styles are only
+   * injected once per page.
+   */
+  _ensureScreenSaverGlobalStyles() {
+    if (document.head.querySelector('#ddc-screensaver-global-styles')) return;
+    try {
+      const style = document.createElement('style');
+      style.id = 'ddc-screensaver-global-styles';
+      style.textContent = `
+        .screensaver-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.92);
+          color: #fff;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.8s ease-in;
+          z-index: 100000;
+        }
+        .screensaver-overlay.active {
+          opacity: 1;
+          pointer-events: auto;
+          transition: opacity 0.3s ease-out;
+        }
+        .screensaver-overlay .screensaver-content {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .screensaver-overlay .screensaver-clock {
+          font-size: 5rem;
+          font-family: monospace;
+          letter-spacing: 0.1em;
+          font-weight: 700;
+          line-height: 1.2;
+          margin: 0;
+          text-align: center;
+          text-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+        .screensaver-overlay .screensaver-date {
+          font-size: 2rem;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-weight: 400;
+          margin-top: 0.8rem;
+          text-align: center;
+          opacity: 0.9;
+        }
+        .screensaver-overlay .screensaver-calendar {
+          margin-top: 1.5rem;
+          width: 100%;
+          max-width: 600px;
+          color: #fff;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-header {
+          font-size: 2.2rem;
+          font-weight: 600;
+          text-align: center;
+          margin-bottom: 0.7rem;
+          padding-bottom: 0.3rem;
+          border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 0.3rem;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div {
+          text-align: center;
+          padding: 0.35rem 0;
+          font-size: 1.0rem;
+          border-radius: 4px;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.header {
+          font-weight: 600;
+          opacity: 0.8;
+          text-transform: uppercase;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.today {
+          background: rgba(255, 255, 255, 0.3);
+          font-weight: 700;
+          color: #000;
+          border-radius: 6px;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.other-month {
+          opacity: 0.4;
+        }
+        .screensaver-overlay .screensaver-calendar .calendar-grid div.weekend {
+          color: #ffb074;
+        }
+      `;
+      document.head.appendChild(style);
+    } catch (e) {
+      console.warn('[drag-and-drop-card] Failed to inject global screensaver styles', e);
+    }
+  }
+
+  /**
+   * Create the screensaver overlay element if it does not already
+   * exist. The overlay is appended to the card container and kept
+   * hidden until activated.
+   */
+  _ensureScreenSaverOverlay() {
+    // Always ensure global screensaver styles are present when overlay is attached to document.body
+    this._ensureScreenSaverGlobalStyles();
+
+    // Determine a unique id for this overlay to avoid collisions if multiple cards exist.
+    if (!this._screenSaverOverlayId) {
+      const baseId = this.config?.id || `ddc_${Math.random().toString(36).slice(2)}`;
+      this._screenSaverOverlayId = `ddc-screensaver-overlay-${baseId}`;
+    }
+    const desiredId = this._screenSaverOverlayId;
+
+    // If overlay already exists and is attached to document.body, nothing to do
+    if (this.screenSaverOverlay && this.screenSaverOverlay.parentNode === document.body) {
+      return;
+    }
+
+    // If an overlay exists but was removed from the DOM (e.g. during rebuild), reattach it to document.body
+    if (this.screenSaverOverlay && !this.screenSaverOverlay.parentNode) {
+      document.body.appendChild(this.screenSaverOverlay);
+      return;
+    }
+
+    // Otherwise create a fresh overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'screensaver-overlay';
+    overlay.id = desiredId;
+    overlay.innerHTML = `
+      <div class="screensaver-content" id="${desiredId}-content">
+        <div class="screensaver-clock" id="${desiredId}-clock"></div>
+        <div class="screensaver-date" id="${desiredId}-date"></div>
+        <div class="screensaver-calendar" id="${desiredId}-calendar"></div>
+      </div>
+    `;
+    // exit screensaver on click/touch/key
+    overlay.addEventListener('click', () => this._deactivateScreenSaver());
+    overlay.addEventListener('keydown', () => this._deactivateScreenSaver());
+    this.screenSaverOverlay = overlay;
+    document.body.appendChild(overlay);
+  }
+
+  /**
+   * Attach listeners for user activity that should reset the idle
+   * timer. Listeners are added only once and removed in
+   * disconnectedCallback().
+   */
+  _attachScreensaverListeners() {
+    if (this._screensaverActivityHandler) return;
+    const handler = () => this._resetScreensaverTimer();
+    this._screensaverActivityHandler = handler;
+    // Include a broader set of events to detect any user activity (mouse, pointer, scroll, touch)
+    this._screensaverEvents = [
+      'mousemove',
+      'mousedown',
+      'click',
+      'keydown',
+      'wheel',
+      'scroll',
+      'touchstart',
+      'touchmove',
+      'touchend',
+      'touchcancel',
+      'pointerdown',
+      'pointermove',
+      'pointerup',
+      'pointercancel'
+    ];
+    // Attach listeners to the document so any user activity inside or outside the card
+    // resets the timer. Use capture phase to ensure early invocation.
+    this._screensaverEvents.forEach(ev => {
+      document.addEventListener(ev, handler, true);
+    });
+  }
+
+  /**
+   * Reset the screensaver idle timer. If the screensaver is
+   * currently active it will be deactivated. A new timeout is
+   * scheduled using the current delay. If the screensaver is
+   * disabled, no timer will be scheduled.
+   */
+  _resetScreensaverTimer() {
+    if (this._screensaverTimer) {
+      clearTimeout(this._screensaverTimer);
+      this._screensaverTimer = null;
+    }
+    if (!this.screenSaverEnabled) {
+      return;
+    }
+    // hide screensaver if active
+    if (this.screensaverActive) {
+      this._deactivateScreenSaver();
+    }
+    const delay = Number(this.screenSaverDelay) || (5 * 60000);
+    this._screensaverTimer = setTimeout(() => {
+      this._activateScreenSaver();
+    }, delay);
+  }
+
+  /**
+   * Activate the screensaver overlay. Creates the overlay if
+   * necessary, updates the time immediately, and starts a clock
+   * update interval. Sets the overlay to active so CSS transitions
+   * apply.
+   */
+  _activateScreenSaver() {
+    if (!this.screenSaverEnabled) return;
+    this._ensureScreenSaverOverlay();
+    if (!this.screenSaverOverlay) return;
+    this.screensaverActive = true;
+    this.screenSaverOverlay.classList.add('active');
+    // Hide the tabs bar while screensaver is active
+    try {
+      if (this.tabsBar) {
+        // Save current display property to restore later
+        this.__savedTabsDisplay = this.tabsBar.style.display;
+        this.tabsBar.style.display = 'none';
+      }
+    } catch {}
+    // update immediately
+    this._updateScreenSaverClock();
+    // update every second
+    if (this._clockInterval) clearInterval(this._clockInterval);
+    this._clockInterval = setInterval(() => this._updateScreenSaverClock(), 1000);
+  }
+
+  /**
+   * Deactivate the screensaver overlay, clear clock interval and
+   * schedule a new idle timer if appropriate.
+   */
+  _deactivateScreenSaver() {
+    if (!this.screensaverActive) return;
+    this.screensaverActive = false;
+    if (this.screenSaverOverlay) this.screenSaverOverlay.classList.remove('active');
+    if (this._clockInterval) {
+      clearInterval(this._clockInterval);
+      this._clockInterval = null;
+    }
+    // Restore tabs bar when screensaver deactivates
+    try {
+      if (this.tabsBar) {
+        if (this.__savedTabsDisplay != null) {
+          this.tabsBar.style.display = this.__savedTabsDisplay;
+        } else {
+          this.tabsBar.style.display = '';
+        }
+      }
+    } catch {}
+    // When user interacts, restart the timer to count idle time again
+    this._resetScreensaverTimer();
+  }
+
+  /**
+   * Update the clock and date displayed on the screensaver overlay.
+   * Uses the user's locale for formatting time and date.
+   */
+  _updateScreenSaverClock() {
+    const overlay = this.screenSaverOverlay;
+    const clockEl = overlay?.querySelector('.screensaver-clock');
+    const dateEl  = overlay?.querySelector('.screensaver-date');
+    const now = new Date();
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    if (dateEl) {
+      dateEl.textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // Update calendar as well
+    try {
+      this._updateScreenSaverCalendar();
+    } catch {}
+  }
+
+  /**
+   * Update the monthly calendar displayed on the screensaver overlay. Builds
+   * a grid for the current month with weekday headers, filling leading and
+   * trailing cells from the previous and next months. Highlights today.
+   */
+  _updateScreenSaverCalendar() {
+    const calEl = this.screenSaverOverlay?.querySelector('.screensaver-calendar');
+    if (!calEl) return;
+    const now = new Date();
+    const locale = undefined; // use default locale
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    // Month name
+    const monthName = now.toLocaleDateString(locale, { month: 'long' });
+    // Day names (Sunday first per Date API)
+    const dayNames = [];
+    // Use a known week starting on Sunday (1970-01-04 is a Sunday) to generate localised day names
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(1970, 0, 4 + i);
+      dayNames.push(d.toLocaleDateString(locale, { weekday: 'short' }));
+    }
+    // Determine first day of current month (0=Sunday)
+    const firstDay = new Date(year, month, 1).getDay();
+    // Number of days in current month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Number of days in previous month
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    // Build weeks array of 42 cells (6 weeks * 7 days)
+    const cells = [];
+    // Leading days from previous month
+    for (let i = 0; i < firstDay; i++) {
+      cells.push({ day: prevMonthDays - (firstDay - 1) + i, other: true });
+    }
+    // Days of current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isToday = d === now.getDate();
+      cells.push({ day: d, today: isToday, other: false });
+    }
+    // Trailing days from next month
+    while (cells.length < 42) {
+      const nextDay = cells.length - firstDay - daysInMonth + 1;
+      cells.push({ day: nextDay, other: true });
+    }
+    // Build HTML
+    let html = '';
+    // Header
+    html += `<div class="calendar-header">${monthName} ${year}</div>`;
+    // Grid container
+    html += '<div class="calendar-grid">';
+    // Day names header
+    for (let i = 0; i < 7; i++) {
+      html += `<div class="header">${dayNames[i]}</div>`;
+    }
+    // Day cells
+    cells.forEach((cell, idx) => {
+      const classes = [];
+      if (cell.other) classes.push('other-month');
+      if (cell.today) classes.push('today');
+      // Highlight weekends
+      const weekDayIndex = idx % 7;
+      if (weekDayIndex === 0 || weekDayIndex === 6) classes.push('weekend');
+      html += `<div class="${classes.join(' ')}">${cell.day}</div>`;
+    });
+    html += '</div>';
+    calEl.innerHTML = html;
+  }
+
+  /**
+   * Apply current screensaver settings. When enabled, attach
+   * listeners and schedule or reset the idle timer. When disabled,
+   * clear timers and hide the overlay.
+   */
+  _updateScreensaverSettings() {
+    // ensure overlay exists if enabling
+    if (this.screenSaverEnabled) {
+      this._ensureScreenSaverOverlay();
+      this._attachScreensaverListeners();
+      // immediately reset timer
+      this._resetScreensaverTimer();
+    } else {
+      // disable: remove timer and hide overlay
+      if (this._screensaverTimer) {
+        clearTimeout(this._screensaverTimer);
+        this._screensaverTimer = null;
+      }
+      if (this.screensaverActive) {
+        this._deactivateScreenSaver();
+      }
+    }
+  }
   _toast(message) {
     const ev = new Event('hass-notification');
     ev.detail = { message };
