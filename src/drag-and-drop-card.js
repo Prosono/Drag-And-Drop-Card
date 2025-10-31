@@ -2159,7 +2159,7 @@ static getConfigElement() {
   };
 
   const toggleSizeControls = () => {
-    const mode = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode').value;
+    const mode = el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value ?? 'dynamic';
     el.querySelector('#sizeCustom').style.display = mode === 'fixed_custom' ? 'inline-flex' : 'none';
     el.querySelector('#sizePresetWrap').style.display = mode === 'preset' ? 'inline-flex' : 'none';
   };
@@ -2268,7 +2268,7 @@ static getConfigElement() {
     base.animate_cards = !!el.querySelector('#animateCards').checked;
 
 
-    base.container_size_mode = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode').value;
+    base.container_size_mode = el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value ?? 'dynamic';
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
     base.container_fixed_height = Number(el.querySelector('#sizeH').value || 0) || undefined;
     base.container_preset = el.querySelector('#sizePreset').value || undefined;
@@ -3079,6 +3079,35 @@ _applyGridVars() {
         border-color:var(--primary-color,#03a9f4);
         box-shadow:0 0 0 2px var(--primary-color,#03a9f4)!important;
       }
+
+      /* CARD WRAPPER FOR BSCKGORUND COLORS START */
+
+      /* Make the inner card and its header fully transparent
+        so the wrapper’s gradient is the only background shown. */
+      .card-wrapper > * {
+        /* Critical: do NOT give the card a background via this variable.
+          Some headers read --ha-card-background when header-color is unset. */
+        --ha-card-background: transparent !important;
+
+        /* Many cards also set a background on the host element; neutralize it. */
+        background: transparent !important;
+      }
+
+      /* Ensure <ha-card> itself doesn't repaint a body background */
+      .card-wrapper ha-card {
+        background: transparent !important;
+      }
+
+      /* Make header strips transparent regardless of how they are implemented */
+      .card-wrapper ::part(header),
+      .card-wrapper ::part(card-header),
+      .card-wrapper .card-header {
+        background: transparent !important;
+        box-shadow: none !important;
+        border-bottom: none !important;
+      }
+
+      /* CARD WRAPPER FOR BSCKGORUND COLORS END */
 
       /* ---- empty-state of the card ---- */
       .btn.cta-empty{
@@ -11065,35 +11094,80 @@ if (urlInput) urlInput.value = '';
   // Put these inside the class
 
   /** Only the exportable knobs the user set in the UI */
+  /** Only the exportable knobs the user set in the UI */
   _exportableOptions() {
+    const cfg = this._config || {};
+
+    // Normalize background objects to only defined keys (keeps the export tidy)
+    const pick = (obj, keys) =>
+      Object.fromEntries(keys.map(k => [k, obj?.[k]]).filter(([,v]) => v !== undefined));
+
+    // Resolve/guess active background mode for completeness
+    const bgMode =
+      cfg.background_mode
+      || (cfg.background_image?.src ? 'image'
+          : cfg.background_youtube ? 'youtube'
+          : cfg.background_particles ? 'particles'
+          : 'none');
+
     const opt = {
+      // Core
       storage_key: this.storageKey || undefined,
       grid: this.gridSize,
-      container_background: this.containerBackground,
-      card_background: this.cardBackground,
-      disable_overlap: !!this.disableOverlap,
       drag_live_snap: !!this.dragLiveSnap,
       auto_save: !!this.autoSave,
       auto_save_debounce: this.autoSaveDebounce,
-      edit_mode_pin: (this.editModePin || undefined),
+      disable_overlap: !!this.disableOverlap,
       debug: !!this.debug,
+      edit_mode_pin: (this.editModePin || undefined),
+
+      // Size & layout
       container_size_mode: this.containerSizeMode,
       container_preset_orientation: this.containerPresetOrient,
       container_fixed_width: this.containerFixedWidth ?? undefined,
       container_fixed_height: this.containerFixedHeight ?? undefined,
       container_preset: this.containerPreset,
+      auto_resize_cards: !!this.autoResizeCards,
+
+      // Appearance
+      container_background: this.containerBackground,
+      card_background: this.cardBackground,
+      animate_cards: !!this.animateCards,
+
+      // HA chrome visibility
+      hide_HA_Header: !!this.hideHaHeader,
+      hide_HA_Sidebar: !!this.hideHaSidebar,
+
+      // Tabs (from the modal section)
       tabs: this.tabs,
       tabs_position: this.tabsPosition,
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
-          auto_resize_cards: !!this.autoResizeCards,
+
+      // Background (image | particles | youtube | none)
+      background_mode: bgMode,
+      background_image: cfg.background_image
+        ? pick(cfg.background_image, ['src','repeat','size','position','attachment','opacity'])
+        : undefined,
+      background_particles: cfg.background_particles
+        ? pick(cfg.background_particles, ['config_url','pointer_events'])
+        : undefined,
+      background_youtube: cfg.background_youtube
+        ? pick(cfg.background_youtube, [
+            'url','start','end','mute','loop','size','position','attachment','opacity'
+          ])
+        : undefined,
+
+      // Screen saver
       screen_saver_enabled: !!this.screenSaverEnabled,
       screen_saver_delay: this.screenSaverDelay,
-};
+    };
+
     // strip undefined to keep files tidy
     Object.keys(opt).forEach(k => opt[k] === undefined && delete opt[k]);
     return opt;
   }
+
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
@@ -11213,12 +11287,29 @@ _importDesign() {
   const HARD_REPLACE = true;                 // fully overwrite existing options
   const ADOPT_IMPORTED_STORAGE_KEY = false;  // keep current storage_key by default
   const KNOWN_OPT_KEYS = [
+    // Core + behavior
     'grid','drag_live_snap','auto_save','auto_save_debounce',
-    'container_background','card_background','debug','disable_overlap',
+    'debug','disable_overlap','card_mod','storage_key',
+    'animate_cards','auto_resize_cards',
+
+    // Visuals
+    'container_background','card_background',
+
+    // Size / layout
     'container_size_mode','container_fixed_width','container_fixed_height',
     'container_preset','container_preset_orientation',
+
+    // Tabs
     'tabs','tabs_position','default_tab','hide_tabs_when_single',
-    'card_mod','storage_key'
+
+    // HA chrome
+    'hide_HA_Header','hide_HA_Sidebar',
+
+    // Background modes
+    'background_mode','background_image','background_particles','background_youtube',
+
+    // Screen saver
+    'screen_saver_enabled','screen_saver_delay',
   ];
   // ----------------------------------
 
@@ -11290,6 +11381,26 @@ _importDesign() {
           // 3) apply imported options
           this._config = { ...cfg, ...imported };
           if (!('card_mod' in imported)) delete this._config.card_mod;
+
+          // Reflect a few toggles to instance fields used elsewhere
+          if ('animate_cards' in imported) this.animateCards = !!imported.animate_cards;
+          if ('auto_resize_cards' in imported) this.autoResizeCards = !!imported.auto_resize_cards;
+
+          // Apply HA header/sidebar visibility immediately
+          if ('hide_HA_Header' in imported || 'hide_HA_Sidebar' in imported) {
+            try { this._applyHaChromeVisibility_?.(); } catch {}
+          }
+
+          // Apply background mode/payload immediately
+          if (
+            'background_mode' in imported ||
+            'background_image' in imported ||
+            'background_particles' in imported ||
+            'background_youtube' in imported
+          ) {
+            try { this._applyBackgroundFromConfig?.(); } catch {}
+          }
+
 
           if (ADOPT_IMPORTED_STORAGE_KEY && imported.storage_key) {
             this.storageKey = imported.storage_key;
