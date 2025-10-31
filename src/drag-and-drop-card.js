@@ -1216,8 +1216,59 @@ _attachYouTubeBackground_(cfg = {}) {
 _layoutYtBackground_() {  // Fit a 16:9 iframe according to selected size
   try {
     if (!this.__ytWrap) return;
-    const r = this.cardContainer.getBoundingClientRect();
-    const cw = r.width, ch = r.height;
+    // In auto size mode the card container’s natural width may be
+    // larger than the visible viewport.  When computing the video
+    // background dimensions we should use the visible container (the
+    // outer scale wrapper) rather than the full card canvas so the
+    // video covers the same portion of the screen as in dynamic mode.
+    // In other modes we continue to use the card container itself.
+    // Prefer the scale wrapper if it exists (both dynamic and auto modes)
+    let contEl = this.__scaleOuter || this.cardContainer;
+    // First determine the natural (design) size of the card canvas.  These
+    // values correspond to the unscaled width and height of the card.  If
+    // these are unavailable we fall back to the measured dimensions.
+    let natW = 0;
+    let natH = 0;
+    try {
+      natW = parseFloat(this.cardContainer?.style?.width)  || this.cardContainer?.scrollWidth  || this.cardContainer?.offsetWidth  || 0;
+      natH = parseFloat(this.cardContainer?.style?.height) || this.cardContainer?.scrollHeight || this.cardContainer?.offsetHeight || 0;
+    } catch {}
+
+    // Determine the visible canvas size.  In auto mode this is the size
+    // of the scale wrapper (contEl), whereas in dynamic mode we want to
+    // treat the canvas as if it had its natural size (so that the video
+    // covers the full design area before scaling).  After computing the
+    // natural size, the actual on‑screen size will be downscaled via the
+    // CSS transform on the card container.
+    let cw;
+    let ch;
+    try {
+      const modeName = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (modeName === 'auto') {
+        const r = contEl.getBoundingClientRect();
+        cw = r.width;
+        // Compute scaled height based on the ratio of visible width to natural width.
+        if (natW > 0) {
+          const scale = Math.min(cw / natW, 1);
+          ch = natH * scale;
+        } else {
+          ch = r.height;
+        }
+      } else {
+        // dynamic mode: treat the canvas as having its natural size.  This
+        // will be downscaled by the CSS transform applied to the
+        // cardContainer.  Using the natural dimensions ensures the video
+        // covers the same area as in auto mode when the design is larger
+        // than the viewport.
+        cw = natW || contEl.getBoundingClientRect().width;
+        ch = natH || contEl.getBoundingClientRect().height;
+      }
+    } catch {
+      // Fallback: use the scale wrapper’s measured dimensions
+      const r = contEl.getBoundingClientRect();
+      cw = r.width;
+      ch = r.height;
+    }
     const fixedAttach = (this.__ytAttachment === 'fixed');
     const vw = fixedAttach ? (window.innerWidth  || cw) : cw;
     const vh = fixedAttach ? (window.innerHeight || ch) : ch;
@@ -5658,6 +5709,13 @@ _applyAutoScale() {
 
   // After scaling, synchronise the tabs width with the new visual size.
   try { this._syncTabsWidth_?.(); } catch {}
+
+  // Update any video background to reflect the new scaled dimensions.  In
+  // dynamic mode the card container is scaled via a CSS transform, so
+  // the resize observer may not fire immediately.  Calling the layout
+  // routine explicitly ensures the background iframe is sized to the
+  // visible area.
+  try { this._layoutYtBackground_?.(); } catch {}
 }
 
 // AUTO (strict): behave like dynamic, but only "fill" when viewport > natural content; never scale.
@@ -5774,6 +5832,11 @@ _applyAutoFillNoScale() {
       tb.style.maxWidth = '100%';
     }
   } finally {
+    // Recompute the background (e.g. YouTube video) sizing based on the
+    // newly updated card dimensions.  Without this call the video
+    // background may retain the size from a previous layout state and
+    // appear cropped or misaligned in auto mode.
+    try { this._layoutYtBackground_?.(); } catch {}
     requestAnimationFrame(() => { this.__applyingAutoFill = false; });
   }
 }
