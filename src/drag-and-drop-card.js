@@ -2597,6 +2597,32 @@ _applyGridVars() {
   container-name: ddc-root;
 }
 
+/* ===== DDC Toolbar and tabs when auto sieze is off ===== */
+
+/* Center toolbar & tabs to viewport when auto-resize is OFF in dynamic mode */
+:host([ddc-fixed-ui]) .ddc-toolbar,
+:host([ddc-fixed-ui]) .ddc-tabs {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--ddc-ui-width, auto);
+  max-width: 100vw;
+  box-sizing: border-box;
+  z-index: 1002; /* above cards/backgrounds, below any dialogs you use */
+}
+
+/* Keep vertical placement the same as before */
+:host([ddc-fixed-ui]) .ddc-toolbar {
+  top: 0;
+}
+
+:host([ddc-fixed-ui]) .ddc-tabs {
+  /* If you normally place tabs just below the toolbar, respect the CSS var you already compute */
+  top: var(--ddc-toolbar-height, 0px);
+}
+/* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
+
+
 /* ===== DDC Toolbar — Minimal Redesign (pills with accent tint) ===== */
 
 
@@ -3924,10 +3950,11 @@ _applyGridVars() {
 
       window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false);
     // Observe host size for auto scaling
-    if (!this.__ddcResizeObs) {
+    // Observe host size only if auto-resize is enabled
+    if (!this.__ddcResizeObs && this.autoResizeCards) {
       this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
-      this.__ddcResizeObs.observe(this);
-      this.__ddcResizeObs.observe(this.cardContainer);
+      try { this.__ddcResizeObs.observe(this); } catch {}
+      try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
       window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
     }
     // initial scale
@@ -3972,27 +3999,41 @@ _startInitialAutosize() {
   try {
     if (this.__autoInitStarted) return;
     this.__autoInitStarted = true;
-    const apply = () => { try { this._applyAutoScale?.(); } catch {} };
-    // Run on next frames to ensure layout is ready
-    requestAnimationFrame(() => {
-      apply();
-      requestAnimationFrame(apply);
-    });
-    // Also after microtasks and when fonts are ready
+
+    // Debounced apply to collapse bursty triggers
+    let scheduled = false;
+    const apply = () => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        try { this._applyAutoScale?.(); } catch {}
+      });
+    };
+
+    // Kick a couple of frames to settle fonts/slots
+    requestAnimationFrame(() => { apply(); requestAnimationFrame(apply); });
     setTimeout(apply, 0);
-    try { document.fonts && document.fonts.ready && document.fonts.ready.then(apply); } catch {}
-    // Observe early DOM churn (e.g., cards mounting) for a brief window
-    try {
-      const inner = this.cardContainer || this.querySelector('#cardContainer');
-      if (inner) {
-        const mo = new MutationObserver(() => apply());
-        mo.observe(inner, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
-        this.__autoInitMO = mo;
-        setTimeout(() => { try { mo.disconnect(); } catch {}; this.__autoInitMO = null; }, 2000);
-      }
-    } catch {}
+    try { document.fonts?.ready?.then(apply); } catch {}
+
+    // Scope the MutationObserver: when auto-resize is OFF, avoid attribute churn
+    const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+    const inner = this.cardContainer || this.querySelector('#cardContainer');
+    if (!inner) return;
+
+    const optsWhenScaling = { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] };
+    const optsWhenStatic  = { childList: true, subtree: true }; // no attribute observation
+
+    const observeAttrs = (this.autoResizeCards || mode === 'auto');
+    const mo = new MutationObserver(() => apply());
+    mo.observe(inner, observeAttrs ? optsWhenScaling : optsWhenStatic);
+    this.__autoInitMO = mo;
+
+    // Auto-stop after 2s to avoid long-running loops on heavy dashboards
+    setTimeout(() => { try { mo.disconnect(); } catch {}; this.__autoInitMO = null; }, 2000);
   } catch {}
 }
+
 
 connectedCallback() {
     this._startInitialAutosize?.();
@@ -4072,8 +4113,17 @@ this.addEventListener('ddc:dragend', () => {
 }
 
 // Also respond to window resizes
+// Respond to window resizes ONLY when scaling is active
 this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
-window.addEventListener('resize', this.__ddcOnWinResize);
+try {
+  const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+  if (this.autoResizeCards || mode === 'auto') {
+    window.addEventListener('resize', this.__ddcOnWinResize);
+  } else {
+    // ensure we’re not double-listening if user toggled earlier
+    window.removeEventListener('resize', this.__ddcOnWinResize);
+  }
+} catch {}
 
     try { this.__ddcBindPointerListeners?.(); 
 // After any card drop, re-apply auto fill (no-scale) when in Auto mode
@@ -5680,33 +5730,57 @@ _applyAutoScale() {
   const c = this.cardContainer; if (!c) return;
 
   // Keep the wrapper in place
-  if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
-
+  //if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+    // Keep the wrapper in place ONLY when scaling is active
+    try {
+      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (this.autoResizeCards || mode === 'auto') {
+        if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+      }
+    } catch {}
   // If auto-resize is off, lock to 1 but still keep scaffold consistent
   if (!this.autoResizeCards) {
     // Design size should still reflect config (fixed/preset or content)
-    const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
-    c.style.width  = `${d.w}px`;
-    c.style.height = `${d.h}px`;
-    c.style.transform = `scale(1)`;
-    c.style.transformOrigin = 'top left';
-    c.style.position = 'absolute';
-    c.style.top = '0';
-    c.style.left = '0';
-    if (this.__scaleOuter) {
-      // Use parent/host width for layout box so we don't force expansion
-      const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
-                 (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
-                 (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
-                 this.offsetWidth || d.w;
-      this.__scaleOuter.style.width  = `${Math.max(1, pw)}px`;
-      this.__scaleOuter.style.height = `${Math.max(1, d.h)}px`;
+    const d = (typeof this._computeDesignSize === 'function')
+      ? this._computeDesignSize()
+      : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+
+    // Avoid write→ResizeObserver→_applyAutoScale loops: only write when needed
+    const wantW = `${d.w}px`;
+    const wantH = `${d.h}px`;
+    const sameW = c.style.width === wantW;
+    const sameH = c.style.height === wantH;
+    const sameT = c.style.transform === 'scale(1)';
+
+    if (!(sameW && sameH && sameT)) {
+      c.style.width  = wantW;
+      c.style.height = wantH;
+      c.style.transform = 'scale(1)';
+      c.style.transformOrigin = 'top left';
+      c.style.position = 'absolute';
+      c.style.top = '0';
+      c.style.left = '0';
+
+      if (this.__scaleOuter) {
+        // Use parent/host width for layout box so we don't force expansion
+        const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+                   (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+                   (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+                   this.offsetWidth || d.w;
+
+        const wantOuterW = `${Math.max(1, pw)}px`;
+        const wantOuterH = `${Math.max(1, d.h)}px`;
+
+        if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
+        if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
+      }
     }
-    // When not scaling cards, still ensure the tabs bar width matches the
-    // container width. This prevents the bar from overflowing the card.
+
+    // Keep tabs width in sync, but don't force container writes unnecessarily
     try { this._syncTabsWidth_?.(); } catch {}
     return;
   }
+
 
   // Determine design size (prefer preset/fixed if configured)
   const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
@@ -10894,7 +10968,38 @@ if (urlInput) urlInput.value = '';
       try {
         // Auto resize cards
         this.autoResizeCards = newAuto;
-        if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+
+        // If turning OFF: disconnect observers & listeners
+        if (!this.autoResizeCards && this.__ddcResizeObs) {
+          try { this.__ddcResizeObs.disconnect(); } catch {}
+          this.__ddcResizeObs = null;
+          if (this.__ddcOnWinResize) {
+            window.removeEventListener('resize', this.__ddcOnWinResize);
+            this.__ddcOnWinResize = null;
+          }
+        }
+
+        // If turning ON: attach observers & listeners (idempotent)
+        if (this.autoResizeCards && !this.__ddcResizeObs) {
+          this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+          try { this.__ddcResizeObs.observe(this); } catch {}
+          try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
+          window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+        }
+
+        // Start/stop any rAF scale watcher depending on mode
+        if (
+          this.autoResizeCards ||
+          String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase() === 'auto'
+        ) {
+          this._startScaleWatch?.();
+        } else {
+          this._stopScaleWatch?.();
+        }
+
+        // Recompute once to settle layout immediately
+        this._applyAutoScale?.();
+
         // Grid size
         if (!isNaN(newGrid) && newGrid > 0 && newGrid !== this.gridSize) {
           this.gridSize = newGrid;
