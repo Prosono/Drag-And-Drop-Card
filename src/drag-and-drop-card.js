@@ -2415,6 +2415,31 @@ _clampAllCardsInside() {
   });
 }
 
+_computeHaSidebarGutters_() {
+  let left = 56; // default desktop gutter; HA collapsed is ~56–64px
+  try {
+    const ha = document.querySelector('home-assistant');
+    const shadow = ha?.shadowRoot;
+    const drawer = shadow?.querySelector('ha-drawer, app-drawer, ha-sidebar, .drawer, .menu');
+    const rect = drawer?.getBoundingClientRect?.();
+    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    // On mobile the nav overlays; treat gutter as 0
+    if (vw <= 870) {
+      left = 0;
+    } else if (rect?.width) {
+      left = Math.max(0, Math.min(256, Math.round(rect.width)));
+    }
+  } catch {}
+  let right = 0; // adjust if you have a right dock; keep 0 otherwise
+  try {
+    // Example hook for themes with a right dock: measure & set right here.
+  } catch {}
+  try {
+    this.style.setProperty('--ddc-left-gutter', `${left}px`);
+    this.style.setProperty('--ddc-right-gutter', `${right}px`);
+  } catch {}
+}
+
 _applyGridVars() {
   const sz = `${this.gridSize || 10}px`;
   // host (inherits down)
@@ -2600,25 +2625,50 @@ _applyGridVars() {
 /* ===== DDC Toolbar and tabs when auto sieze is off ===== */
 
 /* Center toolbar & tabs to viewport when auto-resize is OFF in dynamic mode */
+/* === Centered, nav-aware UI when auto-resize is OFF in dynamic mode === */
 :host([ddc-fixed-ui]) .ddc-toolbar,
 :host([ddc-fixed-ui]) .ddc-tabs {
   position: fixed;
-  left: 50%;
+  /* Keep clear of HA's left navigation bar; computed in JS, fallback 56px desktop / 0 mobile */
+  left: calc(var(--ddc-left-gutter, 56px) + 50%);
   transform: translateX(-50%);
   width: var(--ddc-ui-width, auto);
-  max-width: 100vw;
+  max-width: calc(100vw - var(--ddc-left-gutter, 56px) - var(--ddc-right-gutter, 0px));
   box-sizing: border-box;
-  z-index: 1002; /* above cards/backgrounds, below any dialogs you use */
+  z-index: 1002; /* above canvas, below dialogs */
+  pointer-events: auto;
 }
 
-/* Keep vertical placement the same as before */
-:host([ddc-fixed-ui]) .ddc-toolbar {
-  top: 0;
-}
+/* Vertical placement */
+:host([ddc-fixed-ui]) .ddc-toolbar { top: 0; }
+:host([ddc-fixed-ui]) .ddc-tabs { top: var(--ddc-toolbar-height, 0px); }
 
+/* Make tabs horizontally scrollable when narrow */
 :host([ddc-fixed-ui]) .ddc-tabs {
-  /* If you normally place tabs just below the toolbar, respect the CSS var you already compute */
-  top: var(--ddc-toolbar-height, 0px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+/* Keep inner list no-wrap; match your existing inner wrapper class if different */
+:host([ddc-fixed-ui]) .ddc-tabs .scroll-wrap,
+:host([ddc-fixed-ui]) .ddc-tabs .tabs-inner {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+/* Mobile: sticky works better inside HA's scroll containers */
+@media (max-width: 768px) {
+  :host([ddc-fixed-ui]) .ddc-tabs {
+    position: sticky;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: 100vw;
+    margin-left: 0;
+  }
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
 
@@ -4114,13 +4164,19 @@ this.addEventListener('ddc:dragend', () => {
 
 // Also respond to window resizes
 // Respond to window resizes ONLY when scaling is active
-this.__ddcOnWinResize = this.__ddcOnWinResize || (() => this._applyAutoScale && this._applyAutoScale());
+this.__ddcOnWinResize = this.__ddcOnWinResize || (() => {
+  if (this.hasAttribute('ddc-fixed-ui')) {
+    try { this._computeHaSidebarGutters_?.(); } catch {}
+  }
+  this._applyAutoScale?.();
+});
+
+// Only attach when scaling is active (auto-resize ON or mode === 'auto')
 try {
   const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
   if (this.autoResizeCards || mode === 'auto') {
     window.addEventListener('resize', this.__ddcOnWinResize);
   } else {
-    // ensure we’re not double-listening if user toggled earlier
     window.removeEventListener('resize', this.__ddcOnWinResize);
   }
 } catch {}
@@ -5714,38 +5770,44 @@ _syncEmptyStateUI() {
     }
   }
 _applyAutoScale() {
-  // When the containerSizeMode is set to "auto" we do not perform a
-  // proportional scaling of the drag‑and‑drop canvas.  Instead, we
-  // delegate to the strict fill logic (_applyAutoFillNoScale) and bail
-  // early.  This ensures the canvas fills the available space
-  // immediately on load without requiring a resize or edit toggle.
+  // 1) Early path: "auto" mode (no proportional scaling)
+  let mode = 'dynamic';
   try {
-    const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+    mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
     if (mode === 'auto') {
       this._applyAutoFillNoScale?.();
+      this.removeAttribute('ddc-fixed-ui');
+      this.style?.removeProperty?.('--ddc-ui-width');
       return;
     }
   } catch {}
 
-  const c = this.cardContainer; if (!c) return;
+  const c = this.cardContainer;
+  if (!c) return;
 
-  // Keep the wrapper in place
-  //if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
-    // Keep the wrapper in place ONLY when scaling is active
-    try {
-      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-      if (this.autoResizeCards || mode === 'auto') {
-        if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
-      }
-    } catch {}
-  // If auto-resize is off, lock to 1 but still keep scaffold consistent
+  // 2) Only ensure scale wrapper when actually scaling
+  try {
+    if (this.autoResizeCards || mode === 'auto') {
+      if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
+    }
+  } catch {}
+
+  // 3) Auto-resize OFF: lock to scale(1) and center UI relative to design width
   if (!this.autoResizeCards) {
-    // Design size should still reflect config (fixed/preset or content)
     const d = (typeof this._computeDesignSize === 'function')
       ? this._computeDesignSize()
       : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
 
-    // Avoid write→ResizeObserver→_applyAutoScale loops: only write when needed
+    if (mode === 'dynamic') {
+      try { this._computeHaSidebarGutters_?.(); } catch {}
+      this.setAttribute('ddc-fixed-ui', '');
+      this.style?.setProperty?.('--ddc-ui-width', `${d.w}px`);
+    } else {
+      this.removeAttribute('ddc-fixed-ui');
+      this.style?.removeProperty?.('--ddc-ui-width');
+    }
+
+    // Avoid write→observer loops
     const wantW = `${d.w}px`;
     const wantH = `${d.h}px`;
     const sameW = c.style.width === wantW;
@@ -5753,7 +5815,7 @@ _applyAutoScale() {
     const sameT = c.style.transform === 'scale(1)';
 
     if (!(sameW && sameH && sameT)) {
-      c.style.width  = wantW;
+      c.style.width = wantW;
       c.style.height = wantH;
       c.style.transform = 'scale(1)';
       c.style.transformOrigin = 'top left';
@@ -5762,47 +5824,46 @@ _applyAutoScale() {
       c.style.left = '0';
 
       if (this.__scaleOuter) {
-        // Use parent/host width for layout box so we don't force expansion
-        const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
-                   (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
-                   (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
-                   this.offsetWidth || d.w;
+        const pw =
+          (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+          (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+          (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+          this.offsetWidth || d.w;
 
         const wantOuterW = `${Math.max(1, pw)}px`;
         const wantOuterH = `${Math.max(1, d.h)}px`;
-
         if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
         if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
       }
     }
 
-    // Keep tabs width in sync, but don't force container writes unnecessarily
     try { this._syncTabsWidth_?.(); } catch {}
     return;
   }
 
+  // 4) Auto-resize ON (dynamic scaling path)
+  this.removeAttribute('ddc-fixed-ui');
+  this.style?.removeProperty?.('--ddc-ui-width');
 
-  // Determine design size (prefer preset/fixed if configured)
-  const d = (typeof this._computeDesignSize === 'function') ? this._computeDesignSize() : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+  const d = (typeof this._computeDesignSize === 'function')
+    ? this._computeDesignSize()
+    : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
 
-  // Measure available width from the *parent* (host column) first
-  const pw = (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
-             (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
-             (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
-             this.offsetWidth || d.w;
+  const pw =
+    (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+    (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+    (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+    this.offsetWidth || d.w;
+
   const availableW = Math.max(1, pw);
-
-  // Fit & clamp (never upscale beyond native)
   const scale = Math.min(availableW / Math.max(1, d.w), 1);
 
-  // Outer layout box follows host width and scaled height
   if (this.__scaleOuter) {
     this.__scaleOuter.style.width  = `${availableW}px`;
     this.__scaleOuter.style.height = `${Math.max(1, d.h * scale)}px`;
   }
 
-  // Inner canvas stays at design size and is visually scaled
-  c.style.width  = `${d.w}px`;
+  c.style.width = `${d.w}px`;
   c.style.height = `${d.h}px`;
   c.style.transform = `scale(${scale})`;
   c.style.transformOrigin = 'top left';
@@ -5810,16 +5871,10 @@ _applyAutoScale() {
   c.style.top = '0';
   c.style.left = '0';
 
-  // After scaling, synchronise the tabs width with the new visual size.
   try { this._syncTabsWidth_?.(); } catch {}
-
-  // Update any video background to reflect the new scaled dimensions.  In
-  // dynamic mode the card container is scaled via a CSS transform, so
-  // the resize observer may not fire immediately.  Calling the layout
-  // routine explicitly ensures the background iframe is sized to the
-  // visible area.
   try { this._layoutYtBackground_?.(); } catch {}
 }
+
 
 // AUTO (strict): behave like dynamic, but only "fill" when viewport > natural content; never scale.
 _applyAutoFillNoScale() {
@@ -9684,246 +9739,251 @@ async _getStubConfigForType(type) {
     
     
 modal.innerHTML = `
-  <div class="dialog modern" role="dialog" aria-modal="true">
-    <div class="dlg-head">
-      <h3>Dashboard Settings</h3>
-      <button class="icon-btn" id="ddc-settings-close" title="Close"><ha-icon icon="mdi:close"></ha-icon></button>
-    </div>
+<div class="dialog modern" role="dialog" aria-modal="true">
+  <div class="dlg-head">
+    <h3>Dashboard Settings</h3>
+    <button class="icon-btn" id="ddc-settings-close" title="Close" aria-label="Close dialog">
+      <ha-icon icon="mdi:close"></ha-icon>
+    </button>
+  </div>
 
-    <div class="settings-body">
+  <div class="settings-body">
 
-      <!-- Layout -->
-      <section class="card">
-        <div class="section-head">
-          <ha-icon icon="mdi:view-grid-plus-outline"></ha-icon>
-          <h4>Layout</h4>
-        </div>
-        <p class="caption">Control grid density, canvas sizing, and card behavior.</p>
+    <!-- Layout -->
+    <section class="card" aria-labelledby="layout-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:view-grid-plus-outline" aria-hidden="true"></ha-icon>
+        <h4 id="layout-head">Layout</h4>
+      </div>
+      <p class="caption">Control grid density, canvas sizing, and card behavior.</p>
 
-        <!-- GRID SIZE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:grid"></ha-icon>
-              <label for="ddc-setting-gridSize">Grid size</label>
-            </div>
-            <div class="control">
-              <div class="range-wrap">
-                <input type="range" id="ddc-setting-gridSize" min="1" max="400" step="1" />
-                <output id="ddc-grid-out">100 px</output>
-              </div>
+      <!-- GRID SIZE -->
+      <div class="setting" role="group" aria-labelledby="lbl-grid-size">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:grid" aria-hidden="true"></ha-icon>
+            <label id="lbl-grid-size" for="ddc-setting-gridSize">Grid size</label>
+          </div>
+          <div class="control">
+            <div class="range-wrap">
+              <input type="range" id="ddc-setting-gridSize" min="1" max="400" step="1" />
+              <output id="ddc-grid-out" for="ddc-setting-gridSize">100 px</output>
             </div>
           </div>
-          <div class="hint">Cards snap every <b>N</b> pixels. Lower values give a denser grid for finer placement.</div>
         </div>
+        <div class="hint">Cards snap every <b>N</b> pixels. Lower values give a denser grid for finer placement.</div>
+      </div>
 
-      <div class="preview" style="margin-top:6px">
+      <!-- GRID PREVIEW -->
+      <div class="preview">
         <div class="grid-demo" id="ddc-grid-demo">
           <div class="grid-meta-badge" id="ddc-grid-meta"></div>
         </div>
       </div>
 
-
-        <!-- QUICK CANVAS SIZES -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:move-resize"></ha-icon>
-              <span>Quick canvas sizes</span>
-            </div>
-            <div class="control chips" role="group" aria-label="Quick sizes">
-              <button class="chip" data-w="1280" data-h="720">Tablet (1280×720)</button>
-              <button class="chip" data-w="1920" data-h="1080" aria-pressed="true">Desktop (1920×1080)</button>
-              <button class="chip" data-w="2560" data-h="1440">WQHD (2560×1440)</button>
-            </div>
+      <!-- QUICK CANVAS SIZES -->
+      <div class="setting" role="group" aria-labelledby="lbl-quick-sizes">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:move-resize" aria-hidden="true"></ha-icon>
+            <span id="lbl-quick-sizes">Quick canvas sizes</span>
           </div>
-          <div class="hint">Applies a fixed custom canvas size instantly. Switch back to Dynamic or Preset below if needed.</div>
-        </div>
-
-        <!-- AUTO RESIZE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:resize"></ha-icon>
-              <label for="ddc-setting-autoResize">Auto resize cards</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-autoResize"></ha-switch>
-            </div>
+          <div class="control chips" role="group" aria-label="Quick sizes">
+            <button class="chip" data-w="1280" data-h="720">Tablet (1280×720)</button>
+            <button class="chip" data-w="1920" data-h="1080" aria-pressed="true">Desktop (1920×1080)</button>
+            <button class="chip" data-w="2560" data-h="1440">WQHD (2560×1440)</button>
           </div>
-          <div class="hint">Scale the layout with the viewport. Off = fixed canvas size.</div>
         </div>
+        <div class="hint">Applies a fixed custom canvas size instantly. Switch back to Dynamic or Preset below if needed.</div>
+      </div>
 
-        <!-- LIVE SNAP -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:drag-variant"></ha-icon>
-              <label for="ddc-setting-dragSnap">Live snap while dragging</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-dragSnap"></ha-switch>
-            </div>
+      <!-- AUTO RESIZE -->
+      <div class="setting" role="group" aria-labelledby="lbl-auto-resize">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:resize" aria-hidden="true"></ha-icon>
+            <label id="lbl-auto-resize" for="ddc-setting-autoResize">Auto resize cards</label>
           </div>
-          <div class="hint">While dragging, cards snap to the nearest grid lines in real time.</div>
-        </div>
-
-        <!-- OVERLAP -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:animation"></ha-icon>
-              <label for="ddc-setting-disableOverlap">Prevent overlap</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-disableOverlap"></ha-switch>
-            </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-autoResize"></ha-switch>
           </div>
-          <div class="hint">Blocks placements that would overlap another card.</div>
         </div>
+        <div class="hint">Scale the layout with the viewport. Off = fixed canvas size.</div>
+      </div>
 
-        <div class="divider"></div>
-
-        <!-- SIZE MODE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:move-resize"></ha-icon>
-              <label for="ddc-setting-sizeMode">Container size mode</label>
-            </div>
-            <div class="control">
-              <select id="ddc-setting-sizeMode">
-                <option value="dynamic">Dynamic</option>
-                <option value="preset">Preset</option>
-                <option value="auto">Auto</option>
-                <option value="fixed_custom">Fixed (custom)</option>
-              </select>
-            </div>
+      <!-- LIVE SNAP -->
+      <div class="setting" role="group" aria-labelledby="lbl-live-snap">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:drag-variant" aria-hidden="true"></ha-icon>
+            <label id="lbl-live-snap" for="ddc-setting-dragSnap">Live snap while dragging</label>
           </div>
-          <div class="hint">Dynamic fits the available space (reflows grid). Auto scales the whole grid to fit, preserving positions. Preset uses common screen sizes. Fixed lets you specify width & height.</div>
-        </div>
-
-        <!-- SIZE EXTRAS (injected) -->
-        <div id="ddc-setting-sizeExtras"></div>
-
-        <!-- ORIENTATION -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:phone-rotate-landscape"></ha-icon>
-              <label for="ddc-setting-orient">Orientation</label>
-            </div>
-            <div class="control">
-              <select id="ddc-setting-orient">
-                <option value="auto">Auto</option>
-                <option value="landscape">Landscape</option>
-                <option value="portrait">Portrait</option>
-              </select>
-            </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-dragSnap"></ha-switch>
           </div>
-          <div class="hint">For presets and fixed sizes, choose a preferred orientation. Auto adapts to the screen.</div>
         </div>
+        <div class="hint">While dragging, cards snap to the nearest grid lines in real time.</div>
+      </div>
 
-        <div class="divider"></div>
-
-        <!-- AUTOSAVE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:content-save"></ha-icon>
-              <label for="ddc-setting-autoSave">Auto save</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-autoSave"></ha-switch>
-            </div>
+      <!-- OVERLAP -->
+      <div class="setting" role="group" aria-labelledby="lbl-prevent-overlap">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:animation" aria-hidden="true"></ha-icon>
+            <label id="lbl-prevent-overlap" for="ddc-setting-disableOverlap">Prevent overlap</label>
           </div>
-          <div class="hint">Automatically persist layout changes after you drag or edit.</div>
-        </div>
-
-        <!-- AUTOSAVE DELAY -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:timer-outline"></ha-icon>
-              <label for="ddc-setting-autoSaveDebounce">Auto save delay (ms)</label>
-            </div>
-            <div class="control">
-              <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="50" />
-            </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-disableOverlap"></ha-switch>
           </div>
-          <div class="hint">Wait time after the last change before saving. Lower = more frequent saves.</div>
         </div>
-      </section>
+        <div class="hint">Blocks placements that would overlap another card.</div>
+      </div>
 
-        <!-- EDIT MODE PIN/PASSWORD -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:lock-outline"></ha-icon>
-              <label for="ddc-setting-editPin">Edit mode PIN / password</label>
-            </div>
-            <div class="control">
-              <input type="password" id="ddc-setting-editPin" placeholder="Leave blank to disable" />
-            </div>
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <!-- SIZE MODE -->
+      <div class="setting" role="group" aria-labelledby="lbl-size-mode">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:move-resize" aria-hidden="true"></ha-icon>
+            <label id="lbl-size-mode" for="ddc-setting-sizeMode">Container size mode</label>
           </div>
-          <div class="hint">If set, this code is required to enter Edit Mode.</div>
+          <div class="control">
+            <select id="ddc-setting-sizeMode">
+              <option value="dynamic">Dynamic</option>
+              <option value="preset">Preset</option>
+              <option value="auto">Auto</option>
+              <option value="fixed_custom">Fixed (custom)</option>
+            </select>
+          </div>
         </div>
+        <div class="hint">Dynamic fits the available space (reflows grid). Auto scales the whole grid to fit, preserving positions. Preset uses common screen sizes. Fixed lets you specify width &amp; height.</div>
+      </div>
 
+      <!-- SIZE EXTRAS (injected) -->
+      <div id="ddc-setting-sizeExtras" class="setting" aria-live="polite"></div>
 
-      <!-- Appearance -->
-      <section class="card">
-        <div class="section-head">
-          <ha-icon icon="mdi:palette-swatch"></ha-icon>
-          <h4>Appearance</h4>
+      <!-- ORIENTATION -->
+      <div class="setting" role="group" aria-labelledby="lbl-orientation">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:phone-rotate-landscape" aria-hidden="true"></ha-icon>
+            <label id="lbl-orientation" for="ddc-setting-orient">Orientation</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-orient">
+              <option value="auto">Auto</option>
+              <option value="landscape">Landscape</option>
+              <option value="portrait">Portrait</option>
+            </select>
+          </div>
         </div>
-        <p class="caption">Choose backgrounds and colors. Use theme vars like <code>var(--ha-card-background)</code>.</p>
+        <div class="hint">For presets and fixed sizes, choose a preferred orientation. Auto adapts to the screen.</div>
+      </div>
 
-        <!-- CONTAINER BG -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:palette-swatch"></ha-icon>
-              <label for="ddc-setting-containerBg">Container background</label>
-            </div>
-            <div class="control" style="flex:1">
-              <div class="color-pair" style="margin-bottom:8px">
+      <div class="divider" role="separator" aria-hidden="true"></div>
+
+      <!-- AUTOSAVE -->
+      <div class="setting" role="group" aria-labelledby="lbl-autosave">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:content-save" aria-hidden="true"></ha-icon>
+            <label id="lbl-autosave" for="ddc-setting-autoSave">Auto save</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-autoSave"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Automatically persist layout changes after you drag or edit.</div>
+      </div>
+
+      <!-- AUTOSAVE DELAY -->
+      <div class="setting" role="group" aria-labelledby="lbl-autosave-delay">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:timer-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-autosave-delay" for="ddc-setting-autoSaveDebounce">Auto save delay (ms)</label>
+          </div>
+          <div class="control">
+            <input type="number" id="ddc-setting-autoSaveDebounce" min="100" max="10000" step="50" />
+          </div>
+        </div>
+        <div class="hint">Wait time after the last change before saving. Lower = more frequent saves.</div>
+      </div>
+
+      <!-- EDIT MODE PIN/PASSWORD -->
+      <div class="setting" role="group" aria-labelledby="lbl-edit-pin">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:lock-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-edit-pin" for="ddc-setting-editPin">Edit mode PIN / password</label>
+          </div>
+          <div class="control">
+            <input type="password" id="ddc-setting-editPin" placeholder="Leave blank to disable" />
+          </div>
+        </div>
+        <div class="hint">If set, this code is required to enter Edit Mode.</div>
+      </div>
+    </section>
+
+    <!-- Appearance -->
+    <section class="card" aria-labelledby="appearance-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
+        <h4 id="appearance-head">Appearance</h4>
+      </div>
+      <p class="caption">Choose backgrounds and colors. Use theme vars like <code>var(--ha-card-background)</code>.</p>
+
+      <!-- CONTAINER BG -->
+      <div class="setting" role="group" aria-labelledby="lbl-container-bg">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
+            <label id="lbl-container-bg" for="ddc-setting-containerBg">Container background</label>
+          </div>
+          <div class="control">
+            <div class="stack">
+              <div class="color-pair">
                 <input type="color" id="ddc-color-containerBg" />
                 <input type="text" id="ddc-setting-containerBg" placeholder="transparent · #123456 · var(--ha-card-background)" />
               </div>
+              <div class="swatches" id="ddc-swatches-containerBg"></div>
+              <div class="gradients" id="ddc-gradients-containerBg"></div>
             </div>
           </div>
-          <div class="swatches" id="ddc-swatches-containerBg"></div>
-          <div class="gradients" id="ddc-gradients-containerBg" style="margin-top:6px"></div>
-          <div class="hint">Accepts plain colors or theme variables.</div>
         </div>
+        <div class="hint">Accepts plain colors or theme variables.</div>
+      </div>
 
-        <!-- CARD BG -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:palette-swatch"></ha-icon>
-              <label for="ddc-setting-cardBg">Card background</label>
-            </div>
-            <div class="control" style="flex:1">
-              <div class="color-pair" style="margin-bottom:8px">
+      <!-- CARD BG -->
+      <div class="setting" role="group" aria-labelledby="lbl-card-bg">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
+            <label id="lbl-card-bg" for="ddc-setting-cardBg">Card background</label>
+          </div>
+          <div class="control">
+            <div class="stack">
+              <div class="color-pair">
                 <input type="color" id="ddc-color-cardBg" />
                 <input type="text" id="ddc-setting-cardBg" placeholder="#121212 · var(--ha-card-background)" />
               </div>
+              <div class="swatches" id="ddc-swatches-cardBg"></div>
+              <div class="gradients" id="ddc-gradients-cardBg"></div>
             </div>
           </div>
-          <div class="swatches" id="ddc-swatches-cardBg"></div>
-          <div class="gradients" id="ddc-gradients-cardBg" style="margin-top:6px"></div>
-          <div class="hint">Affects the background of each draggable card container.</div>
         </div>
+        <div class="hint">Affects the background of each draggable card container.</div>
+      </div>
 
-        <div class="divider"></div>
+      <div class="divider" role="separator" aria-hidden="true"></div>
 
-        <!-- BACKGROUND MODE -->
-      <div class="setting">
+      <!-- BACKGROUND MODE -->
+      <div class="setting" role="group" aria-labelledby="lbl-bg-mode">
         <div class="row">
           <div class="title">
-            <ha-icon icon="mdi:layers-triple"></ha-icon>
-            <label for="ddc-bg-mode">Background type</label>
+            <ha-icon icon="mdi:layers-triple" aria-hidden="true"></ha-icon>
+            <label id="lbl-bg-mode" for="ddc-bg-mode">Background type</label>
           </div>
           <div class="control">
             <select id="ddc-bg-mode">
@@ -9937,67 +9997,68 @@ modal.innerHTML = `
         <div class="hint">Choose what renders behind your cards.</div>
       </div>
 
-      <!-- BACKGROUND IMAGE -->
-      <div class="setting" data-bg-section="image">
+      <!-- BACKGROUND: IMAGE -->
+      <div class="setting" data-bg-section="image" role="group" aria-labelledby="lbl-bg-image">
         <div class="row">
           <div class="title">
-            <ha-icon icon="mdi:image-outline"></ha-icon>
-            <label for="ddc-setting-bgImg">Background image</label>
+            <ha-icon icon="mdi:image-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-bg-image" for="ddc-setting-bgImg">Background image</label>
           </div>
-          <div class="control" style="flex:1; flex-direction:column; align-items:flex-start">
-            <div class="input-file">
-              <label class="file-btn" for="ddc-file-bg">Upload image</label>
-              <input id="ddc-file-bg" type="file" accept="image/*" />
-              <div class="thumb" id="ddc-bg-thumb"></div>
-              <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
-            </div>
+          <div class="control">
+            <div class="stack">
+              <div class="input-file">
+                <label class="file-btn" for="ddc-file-bg">Upload image</label>
+                <input id="ddc-file-bg" type="file" accept="image/*" />
+                <div class="thumb" id="ddc-bg-thumb"></div>
+                <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
+              </div>
 
-            <div class="row" style="margin-top:8px; width:100%">
-              <label style="flex:0 0 auto" for="ddc-setting-bgImg">or URL</label>
-              <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" style="flex:1"/>
-            </div>
+              <div class="row">
+                <label for="ddc-setting-bgImg">or URL</label>
+                <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" />
+              </div>
 
-            <!-- NEW: options -->
-            <div class="bg-opts" style="width:100%">
-              <label for="ddc-bg-repeat"><ha-icon icon="mdi:repeat"></ha-icon> Repeat</label>
-              <select id="ddc-bg-repeat">
-                <option value="no-repeat">No repeat</option>
-                <option value="repeat">Repeat</option>
-                <option value="repeat-x">Repeat X</option>
-                <option value="repeat-y">Repeat Y</option>
-              </select>
+              <div class="bg-opts">
+                <label for="ddc-bg-repeat"><ha-icon icon="mdi:repeat"></ha-icon> Repeat</label>
+                <select id="ddc-bg-repeat">
+                  <option value="no-repeat">No repeat</option>
+                  <option value="repeat">Repeat</option>
+                  <option value="repeat-x">Repeat X</option>
+                  <option value="repeat-y">Repeat Y</option>
+                </select>
 
-              <label for="ddc-bg-size"><ha-icon icon="mdi:arrow-expand-all"></ha-icon> Size</label>
-              <select id="ddc-bg-size">
-                <option value="cover">Cover</option>
-                <option value="contain">Contain</option>
-                <option value="auto">Auto</option>
-                <option value="100% 100%">Fill (stretch)</option>
-              </select>
+                <label for="ddc-bg-size"><ha-icon icon="mdi:arrow-expand-all"></ha-icon> Size</label>
+                <select id="ddc-bg-size">
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="auto">Auto</option>
+                  <option value="100% 100%">Fill (stretch)</option>
+                </select>
 
-              <label for="ddc-bg-position"><ha-icon icon="mdi:crosshairs-gps"></ha-icon> Position</label>
-              <select id="ddc-bg-position">
-                <option value="center center">Center</option>
-                <option value="top center">Top</option>
-                <option value="bottom center">Bottom</option>
-                <option value="left center">Left</option>
-                <option value="right center">Right</option>
-                <option value="top left">Top left</option>
-                <option value="top right">Top right</option>
-                <option value="bottom left">Bottom left</option>
-                <option value="bottom right">Bottom right</option>
-              </select>
+                <label for="ddc-bg-position"><ha-icon icon="mdi:crosshairs-gps"></ha-icon> Position</label>
+                <select id="ddc-bg-position">
+                  <option value="center center">Center</option>
+                  <option value="top center">Top</option>
+                  <option value="bottom center">Bottom</option>
+                  <option value="left center">Left</option>
+                  <option value="right center">Right</option>
+                  <option value="top left">Top left</option>
+                  <option value="top right">Top right</option>
+                  <option value="bottom left">Bottom left</option>
+                  <option value="bottom right">Bottom right</option>
+                </select>
 
-              <label for="ddc-bg-attachment"><ha-icon icon="mdi:pin"></ha-icon> Attachment</label>
-              <select id="ddc-bg-attachment">
-                <option value="scroll">Scroll</option>
-                <option value="fixed">Fixed</option>
-              </select>
+                <label for="ddc-bg-attachment"><ha-icon icon="mdi:pin"></ha-icon> Attachment</label>
+                <select id="ddc-bg-attachment">
+                  <option value="scroll">Scroll</option>
+                  <option value="fixed">Fixed</option>
+                </select>
 
-              <label for="ddc-bg-opacity"><ha-icon icon="mdi:opacity"></ha-icon> Opacity</label>
-              <div style="display:flex; align-items:center; gap:10px">
-                <input type="range" id="ddc-bg-opacity" min="0" max="100" step="1" style="width:220px" />
-                <output id="ddc-bg-opacity-out">100%</output>
+                <label for="ddc-bg-opacity"><ha-icon icon="mdi:opacity"></ha-icon> Opacity</label>
+                <div class="range-wrap">
+                  <input type="range" id="ddc-bg-opacity" min="0" max="100" step="1" />
+                  <output id="ddc-bg-opacity-out">100%</output>
+                </div>
               </div>
             </div>
           </div>
@@ -10006,243 +10067,259 @@ modal.innerHTML = `
       </div>
 
       <!-- BACKGROUND: PARTICLES -->
-      <div class="setting" data-bg-section="particles" style="display:none">
+      <div class="setting" data-bg-section="particles" role="group" aria-labelledby="lbl-bg-particles" hidden>
         <div class="row">
           <div class="title">
-            <ha-icon icon="mdi:blur"></ha-icon>
-            <label>Particles.js</label>
+            <ha-icon icon="mdi:blur" aria-hidden="true"></ha-icon>
+            <label id="lbl-bg-particles" for="ddc-particles-url">Particles.js</label>
           </div>
-          <div class="control" style="flex-direction:column; align-items:flex-start; gap:8px;">
-            <label for="ddc-particles-url">Config JSON URL (optional)</label>
-            <input type="text" id="ddc-particles-url" placeholder="/local/particles.json or https://…">
-            <div class="hint">If empty, a sensible default is used. For HACS, prefer hosting the library + JSON under <code>/config/www</code> (served as <code>/local/…</code>).</div>
+          <div class="control">
+            <div class="stack">
+              <label for="ddc-particles-url">Config JSON URL (optional)</label>
+              <input type="text" id="ddc-particles-url" placeholder="/local/particles.json or https://…" />
+              <div class="hint">If empty, a sensible default is used. For HACS, prefer hosting the library + JSON under <code>/config/www</code> (served as <code>/local/…</code>).</div>
 
-            <label style="display:flex;align-items:center;gap:8px;">
-              <ha-switch id="ddc-particles-pointer"></ha-switch>
-              Enable pointer interactivity (hover/click)
-            </label>
-            <div class="hint">Leave off if you want guaranteed unobstructed dragging.</div>
+              <label class="row" for="ddc-particles-pointer" style="gap:8px">
+                <ha-switch id="ddc-particles-pointer"></ha-switch>
+                <span>Enable pointer interactivity (hover/click)</span>
+              </label>
+              <div class="hint">Leave off if you want guaranteed unobstructed dragging.</div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- BACKGROUND: YOUTUBE -->
-      <div class="setting" data-bg-section="youtube" style="display:none">
+      <div class="setting" data-bg-section="youtube" role="group" aria-labelledby="lbl-bg-youtube" hidden>
         <div class="row">
           <div class="title">
-            <ha-icon icon="mdi:youtube"></ha-icon>
-            <label>YouTube background</label>
+            <ha-icon icon="mdi:youtube" aria-hidden="true"></ha-icon>
+            <label id="lbl-bg-youtube" for="ddc-youtube-url">YouTube background</label>
           </div>
-          <div class="control" style="flex-direction:column; align-items:flex-start; gap:8px;">
-            <label for="ddc-youtube-url">YouTube URL or video ID</label>
-            <input type="text" id="ddc-youtube-url" placeholder="https://youtu.be/… or dQw4w9WgXcQ">
+          <div class="control">
+            <div class="stack">
+              <label for="ddc-youtube-url">YouTube URL or video ID</label>
+              <input type="text" id="ddc-youtube-url" placeholder="https://youtu.be/… or dQw4w9WgXcQ" />
 
-            <div style="display:flex; gap:12px; width:100%; max-width:420px;">
-              <label style="flex:1;">
-                <span>Start (s)</span>
-                <input type="number" id="ddc-youtube-start" min="0" step="1" style="width:100%">
+              <div class="row" style="gap:12px">
+                <label for="ddc-youtube-start" class="grow">
+                  <span>Start (s)</span>
+                  <input type="number" id="ddc-youtube-start" min="0" step="1" />
+                </label>
+                <label for="ddc-youtube-end" class="grow">
+                  <span>End (s)</span>
+                  <input type="number" id="ddc-youtube-end" min="1" step="1" />
+                </label>
+              </div>
+
+              <div class="row" style="gap:18px; align-items:center">
+                <label for="ddc-youtube-mute" class="row" style="gap:8px">
+                  <ha-switch id="ddc-youtube-mute" checked></ha-switch>
+                  <span>Mute</span>
+                </label>
+                <label for="ddc-youtube-loop" class="row" style="gap:8px">
+                  <ha-switch id="ddc-youtube-loop" checked></ha-switch>
+                  <span>Loop</span>
+                </label>
+              </div>
+
+              <div class="row" style="gap:12px">
+                <label for="ddc-youtube-size" class="grow">
+                  <ha-icon icon="mdi:arrow-expand-all" aria-hidden="true"></ha-icon>
+                  <span>Size</span>
+                  <select id="ddc-youtube-size">
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="auto">Auto</option>
+                    <option value="100% 100%">Fill (stretch)</option>
+                  </select>
+                </label>
+
+                <label for="ddc-youtube-position" class="grow">
+                  <ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>
+                  <span>Position</span>
+                  <select id="ddc-youtube-position">
+                    <option value="top left">Top left</option>
+                    <option value="top">Top</option>
+                    <option value="top right">Top right</option>
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                    <option value="bottom left">Bottom left</option>
+                    <option value="bottom">Bottom</option>
+                    <option value="bottom right">Bottom right</option>
+                  </select>
+                </label>
+
+                <label for="ddc-youtube-attachment" class="grow">
+                  <ha-icon icon="mdi:image-lock" aria-hidden="true"></ha-icon>
+                  <span>Attachment</span>
+                  <select id="ddc-youtube-attachment">
+                    <option value="scroll">Scroll</option>
+                    <option value="fixed">Fixed</option>
+                  </select>
+                </label>
+              </div>
+
+              <label for="ddc-youtube-opacity">
+                <ha-icon icon="mdi:opacity" aria-hidden="true"></ha-icon> Opacity
               </label>
-              <label style="flex:1;">
-                <span>End (s)</span>
-                <input type="number" id="ddc-youtube-end" min="1" step="1" style="width:100%">
-              </label>
+              <div class="range-wrap">
+                <input type="range" id="ddc-youtube-opacity" min="0" max="100" step="1" value="100" />
+                <output id="ddc-youtube-opacity-out">100%</output>
+              </div>
+
+              <div class="hint">Video plays muted, fills the canvas (“cover”), sits under the grid and cards, and ignores pointer events so dragging remains smooth.</div>
             </div>
-
-            <div style="display:flex; gap:18px; align-items:center;">
-              <label style="display:flex;align-items:center;gap:8px;">
-                <ha-switch id="ddc-youtube-mute" checked></ha-switch> Mute
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;">
-                <ha-switch id="ddc-youtube-loop" checked></ha-switch> Loop
-              </label>
-            
-
-            <label for="ddc-youtube-size"><ha-icon icon="mdi:arrow-expand-all"></ha-icon> Size</label>
-            <select id="ddc-youtube-size">
-              <option value="cover">Cover</option>
-              <option value="contain">Contain</option>
-              <option value="auto">Auto</option>
-              <option value="100% 100%">Fill (stretch)</option>
-            </select>
-            
-            <label for="ddc-youtube-position"><ha-icon icon="mdi:crosshairs-gps"></ha-icon> Position</label>
-            <select id="ddc-youtube-position">
-              <option value="top left">Top left</option>
-              <option value="top">Top</option>
-              <option value="top right">Top right</option>
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-              <option value="bottom left">Bottom left</option>
-              <option value="bottom">Bottom</option>
-              <option value="bottom right">Bottom right</option>
-            </select>
-
-            <label for="ddc-youtube-attachment"><ha-icon icon="mdi:image-lock"></ha-icon> Attachment</label>
-            <select id="ddc-youtube-attachment">
-              <option value="scroll">Scroll</option>
-              <option value="fixed">Fixed</option>
-            </select>
-
-
-            <label for="ddc-youtube-opacity"><ha-icon icon="mdi:opacity"></ha-icon> Opacity</label>
-            <div style="display:flex;align-items:center;gap:8px;width:100%;max-width:420px;">
-              <input type="range" id="ddc-youtube-opacity" min="0" max="100" step="1" value="100" style="flex:1;">
-              <output id="ddc-youtube-opacity-out" style="min-width:48px;text-align:right;">100%</output>
-            </div>
-
-</div>
-
-            <div class="hint">Video plays muted, fills the canvas (“cover”), sits under the grid and cards, and ignores pointer events so dragging remains smooth.</div>
           </div>
         </div>
       </div>
+    </section>
 
-
-      </section>
-
-      <!-- Behaviour -->
-      <section class="card">
-        <div class="section-head">
-          <ha-icon icon="mdi:tune"></ha-icon>
-          <h4>Behaviour</h4>
-        </div>
-        <p class="caption">Animation, logging, and Home Assistant chrome visibility.</p>
-
-        <!-- ANIMATE -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:play-box"></ha-icon>
-              <label for="ddc-setting-animate">Animate cards</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-animate"></ha-switch>
-            </div>
-          </div>
-          <div class="hint">Smooth transitions when moving and resizing cards.</div>
-        </div>
-
-        <!-- DEBUG -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:bug-play-outline"></ha-icon>
-              <label for="ddc-setting-debug">Enable debug logging</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-debug"></ha-switch>
-            </div>
-          </div>
-          <div class="hint">Extra console logs for troubleshooting layout issues.</div>
-        </div>
-
-        <!-- HIDE HEADER -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:page-layout-header"></ha-icon>
-              <label for="ddc-setting-hideHdr">Hide HA Header</label>
-              <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference"></ha-icon>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-hideHdr"></ha-switch>
-            </div>
-          </div>
-          <div class="hint">Removes the top app bar (Search / Assist / Edit). It auto-shows in Edit mode.</div>
-        </div>
-
-        <!-- HIDE SIDEBAR -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:page-layout-sidebar-left"></ha-icon>
-              <label for="ddc-setting-hideSbar">Hide HA Sidebar</label>
-              <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference"></ha-icon>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-hideSbar"></ha-switch>
-            </div>
-          </div>
-          <div class="hint">Hides the left navigation drawer to maximize canvas space.</div>
-        </div>
-      </section>
-
-
-      <!-- Screen Saver -->
-      <section class="card">
-        <div class="section-head">
-          <ha-icon icon="mdi:clock-outline"></ha-icon>
-          <h4>Screen saver</h4>
-        </div>
-        <p class="caption">Show a digital clock after inactivity.</p>
-
-        <!-- Enable Screen Saver -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:power"></ha-icon>
-              <label for="ddc-setting-screenSaverEnabled">Enable screen saver</label>
-            </div>
-            <div class="control">
-              <ha-switch id="ddc-setting-screenSaverEnabled"></ha-switch>
-            </div>
-          </div>
-          <div class="hint">Activate a screen saver overlay with time and date.</div>
-        </div>
-
-        <!-- Screen Saver Delay -->
-        <div class="setting">
-          <div class="row">
-            <div class="title">
-              <ha-icon icon="mdi:timer-outline"></ha-icon>
-              <label for="ddc-setting-screenSaverDelay">Activation delay</label>
-            </div>
-            <div class="control">
-              <div class="range-wrap">
-                <input type="range" id="ddc-setting-screenSaverDelay" min="1" max="20" step="1" />
-                <output id="ddc-screenSaverDelayOut">5 min</output>
-              </div>
-            </div>
-          </div>
-          <div class="hint">Delay (in minutes) before the screen saver activates.</div>
-        </div>
-      </section>
-
-      <!-- Tabs -->
-    <section class="card tabs-card">
+    <!-- Behaviour -->
+    <section class="card" aria-labelledby="behaviour-head">
       <div class="section-head">
-        <ha-icon icon="mdi:tab"></ha-icon>
-        <h4>Tabs</h4>
+        <ha-icon icon="mdi:tune" aria-hidden="true"></ha-icon>
+        <h4 id="behaviour-head">Behaviour</h4>
+      </div>
+      <p class="caption">Animation, logging, and Home Assistant chrome visibility.</p>
+
+      <!-- ANIMATE -->
+      <div class="setting" role="group" aria-labelledby="lbl-animate">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:play-box" aria-hidden="true"></ha-icon>
+            <label id="lbl-animate" for="ddc-setting-animate">Animate cards</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-animate"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Smooth transitions when moving and resizing cards.</div>
+      </div>
+
+      <!-- DEBUG -->
+      <div class="setting" role="group" aria-labelledby="lbl-debug">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:bug-play-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-debug" for="ddc-setting-debug">Enable debug logging</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-debug"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Extra console logs for troubleshooting layout issues.</div>
+      </div>
+
+      <!-- HIDE HEADER -->
+      <div class="setting" role="group" aria-labelledby="lbl-hide-hdr">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:page-layout-header" aria-hidden="true"></ha-icon>
+            <label id="lbl-hide-hdr" for="ddc-setting-hideHdr">Hide HA Header</label>
+            <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference" aria-hidden="true"></ha-icon>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-hideHdr"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Removes the top app bar (Search / Assist / Edit). It auto-shows in Edit mode.</div>
+      </div>
+
+      <!-- HIDE SIDEBAR -->
+      <div class="setting" role="group" aria-labelledby="lbl-hide-sbar">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:page-layout-sidebar-left" aria-hidden="true"></ha-icon>
+            <label id="lbl-hide-sbar" for="ddc-setting-hideSbar">Hide HA Sidebar</label>
+            <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference" aria-hidden="true"></ha-icon>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-hideSbar"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Hides the left navigation drawer to maximize canvas space.</div>
+      </div>
+    </section>
+
+    <!-- Screen Saver -->
+    <section class="card" aria-labelledby="screensaver-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:clock-outline" aria-hidden="true"></ha-icon>
+        <h4 id="screensaver-head">Screen saver</h4>
+      </div>
+      <p class="caption">Show a digital clock after inactivity.</p>
+
+      <!-- Enable -->
+      <div class="setting" role="group" aria-labelledby="lbl-ss-enable">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:power" aria-hidden="true"></ha-icon>
+            <label id="lbl-ss-enable" for="ddc-setting-screenSaverEnabled">Enable screen saver</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-screenSaverEnabled"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Activate a screen saver overlay with time and date.</div>
+      </div>
+
+      <!-- Delay -->
+      <div class="setting" role="group" aria-labelledby="lbl-ss-delay">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:timer-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-ss-delay" for="ddc-setting-screenSaverDelay">Activation delay</label>
+          </div>
+          <div class="control">
+            <div class="range-wrap">
+              <input type="range" id="ddc-setting-screenSaverDelay" min="1" max="20" step="1" />
+              <output id="ddc-screenSaverDelayOut" for="ddc-setting-screenSaverDelay">5 min</output>
+            </div>
+          </div>
+        </div>
+        <div class="hint">Delay (in minutes) before the screen saver activates.</div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section class="card tabs-card" aria-labelledby="tabs-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:tab" aria-hidden="true"></ha-icon>
+        <h4 id="tabs-head">Tabs</h4>
       </div>
       <p class="caption">Create, rename, delete, and choose the default tab. Cards use <code>tabId</code> to decide where they appear.</p>
 
       <!-- Current tabs list -->
-      <div id="ddc-tabs-list"></div>
+      <div id="ddc-tabs-list" class="setting" aria-live="polite"></div>
 
       <!-- Add new tab -->
-      <div class="setting" style="margin-top:8px">
+      <div class="setting" role="group" aria-labelledby="lbl-add-tab">
         <div class="row">
           <div class="title">
-            <ha-icon icon="mdi:tab-plus"></ha-icon>
-            <label for="ddc-new-tab-name">Add tab</label>
+            <ha-icon icon="mdi:tab-plus" aria-hidden="true"></ha-icon>
+            <label id="lbl-add-tab" for="ddc-new-tab-name">Add tab</label>
           </div>
-          <div class="control" style="flex:1">
-            <input type="text" id="ddc-new-tab-name" placeholder="e.g. Lights" />
-            <button class="btn primary" id="ddc-add-tab-btn">Add</button>
+          <div class="control">
+            <div class="row">
+              <input type="text" id="ddc-new-tab-name" placeholder="e.g. Lights" class="grow" />
+              <button class="btn primary" id="ddc-add-tab-btn">Add</button>
+            </div>
           </div>
         </div>
         <div class="hint">Tab IDs must be unique. The label defaults to the ID if left empty.</div>
       </div>
     </section>
 
-    </div>
-
-    <div class="footer">
-      <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
-      <button class="btn primary" id="ddc-settings-save">Save</button>
-    </div>
   </div>
+
+  <div class="footer">
+    <button class="btn secondary" id="ddc-settings-cancel">Cancel</button>
+    <button class="btn primary" id="ddc-settings-save">Save</button>
+  </div>
+</div>
+
 `;
 
     // Only allow one modal at a time across the card. If any modal exists in
