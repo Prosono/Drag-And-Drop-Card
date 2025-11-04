@@ -1908,6 +1908,27 @@ async _onToolbarAction_(action, ctx = {}) {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this.__rebuiltCards = new WeakSet();
   }
+  // === GRID SELECT PATCH START (fields) ===
+  _gridCanvas = null;
+  _gridCtx = null;
+  _gridCols = 0;
+  _gridRows = 0;
+  _gridCellSize = 0;
+  _gridDown = false;
+  _gridStartCol = -1;
+  _gridStartRow = -1;
+  _gridHoverCol = -1;
+  _gridHoverRow = -1;
+  _gridCurrCol = -1;
+  _gridCurrRow = -1;
+  _gridDirty = false;
+  _gridRAF = 0;
+  _gridTile = null;
+  __gridPrevEditMode = undefined;
+  __gridRO = null;
+  __gridPollT = null;
+  // === GRID SELECT PATCH END (fields) ===
+
 
   
   // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
@@ -3250,7 +3271,7 @@ _applyGridVars() {
       .chip .mini.pill{ padding:0; }
 
       /* Edit highlight */
-      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; }
+      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; overflow: hidden; }
       .card-wrapper.editing::after{
         content:""; position:absolute; inset:0; border:1px dashed var(--primary-color,#03a9f4);
         border-radius:12px; pointer-events:none; opacity:.35; z-index:5; box-sizing:border-box;
@@ -3260,27 +3281,30 @@ _applyGridVars() {
       .card-wrapper.editing .shield, .card-wrapper.dragging .shield{pointer-events:auto; cursor:grab}
 
       .resize-handle{
-        display:none; position:absolute; bottom:0; right:0; width:40px; height:40px;
-        background:var(--primary-color); color:#fff; border-top-left-radius:40px;
-        cursor:se-resize; z-index:999; box-shadow:0 3px 8px rgba(0,0,0,.28);
+        display:none; position:absolute; bottom: 6px; right: 6px; width:40px; height:40px;
+        background: #27BEF5 !important; color:#fff; border-top-left-radius:40px;
+        cursor:se-resize; z-index:9999; box-shadow:0 3px 8px rgba(0,0,0,.28);
         display:flex; align-items:center; justify-content:center;
         transition:background .15s, transform .1s, box-shadow .15s;
+        border-bottom-right-radius:5px;
       }
       .resize-handle:hover{ transform:scale(1.05); box-shadow:0 6px 16px rgba(0,0,0,.35); filter:brightness(1.05); }
       .card-wrapper.editing .resize-handle{ display:flex }
-      .resize-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; }
+      .resize-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; color: #fff !important; }
 
       /* Delete handle */
       .delete-handle{
         display:none; position:absolute; top:0; left:0; width:40px; height:40px;
-        background:linear-gradient(135deg, rgba(236,72,72,.9) 0%, rgba(255,105,97,1) 100%);
-        color:#fff; border-bottom-right-radius:40px; z-index:999;
+        background: linear-gradient(135deg, rgba(236,72,72,.98) 0%, rgba(255,85,85,1) 100%) !important;
+        color: #fff !important;
         box-shadow:0 3px 8px rgba(0,0,0,.28); cursor:pointer; align-items:center; justify-content:center;
         transition:background .15s, transform .1s, box-shadow .15s;
+        border-bottom-right-radius:10px;
+
       }
       .delete-handle:hover{ transform:scale(1.05); box-shadow:0 6px 16px rgba(0,0,0,.35); filter:brightness(1.05); }
       .card-wrapper.editing .delete-handle{ display:flex }
-      .delete-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; }
+      .delete-handle ha-icon{ --mdc-icon-size:20px; width:20px; height:20px; pointer-events:none; color: #fff !important;}
 
       /* modal */
       .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:9000 }
@@ -3816,7 +3840,16 @@ _applyGridVars() {
         }
               
 
-        </style>
+        
+/* === GRID SELECT PATCH START (styles) === */
+.ddc-grid-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;     /* receives events only on empty space since it's behind cards */
+  z-index: 5;               /* above visual grid, but behind draggable cards */
+}
+/* === GRID SELECT PATCH END (styles) === */
+</style>
         <div class="ddc-root">
         
 <div class="toolbar ddc-toolbar streamlined v2" role="toolbar" aria-label="Layout editor">
@@ -4086,7 +4119,7 @@ _startInitialAutosize() {
 
 
 connectedCallback() {
-    this._startInitialAutosize?.();
+    try { this._installGridObservers_(); this._updateGridButtonsVisibility(); } catch {}this._startInitialAutosize?.();
     try { this._applyHaChromeVisibility_?.(); 
 // After any card drop, re-apply auto fill (no-scale) when in Auto mode
 this.addEventListener('ddc:dragend', () => {
@@ -4206,7 +4239,7 @@ this.addEventListener('ddc:dragend', () => {
 }
   
   disconnectedCallback() {
-    try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
+    try { this._uninstallGridObservers_(); } catch {}try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
     try { this._applyHaChromeVisibility_?.(); } catch {}
     if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
     if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
@@ -12482,23 +12515,451 @@ _importDesign() {
 }
 
 if (!customElements.get('drag-and-drop-card')) {
+
+  Object.assign(DragAndDropCard.prototype, {
+    /* === GRID SELECT PATCH START (hooks & builder) === */
+    _updateGridButtonsVisibility() {
+      const inEdit = !!this.editMode;
+      const grid = Number(this._config?.grid ?? this._options?.grid ?? 10);
+      const bigEnough = grid > 20;
+      if (!inEdit || !bigEnough) { this._destroyGridCanvas(); return; }
+      this._buildOrUpdateGridCanvas();
+    },
+
+    _requestGridButtonsUpdateSoon() {
+      clearTimeout(this._gridLayoutT);
+      this._gridLayoutT = setTimeout(() => this._updateGridButtonsVisibility(), 50);
+    },
+
+    _buildOrUpdateGridCanvas() {
+      const container = this.cardContainer;
+      if (!container || !container.isConnected) return;
+
+      const gridSize = Number(this._config?.grid ?? this._options?.grid ?? 10);
+      this._gridCellSize = gridSize;
+
+      if (!this._gridCanvas) {
+        const c = document.createElement('canvas');
+        c.className = 'ddc-grid-canvas';
+        // behind cards: insert as first child
+        container.insertBefore(c, container.firstChild || null);
+        this._gridCanvas = c;
+        this._gridCtx = c.getContext('2d');
+
+        c.addEventListener('pointerdown', (ev)=>this._onGridPointerDown(ev), { passive: true });
+        c.addEventListener('pointermove', (ev)=>this._onGridPointerMove(ev), { passive: true });
+        c.addEventListener('pointerup',   (ev)=>this._onGridPointerUp(ev),   { passive: true });
+        c.addEventListener('pointercancel', (ev)=>this._onGridPointerCancel(ev), { passive: true });
+        c.addEventListener('lostpointercapture', (ev)=>this._onGridPointerCancel(ev), { passive: true });
+      }
+
+      // size canvas to container (retina-aware)
+      const rect = container.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      this._gridCanvas.width  = Math.max(1, Math.round(rect.width  * dpr));
+      this._gridCanvas.height = Math.max(1, Math.round(rect.height * dpr));
+      this._gridCanvas.style.width  = rect.width  + 'px';
+      this._gridCanvas.style.height = rect.height + 'px';
+
+      this._gridCols = Math.max(1, Math.floor(rect.width  / gridSize));
+      this._gridRows = Math.max(1, Math.floor(rect.height / gridSize));
+
+      // glass tile for full cell
+      this._buildGridTile_(gridSize, dpr);
+      this._markGridDirty();
+    },
+
+    _destroyGridCanvas() {
+      cancelAnimationFrame(this._gridRAF);
+      this._gridRAF = 0;
+      if (this._gridCanvas?.parentElement) this._gridCanvas.parentElement.removeChild(this._gridCanvas);
+      this._gridCanvas = null;
+      this._gridCtx = null;
+      this._gridTile = null;
+      this._gridDown = false;
+      this._gridHoverCol = this._gridHoverRow = -1;
+    },
+    /* === GRID SELECT PATCH END (hooks & builder) === */
+
+    /* === GRID SELECT PATCH START (rendering) === */
+    // Draw the full grid cell (no inner padding/gap) so visuals match actual grid cells
+    _buildGridTile_(gridSize, dpr) {
+      const r = Math.min(10, gridSize * 0.25);
+      const tw = Math.max(1, Math.round(gridSize * dpr));
+      const th = tw;
+
+      const off = document.createElement('canvas');
+      off.width = tw;
+      off.height = th;
+      const ctx = off.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      const x = 0, y = 0, w = gridSize, h = gridSize;
+      ctx.clearRect(0, 0, tw, th);
+      ctx.beginPath();
+      const rr = Math.min(r, w/2, h/2);
+      ctx.moveTo(x+rr, y);
+      ctx.arcTo(x+w, y, x+w, y+h, rr);
+      ctx.arcTo(x+w, y+h, x, y+h, rr);
+      ctx.arcTo(x, y+h, x, y, rr);
+      ctx.arcTo(x, y, x+w, y, rr);
+      ctx.closePath();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      this._gridTile = off;
+    },
+
+    _markGridDirty() {
+      if (this._gridDirty) return;
+      this._gridDirty = true;
+      this._gridRAF = requestAnimationFrame(() => {
+        this._gridDirty = false;
+        this._renderGridCanvas_();
+      });
+    },
+
+    _renderGridCanvas_() {
+      const c = this._gridCanvas; if (!c) return;
+      const ctx = this._gridCtx;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const grid = this._gridCellSize || 10;
+
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      if (this._gridTile) {
+        const pat = ctx.createPattern(this._gridTile, 'repeat');
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, c.width / dpr, c.height / dpr);
+        ctx.restore();
+      }
+
+      // Hover cell – full cell bounds
+      if (this._gridHoverCol >= 0 && this._gridHoverRow >= 0) {
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+
+        const x = this._gridHoverCol * grid;
+        const y = this._gridHoverRow * grid;
+        const w = grid;
+        const h = grid;
+
+        this._roundRect_(ctx, x, y, w, h, Math.min(10, grid * 0.25));
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Selection rectangle – full grid cells, no insets
+      if (this._gridDown && this._gridStartCol >= 0 && this._gridStartRow >= 0 &&
+          this._gridCurrCol  >= 0 && this._gridCurrRow  >= 0) {
+
+        const minCol = Math.min(this._gridStartCol, this._gridCurrCol);
+        const maxCol = Math.max(this._gridStartCol, this._gridCurrCol);
+        const minRow = Math.min(this._gridStartRow, this._gridCurrRow);
+        const maxRow = Math.max(this._gridStartRow, this._gridCurrRow);
+
+        const x = minCol * grid;
+        const y = minRow * grid;
+        const w = (maxCol - minCol + 1) * grid;
+        const h = (maxRow - minRow + 1) * grid;
+
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = 'rgba(0, 160, 255, 0.22)';
+        ctx.strokeStyle = 'rgba(0, 160, 255, 0.45)';
+        ctx.lineWidth = 2;
+        this._roundRect_(ctx, x, y, w, h, Math.min(12, grid * 0.3));
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+
+    _roundRect_(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+rr, y);
+      ctx.arcTo(x+w, y, x+w, y+h, rr);
+      ctx.arcTo(x+w, y+h, x, y+h, rr);
+      ctx.arcTo(x, y+h, x, y, rr);
+      ctx.arcTo(x, y, x+w, y, rr);
+      ctx.closePath();
+    },
+    /* === GRID SELECT PATCH END (rendering) === */
+
+    /* === GRID SELECT PATCH START (interaction) === */
+    _emptySpaceAt_(clientX, clientY) {
+      const el = document.elementFromPoint(clientX, clientY);
+      return !el || !el.closest || !el.closest('.card-wrapper, .resize-handle, .ddc-chip, .shield');
+    },
+
+    _locToCell_(clientX, clientY) {
+      const c = this._gridCanvas;
+      if (!c) return { col: -1, row: -1 };
+      const rect = c.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const grid = this._gridCellSize || 10;
+      const col = Math.min(this._gridCols - 1, Math.max(0, Math.floor(x / grid)));
+      const row = Math.min(this._gridRows - 1, Math.max(0, Math.floor(y / grid)));
+      return { col, row };
+    },
+
+    _onGridPointerDown(ev) {
+      if (!this._emptySpaceAt_(ev.clientX, ev.clientY)) return;
+      const { col, row } = this._locToCell_(ev.clientX, ev.clientY);
+      this._gridDown = true;
+      this._gridStartCol = col;
+      this._gridStartRow = row;
+      this._gridCurrCol = col;
+      this._gridCurrRow = row;
+      this._markGridDirty();
+      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    },
+
+    _onGridPointerMove(ev) {
+      const { col: hcol, row: hrow } = this._locToCell_(ev.clientX, ev.clientY);
+      if (hcol !== this._gridHoverCol || hrow !== this._gridHoverRow) {
+        this._gridHoverCol = hcol;
+        this._gridHoverRow = hrow;
+        this._markGridDirty();
+      }
+      if (!this._gridDown) return;
+      const { col, row } = this._locToCell_(ev.clientX, ev.clientY);
+      if (col !== this._gridCurrCol || row !== this._gridCurrRow) {
+        this._gridCurrCol = col;
+        this._gridCurrRow = row;
+        this._markGridDirty();
+      }
+    },
+
+    async _onGridPointerUp(_ev) {
+      if (!this._gridDown) return;
+      this._gridDown = false;
+
+      const minCol = Math.min(this._gridStartCol, this._gridCurrCol);
+      const maxCol = Math.max(this._gridStartCol, this._gridCurrCol);
+      const minRow = Math.min(this._gridStartRow, this._gridCurrRow);
+      const maxRow = Math.max(this._gridStartRow, this._gridCurrRow);
+      const cellsCount = (maxCol - minCol + 1) * (maxRow - minRow + 1);
+
+      if (cellsCount < 2) { this._markGridDirty(); return; }
+
+      const grid = this._gridCellSize || 10;
+      const x = minCol * grid;
+      const y = minRow * grid;
+      const w = (maxCol - minCol + 1) * grid;
+      const h = (maxRow - minRow + 1) * grid;
+
+      this._markGridDirty();
+      this._promptNewCardForRect_({ x, y, w, h });
+    },
+
+    _onGridPointerCancel() {
+      this._gridDown = false;
+      this._markGridDirty();
+    },
+    /* === GRID SELECT PATCH END (interaction) === */
+
+    /* === GRID SELECT PATCH START (lifecycle wiring) === */
+    _installGridObservers_() {
+      try {
+        if (this.__gridRO) this.__gridRO.disconnect();
+        this.__gridRO = new ResizeObserver(() => this._requestGridButtonsUpdateSoon());
+        if (this.cardContainer) this.__gridRO.observe(this.cardContainer);
+      } catch {}
+      clearInterval(this.__gridPollT);
+      this.__gridPrevEditMode = undefined;
+      this.__gridPollT = setInterval(() => {
+        const now = !!this.editMode;
+        if (now !== this.__gridPrevEditMode) {
+          this.__gridPrevEditMode = now;
+          this._updateGridButtonsVisibility();
+        }
+      }, 300);
+    },
+
+    _uninstallGridObservers_() {
+      try { this.__gridRO?.disconnect?.(); } catch {}
+      this.__gridRO = null;
+      clearInterval(this.__gridPollT);
+      this.__gridPollT = null;
+    },
+    /* === GRID SELECT PATCH END (lifecycle wiring) === */
+
+    /* === GRID SELECT PATCH START (helpers) === */
+    // Map a canvas-space rect (x,y,w,h) into the container/card coordinate space
+    _gridRectToCardRect_({ x, y, w, h }) {
+      const container = this.cardContainer;
+      const canvas = this._gridCanvas;
+      if (!container || !canvas) return { x, y, w, h };
+
+      const { sx, sy } = this._getContainerScale_();
+
+      const cs = getComputedStyle(container);
+      const padL = parseFloat(cs.paddingLeft)  || 0;
+      const padT = parseFloat(cs.paddingTop)   || 0;
+      const bordL = parseFloat(cs.borderLeftWidth) || 0;
+      const bordT = parseFloat(cs.borderTopWidth)  || 0;
+
+      const scrollX = container.scrollLeft || 0;
+      const scrollY = container.scrollTop  || 0;
+
+      const invX = sx ? (1 / sx) : 1;
+      const invY = sy ? (1 / sy) : 1;
+
+      let cx = x * invX + padL + bordL + scrollX;
+      let cy = y * invY + padT + bordT + scrollY;
+      let cw = w * invX;
+      let ch = h * invY;
+
+      return { x: cx, y: cy, w: cw, h: ch };
+    },
+
+    // Get container's transform scale (matrix or matrix3d). Defaults to 1 if none.
+    _getContainerScale_() {
+      const el = this.cardContainer;
+      if (!el) return { sx: 1, sy: 1 };
+      const t = getComputedStyle(el).transform;
+      if (!t || t === 'none') return { sx: 1, sy: 1 };
+
+      const m2d = t.match(/matrix\(([^)]+)\)/);
+      if (m2d) {
+        const [a,, , d] = m2d[1].split(',').map(v => parseFloat(v.trim()));
+        return { sx: (isFinite(a) && a) ? a : 1, sy: (isFinite(d) && d) ? d : 1 };
+      }
+      const m3d = t.match(/matrix3d\(([^)]+)\)/);
+      if (m3d) {
+        const p = m3d[1].split(',').map(v => parseFloat(v.trim()));
+        return { sx: (isFinite(p[0]) && p[0]) ? p[0] : 1, sy: (isFinite(p[5]) && p[5]) ? p[5] : 1 };
+      }
+      return { sx: 1, sy: 1 };
+    },
+
+    // Convert a canvas-space rect (x,y,w,h) to container's absolute-position CSS pixels
+    _canvasRectToContainerRect_({ x, y, w, h }) {
+      const container = this.cardContainer;
+      const canvas = this._gridCanvas;
+      if (!container || !canvas) return { x, y, w, h };
+
+      const contCS = getComputedStyle(container);
+      const padL = parseFloat(contCS.paddingLeft)  || 0;
+      const padT = parseFloat(contCS.paddingTop)   || 0;
+      const { sx, sy } = this._getContainerScale_();
+
+      const canvRect = canvas.getBoundingClientRect();
+      const contRect = container.getBoundingClientRect();
+
+      const viewportX = canvRect.left + x;
+      const viewportY = canvRect.top  + y;
+
+      let dx = viewportX - contRect.left;
+      let dy = viewportY - contRect.top;
+
+      // border-box → padding-box
+      dx -= padL;
+      dy -= padT;
+
+      // scroll
+      dx += container.scrollLeft || 0;
+      dy += container.scrollTop  || 0;
+
+      const invSX = sx ? 1 / sx : 1;
+      const invSY = sy ? 1 / sy : 1;
+
+      const outX = dx * invSX;
+      const outY = dy * invSY;
+      const outW = (w * invSX);
+      const outH = (h * invSY);
+
+      return { x: outX, y: outY, w: outW, h: outH };
+    },
+    /* === GRID SELECT PATCH END (helpers) === */
+
+    /* === GRID SELECT PATCH START (add card bridge) === */
+    // Store the selection rect and let the normal picker flow run.
+    // The shim below will place the card at this rect instead of the default spot.
+    async _promptNewCardForRect_({ x, y, w, h }) {
+      try {
+        const g = this._gridCellSize || Number(this._config?.grid ?? this._options?.grid ?? 10);
+        const snap = v => Math.round(v / g) * g;
+        const sx = snap(x), sy = snap(y), sw = Math.max(g, snap(w)), sh = Math.max(g, snap(h));
+
+        const mapped = (typeof this._canvasRectToContainerRect_ === 'function')
+          ? this._canvasRectToContainerRect_({ x: sx, y: sy, w: sw, h: sh })
+          : { x: sx, y: sy, w: sw, h: sh };
+
+        const finalRect = {
+          x: Math.round(mapped.x),
+          y: Math.round(mapped.y),
+          w: Math.round(mapped.w),
+          h: Math.round(mapped.h),
+        };
+
+        this.__pendingAddRect = finalRect;
+        await this._openSmartPicker('add', null, null);
+      } catch (e) {
+        console.warn('[ddc] _promptNewCardForRect_ failed', e);
+      }
+    }
+    /* === GRID SELECT PATCH END (add card bridge) === */
+  });
+
+  // --- BEGIN: selection-rect placement shim ---
+  if (!DragAndDropCard.prototype.__addPickedPatched) {
+    const __origAddPicked = DragAndDropCard.prototype._addPickedCardToLayout;
+
+    DragAndDropCard.prototype._addPickedCardToLayout = async function (cardConfig) {
+      // If a selection rect is pending, place the new card exactly there.
+      if (this && this.__pendingAddRect) {
+        const { x, y, w, h } = this.__pendingAddRect;
+        this.__pendingAddRect = null; // consume it
+
+        try { this._hideEmptyPlaceholder?.(); } catch {}
+
+        const cardEl = await this._createCard(cardConfig);
+        const wrap = this._makeWrapper(cardEl);
+
+        this._setCardPosition(wrap, Math.round(x), Math.round(y));
+        wrap.style.width  = `${Math.round(w)}px`;
+        wrap.style.height = `${Math.round(h)}px`;
+        wrap.style.zIndex = String(this._highestZ() + 1);
+        wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+
+        this.cardContainer.appendChild(wrap);
+
+        try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
+        try { this._initCardInteract?.(wrap); } catch {}
+        try { this._resizeContainer?.(); } catch {}
+        try { this._queueSave?.('add'); } catch {}
+        try { this._toast?.('Card added to selection.'); } catch {}
+        try { this._syncEmptyStateUI?.(); } catch {}
+        try { this._applyVisibility_?.(); } catch {}
+
+        return; // handled by shim
+      }
+
+      // Fallback to the original behavior (no selection rect)
+      return await __origAddPicked.call(this, cardConfig);
+    };
+
+    DragAndDropCard.prototype.__addPickedPatched = true;
+  }
+  // --- END: selection-rect placement shim ---
+
   customElements.define('drag-and-drop-card', DragAndDropCard);
 }
 
-/* Register in HA's card picker */
-(() => {
-  try {
-    const list = (window.customCards = window.customCards || []);
-    if (!list.some(c => c.type === 'drag-and-drop-card')) {
-      list.push({
-        type: 'drag-and-drop-card',   // no "custom:" here
-        name: 'Drag & Drop Card',
-        description: 'Freeform drag/resize/snap-to-grid canvas for Lovelace cards.',
-        preview: false
-      });
-    }
-  } catch (e) { /* no-op */ }
-})();
 
 
 /* ==========================================================================
