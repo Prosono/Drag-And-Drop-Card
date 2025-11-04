@@ -3299,7 +3299,7 @@ _applyGridVars() {
         color: #fff !important;
         box-shadow:0 3px 8px rgba(0,0,0,.28); cursor:pointer; align-items:center; justify-content:center;
         transition:background .15s, transform .1s, box-shadow .15s;
-        border-bottom-right-radius:10px;
+        border-bottom-right-radius:10px; z-index: 9999 !important;
 
       }
       .delete-handle:hover{ transform:scale(1.05); box-shadow:0 6px 16px rgba(0,0,0,.35); filter:brightness(1.05); }
@@ -5215,8 +5215,11 @@ _syncEmptyStateUI() {
           const srL  = this.__groupDrag.startRaw.get(lead);
 
           // Compute new raw leader coordinates using pointer delta
-          const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + ev.dx;
-          const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + ev.dy;
+          // Convert screen-pixel deltas to design-space deltas
+          const sx = this.__pointerScaleX || 1;
+          const sy = this.__pointerScaleY || 1;
+          const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + (ev.dx / sx);
+          const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + (ev.dy / sy);
           const dxLead   = curLeadX - srL.x;
           const dyLead   = curLeadY - srL.y;
 
@@ -5298,9 +5301,13 @@ _syncEmptyStateUI() {
           const curW = parseFloat(wrap.style.width)  || wrap.getBoundingClientRect().width;
           const curH = parseFloat(wrap.style.height) || wrap.getBoundingClientRect().height;
     
-          let {width, height} = ev.rect;
-          const wTry = live ? Math.max(gs, Math.round(width/gs)*gs) : width;
-          const hTry = live ? Math.max(gs, Math.round(height/gs)*gs) : height;
+          const sx = this.__pointerScaleX || 1;
+          const sy = this.__pointerScaleY || 1;
+          // Convert screen → design before snapping/limits
+          let width  = ev.rect.width  / sx;
+          let height = ev.rect.height / sy;
+          const wTry = live ? Math.max(gs, Math.round(width / gs) * gs)  : width;
+          const hTry = live ? Math.max(gs, Math.round(height / gs) * gs) : height;
         
           const x = parseFloat(wrap.getAttribute('data-x')) || 0;
           const y = parseFloat(wrap.getAttribute('data-y')) || 0;
@@ -5852,6 +5859,8 @@ _applyAutoScale() {
       c.style.height = wantH;
       c.style.transform = 'scale(1)';
       c.style.transformOrigin = 'top left';
+      this.__pointerScaleX = 1;
+      this.__pointerScaleY = 1;
       c.style.position = 'absolute';
       c.style.top = '0';
       c.style.left = '0';
@@ -5900,6 +5909,9 @@ _applyAutoScale() {
   c.style.height = `${d.h}px`;
   c.style.transform = `scale(${scale})`;
   c.style.transformOrigin = 'top left';
+  // Keep pointer→design scale for interaction math
+  this.__pointerScaleX = scale;
+  this.__pointerScaleY = scale;
   c.style.position = 'absolute';
   c.style.top = '0';
   c.style.left = '0';
@@ -5988,6 +6000,8 @@ _applyAutoFillNoScale() {
     // Apply: NO SCALE. Keep 1:1 pixels so positions are exact.
     inner.style.transform = 'none';
     inner.style.transformOrigin = 'left top';
+    this.__pointerScaleX = 1;
+    this.__pointerScaleY = 1;
     inner.style.width  = `${targetW}px`;
     inner.style.height = `${targetH}px`;
     // In strict auto mode, update the outer container height so that
@@ -9541,7 +9555,10 @@ async _getStubConfigForType(type) {
       const r = cont.getBoundingClientRect();
       const x = ('touches' in ev && ev.touches[0]) ? ev.touches[0].clientX : ev.clientX;
       const y = ('touches' in ev && ev.touches[0]) ? ev.touches[0].clientY : ev.clientY;
-      return { x: x - r.left, y: y - r.top };
+      const sx = this.__pointerScaleX || 1;
+      const sy = this.__pointerScaleY || 1;
+      // Convert to design coordinates so the box aligns under scaling
+      return { x: (x - r.left) / sx, y: (y - r.top) / sy };
     };
 
     const updateSel = (x,y) => {
@@ -12707,8 +12724,10 @@ if (!customElements.get('drag-and-drop-card')) {
       const c = this._gridCanvas;
       if (!c) return { col: -1, row: -1 };
       const rect = c.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
+      const sx = this.__pointerScaleX || 1;
+      const sy = this.__pointerScaleY || 1;
+      const x = (clientX - rect.left) / sx;
+      const y = (clientY - rect.top)  / sy;
       const grid = this._gridCellSize || 10;
       const col = Math.min(this._gridCols - 1, Math.max(0, Math.floor(x / grid)));
       const row = Math.min(this._gridRows - 1, Math.max(0, Math.floor(y / grid)));
