@@ -5155,7 +5155,11 @@ _syncEmptyStateUI() {
 
     // When dragLiveSnap is true, use Interact’s built‑in snap modifier so the pointer
     // (and therefore the element) is snapped to the grid before your handler runs.
-    if (this.dragLiveSnap) {
+    const autoscaled =
+      (this.__pointerScaleX && Math.abs(this.__pointerScaleX - 1) > 1e-6) ||
+      (this.__pointerScaleY && Math.abs(this.__pointerScaleY - 1) > 1e-6);
+
+    if (this.dragLiveSnap && !autoscaled) {
       const gridSnap = window.interact.snappers.grid({ x: this.gridSize, y: this.gridSize });
       mods.push(window.interact.modifiers.snap({
         targets: [gridSnap],
@@ -5216,8 +5220,10 @@ _syncEmptyStateUI() {
 
           // Compute new raw leader coordinates using pointer delta
           // Convert screen-pixel deltas to design-space deltas
+          // Convert screen-pixel deltas → design space using current scale
           const sx = this.__pointerScaleX || 1;
           const sy = this.__pointerScaleY || 1;
+
           const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + (ev.dx / sx);
           const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + (ev.dy / sy);
           const dxLead   = curLeadX - srL.x;
@@ -5303,12 +5309,11 @@ _syncEmptyStateUI() {
     
           const sx = this.__pointerScaleX || 1;
           const sy = this.__pointerScaleY || 1;
-          // Convert screen → design before snapping/limits
           let width  = ev.rect.width  / sx;
           let height = ev.rect.height / sy;
           const wTry = live ? Math.max(gs, Math.round(width / gs) * gs)  : width;
           const hTry = live ? Math.max(gs, Math.round(height / gs) * gs) : height;
-        
+                  
           const x = parseFloat(wrap.getAttribute('data-x')) || 0;
           const y = parseFloat(wrap.getAttribute('data-y')) || 0;
         
@@ -5741,14 +5746,12 @@ _syncEmptyStateUI() {
   }
 
   _setCardPosition(el, x, y) {
-    // ensure integer CSS pixels and use 3D translate to avoid compositor fuzz
     const nx = Math.round(x);
     const ny = Math.round(y);
     el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
     el.setAttribute('data-x', String(nx));
     el.setAttribute('data-y', String(ny));
-    el.setAttribute('data-x-raw', String(nx));
-    el.setAttribute('data-y-raw', String(ny));
+    // Do NOT touch data-*-raw here; drag/resize 
   }
   
 
@@ -5859,11 +5862,12 @@ _applyAutoScale() {
       c.style.height = wantH;
       c.style.transform = 'scale(1)';
       c.style.transformOrigin = 'top left';
-      this.__pointerScaleX = 1;
-      this.__pointerScaleY = 1;
       c.style.position = 'absolute';
       c.style.top = '0';
       c.style.left = '0';
+
+      this.__pointerScaleX = 1;
+      this.__pointerScaleY = 1;
 
       if (this.__scaleOuter) {
         const pw =
@@ -5909,12 +5913,13 @@ _applyAutoScale() {
   c.style.height = `${d.h}px`;
   c.style.transform = `scale(${scale})`;
   c.style.transformOrigin = 'top left';
-  // Keep pointer→design scale for interaction math
-  this.__pointerScaleX = scale;
-  this.__pointerScaleY = scale;
   c.style.position = 'absolute';
   c.style.top = '0';
   c.style.left = '0';
+
+  // pointer → design scale
+  this.__pointerScaleX = scale || 1;
+  this.__pointerScaleY = scale || 1;
 
   try { this._syncTabsWidth_?.(); } catch {}
   try { this._layoutYtBackground_?.(); } catch {}
@@ -9557,7 +9562,6 @@ async _getStubConfigForType(type) {
       const y = ('touches' in ev && ev.touches[0]) ? ev.touches[0].clientY : ev.clientY;
       const sx = this.__pointerScaleX || 1;
       const sy = this.__pointerScaleY || 1;
-      // Convert to design coordinates so the box aligns under scaling
       return { x: (x - r.left) / sx, y: (y - r.top) / sy };
     };
 
@@ -12724,10 +12728,9 @@ if (!customElements.get('drag-and-drop-card')) {
       const c = this._gridCanvas;
       if (!c) return { col: -1, row: -1 };
       const rect = c.getBoundingClientRect();
-      const sx = this.__pointerScaleX || 1;
-      const sy = this.__pointerScaleY || 1;
-      const x = (clientX - rect.left) / sx;
-      const y = (clientY - rect.top)  / sy;
+      const { sx, sy } = this._getContainerScale_();
+      const x = (clientX - rect.left) / (sx || 1);
+      const y = (clientY - rect.top)  / (sy || 1);
       const grid = this._gridCellSize || 10;
       const col = Math.min(this._gridCols - 1, Math.max(0, Math.floor(x / grid)));
       const row = Math.min(this._gridRows - 1, Math.max(0, Math.floor(y / grid)));
