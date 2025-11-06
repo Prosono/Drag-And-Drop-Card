@@ -295,7 +295,7 @@ _ensureSettingsStyles_() {
   .card h4 { margin:0; font-size:1rem; font-weight:700; color:var(--primary-text-color); }
   .row { display:flex; align-items:center; gap:12px; }
   .row label { flex:1; font-size:.95rem; }
-  .row input[type="text"], .row input[type="number"], .row select { flex:1; padding:8px; border:1px solid var(--divider-color, rgba(0,0,0,.2)); border-radius:8px; background:var(--card-background-color, #fff); }
+  .row input[type="text"], .row input[type="number"], .row input[type="password"], .row select { flex:1; padding:8px; border:1px solid var(--divider-color, rgba(0,0,0,.2)); border-radius:8px; background:var(--card-background-color, #fff); }
   .range-wrap { display:flex; align-items:center; gap:12px; }
   .range-wrap input[type="range"] { flex:1; }
   .range-wrap output { width:64px; text-align:right; color:var(--secondary-text-color); font-weight:600; }
@@ -363,7 +363,8 @@ _ensureSettingsStyles_() {
     .caption { margin:0 0 8px 0; color:var(--secondary-text-color); font-size:.9rem; }
 
     .swatches { display:flex; gap:8px; flex-wrap:wrap; }
-    .swatch { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+    /* Make swatches more obvious as clickable targets by thickening their border */
+    .swatch { width:28px; height:28px; border-radius:6px; border:2px solid rgba(0,0,0,.25); cursor:pointer; position:relative; }
     .swatch[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:8px; }
 
     .inline-help { display:inline-flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:.9rem; }
@@ -398,7 +399,7 @@ _ensureSettingsStyles_() {
 
     /* gradient swatches */
     .gradients { display:flex; gap:8px; flex-wrap:wrap; }
-    .gradient { width:44px; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.15); cursor:pointer; position:relative; }
+    .gradient { width:44px; height:28px; border-radius:8px; border:2px solid rgba(0,0,0,.25); cursor:pointer; position:relative; }
     .gradient[aria-pressed="true"]::after { content:""; position:absolute; inset:-3px; border:2px solid var(--primary-color); border-radius:10px; }
 
     /* Section hierarchy */
@@ -443,11 +444,49 @@ _ensureSettingsStyles_() {
     }
 
     /* Inputs */
+    /* Inputs and selects within the modern dialog now have a more prominent outline for better visibility. */
     .modern select,
     .modern input[type="text"],
-    .modern input[type="number"] {
+    .modern input[type="number"],
+    .modern input[type="password"] {
       padding:8px 10px;
-      border:1px solid var(--divider-color,rgba(0,0,0,.25));
+      border:2px solid var(--divider-color,rgba(0,0,0,.25));
+      border-radius:10px;
+      background:var(--ha-card-background,#fff);
+    }
+
+    /* Style for the "Add tab" text field to make it stand out */
+    #ddc-new-tab-name {
+      flex:1;
+      padding:8px 10px;
+      border:2px solid var(--primary-color);
+      border-radius:10px;
+      background:var(--ha-card-background,#fff);
+      font-weight:600;
+    }
+
+    /* Style the manual grid size input alongside the slider */
+    .range-wrap input[type="number"] {
+      width:80px;
+      padding:6px 8px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.25));
+      border-radius:8px;
+      background:var(--card-background-color, #fff);
+      text-align:center;
+    }
+
+    /* Harmonise the appearance of background configuration sections (image, particles, YouTube) */
+    .setting[data-bg-section] .stack {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .setting[data-bg-section] .stack input[type="text"],
+    .setting[data-bg-section] .stack input[type="number"],
+    .setting[data-bg-section] .stack select {
+      width:100%;
+      padding:8px 10px;
+      border:2px solid var(--divider-color, rgba(0,0,0,.25));
       border-radius:10px;
       background:var(--ha-card-background,#fff);
     }
@@ -2172,11 +2211,32 @@ static getConfigElement() {
     applyBtn.disabled = !dirty;
   };
 
-  const fire = () => {
+  const fire = async () => {
     const newConfig = el.getConfig();
     el.dispatchEvent(new CustomEvent('config-changed', { detail: { config: newConfig } }));
     // Re-check button states after applying
     updateButtons();
+
+    try {
+      if (this.storageKey) {
+        const optsToSave = this._exportableOptions ? this._exportableOptions() : newConfig;
+        await this._saveOptionsToBackend(this.storageKey, optsToSave);
+      }
+    } catch {}
+
+
+    // Persist immediately (storage dashboards first; fallback to YAML patch)
+    try {
+      await this._persistThisCardConfigToStorage_();
+    } catch (e) {
+      try {
+        const opts = this._exportableOptions ? this._exportableOptions() : newConfig;
+        await this._persistOptionsToYaml?.(opts, { patchAllInCurrentViewIfNoKey: true });
+      } catch {}
+    }
+
+    try { this._applyBackgroundFromConfig?.(); } catch {}
+
   };
 
   const toggleSizeControls = () => {
@@ -2282,6 +2342,86 @@ static getConfigElement() {
     base.debug = !!el.querySelector('#debug').checked;
     base.disable_overlap = !!el.querySelector('#noOverlap').checked;
     base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
+    // === Background persistence ===
+    try {
+      const selBgMode        = el.querySelector('#ddc-bg-mode');
+      const inpBgImg         = el.querySelector('#ddc-setting-bgImg');
+      const selBgRepeat      = el.querySelector('#ddc-bg-repeat');
+      const selBgSize        = el.querySelector('#ddc-bg-size');
+      const selBgPosition    = el.querySelector('#ddc-bg-position');
+      const selBgAttachment  = el.querySelector('#ddc-bg-attachment');
+      const rngBgOpacity     = el.querySelector('#ddc-bg-opacity');
+      const inpParticlesUrl  = el.querySelector('#ddc-particles-url');
+      const chkParticlesPtr  = el.querySelector('#ddc-particles-pointer');
+      const inpYtUrl         = el.querySelector('#ddc-youtube-url');
+      const inpYtStart       = el.querySelector('#ddc-youtube-start');
+      const inpYtEnd         = el.querySelector('#ddc-youtube-end');
+      const chkYtMute        = el.querySelector('#ddc-youtube-mute');
+      const chkYtLoop        = el.querySelector('#ddc-youtube-loop');
+      const selYtSize        = el.querySelector('#ddc-youtube-size');
+      const selYtPosition    = el.querySelector('#ddc-youtube-position');
+      const selYtAttachment  = el.querySelector('#ddc-youtube-attachment');
+      const rngYtOpacity     = el.querySelector('#ddc-youtube-opacity');
+
+      const mode = selBgMode?.value || 'none';
+      base.background_mode = mode;
+
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      const pctTo01 = (el) => {
+        const v = parseFloat(el?.value || '100');
+        if (!Number.isFinite(v)) return 1;
+        return clamp01(v / 100);
+      };
+
+      // Build objects, omitting undefined keys
+      const pick = (o) => Object.fromEntries(Object.entries(o).filter(([,v]) => v !== undefined && v !== null && v !== ''));
+
+      // Image
+      if (mode === 'image') {
+        const srcVal = (inpBgImg?.value || '').trim();
+        base.background_image = pick({
+          src: srcVal || undefined,
+          repeat: selBgRepeat?.value || 'no-repeat',
+          size: selBgSize?.value || 'cover',
+          position: selBgPosition?.value || 'center center',
+          attachment: selBgAttachment?.value || 'scroll',
+          opacity: pctTo01(rngBgOpacity),
+        });
+      }
+
+      // Particles
+      if (mode === 'particles') {
+        base.background_particles = pick({
+          config_url: (inpParticlesUrl?.value || '').trim() || undefined,
+          pointer_events: !!chkParticlesPtr?.checked,
+        });
+      }
+
+      // YouTube
+      if (mode === 'youtube') {
+        const n = (x) => {
+          const v = parseInt((x?.value || '').trim(), 10);
+          return Number.isFinite(v) ? v : undefined;
+        };
+        base.background_youtube = pick({
+          url: (inpYtUrl?.value || '').trim() || undefined,
+          start: n(inpYtStart),
+          end: n(inpYtEnd),
+          mute: !!chkYtMute?.checked,
+          loop: !!chkYtLoop?.checked,
+          size: selYtSize?.value || 'cover',
+          position: selYtPosition?.value || 'center center',
+          attachment: selYtAttachment?.value || 'scroll',
+          opacity: pctTo01(rngYtOpacity),
+        });
+      }
+
+      // When switching modes, avoid leaving stale large objects around
+      if (mode !== 'image') delete base.background_image;
+      if (mode !== 'particles') delete base.background_particles;
+      if (mode !== 'youtube') delete base.background_youtube;
+    } catch (e) { /* non-fatal */ }
+
 
     // Reflect the animate cards setting back into the configuration. When
     // true, cards will perform a fly‑in animation on tab switch. This key
@@ -2527,6 +2667,9 @@ _applyGridVars() {
     this.containerBackground      = config.container_background ?? 'transparent';
     this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
 
+    // Whether to apply a drop shadow to card wrappers (defaults to false)
+    this.cardShadowEnabled        = !!config.card_shadow;
+
     this.hideHaHeader            = !!(config.hide_HA_Header ?? config.hide_ha_header ?? false);
     this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
         this.debug                    = !!config.debug;
@@ -2607,6 +2750,12 @@ _applyGridVars() {
 
     this.style.setProperty('--ddc-bg', this.containerBackground);
     this.style.setProperty('--ddc-card-bg', this.cardBackground);
+
+    // Apply initial card drop shadow if enabled
+    if (this.cardShadowEnabled) {
+      // Set a more prominent drop shadow by default
+      this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+    }
 
     // preload libs
     if (!window.jsyaml) {
@@ -2692,6 +2841,19 @@ _applyGridVars() {
   }
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
+
+/* --- Override: Use auto‑resize styling for toolbar and tabs even when auto‑resize is disabled --- */
+:host([ddc-fixed-ui]) .ddc-toolbar,
+:host([ddc-fixed-ui]) .ddc-tabs {
+  /* Behave like auto-resize is on: sticky positioning within the card, full width */
+  position: sticky;
+  left: 0;
+  transform: none;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  box-sizing: border-box;
+}
 
 
 /* ===== DDC Toolbar — Minimal Redesign (pills with accent tint) ===== */
@@ -3167,7 +3329,8 @@ _applyGridVars() {
         cursor:grab;
         overflow:auto;
         border-radius:14px;
-        box-shadow:var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18));
+        /* Allow a custom drop shadow via --ddc-card-shadow. Fallback to the HA default if unset */
+        box-shadow: var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18)));
         will-change:transform,width,height,box-shadow; touch-action:auto;
         z-index:2;
       }
@@ -4406,19 +4569,23 @@ if (this.__ddcOnWinResize) {
 
       // 1) Apply persisted options as baseline
         if (saved?.options) {
-          const { storage_key, ...optsNoKey } = saved.options;
-          this._applyImportedOptions(optsNoKey, true);
-        } else if (typeof saved?.grid === 'number') {
+  const { storage_key, ...optsNoKey } = saved.options;
+  // Do not let stale snapshot backgrounds override YAML card config
+  delete optsNoKey.background_mode;
+  delete optsNoKey.background_image;
+  delete optsNoKey.background_particles;
+  delete optsNoKey.background_youtube;
+  this._applyImportedOptions(optsNoKey, true);
+} else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
       }
 
       // 2) Overlay explicit YAML options (take precedence)
       const overrideKeys = [
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
-        'container_background','card_background','debug','disable_overlap',
+        'container_background','card_background','card_shadow','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards'
-      ];
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'background_mode', 'background_image', 'background_particles', 'background_youtube'];
       const cfgOpts = {};
       for (const k of overrideKeys) {
         if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
@@ -4879,6 +5046,14 @@ _toggleEditMode(force = null) {
   this.editMode = entering;
   this._syncEmptyStateUI?.();
   this.cardContainer?.classList.toggle('grid-on', this.editMode);
+
+  // When entering or exiting edit mode, reset the screensaver timer to prevent
+  // the screensaver from activating during edits and to hide it if currently active.
+  try {
+    if (typeof this._resetScreensaverTimer === 'function') {
+      this._resetScreensaverTimer();
+    }
+  } catch {}
 
   const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
   wraps.forEach((w) => {
@@ -5902,7 +6077,14 @@ _applyAutoScale() {
     this.offsetWidth || d.w;
 
   const availableW = Math.max(1, pw);
-  const scale = Math.min(availableW / Math.max(1, d.w), 1);
+  // Compute the scale factor relative to the design width.  Previously the
+  // factor was clamped to ≤1, meaning the layout would only shrink but
+  // never grow.  This resulted in the “auto‑resize cards” option having
+  // no visible effect in dynamic mode when the design was narrower than
+  // the viewport.  Remove the clamp so that smaller layouts can grow to
+  // fill the available space.  If desired a maximum cap could be
+  // introduced here; for now allow the layout to scale up as needed.
+  const scale = availableW / Math.max(1, d.w);
 
   if (this.__scaleOuter) {
     this.__scaleOuter.style.width  = `${availableW}px`;
@@ -5923,6 +6105,10 @@ _applyAutoScale() {
 
   try { this._syncTabsWidth_?.(); } catch {}
   try { this._layoutYtBackground_?.(); } catch {}
+  // After applying a new scale, refresh the grid overlay dimensions so that
+  // the selectable squares cover the scaled content area.  Without this
+  // update the overlay may not extend across the resized canvas.
+  try { this._requestGridButtonsUpdateSoon?.(); } catch {}
 }
 
 
@@ -6047,6 +6233,12 @@ _applyAutoFillNoScale() {
     // background may retain the size from a previous layout state and
     // appear cropped or misaligned in auto mode.
     try { this._layoutYtBackground_?.(); } catch {}
+
+    // Ensure the grid overlay updates to reflect any changes in natural
+    // size or viewport fills.  Without this call the overlay may not
+    // redraw until the next interaction, leading to partially rendered
+    // selection squares after adding a card in auto mode.
+    try { this._requestGridButtonsUpdateSoon?.(); } catch {}
     requestAnimationFrame(() => { this.__applyingAutoFill = false; });
   }
 }
@@ -6080,6 +6272,13 @@ _applyAutoFillNoScale() {
     // width so it remains aligned with the container. If the scale wrapper
     // recalculates later the call in _applyAutoScale will also update this.
     try { this._syncTabsWidth_?.(); } catch {}
+
+    // When the container size changes (e.g. after adding a card or resizing),
+    // the grid overlay may become stale.  Schedule an update so that the
+    // selectable overlay stretches to the new dimensions.  Without this call
+    // the overlay can remain clipped until the next edit toggle or page
+    // refresh.
+    try { this._requestGridButtonsUpdateSoon?.(); } catch {}
   }
   
   /**
@@ -9822,6 +10021,8 @@ modal.innerHTML = `
             <div class="range-wrap">
               <input type="range" id="ddc-setting-gridSize" min="1" max="400" step="1" />
               <output id="ddc-grid-out" for="ddc-setting-gridSize">100 px</output>
+              <!-- Added number input for manual entry of grid size -->
+              <input type="number" id="ddc-setting-gridSizeInput" min="1" max="400" step="1" class="grid-input" />
             </div>
           </div>
         </div>
@@ -10028,6 +10229,20 @@ modal.innerHTML = `
           </div>
         </div>
         <div class="hint">Affects the background of each draggable card container.</div>
+      </div>
+
+      <!-- CARD SHADOW -->
+      <div class="setting" role="group" aria-labelledby="lbl-card-shadow">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:shadow" aria-hidden="true"></ha-icon>
+            <label id="lbl-card-shadow" for="ddc-setting-cardShadow">Card drop shadow</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-cardShadow"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Toggle a drop shadow on card containers.</div>
       </div>
 
       <div class="divider" role="separator" aria-hidden="true"></div>
@@ -10272,7 +10487,7 @@ modal.innerHTML = `
           <div class="title">
             <ha-icon icon="mdi:page-layout-header" aria-hidden="true"></ha-icon>
             <label id="lbl-hide-hdr" for="ddc-setting-hideHdr">Hide HA Header</label>
-            <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference" aria-hidden="true"></ha-icon>
+            <!-- Removed thumbs up/down icon -->
           </div>
           <div class="control">
             <ha-switch id="ddc-setting-hideHdr"></ha-switch>
@@ -10287,7 +10502,7 @@ modal.innerHTML = `
           <div class="title">
             <ha-icon icon="mdi:page-layout-sidebar-left" aria-hidden="true"></ha-icon>
             <label id="lbl-hide-sbar" for="ddc-setting-hideSbar">Hide HA Sidebar</label>
-            <ha-icon class="suffix" icon="mdi:thumbs-up-down" title="Preference" aria-hidden="true"></ha-icon>
+            <!-- Removed thumbs up/down icon -->
           </div>
           <div class="control">
             <ha-switch id="ddc-setting-hideSbar"></ha-switch>
@@ -10328,8 +10543,8 @@ modal.innerHTML = `
           </div>
           <div class="control">
             <div class="range-wrap">
-              <input type="range" id="ddc-setting-screenSaverDelay" min="1" max="20" step="1" />
-              <output id="ddc-screenSaverDelayOut" for="ddc-setting-screenSaverDelay">5 min</output>
+              <input type="number" id="ddc-setting-screenSaverDelay" min="1" max="60" step="1" />
+              <span class="unit">min</span>
             </div>
           </div>
         </div>
@@ -10411,6 +10626,7 @@ modal.innerHTML = `
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
+    const chkShadow  = modal.querySelector('#ddc-setting-cardShadow');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
     const selBgRepeat     = modal.querySelector('#ddc-bg-repeat');
     const selBgSize       = modal.querySelector('#ddc-bg-size');
@@ -10484,6 +10700,14 @@ modal.innerHTML = `
     };
     selBgMode?.addEventListener('change', showBgSections);
     showBgSections();
+    // Hide auto-resize setting when the container size mode is not dynamic
+    const secAutoResize = modal.querySelector('[aria-labelledby="lbl-auto-resize"]');
+    const updateAutoResizeVisibility = () => {
+      const mode = selSize?.value || 'dynamic';
+      if (secAutoResize) secAutoResize.style.display = (mode === 'dynamic') ? '' : 'none';
+    };
+    updateAutoResizeVisibility();
+    selSize?.addEventListener('change', updateAutoResizeVisibility);
 
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
@@ -10503,6 +10727,8 @@ modal.innerHTML = `
       inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
     }
     if (chkDebug)   chkDebug.checked   = !!this.debug;
+    // Initialize the drop shadow toggle
+    if (chkShadow)  chkShadow.checked  = !!this.cardShadowEnabled;
     if (selBgRepeat)     selBgRepeat.value     = String(bgCfg.repeat     || 'no-repeat');
     if (selBgSize)       selBgSize.value       = String(bgCfg.size       || 'cover');
     if (selBgPosition)   selBgPosition.value   = String(bgCfg.position   || 'center center');
@@ -10516,6 +10742,20 @@ modal.innerHTML = `
         outBgOpacity.textContent = `${v}%`;
         // Live preview without waiting for Save
         this.style.setProperty('--ddc-bg-opacity', String(v/100));
+      });
+    }
+
+    // Live update drop shadow when the toggle is changed
+    if (chkShadow) {
+      chkShadow.addEventListener('change', () => {
+        try {
+          if (chkShadow.checked) {
+            // Use a more prominent drop shadow on toggle
+            this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+          } else {
+            this.style.removeProperty('--ddc-card-shadow');
+          }
+        } catch {}
       });
     }
 
@@ -10533,12 +10773,12 @@ modal.innerHTML = `
       const ms = this.screenSaverDelay != null ? Number(this.screenSaverDelay) : (5 * 60000);
       let mins = Math.round(ms / 60000);
       if (!Number.isFinite(mins) || mins < 1) mins = 5;
-      if (mins > 20) mins = 20;
+      if (mins > 60) mins = 60;
       rngScreenDelay.value = String(mins);
       if (outScreenDelay) outScreenDelay.textContent = `${mins} min`;
       rngScreenDelay.addEventListener('input', () => {
         const v = parseInt(rngScreenDelay.value || '1', 10);
-        const m = Math.max(1, Math.min(20, isNaN(v) ? 1 : v));
+        const m = Math.max(1, Math.min(60, isNaN(v) ? 1 : v));
         if (outScreenDelay) outScreenDelay.textContent = `${m} min`;
         this.screenSaverDelay = m * 60000;
         if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
@@ -10564,6 +10804,8 @@ modal.innerHTML = `
     const gridOut    = modal.querySelector('#ddc-grid-out');
     const gridDemo   = modal.querySelector('#ddc-grid-demo');
     const gridMeta   = modal.querySelector('#ddc-grid-meta');
+    // Reference to the manual grid size input (number field)
+    const gridInput  = modal.querySelector('#ddc-setting-gridSizeInput');
 
     const renderMeta = () => {
       if (!gridDemo || !gridMeta) return;
@@ -10587,8 +10829,23 @@ modal.innerHTML = `
     // Init + live update on input
     if (gridSlider) {
       if (!gridSlider.value) gridSlider.value = String(this.gridSize || 100);
-      gridSlider.addEventListener('input', syncGrid);
+      gridSlider.addEventListener('input', () => {
+        // Keep the numeric input in sync with the slider
+        if (gridInput) gridInput.value = gridSlider.value;
+        syncGrid();
+      });
+      // Prepopulate the corresponding number input
+      if (gridInput) gridInput.value = gridSlider.value;
       syncGrid();
+    }
+
+    // Listen to manual grid number changes
+    if (gridInput) {
+      gridInput.addEventListener('input', () => {
+        const v = Math.max(1, Math.min(400, parseInt(gridInput.value || '100', 10)));
+        gridSlider.value = String(v);
+        syncGrid();
+      });
     }
 
     // Recompute rows×cols when the demo box changes size (responsive dialog)
@@ -10620,8 +10877,15 @@ modal.innerHTML = `
     });
 
     // Swatches (theme-friendly set; tweak as you like)
-    const SWATCHES = ['#ffffff','#f5f7fa','#ebeff5','#121212','#1f2937','#334155',
-                      'var(--card-background-color)','var(--ha-card-background)','transparent'];
+    const SWATCHES = [
+      '#ffffff','#f5f7fa','#ebeff5','#121212','#1f2937','#334155',
+      '#ff6b6b','#fcbf49','#ffe66d','#4ecdc4','#1a535c','#6b5b95',
+      '#f6f5f5','#00aaff','#ff00ff','#00ff00',
+      'var(--card-background-color)','var(--ha-card-background)','transparent',
+      /* Semi‑transparent glass‑like presets */
+      'rgba(255,255,255,0.4)', 'rgba(0,0,0,0.3)', 'rgba(0,128,255,0.3)',
+      'rgba(255,0,128,0.3)', 'rgba(255,255,0,0.3)', 'rgba(0,255,128,0.3)'
+    ];
     const buildSwatches = (containerSel, targetInputSel, targetPickerSel) => {
       const wrap = modal.querySelector(containerSel);
       const target = modal.querySelector(targetInputSel);
@@ -10640,6 +10904,8 @@ modal.innerHTML = `
           s.setAttribute('aria-pressed','true');
           target.value = val;
           if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val) && picker) picker.value = val;
+          // Trigger input event so live preview updates for container/card background
+          try { target.dispatchEvent(new Event('input', { bubbles: true, composed: true })); } catch {}
         });
         wrap.appendChild(s);
         // preselect current value if matches
@@ -11036,8 +11302,14 @@ if (urlInput) urlInput.value = '';
           target.value = g;                          // write into the same input your save handler already reads
           // Live apply for preview:
           try {
-            this.containerBackground = g;
-            this.style.setProperty('--ddc-bg', g);
+            const isCard = String(targetInputSel || '').toLowerCase().includes('cardbg');
+            if (isCard) {
+              this.cardBackground = g;
+              this.style.setProperty('--ddc-card-bg', g);
+            } else {
+              this.containerBackground = g;
+              this.style.setProperty('--ddc-bg', g);
+            }
           } catch {}
         });
         wrap.appendChild(b);
@@ -11046,6 +11318,26 @@ if (urlInput) urlInput.value = '';
     };
     buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
     buildGradients('#ddc-gradients-cardBg',      '#ddc-setting-cardBg');
+
+    // Live preview when manually editing background text inputs
+    if (inpCBg) {
+      inpCBg.addEventListener('input', () => {
+        const val = (inpCBg.value || '').trim();
+        try {
+          this.containerBackground = val;
+          this.style.setProperty('--ddc-bg', val);
+        } catch {}
+      });
+    }
+    if (inpCardBg) {
+      inpCardBg.addEventListener('input', () => {
+        const val = (inpCardBg.value || '').trim();
+        try {
+          this.cardBackground = val;
+          this.style.setProperty('--ddc-card-bg', val);
+        } catch {}
+      });
+    }
 
 
     // Remove modal helper
@@ -11061,7 +11353,9 @@ if (urlInput) urlInput.value = '';
     modal.querySelector('#ddc-settings-save')?.addEventListener('click', (e) => {
       e.stopPropagation();
       // Read values
-      const newAuto      = !!chkAuto?.checked;
+      const newSize      = selSize?.value || 'dynamic';
+      // Auto-resize is only honored when the container size mode is dynamic
+      const newAuto      = (newSize === 'dynamic') && !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
       const newHideHdr   = !!chkHdr?.checked;
@@ -11069,7 +11363,6 @@ if (urlInput) urlInput.value = '';
       const newSnap      = !!chkSnap?.checked;
       const newASave     = !!chkASave?.checked;
       const newDeb       = parseInt(inpDeb?.value || '0', 10);
-      const newSize      = selSize?.value || 'dynamic';
       const newOrient    = selOrient?.value || 'auto';
       const newOverlap   = !!chkOverlap?.checked;
       const newCBg       = (inpCBg?.value || '').trim();
@@ -11089,6 +11382,9 @@ if (urlInput) urlInput.value = '';
       const newYtPosition = (selYtPosition?.value || 'center');
       const newYtOpacity  = rngYtOpacity ? Math.max(0, Math.min(100, parseInt(rngYtOpacity.value || '100', 10))) / 100 : 1;
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
+
+      // Card shadow toggle
+      const newShadow = !!chkShadow?.checked;
 
       // Screen saver values
       const newScreenSaverEnabled   = !!chkScreenSaver?.checked;
@@ -11136,6 +11432,14 @@ if (urlInput) urlInput.value = '';
           this.gridSize = newGrid;
           this._applyGridVars?.();
           this._resizeContainer?.();
+        }
+        // Apply card drop shadow
+        this.cardShadowEnabled = newShadow;
+        if (this.cardShadowEnabled) {
+          // Use a more prominent drop shadow when enabled
+          this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+        } else {
+          this.style.removeProperty('--ddc-card-shadow');
         }
         // Edit mode PIN
         this.editModePin = newEditPin;
@@ -11297,6 +11601,8 @@ if (urlInput) urlInput.value = '';
           this._config.disable_overlap         = !!this.disableOverlap;
           this._config.container_background    = this.containerBackground;
           this._config.card_background         = this.cardBackground;
+          // Persist card shadow setting
+          this._config.card_shadow            = !!this.cardShadowEnabled;
           this._config.debug                   = !!this.debug;
           this._config.animate_cards           = !!this.animateCards;
           this._config.hide_HA_Header          = !!this.hideHaHeader;
@@ -11368,6 +11674,7 @@ if (urlInput) urlInput.value = '';
       // Appearance
       container_background: this.containerBackground,
       card_background: this.cardBackground,
+      card_shadow: !!this.cardShadowEnabled,
       animate_cards: !!this.animateCards,
 
       // HA chrome visibility
@@ -11432,6 +11739,7 @@ if (urlInput) urlInput.value = '';
     if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
     if ('container_background' in opts) this.containerBackground = opts.container_background ?? 'transparent';
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    if ('card_shadow' in opts)          this.cardShadowEnabled = !!opts.card_shadow;
     if ('debug' in opts)              this.debug = !!opts.debug;
     if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
 
@@ -11464,6 +11772,14 @@ if (urlInput) urlInput.value = '';
     // reflect to CSS
     this.style.setProperty('--ddc-bg', this.containerBackground);
     this.style.setProperty('--ddc-card-bg', this.cardBackground);
+
+    // Apply card shadow based on imported options
+    if (this.cardShadowEnabled) {
+      // Apply a stronger drop shadow when the option is enabled
+      this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+    } else {
+      this.style.removeProperty('--ddc-card-shadow');
+    }
     this._applyGridVars();
 
     if (recalc) {
@@ -12018,6 +12334,24 @@ _importDesign() {
       throw e;
     }
   }
+  async _saveOptionsToBackend(key, newOptions) {
+    try {
+      const cur = await this._loadLayoutFromBackend(key);
+      const merged = {
+        version: 2,
+        ...(cur || {}),
+        options: newOptions || this._exportableOptions?.() || {}
+      };
+      // Preserve cards array if present
+      if (cur && Array.isArray(cur.cards)) merged.cards = cur.cards;
+      await this._saveLayoutToBackend(key, merged);
+      return true;
+    } catch (e) {
+      console.warn('[ddc] saveOptionsToBackend failed', e);
+      return false;
+    }
+  }
+
 
   _updateStoreBadge() {
     const el = this.storeBadge; if (!el) return;
@@ -12335,14 +12669,20 @@ _importDesign() {
    * disabled, no timer will be scheduled.
    */
   _resetScreensaverTimer() {
+    // Always clear any existing timer
     if (this._screensaverTimer) {
       clearTimeout(this._screensaverTimer);
       this._screensaverTimer = null;
     }
-    if (!this.screenSaverEnabled) {
+    // Evaluate whether the screensaver should be used in the current context
+    if (!this._shouldUseScreensaver()) {
+      // If a screensaver is currently active but conditions no longer allow it, hide it
+      if (this.screensaverActive) {
+        this._deactivateScreenSaver();
+      }
       return;
     }
-    // hide screensaver if active
+    // Hide screensaver if active before scheduling a new one
     if (this.screensaverActive) {
       this._deactivateScreenSaver();
     }
@@ -12359,7 +12699,8 @@ _importDesign() {
    * apply.
    */
   _activateScreenSaver() {
-    if (!this.screenSaverEnabled) return;
+    // Only activate when conditions allow the screensaver (enabled, not editing, not in HA editor, and attached)
+    if (!this._shouldUseScreensaver()) return;
     this._ensureScreenSaverOverlay();
     if (!this.screenSaverOverlay) return;
     this.screensaverActive = true;
@@ -12517,6 +12858,28 @@ _importDesign() {
       }
     }
   }
+
+  /**
+   * Determine if the screensaver should be used based on current state.
+   * It must be enabled, the card must not be in edit mode, not inside
+   * the Home Assistant editor preview, and still be attached to the DOM.
+   * @returns {boolean}
+   */
+  _shouldUseScreensaver() {
+    try {
+      // screenSaverEnabled controls the overall feature
+      if (!this.screenSaverEnabled) return false;
+      // Do not show while editing in drag-and-drop card
+      if (this.editMode) return false;
+      // Do not show while in HA editor preview
+      if (typeof this._isInHaEditorPreview === 'function' && this._isInHaEditorPreview()) return false;
+      // Only show when the card is currently in the DOM (on its dashboard page)
+      if (!this.isConnected) return false;
+    } catch {
+      return false;
+    }
+    return true;
+  }
   _toast(message) {
     const ev = new Event('hass-notification');
     ev.detail = { message };
@@ -12542,9 +12905,25 @@ if (!customElements.get('drag-and-drop-card')) {
     _updateGridButtonsVisibility() {
       const inEdit = !!this.editMode;
       const grid = Number(this._config?.grid ?? this._options?.grid ?? 10);
-      const bigEnough = grid > 20;
-      if (!inEdit || !bigEnough) { this._destroyGridCanvas(); return; }
+      // Show the selectable overlay when the grid size is reasonably large.  The
+      // original threshold of 20px resulted in the overlay never activating
+      // for most default configurations (typically 10px).  Lower the threshold
+      // so that any grid size above 10px will enable the drag‑select overlay.
+      const bigEnough = grid >= 10;
+      const cont = this.cardContainer;
+      // When not in edit mode or the grid is too small, destroy the overlay
+      // and fall back to the traditional dotted grid lines (grid-on class).
+      if (!inEdit || !bigEnough) {
+        this._destroyGridCanvas();
+        // restore underlying grid lines only when editing
+        if (cont) cont.classList.toggle('grid-on', inEdit);
+        return;
+      }
+      // In edit mode with a sufficiently large grid, build or update the
+      // selection overlay.  Hide the underlying CSS grid lines to avoid
+      // misaligned double grids.
       this._buildOrUpdateGridCanvas();
+      if (cont) cont.classList.remove('grid-on');
     },
 
     _requestGridButtonsUpdateSoon() {
@@ -12574,16 +12953,41 @@ if (!customElements.get('drag-and-drop-card')) {
         c.addEventListener('lostpointercapture', (ev)=>this._onGridPointerCancel(ev), { passive: true });
       }
 
-      // size canvas to container (retina-aware)
+      // size canvas to container (retina-aware).  When the card
+      // container is scaled (auto-resize in dynamic mode), its
+      // boundingClientRect returns the *visual* size (already
+      // multiplied by the scale factor).  If we use that width
+      // directly as the canvas size, the canvas will be scaled a
+      // second time by the container’s transform.  This results in the
+      // selectable overlay being too large and misaligned.  Instead,
+      // compute the unscaled width/height by dividing by the current
+      // container scale.  The canvas is then sized to the unscaled
+      // dimensions; after the parent’s transform applies, the canvas
+      // expands to the correct visual size.
       const rect = container.getBoundingClientRect();
+      const { sx, sy } = this._getContainerScale_();
+      // guard against invalid scale values (e.g., 0 or NaN)
+      const invSX = sx && isFinite(sx) ? (1 / sx) : 1;
+      const invSY = sy && isFinite(sy) ? (1 / sy) : 1;
+      const unscaledW = rect.width  * invSX;
+      const unscaledH = rect.height * invSY;
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-      this._gridCanvas.width  = Math.max(1, Math.round(rect.width  * dpr));
-      this._gridCanvas.height = Math.max(1, Math.round(rect.height * dpr));
-      this._gridCanvas.style.width  = rect.width  + 'px';
-      this._gridCanvas.style.height = rect.height + 'px';
+      // Assign the canvas buffer dimensions using the unscaled size
+      this._gridCanvas.width  = Math.max(1, Math.round(unscaledW * dpr));
+      this._gridCanvas.height = Math.max(1, Math.round(unscaledH * dpr));
+      // Set the CSS size to the unscaled dimensions so that after
+      // scaling the canvas fills the visual space exactly
+      this._gridCanvas.style.width  = unscaledW + 'px';
+      this._gridCanvas.style.height = unscaledH + 'px';
 
-      this._gridCols = Math.max(1, Math.floor(rect.width  / gridSize));
-      this._gridRows = Math.max(1, Math.floor(rect.height / gridSize));
+      // Compute the number of columns/rows based on the unscaled width.
+      // Dividing by the grid size in design units ensures that the
+      // overlay grid matches the underlying design grid regardless of
+      // scaling.  Use Math.ceil here so that partial cells at the
+      // right/bottom edges are included, preventing gaps when the
+      // canvas size is not an exact multiple of the grid size.
+      this._gridCols = Math.max(1, Math.ceil(unscaledW  / gridSize));
+      this._gridRows = Math.max(1, Math.ceil(unscaledH / gridSize));
 
       // glass tile for full cell
       this._buildGridTile_(gridSize, dpr);
@@ -12654,6 +13058,14 @@ if (!customElements.get('drag-and-drop-card')) {
 
       if (this._gridTile) {
         const pat = ctx.createPattern(this._gridTile, 'repeat');
+        // Offset the pattern by the container's padding so the rendered
+        // squares align perfectly with the underlying CSS grid lines.
+        // Draw the grid pattern starting at the canvas origin (0,0).
+        // The selectable cells use the same grid origin (0,0) relative to
+        // the canvas, so aligning the pattern origin with the canvas
+        // origin ensures that the visual grid exactly matches the
+        // interactive grid.  No translation is needed; simply fill the
+        // entire canvas with the repeating pattern.
         ctx.save();
         ctx.scale(dpr, dpr);
         ctx.fillStyle = pat;
@@ -12661,12 +13073,18 @@ if (!customElements.get('drag-and-drop-card')) {
         ctx.restore();
       }
 
-      // Hover cell – full cell bounds
+      // Hover cell – full cell bounds.  Use a more visible accent color
+      // so that hovered cells stand out clearly on the grid.  Increase
+      // both fill and stroke opacity for better contrast.
       if (this._gridHoverCol >= 0 && this._gridHoverRow >= 0) {
         ctx.save();
         ctx.scale(dpr, dpr);
-        ctx.fillStyle = 'rgba(255,255,255,0.10)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        // Hover cell – full cell bounds.  Increase the fill and stroke
+        // opacity so the hovered cell stands out clearly against the
+        // grid pattern.  A more saturated accent color makes the
+        // interactive area obvious.
+        ctx.fillStyle = 'rgba(0, 160, 255, 0.30)';
+        ctx.strokeStyle = 'rgba(0, 160, 255, 0.60)';
         ctx.lineWidth = 1;
 
         const x = this._gridHoverCol * grid;
@@ -12826,8 +13244,14 @@ if (!customElements.get('drag-and-drop-card')) {
       const canvas = this._gridCanvas;
       if (!container || !canvas) return { x, y, w, h };
 
-      const { sx, sy } = this._getContainerScale_();
-
+      // In dynamic modes the selection coordinates (x,y,w,h) are
+      // expressed in unscaled design units (grid cell multiples).  When
+      // the container is scaled via a CSS transform, we must *not*
+      // divide by the scale factor here: the design units already
+      // correspond to the unscaled layout.  Instead simply add the
+      // container’s padding, border and scroll offsets.  This differs
+      // from the original implementation which divided by the scale to
+      // compensate for a canvas sized to the scaled dimensions.
       const cs = getComputedStyle(container);
       const padL = parseFloat(cs.paddingLeft)  || 0;
       const padT = parseFloat(cs.paddingTop)   || 0;
@@ -12837,13 +13261,10 @@ if (!customElements.get('drag-and-drop-card')) {
       const scrollX = container.scrollLeft || 0;
       const scrollY = container.scrollTop  || 0;
 
-      const invX = sx ? (1 / sx) : 1;
-      const invY = sy ? (1 / sy) : 1;
-
-      let cx = x * invX + padL + bordL + scrollX;
-      let cy = y * invY + padT + bordT + scrollY;
-      let cw = w * invX;
-      let ch = h * invY;
+      const cx = x + padL + bordL + scrollX;
+      const cy = y + padT + bordT + scrollY;
+      const cw = w;
+      const ch = h;
 
       return { x: cx, y: cy, w: cw, h: ch };
     },
@@ -12877,6 +13298,8 @@ if (!customElements.get('drag-and-drop-card')) {
       const contCS = getComputedStyle(container);
       const padL = parseFloat(contCS.paddingLeft)  || 0;
       const padT = parseFloat(contCS.paddingTop)   || 0;
+      const bL   = parseFloat(contCS.borderLeftWidth) || 0;
+      const bT   = parseFloat(contCS.borderTopWidth)  || 0;
       const { sx, sy } = this._getContainerScale_();
 
       const canvRect = canvas.getBoundingClientRect();
@@ -12888,13 +13311,11 @@ if (!customElements.get('drag-and-drop-card')) {
       let dx = viewportX - contRect.left;
       let dy = viewportY - contRect.top;
 
-      // border-box → padding-box
-      dx -= padL;
-      dy -= padT;
+      // border-box → padding-box (also subtract borders)
+      dx -= (padL + bL);
+      dy -= (padT + bT);
 
-      // scroll
-      dx += container.scrollLeft || 0;
-      dy += container.scrollTop  || 0;
+
 
       const invSX = sx ? 1 / sx : 1;
       const invSY = sy ? 1 / sy : 1;
@@ -12917,9 +13338,28 @@ if (!customElements.get('drag-and-drop-card')) {
         const snap = v => Math.round(v / g) * g;
         const sx = snap(x), sy = snap(y), sw = Math.max(g, snap(w)), sh = Math.max(g, snap(h));
 
-        const mapped = (typeof this._canvasRectToContainerRect_ === 'function')
-          ? this._canvasRectToContainerRect_({ x: sx, y: sy, w: sw, h: sh })
-          : { x: sx, y: sy, w: sw, h: sh };
+        // Map the snapped canvas-space rect into the card container coordinate space.
+        // When the layout is scaled (auto-resize in dynamic mode), the
+        // container may be transformed and scrolled, so we use the
+        // grid-to-card mapping which compensates for padding, borders, scroll
+        // and scale.  In strict auto size mode the container is resized
+        // instead of transformed, so we fall back to the canvas→container
+        // mapping that accounts for differences between the canvas and
+        // container bounding boxes.  If neither helper exists we use the
+        // snapped values directly.
+        let mapped;
+        try {
+          const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+          if (mode === 'auto' && typeof this._canvasRectToContainerRect_ === 'function') {
+            mapped = this._canvasRectToContainerRect_({ x: sx, y: sy, w: sw, h: sh });
+          } else if (typeof this._gridRectToCardRect_ === 'function') {
+            mapped = this._gridRectToCardRect_({ x: sx, y: sy, w: sw, h: sh });
+          } else {
+            mapped = { x: sx, y: sy, w: sw, h: sh };
+          }
+        } catch {
+          mapped = { x: sx, y: sy, w: sw, h: sh };
+        }
 
         const finalRect = {
           x: Math.round(mapped.x),
@@ -12967,6 +13407,23 @@ if (!customElements.get('drag-and-drop-card')) {
         try { this._toast?.('Card added to selection.'); } catch {}
         try { this._syncEmptyStateUI?.(); } catch {}
         try { this._applyVisibility_?.(); } catch {}
+
+        // When auto-resize is active (dynamic mode) or strict auto mode,
+        // adding a card changes the design dimensions.  Immediately
+        // recompute the scale and refresh the grid overlay.  Without
+        // this, the canvas and drop area remain sized to the old
+        // dimensions until a manual refresh or tab switch.
+        requestAnimationFrame(() => {
+          try {
+            const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+            if (mode === 'auto') {
+              this._applyAutoFillNoScale?.();
+            } else if (this.autoResizeCards) {
+              this._applyAutoScale?.();
+            }
+            this._requestGridButtonsUpdateSoon?.();
+          } catch {}
+        });
 
         return; // handled by shim
       }
