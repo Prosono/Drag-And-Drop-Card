@@ -2048,6 +2048,38 @@ async _onToolbarAction_(action, ctx = {}) {
     return `layout_${id}`;
   }
 
+  // ---------------------------------------------------------------------------
+  // Card picker metadata
+  //
+  // Home Assistant’s Lovelace card picker inspects certain static getters
+  // on custom card classes to discover their type, title, description and
+  // associated icon.  Without these, the editor may not display the card in
+  // its “Add card” dialog.  By providing these properties, we ensure the
+  // drag‑and‑drop card is discoverable and properly categorized.  Note that
+  // the returned `type` includes the `custom:` prefix, matching the type
+  // string used in YAML configuration.
+  static get type() {
+    // When registering with Home Assistant’s card picker via window.customCards,
+    // the type should be the element tag itself (without the `custom:`
+    // prefix).  Returning the tag here makes it consistent with the
+    // registration below and prevents mismatches when the card is added
+    // through the visual editor.
+    return 'drag-and-drop-card';
+  }
+  static get title() {
+    return 'Drag & Drop Card';
+  }
+  static get description() {
+    return 'Flexible grid layout card with drag‑and‑drop editing.';
+  }
+  static get icon() {
+    return 'mdi:cursor-move';
+  }
+  // Place the card into the `custom` group in the picker
+  static get group() {
+    return 'custom';
+  }
+
   static getStubConfig(/* hass, entities, entitiesFallback */) {
     return {
       type: 'custom:drag-and-drop-card',
@@ -13424,6 +13456,42 @@ if (!customElements.get('drag-and-drop-card')) {
   // --- END: selection-rect placement shim ---
 
   customElements.define('drag-and-drop-card', DragAndDropCard);
+
+  /*
+   * Register this card with Home Assistant’s card picker.  The HA dashboard
+   * editor discovers custom cards by reading a global `window.customCards`
+   * array.  Each entry in that array is an object describing a custom
+   * card.  Without registering here, the drag‑and‑drop card will not
+   * appear in the “Custom” section of the card picker and users must
+   * manually add it via YAML.  To fix that, we push a descriptor into
+   * `window.customCards` if one isn’t already present.  See the Home
+   * Assistant developer docs for the expected fields.
+   */
+  try {
+    // Ensure the registry exists
+    if (!Array.isArray(window.customCards)) {
+      window.customCards = [];
+    }
+    // Avoid duplicate registrations (multiple script loads)
+    const exists = window.customCards.some((c) => c && typeof c.type === 'string' && c.type.toLowerCase() === 'custom:drag-and-drop-card');
+    if (!exists) {
+      window.customCards.push({
+        // Use the tag name here (no `custom:` prefix) as required by the HA
+        // card picker.  See the example in the developer docs【20940309320886†L345-L347】.
+        type: 'drag-and-drop-card',
+        name: 'Drag & Drop Card',
+        description: 'Flexible grid layout card with drag‑and‑drop editing.',
+        // Do not enable the preview; the card’s dynamic nature means
+        // generating a static preview isn’t meaningful.  Setting this to
+        // false matches the behaviour of the original implementation.
+        preview: false,
+        // Icon shown in the card picker (optional)
+        icon: 'mdi:cursor-move'
+      });
+    }
+  } catch (e) {
+    console.warn('[drag-and-drop-card] Failed to register card in customCards', e);
+  }
 }
 
 
