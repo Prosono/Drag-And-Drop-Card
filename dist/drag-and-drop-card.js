@@ -617,19 +617,6 @@ var Ma=Object.create;var gr=Object.defineProperty;var Pa=Object.getOwnPropertyDe
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
 
-/* --- Override: Use auto\u2011resize styling for toolbar and tabs even when auto\u2011resize is disabled --- */
-:host([ddc-fixed-ui]) .ddc-toolbar,
-:host([ddc-fixed-ui]) .ddc-tabs {
-  /* Behave like auto-resize is on: sticky positioning within the card, full width */
-  position: sticky;
-  left: 0;
-  transform: none;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  box-sizing: border-box;
-}
-
 
 /* ===== DDC Toolbar \u2014 Minimal Redesign (pills with accent tint) ===== */
 
