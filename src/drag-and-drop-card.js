@@ -1651,8 +1651,9 @@ _applyVisibility_() {
   _syncTabsWidth_() {
     try {
       // In auto size mode the tabs bar spans the viewport width and
-      // should not be recalculated based on the card canvas.  Exit early
-      // so we don't inadvertently clamp or expand the bar on tab changes.
+      // should not be recalculated based on the card canvas.  Exit
+      // early so we don't inadvertently clamp or expand the bar on
+      // tab changes.
       const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
       if (mode === 'auto') {
         return;
@@ -6038,7 +6039,9 @@ _applyAutoScale() {
     }
   } catch {}
 
-  // 3) Auto-resize OFF: lock to scale(1) and center UI relative to design width
+  // 3) Auto-resize OFF: lock to scale(1) but do not force a fixed UI.  In
+  // dynamic mode, the toolbar and tabs should remain in the normal flow
+  // (similar to auto mode) rather than being centered with a fixed width.
   if (!this.autoResizeCards) {
     const d = (typeof this._computeDesignSize === 'function')
       ? this._computeDesignSize()
@@ -6046,8 +6049,11 @@ _applyAutoScale() {
 
     if (mode === 'dynamic') {
       try { this._computeHaSidebarGutters_?.(); } catch {}
-      this.setAttribute('ddc-fixed-ui', '');
-      this.style?.setProperty?.('--ddc-ui-width', `${d.w}px`);
+      // Remove any fixed UI attributes and widths so the toolbar and tabs
+      // behave like they do in auto mode.  Without this the UI is centered
+      // via CSS (:host[ddc-fixed-ui]) which causes inconsistent styling.
+      this.removeAttribute('ddc-fixed-ui');
+      this.style?.removeProperty?.('--ddc-ui-width');
     } else {
       this.removeAttribute('ddc-fixed-ui');
       this.style?.removeProperty?.('--ddc-ui-width');
