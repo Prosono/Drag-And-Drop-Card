@@ -1565,7 +1565,11 @@ _applyVisibility_() {
       const y = (parseFloat(t.getAttribute('data-y')) || 0) + step;
 
       this._setCardPosition?.(w2, x, y);
-      w2.style.zIndex = String((this._highestZ?.() || 0) + 1);
+      // Assign a new z-index that is at least 6 so that the duplicated card
+      // always appears above the grid overlay.  Use the higher of the
+      // current highest z-index plus one or the baseline of 6.
+      const nextZVal = (this._highestZ?.() || 0) + 1;
+      w2.style.zIndex = String(Math.max(nextZVal, 6));
         // Preserve the tab assignment from the original wrapper. Without this,
         // duplicates incorrectly end up in the currently active tab instead of
         // inheriting the source tab. See: https://github.com/owner/repo/issues/XYZ
@@ -2081,22 +2085,39 @@ async _onToolbarAction_(action, ctx = {}) {
   }
 
   static getStubConfig(/* hass, entities, entitiesFallback */) {
+    // Return default configuration for a new drag‑and‑drop card.  These values
+    // initialize the card in “auto” mode with a 20px grid and no hero
+    // background image.  The storage_key is generated once so each new
+    // card has its own persistent layout key.
     return {
       type: 'custom:drag-and-drop-card',
-      // ← generated immediately when the card is added
       storage_key: this._genKey(),
-
-      // (optional) sensible defaults you already use:
-      grid: 10,
-      drag_live_snap: false,
+      grid: 20,
+      drag_live_snap: true,
       auto_save: true,
       auto_save_debounce: 800,
-      container_size_mode: 'dynamic',
-
-
-      // your baked-in hero image, if you want it visible by default
-      hero_image:
-        "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png",
+      container_size_mode: 'auto',
+      container_background: 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+      card_background: 'linear-gradient(135deg, #111827, #1f2937)',
+      debug: false,
+      disable_overlap: false,
+      auto_resize_cards: false,
+      background_mode: 'none',
+      animate_cards: true,
+      container_preset_orientation: 'auto',
+      edit_mode_pin: '',
+      container_fixed_width: null,
+      container_fixed_height: null,
+      container_preset: 'fullhd',
+      card_shadow: true,
+      hide_HA_Header: false,
+      hide_HA_Sidebar: false,
+      screen_saver_enabled: true,
+      screen_saver_delay: 1500000,
+      tabs: [
+        { id: 'home', label: 'Home', icon: 'mdi:home', label_mode: 'both' }
+      ],
+      default_tab: 'home'
     };
   }
 
@@ -2112,130 +2133,52 @@ async _onToolbarAction_(action, ctx = {}) {
 // for the Apply button when there are unapplied changes.
 
 static getConfigElement() {
-  const el = document.createElement('div');
-  el.innerHTML = `
-    <style>
-      :host, .ddc-editor { font-family: var(--paper-font-body1_-_font-family, Roboto, system-ui, sans-serif); color: var(--primary-text-color); }
-
-      .ddc-editor { display: grid; grid-template-columns: 220px 1fr; gap: 10px 16px; align-items: center; box-sizing: border-box; padding: 8px 4px; }
-      .section { grid-column: 1 / -1; margin: 10px 0 2px; font-weight: 600; opacity: 0.9; }
-      .row-spacer { grid-column: 1 / -1; height: 2px; background: var(--divider-color); opacity: .2; border-radius: 2px; }
-
-      .label { align-self: flex-start; padding-top: 6px; font-weight: 600; opacity: .9; }
-      .helper { grid-column: 2 / 3; font-size: .85rem; opacity: .7; margin-top: -6px; }
-
-      .inline { display: inline-flex; align-items: center; gap: 8px; }
-      .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-
-      .actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-      .actions ha-button[disabled] { opacity: .6; }
-
-      /* Subtle pulse for enabled Apply button */
-      @keyframes ddcPulse {
-        0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
-        50% { transform: scale(1.035); box-shadow: 0 0 12px 2px rgba(255,255,255,.22); }
+    // -------------------------------------------------------------------------
+    // Simplified visual editor: only expose the storage key.
+    // All other settings should be edited from the dashboard settings.  The
+    // editor renders a single HA textfield and propagates changes via the
+    // `config-changed` event.
+    const editor = document.createElement('div');
+    editor.style.display = 'grid';
+    editor.style.gridTemplateColumns = '1fr';
+    editor.style.rowGap = '12px';
+    // Create storage key input field
+    const text = document.createElement('ha-textfield');
+    text.id = 'storage_key';
+    text.label = 'Storage key';
+    text.placeholder = 'Auto-generated if left blank';
+    editor.appendChild(text);
+    // Provide helper text below the input
+    const helper = document.createElement('div');
+    helper.style.fontSize = '0.85rem';
+    helper.style.opacity = '0.7';
+    helper.textContent = 'Unique key for saving layout positions. Leave blank to auto‑generate.';
+    editor.appendChild(helper);
+    // setConfig: populate input from incoming config
+    editor.setConfig = (config = {}) => {
+      editor._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
+      // Auto-generate a storage key if not provided
+      if (!editor._config.storage_key) {
+        editor._config.storage_key = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
       }
-      #applyBtn:not([disabled]) { animation: ddcPulse 1.8s ease-in-out infinite; }
+      text.value = editor._config.storage_key || '';
+    };
+    // getConfig: return updated configuration containing only the storage_key
+    editor.getConfig = () => {
+      const base = { ...(editor._config || {}) };
+      base.type = 'custom:drag-and-drop-card';
+      base.storage_key = text.value || '';
+      return base;
+    };
+    // Dispatch config-changed event when the value changes
+    text.addEventListener('input', () => {
+      editor.dispatchEvent(new CustomEvent('config-changed', { detail: { config: editor.getConfig() } }));
+    });
+    return editor;
 
-      /* Make HA inputs fill width nicely */
-      ha-textfield, ha-select { width: 100%; }
-
-      /* Checkbox rows: keep left column reserved so alignment stays consistent */
-      .left-empty { visibility: hidden; }
-
-</style>
-
-     <div class="ddc-editor">
-      <div class="section">Layout & Behavior</div>
-
-      <div class="label">Storage key</div>
-      <ha-textfield id="storage_key" label="Storage key" placeholder="my_unique_layout_key"></ha-textfield>
-      <div class="helper">Unique key for saving layout positions. Auto-generated if empty.</div>
-
-      <div class="label">Grid size</div>
-      <ha-textfield id="grid" label="Grid (px)" type="number" min="4" max="32" step="1" value="10"></ha-textfield>
-      <div class="helper">Pixel size of each grid cell. Affects snap and default card size.</div>
-
-      <div class="label">Snap while dragging</div>
-      <ha-formfield label="Snap to grid during drag (live)">
-        <ha-checkbox id="liveSnap"></ha-checkbox>
-      </ha-formfield>
-      <div class="helper">If on, elements snap to grid while dragging. If off, snap occurs on drop.</div>
-
-      <div class="label">Auto-save</div>
-      <div class="two-col">
-        <ha-formfield label="Auto-save changes">
-          <ha-checkbox id="autoSave"></ha-checkbox>
-        </ha-formfield>
-        <ha-textfield id="autoSaveDebounce" label="Debounce (ms)" type="number" min="0" step="50" value="800"></ha-textfield>
-      </div>
-      <div class="helper">When enabled, layout changes are saved automatically after a short delay.</div>
-
-      <div class="row-spacer"></div>
-      <div class="section">Appearance</div>
-
-      <div class="label">Container background</div>
-      <ha-textfield id="containerBg" label="CSS color/gradient" placeholder="transparent, #232f3e, linear-gradient(...)" helper=""></ha-textfield>
-      <div class="helper">Examples: <code>transparent</code>, <code>#232f3e</code>, <code>linear-gradient(...)</code>.</div>
-
-      <div class="label">Card background</div>
-      <ha-textfield id="cardBg" label="CSS color/gradient" placeholder="var(--ha-card-background) or #ffffffcc"></ha-textfield>
-      <div class="helper">Background for each card in the layout; can use theme vars.</div>
-
-      <div class="label">Debug logs</div>
-      <ha-formfield label="Enable console debug">
-        <ha-checkbox id="debug"></ha-checkbox>
-      </ha-formfield>
-
-      <div class="label">Disable overlap</div>
-      <ha-formfield label="Prevent cards from overlapping">
-        <ha-checkbox id="noOverlap"></ha-checkbox>
-      </ha-formfield>
-
-      <div class="label">Auto-resize cards</div>
-      <ha-formfield label="Scale layout to fit parent (view mode)">
-        <ha-checkbox id="autoResize"></ha-checkbox>
-      </ha-formfield>
-
-      <div class="label">Animate cards</div>
-      <ha-formfield label="Animate cards on tab switch">
-        <ha-checkbox id="animateCards"></ha-checkbox>
-      </ha-formfield>
-      <div class="helper">If enabled, cards will fly in when switching tabs or on refresh.</div>
-
-
-      <div class="row-spacer"></div>
-      <div class="section">Container Size</div>
-
-      <div class="label">Mode</div>
-      <ha-select id="sizeMode" label="Container size mode">
-        <mwc-list-item value="dynamic">Dynamic (auto)</mwc-list-item>
-        <mwc-list-item value="fixed_custom">Fixed (custom)</mwc-list-item>
-        <mwc-list-item value="preset">Preset</mwc-list-item>
-      </ha-select>
-
-      <div class="label">Fixed size</div>
-      <div class="inline" id="sizeCustom" style="display:none">
-        <ha-textfield id="sizeW" type="number" label="W" min="100" step="10"></ha-textfield>
-        <ha-textfield id="sizeH" type="number" label="H" min="100" step="10"></ha-textfield>
-      </div>
-
-      <div class="label">Preset</div>
-      <div class="inline" id="sizePresetWrap" style="display:none">
-        <ha-select id="sizePreset" label="Preset"></ha-select>
-        <ha-select id="sizeOrientation" label="Orientation">
-          <mwc-list-item value="auto">Auto</mwc-list-item>
-          <mwc-list-item value="landscape">Landscape</mwc-list-item>
-          <mwc-list-item value="portrait">Portrait</mwc-list-item>
-        </ha-select>
-      </div>
-
-      <div class="actions">
-        <ha-button id="revertBtn">Revert</ha-button>
-        <ha-button id="applyBtn" raised disabled>Apply</ha-button>
-      </div>
-    </div>
-  `;
+    // -------------------------------------------------------------------------
+    // The original editor code is below but will never be executed.
+    // -------------------------------------------------------------------------
 
   // ---- Utility helpers ----
   const updateButtons = () => {
@@ -3351,7 +3294,16 @@ _applyGridVars() {
         /* Allow a custom drop shadow via --ddc-card-shadow. Fallback to the HA default if unset */
         box-shadow: var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18)));
         will-change:transform,width,height,box-shadow; touch-action:auto;
-        z-index:2;
+        /*
+         * Ensure cards are always layered above the interactive grid overlay.  The
+         * selectable grid canvas uses a z-index of 5 (see .ddc-grid-canvas).  By
+         * default the card wrappers were assigned a z-index of 2, causing
+         * newly added cards to appear behind the overlay until enough cards
+         * were added to raise the maximum z-index above 5.  Raising this
+         * baseline to 6 ensures all cards start above the grid overlay and
+         * remain interactive without requiring the user to add multiple cards.
+         */
+        z-index:6;
       }
       .card-wrapper.dragging{ cursor:grabbing; touch-action: none; }
       .card-wrapper.editing.selected{
@@ -5608,7 +5560,14 @@ _syncEmptyStateUI() {
     wrap.classList.add('card-wrapper');
     wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
     if (this.editMode) wrap.classList.add('editing');
-    if (!wrap.style.zIndex) wrap.style.zIndex = String(this._highestZ() + 1);
+    if (!wrap.style.zIndex) {
+      // Compute the next z-index and ensure it is at least 6.  Without
+      // clamping, the first few cards could be assigned low z-indices
+      // that place them behind the grid overlay.  See _highestZ() for
+      // baseline initialization.
+      const nextVal = this._highestZ() + 1;
+      wrap.style.zIndex = String(Math.max(nextVal, 6));
+    }
 
     const chip = document.createElement('div');
     chip.className = 'chip';
@@ -5686,7 +5645,12 @@ _syncEmptyStateUI() {
           const x = (parseFloat(t.getAttribute('data-x')) || 0) + this.gridSize;
           const y = (parseFloat(t.getAttribute('data-y')) || 0) + this.gridSize;
           this._setCardPosition(w2, x, y);
-          w2.style.zIndex = String(this._highestZ() + 1);
+          // Ensure a baseline z-index of 6 so duplicates are always above the grid
+          // overlay.  Compute next z-index and clamp to at least 6.
+          {
+            const nextVal = this._highestZ() + 1;
+            w2.style.zIndex = String(Math.max(nextVal, 6));
+          }
           // Preserve the tab assignment from the original wrapper so that
           // duplicates appear in the correct tab rather than defaulting to
           // the currently active tab. See bug #3.
@@ -5744,7 +5708,8 @@ _syncEmptyStateUI() {
         let baseMin = minZ;
         for (const w of targets) {
           baseMin -= 1;
-          w.style.zIndex = String(Math.max(1, baseMin));
+          // Ensure cards never drop below 6 so they remain above the grid overlay.
+          w.style.zIndex = String(Math.max(6, baseMin));
         }
         this._queueSave('z-change');
       } else if (act === 'edit') {
@@ -5907,12 +5872,49 @@ _syncEmptyStateUI() {
   }
 
   _showEmptyPlaceholder() {
+    // Avoid creating multiple placeholders
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    const p = this._makePlaceholderAt(0,0,200,200);
+    // Define placeholder dimensions.  These values mirror the original
+    // implementation and can be adjusted if the default size changes.
+    const phW = 200;
+    const phH = 200;
+    // Initially create the placeholder at (0,0) so that the resize logic can
+    // compute an appropriate container size.  We will center it after the
+    // container dimensions have been updated.
+    const p = this._makePlaceholderAt(0, 0, phW, phH);
     this.cardContainer.appendChild(p);
+    // Resize the container so its dimensions reflect the presence of the
+    // placeholder.  Without this call the container width/height may be
+    // reported as zero, preventing proper centering.
     this._resizeContainer();
+    // Compute the center position for the placeholder relative to the
+    // component’s bounding box rather than the card container.  The card
+    // container grows and shrinks based on its contents, so its width may
+    // match the placeholder width exactly, making (cw - phW)/2 equal to 0.
+    // Instead, use the host element’s bounding rectangle to find the
+    // available width/height and offset by the difference between the
+    // container and host origins.  This centers the placeholder within
+    // the entire drag‑and‑drop card, not just within the container.
+    try {
+      const rootRect = this.getBoundingClientRect?.();
+      const contRect = this.cardContainer?.getBoundingClientRect?.();
+      if (rootRect && contRect) {
+        // Compute center coordinates in the host’s coordinate space
+        const hostCenterX = (rootRect.width  - phW) / 2;
+        const hostCenterY = (rootRect.height - phH) / 2;
+        // Translate host coordinates into container coordinates
+        let centerX = hostCenterX - (contRect.left - rootRect.left);
+        let centerY = hostCenterY - (contRect.top  - rootRect.top);
+        // Clamp to zero to avoid negative translations on very small hosts
+        if (!Number.isFinite(centerX) || centerX < 0) centerX = 0;
+        if (!Number.isFinite(centerY) || centerY < 0) centerY = 0;
+        this._setCardPosition(p, centerX, centerY);
+      }
+    } catch {
+      // Fallback: leave placeholder at (0,0) if any errors occur
+    }
+    // Update UI state (add button visibility, etc.)
     this._syncEmptyStateUI();
-
   }
   _hideEmptyPlaceholder() { this.cardContainer.querySelectorAll('.ddc-placeholder').forEach(n => n.remove()); }
   _ensurePlaceholderIfEmpty() {
@@ -5931,7 +5933,14 @@ _syncEmptyStateUI() {
   }
 
   _highestZ() {
-    let max = 0;
+    // Default to a baseline of 5 so that newly created cards (which use
+    // _highestZ() + 1) start at a z-index of at least 6.  Without this
+    // baseline the first few cards would receive very low z-indices (1–4)
+    // and appear behind the interactive grid overlay (z-index 5).  By
+    // initializing max to 5 the first call returns 5, causing the first
+    // wrapper to be assigned 6.  Subsequent wrappers will increment from
+    // there, preserving relative ordering.
+    let max = 5;
     this.cardContainer.querySelectorAll('.card-wrapper').forEach(w => {
       const z = parseInt(w.style.zIndex || '0', 10);
       if (z > max) max = z;
@@ -9625,7 +9634,12 @@ async _getStubConfigForType(type) {
     this._setCardPosition(wrap, next.x, next.y);
     wrap.style.width  = `${14*this.gridSize}px`;
     wrap.style.height = `${10*this.gridSize}px`;
-    wrap.style.zIndex = String(this._highestZ() + 1);
+    // Assign a z-index for the new card that is at least 6.  Without
+    // clamping the first few cards could be placed behind the grid overlay.
+    {
+      const nextVal = this._highestZ() + 1;
+      wrap.style.zIndex = String(Math.max(nextVal, 6));
+    }
     this.cardContainer.appendChild(wrap);
     
   try { this._rebuildOnce(wrap.firstElementChild); } catch {}
@@ -9743,8 +9757,13 @@ async _getStubConfigForType(type) {
         const x = baseX + (it.dx || 0);
         const y = baseY + (it.dy || 0);
         this._setCardPosition(wrap, x, y);
-        // Bring to front
-        wrap.style.zIndex = String(this._highestZ() + 1);
+        // Bring to front.  Ensure the new card's z-index is at least 6 so
+        // pasted cards never end up behind the grid overlay.  Compute
+        // highest z-index among existing cards and clamp to our baseline.
+        {
+          const nextVal = this._highestZ() + 1;
+          wrap.style.zIndex = String(Math.max(nextVal, 6));
+        }
         // Assign to current tab
         try {
           const tid = this._normalizeTabId(this.activeTab || this.defaultTab);
@@ -13414,7 +13433,13 @@ if (!customElements.get('drag-and-drop-card')) {
         this._setCardPosition(wrap, Math.round(x), Math.round(y));
         wrap.style.width  = `${Math.round(w)}px`;
         wrap.style.height = `${Math.round(h)}px`;
-        wrap.style.zIndex = String(this._highestZ() + 1);
+        // Assign a z-index for the new card based on the highest existing
+        // z-index.  Ensure the result is at least 6 so new cards always
+        // appear above the grid overlay.
+        {
+          const nextVal = this._highestZ() + 1;
+          wrap.style.zIndex = String(Math.max(nextVal, 6));
+        }
         wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
 
         this.cardContainer.appendChild(wrap);
