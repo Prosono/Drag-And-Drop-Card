@@ -757,12 +757,20 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
 @keyframes ddc-pulse{ 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.35)} }
 
 /* store badge (optional) */
-.ddc-toolbar.streamlined.v2 .store-badge{
-  display:inline-flex; align-items:center; height:var(--btn-h);
-  border:1px solid var(--ddc-border); border-radius:999px; padding:6px 10px; font-size:.85rem;
-  background: color-mix(in oklab, #ffc107 22%, transparent); color:#1a1200;
-  flex: 1 1 220px; min-width: 160px;
+.ddc-toolbar.streamlined.v2 .store-badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--btn-h);
+  border: 1px solid var(--ddc-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: .85rem;
+  background: color-mix(in oklab, #ffc107 22%, transparent);
+  color: #fff; /* \u2190 white text */
+  flex: 1 1 220px;
+  min-width: 160px;
 }
+
 
 /* Layouts: inline switcher styling */
 .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{ display:flex; justify-content:center; gap:12px; flex-wrap: wrap; }
@@ -1188,6 +1196,7 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
             border-right:1px solid var(--divider-color);
             overflow:auto;
             background:var(--primary-background-color);
+            color: var(--primary-text-color, #fff); /* \u{1F448} ensure readable text */
             /*
              * Remove contain:content so that fixed-position menus from
              * custom card editors can correctly position themselves
