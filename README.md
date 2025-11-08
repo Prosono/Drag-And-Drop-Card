@@ -86,7 +86,6 @@ drag_live_snap: true                   # snap while dragging/resizing
 auto_save: true                        # auto-save after edits
 auto_save_debounce: 800                # ms debounce
 container_size_mode: auto              # auto | dynamic | fixed_custom | preset
-auto_resize_cards: true                # in dynamic mode this is always forced on
 container_background: transparent      # canvas background
 card_background: var(--ha-card-background, var(--card-background-color))
 disable_overlap: false                 # prevent overlapping when true
@@ -120,12 +119,10 @@ tabs:
     icon: mdi:television
     label_mode: icon
 default_tab: home
-tabs_position: top        # top (default) | left
 hide_tabs_when_single: true
 ```
 
 - The card remembers the **last active tab** per `storage_key`.
-- Set `tabs_position: left` to get a vertical tab bar.
 - When there is only one tab and `hide_tabs_when_single: true`, the tab bar is hidden.
 
 ---
@@ -213,7 +210,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `container_preset_orientation` | string    | `auto`                     | `auto` \| `portrait` \| `landscape`. |
 | `container_background`         | string    | `transparent`              | Canvas background (e.g. color/gradient). |
 | `card_background`              | string    | `var(--ha-card-background, var(--card-background-color))` | Default background for wrapped cards. |
-| `disable_overlap`              | boolean   | `false`                    | If `true`, prevents overlapping during edit (experimental). |
+| `disable_overlap`              | boolean   | `false`                    | If `true`, prevents overlapping during edit (experimental - NOT RECCOMENDED WHEN USING TABS!). |
 | `animate_cards`                | boolean   | `false`                    | If `true`, cards animate in when switching tabs or loading. |
 | `background_mode`              | string    | `none`                     | `none` \| `image` \| `particles` \| `youtube`. |
 | `background_image`             | object    | _none_                     | Image background settings when `background_mode: image`. |
@@ -223,9 +220,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `screen_saver_delay`           | number    | `300000`                   | Screen saver delay in ms (fallback to 5 minutes if invalid). |
 | `tabs`                         | array     | `[]`                       | Tab definitions (see Tabs section). |
 | `default_tab`                  | string    | first tab id / `'default'` | Default tab id when the card loads. |
-| `tabs_position`                | string    | `top`                      | `top` or `left`. |
 | `hide_tabs_when_single`        | boolean   | `true`                     | Hide tab bar when there is only one tab. |
-| `hero_image`                   | string    | internal default URL       | Optional header/hero image used in the editor UI. |
 | `card_shadow`                  | boolean   | `false`                    | Apply a drop shadow to card wrappers. |
 | `hide_HA_Header`               | boolean   | `false`                    | Hide the Home Assistant top header while in this card. |
 | `hide_HA_Sidebar`              | boolean   | `false`                    | Hide the Home Assistant sidebar while in this card. |
@@ -246,25 +241,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 
 ## 🧱 Adding Cards
 
-Use the **Add** button in edit mode to pick from standard Lovelace cards.  
-You can also embed initial cards directly in YAML (helpful as a starting snapshot):
-
-```yaml
-type: custom:drag-and-drop-card
-storage_key: demo_layout
-grid: 12
-cards:
-  - type: button
-    entity: light.kitchen
-  - type: gauge
-    entity: sensor.temperature_living_room
-    min: 0
-    max: 40
-  - type: entities
-    entities:
-      - switch.coffee_machine
-      - switch.toaster
-```
+Use the **Add** button in edit mode to pick from standard Lovelace cards or drag across an area to add a card directly to the grid.
 
 Each added card is wrapped in a draggable/resizable container that participates in snapping and layout persistence.
 
@@ -404,7 +381,5 @@ drag-and-drop-card vX.Y.Z
 
 A couple of bugs are already known:
 
-1. On some custom cards certain dropdowns can cause the visual editor to disappear temporarily. The editor returns once an option is selected.
-2. Card-mod support **inside** nested cards is still limited and may not behave as expected.
-3. The visual editor for the Entity card is currently not working correctly in the card selector inside Drag & Drop Card.
-4. …probably more 🙂
+1. Card-mod support **inside** nested cards is still limited and may not behave as expected.
+2. …probably more 🙂
