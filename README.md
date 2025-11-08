@@ -214,7 +214,6 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `container_background`         | string    | `transparent`              | Canvas background (e.g. color/gradient). |
 | `card_background`              | string    | `var(--ha-card-background, var(--card-background-color))` | Default background for wrapped cards. |
 | `disable_overlap`              | boolean   | `false`                    | If `true`, prevents overlapping during edit (experimental). |
-| `auto_resize_cards`            | boolean   | `true` (mode-dependent)    | In `dynamic` mode this is **forced true**; in other modes `false` disables auto-scaling. |
 | `animate_cards`                | boolean   | `false`                    | If `true`, cards animate in when switching tabs or loading. |
 | `background_mode`              | string    | `none`                     | `none` \| `image` \| `particles` \| `youtube`. |
 | `background_image`             | object    | _none_                     | Image background settings when `background_mode: image`. |
