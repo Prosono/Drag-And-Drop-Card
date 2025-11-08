@@ -1,7 +1,7 @@
 # The Drag & Drop Card for Home Assistant
 
 <p align="center">
-  <img src="https://i.postimg.cc/fTktZVG1/ezgif-888e8d5cad9711a8.gif" alt="Demo of Drag and Drop Card" width="100%" referrerpolicy="no-referrer">
+  <img src="assets/demo.gif" alt="Demo of Drag and Drop Card" width="100%">
 </p>
 
 [![Watch the demo on YouTube](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
