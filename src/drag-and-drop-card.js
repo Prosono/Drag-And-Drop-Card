@@ -1709,49 +1709,61 @@ _applyVisibility_() {
 
 
 
-  _syncTabsWidth_() {
+_syncTabsWidth_() {
+  try {
+    const mode = String(
+      (this.containerSizeMode || this.container_size_mode || 'dynamic')
+    ).toLowerCase();
+    if (mode === 'auto') {
+      return;
+    }
+
+    const bar = this.tabsBar;
+    if (!bar) return;
+
+    // 📱 On narrow viewports, don't clamp the bar at all.
+    // Let CSS handle width and scrolling so you can reach all tabs.
     try {
-      // In auto size mode the tabs bar spans the viewport width and
-      // should not be recalculated based on the card canvas.  Exit
-      // early so we don't inadvertently clamp or expand the bar on
-      // tab changes.
-      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-      if (mode === 'auto') {
-        return;
-      }
-      const bar = this.tabsBar;
-      if (!bar) return;
-      // For left-side tabs the width should not be clamped; reset and bail.
-      if (this.tabsPosition === 'left') {
+      const vw =
+        window.innerWidth ||
+        document.documentElement?.clientWidth ||
+        0;
+      if (vw && vw <= 768) {
         bar.style.width = '';
         bar.style.maxWidth = '';
         return;
       }
-      // Determine the element representing the visible card canvas. We use
-      // the bounding box of the card container itself rather than the
-      // outer scaling wrapper. The container has the transform applied to
-      // it, so getBoundingClientRect() returns the actual visible width.
-      const ref = this.cardContainer || this.__scaleOuter;
-      if (!ref) return;
-      let width = 0;
-      try {
-        const rect = ref.getBoundingClientRect();
-        width = rect && rect.width ? rect.width : 0;
-      } catch {}
-      // Fallback: if the container hasn't been laid out yet, try the scale
-      // wrapper. This can happen very early in the lifecycle.
-      if (width <= 0 && this.__scaleOuter && this.__scaleOuter !== ref) {
-        try {
-          const rect2 = this.__scaleOuter.getBoundingClientRect();
-          width = rect2 && rect2.width ? rect2.width : 0;
-        } catch {}
-      }
-      if (width > 0) {
-        bar.style.width = `${width}px`;
-        bar.style.maxWidth = `${width}px`;
-      }
     } catch {}
-  }
+
+    // For left-side tabs the width should not be clamped; reset and bail.
+    if (this.tabsPosition === 'left') {
+      bar.style.width = '';
+      bar.style.maxWidth = '';
+      return;
+    }
+
+    const ref = this.cardContainer || this.__scaleOuter;
+    if (!ref) return;
+    let width = 0;
+    try {
+      const rect = ref.getBoundingClientRect();
+      width = rect && rect.width ? rect.width : 0;
+    } catch {}
+    if (width <= 0 && this.__scaleOuter && this.__scaleOuter !== ref) {
+      try {
+        const rect2 = this.__scaleOuter.getBoundingClientRect();
+        width = rect2 && rect2.width ? rect2.width : 0;
+      } catch {}
+    }
+    if (width > 0) {
+      bar.style.width = `${width}px`;
+      bar.style.maxWidth = `${width}px`;
+    }
+  } catch {}
+}
+
+
+
 
 
   _isTypingTarget_(t) {
@@ -2876,15 +2888,25 @@ _applyGridVars() {
   white-space: nowrap;
 }
 
-/* Mobile: sticky works better inside HA's scroll containers */
+/* Mobile: make toolbar & tabs full-width and not offset */
+/* Mobile: tabs should not be centered with left/translate. Just full-width & scrollable */
 @media (max-width: 768px) {
-  :host([ddc-fixed-ui]) .ddc-tabs {
+  .ddc-tabs {
     position: sticky;
-    left: auto;
-    transform: none;
-    width: 100%;
-    max-width: 100vw;
-    margin-left: 0;
+    top: var(--ddc-toolbar-height, 0px);
+    left: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin: 0;
+    padding-inline: 0;
+    justify-content: flex-start !important;
+    /* make the whole strip scrollable, nothing faded away at edges */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
@@ -3845,6 +3867,8 @@ _applyGridVars() {
   );
 }
 
+
+
 .ddc-tabs::-webkit-scrollbar {
   height: 8px;
 }
@@ -3855,6 +3879,41 @@ _applyGridVars() {
 .ddc-tabs::-webkit-scrollbar-track {
   background: transparent;
 }
+
+
+/* Mobile: simple full-width tabs, no centering, no edge fade */
+@media (max-width: 768px) {
+  :host([ddc-fixed-ui]) .ddc-tabs,
+  .ddc-tabs {
+    position: sticky;
+    top: calc(
+      max(env(safe-area-inset-top, 0px), 0px) +
+      var(--ddc-toolbar-height, 0px)
+    );
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
+
+    justify-content: flex-start;     /* 👈 stop centering on mobile */
+    padding-left: 0;
+    padding-right: 0;
+    padding-inline-end: 0;
+
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+
+    /* 🔑 remove the mask so the first tabs are fully visible */
+    -webkit-mask-image: none;
+    mask-image: none;
+
+    /* optional: avoid weird snapping on tiny screens */
+    scroll-snap-type: none;
+  }
+}
+
 
 /* ---------- TAB (Chrome-like shape) ---------- */
 /* ====================================================================
@@ -4802,9 +4861,20 @@ if (this.__ddcOnWinResize) {
     try {
       const activeBtn = bar.querySelector?.('.ddc-tab.active');
       if (activeBtn && bar.scrollWidth > bar.clientWidth) {
-        // Use nearest scrolling so the element becomes visible but does not
-        // forcibly center itself if there’s already sufficient whitespace.
-        activeBtn.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+        let vw = 0;
+        try {
+          vw = window.innerWidth || document.documentElement?.clientWidth || 0;
+        } catch {}
+
+        // On small screens let the user control the scroll position manually.
+        if (!vw || vw > 768) {
+          // Desktop / wide: still auto-scroll the active tab into view.
+          activeBtn.scrollIntoView({
+            behavior: 'auto',
+            block: 'nearest',
+            inline: 'nearest',
+          });
+        }
       }
     } catch {}
   }
