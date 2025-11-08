@@ -675,7 +675,6 @@ _setHeaderVisible_(show = true) {
     // 3) Adjust CSS variables so layout doesn't reserve header space
     //    Include an extra var some themes use, and collapse content padding.
     const containers = [
-      // common layout hosts that own the header height vars/padding
       ...(this._deepQueryAll?.('ha-app-layout') || []),
       ...(this._deepQueryAll?.('home-assistant-main') || []),
       document.documentElement,
@@ -707,7 +706,6 @@ _setHeaderVisible_(show = true) {
         host.style.setProperty('--app-header-height', '0px');
         host.style.setProperty('--header-height', '0px');
         host.style.setProperty('--ha-header-height', '0px');
-        // collapse any padding that might be applied because of header height
         try { host.style.paddingTop = '0px'; } catch {}
       }
     });
@@ -720,6 +718,23 @@ _setHeaderVisible_(show = true) {
         cc.dataset.ddcPrevContentPadTop = (cc.style && (cc.style.paddingTop || '')) || '';
       }
       cc.style.paddingTop = show ? (cc.dataset.ddcPrevContentPadTop || '') : '0px';
+    });
+
+    // 5) Hide the main title (e.g. "Home")
+    const mainTitles = this._deepQueryAll?.('.main-title') || [];
+    mainTitles.forEach(el => {
+      if (!el) return;
+      if (el.dataset.ddcPrevDisplayTitle === undefined) {
+        el.dataset.ddcPrevDisplayTitle = el.style.display || '';
+        el.dataset.ddcPrevVisTitle = el.style.visibility || '';
+      }
+      if (show) {
+        el.style.display = el.dataset.ddcPrevDisplayTitle || '';
+        el.style.visibility = el.dataset.ddcPrevVisTitle || '';
+      } else {
+        el.style.display = 'none';
+        el.style.visibility = 'hidden';
+      }
     });
 
   } catch {}
@@ -2781,7 +2796,7 @@ _applyGridVars() {
   width: var(--ddc-ui-width, auto);
   max-width: calc(100vw - var(--ddc-left-gutter, 56px) - var(--ddc-right-gutter, 0px));
   box-sizing: border-box;
-  z-index: 1002; /* above canvas, below dialogs */
+  z-index: 3; /* above canvas, below dialogs */
   pointer-events: auto;
 }
 
@@ -3731,7 +3746,7 @@ _applyGridVars() {
 
   position: sticky;
   top: calc(max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
-  z-index: 100;
+  z-index: 3;
 
   display: flex;
   align-items: flex-end;
@@ -3802,7 +3817,7 @@ _applyGridVars() {
 
   position: sticky;
   top: calc(max(env(safe-area-inset-top,0px), 0px) + var(--ddc-toolbar-height, 0px));
-  z-index: 100;
+  z-index: 3;
 
   display: flex;
   align-items: flex-end;
@@ -13457,76 +13472,85 @@ if (!customElements.get('drag-and-drop-card')) {
   });
 
   // --- BEGIN: selection-rect placement shim ---
-  if (!DragAndDropCard.prototype.__addPickedPatched) {
-    const __origAddPicked = DragAndDropCard.prototype._addPickedCardToLayout;
+if (!DragAndDropCard.prototype.__addPickedPatched) {
+  const __origAddPicked = DragAndDropCard.prototype._addPickedCardToLayout;
 
-    DragAndDropCard.prototype._addPickedCardToLayout = async function (cardConfig) {
-      // If a selection rect is pending, place the new card exactly there.
-      if (this && this.__pendingAddRect) {
-        const { x, y, w, h } = this.__pendingAddRect;
-        this.__pendingAddRect = null; // consume it
+  DragAndDropCard.prototype._addPickedCardToLayout = async function (cardConfig) {
+    // If a selection rect is pending, place the new card exactly there.
+    if (this && this.__pendingAddRect) {
+      const { x, y, w, h } = this.__pendingAddRect;
+      this.__pendingAddRect = null; // consume it
 
-        try { this._hideEmptyPlaceholder?.(); } catch {}
+      try { this._hideEmptyPlaceholder?.(); } catch {}
 
-        const cardEl = await this._createCard(cardConfig);
-        const wrap = this._makeWrapper(cardEl);
+      const cardEl = await this._createCard(cardConfig);
+      const wrap   = this._makeWrapper(cardEl);
 
-        // When placing a new card from a selection rect, apply a slight
-        // negative offset so that the card appears 10px up and left from
-        // the drawn rectangle.  Without this the card will align exactly
-        // with the rectangle bounds, but users requested a small offset.
-        const offX = 11;
-        const offY = 11;
-        const posX = Math.round(x) - offX;
-        const posY = Math.round(y) - offY;
-        this._setCardPosition(wrap, posX, posY);
-        wrap.style.width  = `${Math.round(w)}px`;
-        wrap.style.height = `${Math.round(h)}px`;
-        // Assign a z-index for the new card based on the highest existing
-        // z-index.  Ensure the result is at least 6 so new cards always
-        // appear above the grid overlay.
-        {
-          const nextVal = this._highestZ() + 1;
-          wrap.style.zIndex = String(Math.max(nextVal, 6));
-        }
-        wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+      // Determine mode: auto vs everything else
+      const mode = String(
+        this.containerSizeMode ||
+        this.container_size_mode ||
+        this._config?.container_size_mode ||
+        'dynamic'
+      ).toLowerCase();
 
-        this.cardContainer.appendChild(wrap);
+      // In auto mode we use 0 offset; otherwise 11 px up/left
+      const isAuto = mode === 'auto';
+      const offX   = isAuto ? -11 : 11;
+      const offY   = isAuto ? -11 : 11;
 
-        try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
-        try { this._initCardInteract?.(wrap); } catch {}
-        try { this._resizeContainer?.(); } catch {}
-        try { this._queueSave?.('add'); } catch {}
-        try { this._toast?.('Card added to selection.'); } catch {}
-        try { this._syncEmptyStateUI?.(); } catch {}
-        try { this._applyVisibility_?.(); } catch {}
+      const posX = Math.round(x) - offX;
+      const posY = Math.round(y) - offY;
 
-        // When auto-resize is active (dynamic mode) or strict auto mode,
-        // adding a card changes the design dimensions.  Immediately
-        // recompute the scale and refresh the grid overlay.  Without
-        // this, the canvas and drop area remain sized to the old
-        // dimensions until a manual refresh or tab switch.
-        requestAnimationFrame(() => {
-          try {
-            const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-            if (mode === 'auto') {
-              this._applyAutoFillNoScale?.();
-            } else if (this.autoResizeCards) {
-              this._applyAutoScale?.();
-            }
-            this._requestGridButtonsUpdateSoon?.();
-          } catch {}
-        });
+      this._setCardPosition(wrap, posX, posY);
+      wrap.style.width  = `${Math.round(w)}px`;
+      wrap.style.height = `${Math.round(h)}px`;
 
-        return; // handled by shim
+      // Ensure new cards are above the grid overlay
+      {
+        const nextVal = this._highestZ() + 1;
+        wrap.style.zIndex = String(Math.max(nextVal, 6));
       }
 
-      // Fallback to the original behavior (no selection rect)
-      return await __origAddPicked.call(this, cardConfig);
-    };
+      wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+      this.cardContainer.appendChild(wrap);
 
-    DragAndDropCard.prototype.__addPickedPatched = true;
-  }
+      try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
+      try { this._initCardInteract?.(wrap); } catch {}
+      try { this._resizeContainer?.(); } catch {}
+      try { this._queueSave?.('add'); } catch {}
+      try { this._toast?.('Card added to selection.'); } catch {}
+      try { this._syncEmptyStateUI?.(); } catch {}
+      try { this._applyVisibility_?.(); } catch {}
+
+      // Keep your existing auto-resize / grid refresh behaviour
+      requestAnimationFrame(() => {
+        try {
+          const modeNow = String(
+            this.containerSizeMode ||
+            this.container_size_mode ||
+            this._config?.container_size_mode ||
+            'dynamic'
+          ).toLowerCase();
+
+          if (modeNow === 'auto') {
+            this._applyAutoFillNoScale?.();
+          } else if (this.autoResizeCards) {
+            this._applyAutoScale?.();
+          }
+          this._requestGridButtonsUpdateSoon?.();
+        } catch {}
+      });
+
+      return; // handled by shim
+    }
+
+    // Fallback to the original behavior (no selection rect)
+    return await __origAddPicked.call(this, cardConfig);
+  };
+
+  DragAndDropCard.prototype.__addPickedPatched = true;
+}
   // --- END: selection-rect placement shim ---
 
   customElements.define('drag-and-drop-card', DragAndDropCard);
