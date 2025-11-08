@@ -5067,6 +5067,37 @@ _toggleEditMode(force = null) {
         try { h = toolbar.scrollHeight || toolbar.offsetHeight || 0; } catch {}
       }
       root.style.setProperty('--ddc-toolbar-height', h + 'px');
+      // When auto‑resize cards is disabled, push down the card container
+      // by the height of the toolbar so the draggable area does not sit
+      // underneath the toolbar.  Clear the margin when exiting edit mode.
+      if (!this.autoResizeCards && this.cardContainer) {
+        if (entering && toolbar) {
+          this.cardContainer.style.marginTop = h + 'px';
+        } else {
+          this.cardContainer.style.marginTop = '';
+        }
+      }
+    }
+  } catch {}
+
+  // === Ensure the drag area renders fully on edit-mode toggle ===
+  // In dynamic mode with auto‑resize off, the container does not
+  // recompute its dimensions until a card is moved.  This can result
+  // in the drag-and-drop area appearing clipped when first entering
+  // edit mode.  Explicitly trigger a resize after toggling edit mode
+  // so that the container grows to fit its contents and the grid
+  // overlay updates immediately.  Always guard against missing
+  // functions.
+  try {
+    // Resize the container based on current card positions.  This
+    // updates its width/height and refreshes the grid overlay.
+    if (typeof this._resizeContainer === 'function') {
+      this._resizeContainer();
+    }
+    // Reapply scaling to ensure the card container stays aligned
+    // relative to the viewport and to recompute pointer scaling.
+    if (typeof this._applyAutoScale === 'function') {
+      this._applyAutoScale();
     }
   } catch {}
 }
@@ -13053,6 +13084,9 @@ if (!customElements.get('drag-and-drop-card')) {
     /* === GRID SELECT PATCH START (rendering) === */
     // Draw the full grid cell (no inner padding/gap) so visuals match actual grid cells
     _buildGridTile_(gridSize, dpr) {
+
+      gridSize = gridSize / 2;
+      
       const r = Math.min(10, gridSize * 0.25);
       const tw = Math.max(1, Math.round(gridSize * dpr));
       const th = tw;
@@ -13097,6 +13131,7 @@ if (!customElements.get('drag-and-drop-card')) {
       const ctx = this._gridCtx;
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const grid = this._gridCellSize || 10;
+      const scale = this._canvasScale || 1;  
 
       ctx.clearRect(0, 0, c.width, c.height);
 
@@ -13151,10 +13186,10 @@ if (!customElements.get('drag-and-drop-card')) {
         const minRow = Math.min(this._gridStartRow, this._gridCurrRow);
         const maxRow = Math.max(this._gridStartRow, this._gridCurrRow);
 
-        const x = minCol * grid;
-        const y = minRow * grid;
-        const w = (maxCol - minCol + 1) * grid;
-        const h = (maxRow - minRow + 1) * grid;
+        const x = minCol * grid * scale;
+        const y = minRow * grid * scale;
+        const w = (maxCol - minCol + 1) * grid * scale;
+        const h = (maxRow - minRow + 1) * grid * scale;
 
         ctx.save();
         ctx.scale(dpr, dpr);
@@ -13436,7 +13471,15 @@ if (!customElements.get('drag-and-drop-card')) {
         const cardEl = await this._createCard(cardConfig);
         const wrap = this._makeWrapper(cardEl);
 
-        this._setCardPosition(wrap, Math.round(x), Math.round(y));
+        // When placing a new card from a selection rect, apply a slight
+        // negative offset so that the card appears 10px up and left from
+        // the drawn rectangle.  Without this the card will align exactly
+        // with the rectangle bounds, but users requested a small offset.
+        const offX = 11;
+        const offY = 11;
+        const posX = Math.round(x) - offX;
+        const posY = Math.round(y) - offY;
+        this._setCardPosition(wrap, posX, posY);
         wrap.style.width  = `${Math.round(w)}px`;
         wrap.style.height = `${Math.round(h)}px`;
         // Assign a z-index for the new card based on the highest existing
