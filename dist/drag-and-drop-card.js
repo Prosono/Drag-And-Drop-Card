@@ -423,9 +423,55 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
       background: var(--primary-color); color: #fff; border-color: transparent;
     }
 
-  .grid-meta-badge ha-icon{ opacity:.9; }
-  .color-pair { display:flex; gap:8px; }
-  .color-pair input[type="color"] { width:44px; height:36px; border:0; background:transparent; padding:0; }
+    .grid-meta-badge ha-icon{ opacity:.9; }
+
+    .color-pair {
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .color-pair input[type="color"] {
+      width:44px;
+      height:36px;
+      border:0;
+      background:transparent;
+      padding:0;
+    }
+    .color-pair input[type="text"] {
+      flex:1;
+    }
+
+    .color-stack {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .color-group {
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.15));
+      background:var(--ha-card-background, rgba(0,0,0,0.12));
+    }
+
+    .color-group-title {
+      font-size:0.75rem;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      opacity:.8;
+      margin-bottom:4px;
+      display:flex;
+      justify-content:space-between;
+    }
+
+    .swatches,
+    .gradients {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:4px;
+    }
+
   .footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid var(--divider-color, rgba(0,0,0,.12)); }
   .btn.primary { background:var(--primary-color); color:#fff; border:0; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; }
   .btn.secondary { background:transparent; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; padding:8px 16px; cursor:pointer; }
@@ -2105,16 +2151,33 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
             <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
             <label id="lbl-container-bg" for="ddc-setting-containerBg">Container background</label>
           </div>
-          <div class="control">
-            <div class="stack">
-              <div class="color-pair">
-                <input type="color" id="ddc-color-containerBg" />
-                <input type="text" id="ddc-setting-containerBg" placeholder="transparent \xB7 #123456 \xB7 var(--ha-card-background)" />
+            <div class="control">
+              <div class="stack color-stack">
+                <div class="color-group">
+                  <div class="color-group-title">
+                    <span>Custom</span>
+                    <span>hex \xB7 rgba \xB7 var()</span>
+                  </div>
+                  <div class="color-pair">
+                    <input type="color" id="ddc-color-containerBg" />
+                    <input
+                      type="text"
+                      id="ddc-setting-containerBg"
+                      placeholder="transparent \xB7 #123456 \xB7 var(--ha-card-background)"
+                    />
+                  </div>
+                </div>
+
+                <div class="color-group">
+                  <div class="color-group-title">
+                    <span>Presets</span>
+                  </div>
+                  <div class="swatches" id="ddc-swatches-containerBg"></div>
+                  <div class="gradients" id="ddc-gradients-containerBg"></div>
+                </div>
               </div>
-              <div class="swatches" id="ddc-swatches-containerBg"></div>
-              <div class="gradients" id="ddc-gradients-containerBg"></div>
             </div>
-          </div>
+
         </div>
         <div class="hint">Accepts plain colors or theme variables.</div>
       </div>
@@ -2127,13 +2190,28 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
             <label id="lbl-card-bg" for="ddc-setting-cardBg">Card background</label>
           </div>
           <div class="control">
-            <div class="stack">
-              <div class="color-pair">
-                <input type="color" id="ddc-color-cardBg" />
-                <input type="text" id="ddc-setting-cardBg" placeholder="#121212 \xB7 var(--ha-card-background)" />
+            <div class="stack color-stack">
+              <div class="color-group">
+                <div class="color-group-title">
+                  <span>Custom</span>
+                </div>
+                <div class="color-pair">
+                  <input type="color" id="ddc-color-cardBg" />
+                  <input
+                    type="text"
+                    id="ddc-setting-cardBg"
+                    placeholder="#121212 \xB7 var(--ha-card-background)"
+                  />
+                </div>
               </div>
-              <div class="swatches" id="ddc-swatches-cardBg"></div>
-              <div class="gradients" id="ddc-gradients-cardBg"></div>
+
+              <div class="color-group">
+                <div class="color-group-title">
+                  <span>Presets</span>
+                </div>
+                <div class="swatches" id="ddc-swatches-cardBg"></div>
+                <div class="gradients" id="ddc-gradients-cardBg"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -2275,79 +2353,120 @@ var Ma=Object.create;var gr=Object.defineProperty;var La=Object.getOwnPropertyDe
             <label id="lbl-bg-youtube" for="ddc-youtube-url">YouTube background</label>
           </div>
           <div class="control">
+                      <div class="control">
             <div class="stack">
               <label for="ddc-youtube-url">YouTube URL or video ID</label>
-              <input type="text" id="ddc-youtube-url" placeholder="https://youtu.be/\u2026 or dQw4w9WgXcQ" />
+              <input
+                type="text"
+                id="ddc-youtube-url"
+                placeholder="https://youtu.be/\u2026 or dQw4w9WgXcQ"
+              />
 
-              <div class="row" style="gap:12px">
-                <label for="ddc-youtube-start" class="grow">
-                  <span>Start (s)</span>
-                  <input type="number" id="ddc-youtube-start" min="0" step="1" />
+              <div class="bg-opts bg-opts--youtube">
+                <!-- Start -->
+                <label for="ddc-youtube-start">
+                  <ha-icon icon="mdi:clock-start" aria-hidden="true"></ha-icon>
+                  Start (s)
                 </label>
-                <label for="ddc-youtube-end" class="grow">
-                  <span>End (s)</span>
-                  <input type="number" id="ddc-youtube-end" min="1" step="1" />
-                </label>
-              </div>
+                <input
+                  type="number"
+                  id="ddc-youtube-start"
+                  min="0"
+                  step="1"
+                />
 
-              <div class="row" style="gap:18px; align-items:center">
-                <label for="ddc-youtube-mute" class="row" style="gap:8px">
-                  <ha-switch id="ddc-youtube-mute" checked></ha-switch>
-                  <span>Mute</span>
+                <!-- End -->
+                <label for="ddc-youtube-end">
+                  <ha-icon icon="mdi:clock-end" aria-hidden="true"></ha-icon>
+                  End (s)
                 </label>
-                <label for="ddc-youtube-loop" class="row" style="gap:8px">
-                  <ha-switch id="ddc-youtube-loop" checked></ha-switch>
-                  <span>Loop</span>
-                </label>
-              </div>
+                <input
+                  type="number"
+                  id="ddc-youtube-end"
+                  min="0"
+                  step="1"
+                />
 
-              <div class="row" style="gap:12px">
-                <label for="ddc-youtube-size" class="grow">
+                <!-- Mute -->
+                <label for="ddc-youtube-mute">
+                  <ha-icon icon="mdi:volume-off" aria-hidden="true"></ha-icon>
+                  Mute
+                </label>
+                <ha-switch
+                  id="ddc-youtube-mute"
+                  checked
+                ></ha-switch>
+
+                <!-- Loop -->
+                <label for="ddc-youtube-loop">
+                  <ha-icon icon="mdi:repeat" aria-hidden="true"></ha-icon>
+                  Loop
+                </label>
+                <ha-switch
+                  id="ddc-youtube-loop"
+                  checked
+                ></ha-switch>
+
+                <!-- Size -->
+                <label for="ddc-youtube-size">
                   <ha-icon icon="mdi:arrow-expand-all" aria-hidden="true"></ha-icon>
-                  <span>Size</span>
-                  <select id="ddc-youtube-size">
-                    <option value="cover">Cover</option>
-                    <option value="contain">Contain</option>
-                    <option value="auto">Auto</option>
-                    <option value="100% 100%">Fill (stretch)</option>
-                  </select>
+                  Size
                 </label>
+                <select id="ddc-youtube-size">
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="auto">Auto</option>
+                  <option value="100% 100%">Fill (stretch)</option>
+                </select>
 
-                <label for="ddc-youtube-position" class="grow">
+                <!-- Position -->
+                <label for="ddc-youtube-position">
                   <ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>
-                  <span>Position</span>
-                  <select id="ddc-youtube-position">
-                    <option value="top left">Top left</option>
-                    <option value="top">Top</option>
-                    <option value="top right">Top right</option>
-                    <option value="left">Left</option>
-                    <option value="center">Center</option>
-                    <option value="right">Right</option>
-                    <option value="bottom left">Bottom left</option>
-                    <option value="bottom">Bottom</option>
-                    <option value="bottom right">Bottom right</option>
-                  </select>
+                  Position
                 </label>
+                <select id="ddc-youtube-position">
+                  <option value="top left">Top left</option>
+                  <option value="top">Top</option>
+                  <option value="top right">Top right</option>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                  <option value="bottom left">Bottom left</option>
+                  <option value="bottom">Bottom</option>
+                  <option value="bottom right">Bottom right</option>
+                </select>
 
-                <label for="ddc-youtube-attachment" class="grow">
-                  <ha-icon icon="mdi:image-lock" aria-hidden="true"></ha-icon>
-                  <span>Attachment</span>
-                  <select id="ddc-youtube-attachment">
-                    <option value="scroll">Scroll</option>
-                    <option value="fixed">Fixed</option>
-                  </select>
+                <!-- Attachment -->
+                <label for="ddc-youtube-attachment">
+                  <ha-icon icon="mdi:link-variant" aria-hidden="true"></ha-icon>
+                  Attachment
                 </label>
+                <select id="ddc-youtube-attachment">
+                  <option value="scroll">Scroll</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+
+                <!-- Opacity -->
+                <label for="ddc-youtube-opacity">
+                  <ha-icon icon="mdi:opacity" aria-hidden="true"></ha-icon>
+                  Opacity
+                </label>
+                <div class="range-wrap">
+                  <input
+                    type="range"
+                    id="ddc-youtube-opacity"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="100"
+                  />
+                  <output id="ddc-youtube-opacity-out">100%</output>
+                </div>
               </div>
 
-              <label for="ddc-youtube-opacity">
-                <ha-icon icon="mdi:opacity" aria-hidden="true"></ha-icon> Opacity
-              </label>
-              <div class="range-wrap">
-                <input type="range" id="ddc-youtube-opacity" min="0" max="100" step="1" value="100" />
-                <output id="ddc-youtube-opacity-out">100%</output>
+              <div class="hint">
+                Video plays muted, sits behind your cards, and ignores pointer events so dragging remains smooth.
               </div>
-
-              <div class="hint">Video plays muted, fills the canvas (\u201Ccover\u201D), sits under the grid and cards, and ignores pointer events so dragging remains smooth.</div>
             </div>
           </div>
         </div>
