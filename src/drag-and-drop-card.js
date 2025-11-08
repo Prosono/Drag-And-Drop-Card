@@ -6095,22 +6095,51 @@ _syncEmptyStateUI() {
 
 
   /* -------------------- Live scale watcher (rAF fallback) -------------------- */
-  _startScaleWatch() {
-    if (!this.autoResizeCards) return;
-    if (this.__scaleRAF) return;
-    const tick = () => {
-      if (!this.autoResizeCards) { this.__scaleRAF = null; return; }
-      // Check host width; if changed, re-apply scaling
-      const rect = this.getBoundingClientRect();
-      const w = Math.max(1, rect.width || 0);
-      if (w !== this.__lastScaleW) {
-        this.__lastScaleW = w;
-        const __m = String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase(); (__m==='auto'?this._applyAutoFillNoScale?.():this._applyAutoScale?.());
+/* -------------------- Live scale watcher (rAF fallback) -------------------- */
+_startScaleWatch() {
+  if (!this.autoResizeCards) return;
+  if (this.__scaleRAF) return;
+
+  const tick = () => {
+    if (!this.autoResizeCards) {
+      this.__scaleRAF = null;
+      return;
+    }
+
+    // Safely measure host width
+    let w = 1;
+    try {
+      const rect = this.getBoundingClientRect?.();
+      w = Math.max(1, (rect && rect.width) || this.offsetWidth || 1);
+    } catch {
+      w = Math.max(1, this.offsetWidth || 1);
+    }
+
+    const last  = this.__lastScaleW || 0;
+    const delta = Math.abs(w - last);
+
+    // Hysteresis: ignore tiny width changes (scrollbar, rounding, etc.)
+    const MIN_DELTA = 20; // px – adjust if you want it more/less sensitive
+
+    if (!last || delta >= MIN_DELTA) {
+      this.__lastScaleW = w;
+
+      const mode = String(
+        this.containerSizeMode || this.container_size_mode || 'dynamic'
+      ).toLowerCase();
+
+      if (mode === 'auto') {
+        this._applyAutoFillNoScale?.();
+      } else {
+        this._applyAutoScale?.();
       }
-      this.__scaleRAF = requestAnimationFrame(tick);
-    };
+    }
+
     this.__scaleRAF = requestAnimationFrame(tick);
-  }
+  };
+
+  this.__scaleRAF = requestAnimationFrame(tick);
+}
 
   _stopScaleWatch() {
     if (this.__scaleRAF) {
