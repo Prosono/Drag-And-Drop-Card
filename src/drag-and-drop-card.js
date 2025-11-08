@@ -1035,21 +1035,35 @@ _attachParticlesBackground_(cfg = {}) {
 
   const DEFAULTS = {
     particles: {
-      number: { value: 70, density: { enable: true, value_area: 900 } },
+      number: { value: 30, density: { enable: true, value_area: 1200 } },
       color: { value: '#ffffff' },
       shape: { type: 'circle' },
-      opacity: { value: 0.4 },
-      size: { value: 3, random: true },
-      line_linked: { enable: true, distance: 150, color: '#ffffff', opacity: 0.3, width: 1 },
-      move: { enable: true, speed: 2, out_mode: 'out' }
+      opacity: { value: 0.35 },
+      size: { value: 2.5, random: true },
+      line_linked: {
+        enable: false,          // disable connecting lines (big perf win)
+        distance: 150,
+        color: '#ffffff',
+        opacity: 0.3,
+        width: 1
+      },
+      move: { enable: true, speed: 0.7, out_mode: 'out' }
     },
     interactivity: {
       detect_on: 'canvas',
-      events: { onhover: { enable: false }, onclick: { enable: false }, resize: true },
-      modes: { repulse: { distance: 100 }, push: { particles_nb: 4 } }
+      events: {
+        onhover: { enable: false },
+        onclick: { enable: false },
+        resize: true
+      },
+      modes: {
+        repulse: { distance: 100 },
+        push: { particles_nb: 3 }
+      }
     },
-    retina_detect: true
+    retina_detect: false        // don’t render at 2x/3x DPR; keeps CPU down
   };
+
 
   const allowPointer = !!cfg.pointer_events;
   const conf = cfg.config || JSON.parse(JSON.stringify(DEFAULTS)); // clone defaults
@@ -10548,15 +10562,18 @@ modal.innerHTML = `
           <div class="control">
             <div class="stack">
               <div class="input-file">
-                <label class="file-btn" for="ddc-file-bg">Upload image</label>
-                <input id="ddc-file-bg" type="file" accept="image/*" />
+                <!-- Only a thumbnail + delete button, no upload -->
                 <div class="thumb" id="ddc-bg-thumb"></div>
                 <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
               </div>
 
               <div class="row">
-                <label for="ddc-setting-bgImg">or URL</label>
-                <input type="text" id="ddc-setting-bgImg" placeholder="https://… or /local/…" />
+                <label for="ddc-setting-bgImg">Image URL (e.g. /media/local/...)</label>
+                <input
+                  type="text"
+                  id="ddc-setting-bgImg"
+                  placeholder="/media/local/… or https://…"
+                />
               </div>
 
               <div class="bg-opts">
@@ -11242,46 +11259,23 @@ modal.innerHTML = `
         });
       });
 
-    const fileInput = modal.querySelector('#ddc-file-bg');
     const urlInput  = modal.querySelector('#ddc-setting-bgImg');
     const thumb     = modal.querySelector('#ddc-bg-thumb');
-    const updateThumb = (src) => { if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none'; };
+    const updateThumb = (src) => {
+      if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none';
+    };
 
-    if (urlInput?.value) updateThumb(urlInput.value);
-
-    fileInput?.addEventListener('change', async () => {
-      const file = fileInput.files?.[0]; if (!file) return;
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-const objectUrl = URL.createObjectURL(file);
-// Live preview using an object URL (avoids huge base64 in memory/config)
-updateThumb(objectUrl);
-this.style.setProperty('--ddc-bg-image', `url("${objectUrl}")`);
-// Do not persist base64 by default; keep input empty unless small and non-iOS
-if (urlInput) urlInput.value = '';
-(async () => {
-  if (!isIOS) {
-    try {
-      const img = new Image();
-      img.src = objectUrl;
-      await img.decode();
-      const scale = Math.min(1920 / img.naturalWidth, 1080 / img.naturalHeight, 1);
-      const w = Math.round(img.naturalWidth * scale);
-      const h = Math.round(img.naturalHeight * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d', { alpha: false });
-      ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-      if (dataUrl && dataUrl.length < 300000) {
-        // only store if reasonably small
-        if (urlInput) urlInput.value = dataUrl;
-      }
-    } catch (e) {
-      // ignore compression errors; preview still works
+    // Initialize thumbnail from existing value
+    if (urlInput?.value) {
+      updateThumb(urlInput.value);
     }
-  }
-})();
-});
+
+    // Live preview whenever the URL changes
+    urlInput?.addEventListener('input', () => {
+      const v = (urlInput.value || '').trim();
+      updateThumb(v || '');
+    });
+
 
     modal.querySelector('#ddc-clear-bg')?.addEventListener('click', () => {
       if (urlInput) urlInput.value = '';
