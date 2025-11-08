@@ -2117,7 +2117,7 @@ async _onToolbarAction_(action, ctx = {}) {
       card_background: 'linear-gradient(135deg, #111827, #1f2937)',
       debug: false,
       disable_overlap: false,
-      auto_resize_cards: false,
+      auto_resize_cards: true,
       background_mode: 'none',
       animate_cards: true,
       container_preset_orientation: 'auto',
@@ -2668,7 +2668,17 @@ _applyGridVars() {
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
-    this.autoResizeCards         = !!config.auto_resize_cards;
+    
+
+    const sizeModeLower           = String(this.containerSizeMode || 'dynamic').toLowerCase();
+
+    if (sizeModeLower === 'dynamic') {
+      // In dynamic mode cards should always auto-scale.
+      this.autoResizeCards = true;
+    } else {
+      // Other modes can still opt-out via config.auto_resize_cards: false
+      this.autoResizeCards = config.auto_resize_cards !== false;
+    }
 
     // Whether to play a fly‑in animation when switching tabs or refreshing
     // Defaults to false when not specified.  When true, the card wrappers
@@ -10142,20 +10152,6 @@ modal.innerHTML = `
         <div class="hint">Applies a fixed custom canvas size instantly. Switch back to Dynamic or Preset below if needed.</div>
       </div>
 
-      <!-- AUTO RESIZE -->
-      <div class="setting" role="group" aria-labelledby="lbl-auto-resize">
-        <div class="row">
-          <div class="title">
-            <ha-icon icon="mdi:resize" aria-hidden="true"></ha-icon>
-            <label id="lbl-auto-resize" for="ddc-setting-autoResize">Auto resize cards</label>
-          </div>
-          <div class="control">
-            <ha-switch id="ddc-setting-autoResize"></ha-switch>
-          </div>
-        </div>
-        <div class="hint">Scale the layout with the viewport. Off = fixed canvas size.</div>
-      </div>
-
       <!-- LIVE SNAP -->
       <div class="setting" role="group" aria-labelledby="lbl-live-snap">
         <div class="row">
@@ -11833,17 +11829,52 @@ if (urlInput) urlInput.value = '';
     if ('debug' in opts)              this.debug = !!opts.debug;
     if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
 
-    if ('container_size_mode' in opts)        this.containerSizeMode = opts.container_size_mode || 'dynamic';
+        if ('container_size_mode' in opts) {
+      this.containerSizeMode = opts.container_size_mode || 'dynamic';
+
+      const modeLower = String(this.containerSizeMode || 'dynamic').toLowerCase();
+
+      // In dynamic mode we always force auto-resize ON.
+      if (modeLower === 'dynamic') {
+        this.autoResizeCards = true;
+      }
+
+      // Keep the scale watcher in sync when the size mode changes.
+      if (this.autoResizeCards || modeLower === 'auto') {
+        this._startScaleWatch?.();
+      } else {
+        this._stopScaleWatch?.();
+      }
+
+      this._applyAutoScale?.();
+    }
+
     if ('container_fixed_width' in opts)      this.containerFixedWidth  = Number(opts.container_fixed_width)  || null;
     if ('container_fixed_height' in opts)     this.containerFixedHeight = Number(opts.container_fixed_height) || null;
     if ('container_preset' in opts)           this.containerPreset = opts.container_preset || 'fhd';
     if ('container_preset_orientation' in opts) this.containerPresetOrient = opts.container_preset_orientation || 'auto';
     
     if ('auto_resize_cards' in opts) {
-      this.autoResizeCards = !!opts.auto_resize_cards;
-      if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+      const modeLower = String(
+        (this.containerSizeMode || this.container_size_mode || 'dynamic')
+      ).toLowerCase();
+
+      if (modeLower === 'dynamic') {
+        // Ignore manual toggles in dynamic mode – always ON.
+        this.autoResizeCards = true;
+      } else {
+        this.autoResizeCards = !!opts.auto_resize_cards;
+      }
+
+      if (this.autoResizeCards || modeLower === 'auto') {
+        this._startScaleWatch?.();
+      } else {
+        this._stopScaleWatch?.();
+      }
+
       this._applyAutoScale?.();
     }
+
 
     // Screen saver: apply imported values
     if ('screen_saver_enabled' in opts) {
@@ -13426,6 +13457,9 @@ if (!customElements.get('drag-and-drop-card')) {
     /* === GRID SELECT PATCH START (add card bridge) === */
     // Store the selection rect and let the normal picker flow run.
     // The shim below will place the card at this rect instead of the default spot.
+    /* === GRID SELECT PATCH START (add card bridge) === */
+    // Store the selection rect and let the normal picker flow run.
+    // The shim below will place the card at this rect instead of the default spot.
     async _promptNewCardForRect_({ x, y, w, h }) {
       try {
         const g = this._gridCellSize || Number(this._config?.grid ?? this._options?.grid ?? 10);
@@ -13462,12 +13496,68 @@ if (!customElements.get('drag-and-drop-card')) {
           h: Math.round(mapped.h),
         };
 
+        // --- NEW: if 2+ cards already in this area, do NOT open the picker ---
+        try {
+          const cont = this.cardContainer;
+          if (cont) {
+            const wraps = Array.from(
+              cont.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
+            );
+
+            const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
+            const intersects = (r1, r2) => !(
+              r2.x >= r1.x + r1.w ||
+              r2.x + r2.w <= r1.x ||
+              r2.y >= r1.y + r1.h ||
+              r2.y + r2.h <= r1.y
+            );
+
+            let hitCount = 0;
+
+            for (const wEl of wraps) {
+              // Only consider cards on the active tab
+              const tabId = wEl.dataset.tabId
+                ? this._normalizeTabId(wEl.dataset.tabId)
+                : currentTab;
+              if (tabId !== currentTab) continue;
+
+              // Skip hidden cards
+              const cs = getComputedStyle(wEl);
+              if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+
+              const wx = parseFloat(wEl.getAttribute('data-x')) || 0;
+              const wy = parseFloat(wEl.getAttribute('data-y')) || 0;
+              const ww = parseFloat(wEl.style.width)  || wEl.getBoundingClientRect().width;
+              const wh = parseFloat(wEl.style.height) || wEl.getBoundingClientRect().height;
+
+              const cardRect = { x: wx, y: wy, w: ww, h: wh };
+
+              if (intersects(finalRect, cardRect)) {
+                hitCount++;
+                if (hitCount >= 2) break;
+              }
+            }
+
+            if (hitCount >= 2) {
+              // Too many cards already in this selection area: abort add
+              this.__pendingAddRect = null;
+              try { this._toast?.('Area already contains multiple cards.'); } catch {}
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[ddc] selection-area card count check failed', err);
+        }
+        // --- END NEW LOGIC ---
+
+        // Normal flow: store rect and open HA card picker
         this.__pendingAddRect = finalRect;
         await this._openSmartPicker('add', null, null);
       } catch (e) {
         console.warn('[ddc] _promptNewCardForRect_ failed', e);
       }
     }
+/* === GRID SELECT PATCH END (add card bridge) === */
     /* === GRID SELECT PATCH END (add card bridge) === */
   });
 
