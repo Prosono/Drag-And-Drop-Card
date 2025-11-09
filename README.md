@@ -8,6 +8,8 @@
 
 ▶️ Click the image above to watch the video of the latest release of the card
 
+---
+
 [![Watch the demo on YouTube](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
 
 ▶️ Click the image above to watch the video of first release of the card
