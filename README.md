@@ -14,9 +14,6 @@
 
 
 
-https://www.youtube.com/watch?v=1T68T51tEqY
-
-
 A freeform **drag / resize / snap-to-grid** canvas for Lovelace cards.  
 Arrange any Lovelace cards visually, save the layout (auto-save or manual), export/import full designs, and quickly prototype dashboards with device-size presets.
 
