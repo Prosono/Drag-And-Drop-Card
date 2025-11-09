@@ -4,9 +4,18 @@
   <img src="assets/demo.gif" alt="Demo of Drag and Drop Card" width="100%">
 </p>
 
+[![Watch the demo on YouTube](https://img.youtube.com/vi/1T68T51tEqY/maxresdefault.jpg)](https://www.youtube.com/watch?v=1T68T51tEqY)
+
+▶️ Click the image above to watch the video of the latest release of the card
+
 [![Watch the demo on YouTube](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
 
-▶️ Click the image above to watch the video of the card
+▶️ Click the image above to watch the video of first release of the card
+
+
+
+https://www.youtube.com/watch?v=1T68T51tEqY
+
 
 A freeform **drag / resize / snap-to-grid** canvas for Lovelace cards.  
 Arrange any Lovelace cards visually, save the layout (auto-save or manual), export/import full designs, and quickly prototype dashboards with device-size presets.
