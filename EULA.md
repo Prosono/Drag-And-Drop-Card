@@ -87,8 +87,8 @@ This Agreement constitutes the entire agreement between the parties with respect
 
 ## 14. Contact
 For questions about this Agreement, contact:
-**SMARTI AS** — Legal & Licensing  
-(Add your preferred contact details here.)
+**SMARTI AS** — 
+contact@smarti.dev
 
 ---
 
