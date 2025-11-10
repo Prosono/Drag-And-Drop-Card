@@ -55,13 +55,10 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 
 ### Option A: HACS (Recommended)
 
-1. Add this repository as a **Custom Repository** in HACS (Frontend).
-2. Install **Drag & Drop Card**.
-3. In Home Assistant, go to **Settings → Dashboards → … → Resources**, ensure a resource exists:
-   ```yaml
-   url: https://github.com/Prosono/Drag-And-Drop-Card
-   type: module
-   ```
+1. Add this repository as a **Custom Repository** in HACS. Select "Dashboard" As type.
+2. Search for "Drag and Drop Card" in HACS
+3. Click the download button. ⬇️
+4. The card is now available as a custom card in the Native Home Assistant Card Selector when adding new cards to a dashboard. 
 
 ### Option B: Manual
 
@@ -88,7 +85,7 @@ Without this, a simple browser refresh or Home Assistant restart can wipe your c
 
 ## 🚀 Quick Start
 
-Add a **Drag & Drop Card** to your dashboard:
+Add a **Drag & Drop Card** to your dashboard using YAML:
 
 ```yaml
 type: custom:drag-and-drop-card
