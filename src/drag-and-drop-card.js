@@ -14788,19 +14788,43 @@ async function _persistOptionsToYaml(opts, {
       btn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon><span style="margin-left:6px">Refresh</span>';
       // Create a delete button to remove the selected layout (except the current one)
       const deleteBtn = document.createElement('button');
+      // Style the delete button similar to other danger actions (red background, white text)
+      // Use the base 'btn secondary' class so disabled styles still apply
       deleteBtn.className = 'btn secondary';
       deleteBtn.type = 'button';
       deleteBtn.style.padding = '6px 10px';
-      // Use a trash can icon for delete
-      deleteBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+      deleteBtn.style.display = 'inline-flex';
+      deleteBtn.style.alignItems = 'center';
+      deleteBtn.style.gap = '6px';
+      // Fixed red background rather than relying on CSS variables that may be undefined
+      deleteBtn.style.background = '#ef4444';
+      deleteBtn.style.color = '#fff';
+      deleteBtn.style.border = 'none';
+      deleteBtn.style.borderRadius = '8px';
+      deleteBtn.style.cursor = 'pointer';
+      deleteBtn.style.fontWeight = '600';
+      // Set icon and text for delete
+      deleteBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon><span style="margin-left:6px">Delete</span>';
       deleteBtn.title = 'Delete selected layout';
       // Create an undo button to restore the most recently deleted layouts
       const undoBtn = document.createElement('button');
+      // Style the restore button similar to resize handles (blue background, white text)
+      // Use the base 'btn secondary' class so disabled styles still apply
       undoBtn.className = 'btn secondary';
       undoBtn.type = 'button';
       undoBtn.style.padding = '6px 10px';
-      undoBtn.innerHTML = '<ha-icon icon="mdi:undo"></ha-icon>';
-      undoBtn.title = 'Undo last delete';
+      undoBtn.style.display = 'inline-flex';
+      undoBtn.style.alignItems = 'center';
+      undoBtn.style.gap = '6px';
+      // Fixed blue background for restore
+      undoBtn.style.background = '#3b82f6';
+      undoBtn.style.color = '#fff';
+      undoBtn.style.border = 'none';
+      undoBtn.style.borderRadius = '8px';
+      undoBtn.style.cursor = 'pointer';
+      undoBtn.style.fontWeight = '600';
+      undoBtn.innerHTML = '<ha-icon icon="mdi:undo"></ha-icon><span style="margin-left:6px">Restore</span>';
+      undoBtn.title = 'Restore last deleted layout';
       wrap.appendChild(label);
       wrap.appendChild(select);
       wrap.appendChild(btn);
@@ -14814,8 +14838,12 @@ async function _persistOptionsToYaml(opts, {
         const backupKeys = _collectBackupKeys();
         const recentKeys = _getRecentKeys();
         const toUnique = (arr) => Array.from(new Set(arr.filter(Boolean)));
-        // Filter out any keys that have been marked as deleted during this session
-        const deletedKeys = (this._ddcDeletedKeys || []);
+        // Filter out any keys that have been marked as deleted (session or persisted)
+        let persistentDeleted = [];
+        try {
+          persistentDeleted = JSON.parse(localStorage.getItem('ddc.deleted.keys') || '[]');
+        } catch {}
+        const deletedKeys = [...(this._ddcDeletedKeys || []), ...persistentDeleted];
         const server = toUnique(serverKeys).filter(k => !deletedKeys.includes(k));
         const backups = toUnique(backupKeys).filter(k => !deletedKeys.includes(k));
         const recent = toUnique(recentKeys).filter(k => !deletedKeys.includes(k));
@@ -14829,12 +14857,13 @@ async function _persistOptionsToYaml(opts, {
         }
         const makeGroup = (label, list) => {
           if (!list.length) return;
-          const og = document.createElement('optgroup'); og.label = label;
+          const og = document.createElement('optgroup');
+          og.label = label;
           list.forEach(k => {
             const o = document.createElement('option');
             o.value = k;
-            // Append a trash can emoji to visually indicate deletable layouts
-            o.textContent = `${k} \u{1F5D1}`;
+            // Show just the key name without any trash can emoji
+            o.textContent = `${k}`;
             if (k === current) o.selected = true;
             og.appendChild(o);
           });
@@ -14888,38 +14917,39 @@ async function _persistOptionsToYaml(opts, {
           if (!this._ddcDeletedKeys) this._ddcDeletedKeys = [];
           if (!this._ddcDeletedKeys.includes(key)) this._ddcDeletedKeys.push(key);
         } catch {}
+        // Persist deleted keys to localStorage so they remain hidden after page reloads
+        try {
+          const storedDeleted = JSON.parse(localStorage.getItem('ddc.deleted.keys') || '[]');
+          if (!storedDeleted.includes(key)) {
+            storedDeleted.push(key);
+            localStorage.setItem('ddc.deleted.keys', JSON.stringify(storedDeleted));
+          }
+        } catch {}
+        // Attempt to delete via Home Assistant API. Try multiple possible endpoints.
         let okDelete = false;
-        // Attempt to delete via Home Assistant API (DELETE method)
         try {
           if (this?.hass?.callApi) {
             await this.hass.callApi('delete', `dragdrop_storage/${encodeURIComponent(key)}`);
             okDelete = true;
           }
-        } catch(e) {}
-        // Fallback: attempt via direct fetch (DELETE)
-        if (!okDelete) {
-          try {
-            const resp = await fetch(`/api/dragdrop_storage/${encodeURIComponent(key)}`, { method: 'DELETE' });
-            if (resp && resp.ok) okDelete = true;
-          } catch(e) {}
+        } catch(e) {
+          okDelete = false;
         }
-        // Additional fallback: attempt to call a delete endpoint via POST
+        // Fallback to alternate endpoint name (drag_and_drop_card_backend)
         if (!okDelete) {
           try {
             if (this?.hass?.callApi) {
-              await this.hass.callApi('post', 'dragdrop_storage/delete', { key });
+              await this.hass.callApi('delete', `drag_and_drop_card_backend/${encodeURIComponent(key)}`);
               okDelete = true;
             }
-          } catch(e) {}
+          } catch(e) {
+            okDelete = false;
+          }
         }
-        // Fallback: attempt to POST to /api/dragdrop_storage/delete
+        // Final fallback: direct HTTP DELETE call to /api/drag_and_drop_card_backend/<key>
         if (!okDelete) {
           try {
-            const resp = await fetch('/api/dragdrop_storage/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key })
-            });
+            const resp = await fetch(`/api/drag_and_drop_card_backend/${encodeURIComponent(key)}`, { method: 'DELETE' });
             if (resp && resp.ok) okDelete = true;
           } catch(e) {}
         }
@@ -14974,6 +15004,15 @@ async function _persistOptionsToYaml(opts, {
         try {
           if (this._ddcDeletedKeys) {
             this._ddcDeletedKeys = this._ddcDeletedKeys.filter(k => k !== restoreKey);
+          }
+        } catch {}
+        // Also remove from persistent deleted keys list
+        try {
+          const storedDeleted = JSON.parse(localStorage.getItem('ddc.deleted.keys') || '[]');
+          const idx = storedDeleted.indexOf(restoreKey);
+          if (idx >= 0) {
+            storedDeleted.splice(idx, 1);
+            localStorage.setItem('ddc.deleted.keys', JSON.stringify(storedDeleted));
           }
         } catch {}
         // Refresh dropdown and update button states
