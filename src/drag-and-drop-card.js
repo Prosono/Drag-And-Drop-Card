@@ -3431,7 +3431,12 @@ _applyGridVars() {
 
       /* Make the inner card and its header fully transparent
         so the wrapper’s gradient is the only background shown. */
-      .card-wrapper > * {
+      /*
+       * Make the inner card and its header fully transparent so the wrapper’s gradient is the only
+       * background shown. However, exclude the card settings popup (.ddc-card-settings), the
+       * resize handle, and the delete handle so those elements can define their own backgrounds.
+       */
+      .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle) {
         /* Critical: do NOT give the card a background via this variable.
           Some headers read --ha-card-background when header-color is unset. */
         --ha-card-background: transparent !important;
@@ -4695,11 +4700,11 @@ if (this.__ddcOnWinResize) {
       // 1) Apply persisted options as baseline
         if (saved?.options) {
   const { storage_key, ...optsNoKey } = saved.options;
-  // Do not let stale snapshot backgrounds override YAML card config
-  delete optsNoKey.background_mode;
-  delete optsNoKey.background_image;
-  delete optsNoKey.background_particles;
-  delete optsNoKey.background_youtube;
+  // Apply all persisted options, including background-related fields. Previously, the
+  // backgrounds were stripped to avoid overwriting YAML values. However, this
+  // prevented users from changing the card and container backgrounds or background
+  // modes via the settings UI. Including them here allows saved options (and
+  // consequently YAML updates) to take effect on reload.
   this._applyImportedOptions(optsNoKey, true);
 } else if (typeof saved?.grid === 'number') {
         this._applyImportedOptions({ grid: saved.grid }, true);
@@ -4710,7 +4715,13 @@ if (this.__ddcOnWinResize) {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','card_shadow','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'background_mode', 'background_image', 'background_particles', 'background_youtube'];
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'background_mode', 'background_image', 'background_particles', 'background_youtube',
+        // Ensure screen saver settings from YAML override persisted options on reload. Without
+        // including these keys, the screensaver delay can become stuck because the overlay
+        // of YAML values never occurs. Adding them keeps behaviour consistent with other
+        // settings like disable_overlap.
+        'screen_saver_enabled', 'screen_saver_delay'
+      ];
       const cfgOpts = {};
       for (const k of overrideKeys) {
         if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
@@ -4747,6 +4758,17 @@ if (this.__ddcOnWinResize) {
           wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
           wrap.style.height = `${conf.size?.height ?? 10 * this.gridSize}px`;
           if (conf.z != null) wrap.style.zIndex = String(conf.z);
+          // Apply any per-card overflow override. When a card was saved with
+          // overflow explicitly set (e.g. "visible" or "hidden"), apply it
+          // to the wrapper. Persist it on the dataset as well for UI toggles.
+          if (conf.overflow) {
+            try {
+              wrap.style.overflow = conf.overflow;
+              wrap.dataset.overflow = conf.overflow;
+              const cardEl = wrap.firstElementChild;
+              if (cardEl) cardEl.style.overflow = conf.overflow;
+            } catch {}
+          }
 
           this.cardContainer.appendChild(wrap);
 
@@ -5071,6 +5093,238 @@ _animateCards() {
       } catch {}
       try { this._queueSave('tab-change'); } catch {}
     };
+
+    // Prevent the dropdown from starting a drag operation on mousedown,
+    // pointerdown or touchstart. Without stopping these events, Interact
+    // will interpret a pointer press on the select as the start of a drag.
+    const stop = (ev) => ev.stopPropagation();
+    sel.addEventListener('mousedown', stop);
+    sel.addEventListener('pointerdown', stop);
+    sel.addEventListener('touchstart', stop);
+  }
+
+  /**
+   * Open or toggle a small settings menu attached to a card wrapper. This menu
+   * currently exposes an overflow option that allows the user to choose
+   * between the default overflow behaviour, visible overflow or hidden
+   * overflow on a per-card basis. The menu is inserted as a child of the
+   * wrapper and removed when toggled off or when clicking outside it.
+   *
+   * @param {HTMLElement} wrap The card wrapper to attach the settings menu to.
+   */
+  _openCardSettingsMenu(wrap) {
+    if (!wrap) return;
+    // Toggle existing menu: if one is present on this wrapper, remove it.
+    const existing = wrap.querySelector('.ddc-card-settings');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    // Create the menu container
+    const menu = document.createElement('div');
+    menu.className = 'ddc-card-settings';
+    // Note: do not reset all styles here. The menu relies on the surrounding card theme
+    // variables (like colors) for its look. Inheriting them is intentional.
+    // Position and style the menu. Inline styles allow it to work without
+    // relying on external CSS. The design aims to match the settings modal:
+    // solid background, drop shadow and clean spacing. Center the menu
+    // over the card by using 50% offsets and translate. A higher z-index
+    // ensures it overlays the card contents.
+    Object.assign(menu.style, {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: '10000',
+      // Use a non-transparent background. Fall back to a dark colour if theme
+      // variables are unset. This makes the popup look like a standalone card.
+      background: 'var(--ha-card-background, var(--card-background-color, var(--primary-background-color, #1e1e1e)))',
+      border: '1px solid var(--divider-color, rgba(0,0,0,.3))',
+      borderRadius: '12px',
+      padding: '14px',
+      boxShadow: '0 10px 24px rgba(0,0,0,.4)',
+      color: 'var(--primary-text-color, #f5f5f5)',
+      minWidth: '220px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      fontSize: '.875rem',
+      opacity: '1',
+      mixBlendMode: 'normal'
+    });
+    // Intercept pointer events in the menu to prevent card drag when
+    // interacting with dropdowns or other controls. Without stopping
+    // propagation, Interact’s draggable handler would treat pointer
+    // presses inside the menu as the start of a drag.
+    const stopEvt = (ev) => ev.stopPropagation();
+    menu.addEventListener('pointerdown', stopEvt, true);
+    menu.addEventListener('mousedown', stopEvt, true);
+    menu.addEventListener('touchstart', stopEvt, true);
+
+    // Add a title for the settings popup
+    const titleEl = document.createElement('div');
+    titleEl.textContent = 'Card Settings';
+    Object.assign(titleEl.style, {
+      fontWeight: '600',
+      fontSize: '1rem',
+      marginBottom: '4px',
+      color: 'var(--primary-text-color, #f5f5f5)'
+    });
+    menu.appendChild(titleEl);
+
+    // Add a close button in the top-right corner of the menu. Use
+    // absolute positioning so it doesn’t affect layout of other rows.
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'mini';
+    Object.assign(closeBtn.style, {
+      position: 'absolute',
+      top: '4px',
+      right: '4px',
+      border: 'none',
+      background: 'transparent',
+      color: 'var(--secondary-text-color, #9ca3af)',
+      cursor: 'pointer',
+      width: '24px',
+      height: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    });
+    closeBtn.setAttribute('title', 'Close');
+    closeBtn.setAttribute('aria-label', 'Close settings');
+    closeBtn.innerHTML = '<ha-icon icon="mdi:close"></ha-icon>';
+    closeBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      menu.remove();
+    });
+    menu.appendChild(closeBtn);
+
+    // Build a row factory for label + select combos. Rows are laid
+    // horizontally with a fixed gap between label and control.
+    const makeRow = (labelText, selectElement) => {
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.gap = '12px';
+      row.style.width = '100%';
+      // Label
+      const lab = document.createElement('span');
+      lab.textContent = labelText;
+      lab.style.color = 'var(--secondary-text-color, #9ca3af)';
+      lab.style.fontWeight = '500';
+      lab.style.whiteSpace = 'nowrap';
+      // Control inherits width via flex
+      selectElement.style.flex = '1 1 auto';
+      row.appendChild(lab);
+      row.appendChild(selectElement);
+      return row;
+    };
+
+    // Predefine a common select style for all dropdowns. This closely
+    // matches the styling used in the main settings modal: subtle border,
+    // rounded corners and consistent padding/background. The `appearance`
+    // property removes native OS styling for a cleaner look.
+    const applySelectStyle = (sel) => {
+      Object.assign(sel.style, {
+        appearance: 'none',
+        padding: '6px 8px',
+        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
+        borderRadius: '8px',
+        background: 'var(--ha-card-background, var(--card-background-color, var(--primary-background-color, #fff)))',
+        color: 'var(--primary-text-color, #000)',
+        font: 'inherit',
+        lineHeight: '1.4',
+        width: '100%'
+      });
+    };
+
+    // Build Tab selector row if multiple tabs exist
+    if (Array.isArray(this.tabs) && this.tabs.length > 1) {
+      const tabSelect = document.createElement('select');
+      applySelectStyle(tabSelect);
+      for (const t of this.tabs) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.label || t.id;
+        tabSelect.appendChild(opt);
+      }
+      const currentTab = wrap.dataset.tabId || this.defaultTab;
+      tabSelect.value = this._normalizeTabId(currentTab);
+      tabSelect.addEventListener('change', () => {
+        const val = tabSelect.value;
+        wrap.dataset.tabId = this._normalizeTabId(val);
+        try { this._addTabSelectorToChip?.(wrap, wrap.dataset.tabId); } catch {}
+        try { this._applyActiveTab(); } catch {}
+        try { this._applyVisibility_(); } catch {}
+        try { this._queueSave('tab-change'); } catch {}
+      });
+      // Add pointer blocker to the select itself
+      tabSelect.addEventListener('pointerdown', stopEvt);
+      tabSelect.addEventListener('mousedown', stopEvt);
+      tabSelect.addEventListener('touchstart', stopEvt);
+      const row = makeRow('Tab', tabSelect);
+      menu.appendChild(row);
+      // Hint for Tab selector
+      const tabHint = document.createElement('div');
+      tabHint.textContent = 'Choose which tab this card appears on.';
+      Object.assign(tabHint.style, {
+        fontSize: '.75rem',
+        color: 'var(--secondary-text-color, #9ca3af)',
+        marginTop: '2px'
+      });
+      menu.appendChild(tabHint);
+    }
+
+    // Build Overflow selector row with additional options (e.g. Scroll)
+    const overflowSelect = document.createElement('select');
+    applySelectStyle(overflowSelect);
+    // Define overflow modes: default (inherit), visible, hidden, scroll/auto
+    const modes = [
+      { value: '', label: 'Default' },
+      { value: 'visible', label: 'Visible' },
+      { value: 'hidden', label: 'Hidden' },
+      { value: 'auto', label: 'Scroll' }
+    ];
+    for (const m of modes) {
+      const opt = document.createElement('option');
+      opt.value = m.value;
+      opt.textContent = m.label;
+      overflowSelect.appendChild(opt);
+    }
+    const currentOverflow = wrap.dataset.overflow || wrap.style.overflow || '';
+    overflowSelect.value = currentOverflow || '';
+    overflowSelect.addEventListener('change', () => {
+      const val = overflowSelect.value;
+      const cardEl = wrap.firstElementChild;
+      if (val) {
+        wrap.style.setProperty('overflow', val, 'important');
+        if (cardEl) cardEl.style.setProperty('overflow', val, 'important');
+        wrap.dataset.overflow = val;
+      } else {
+        wrap.style.removeProperty('overflow');
+        if (cardEl) cardEl.style.removeProperty('overflow');
+        delete wrap.dataset.overflow;
+      }
+      try { this._queueSave('overflow-change'); } catch {}
+    });
+    // Add pointer blocker to overflow select
+    overflowSelect.addEventListener('pointerdown', stopEvt);
+    overflowSelect.addEventListener('mousedown', stopEvt);
+    overflowSelect.addEventListener('touchstart', stopEvt);
+    const rowOv = makeRow('Overflow', overflowSelect);
+    menu.appendChild(rowOv);
+    // Hint for Overflow selector
+    const ovHint = document.createElement('div');
+    ovHint.textContent = 'Control how card content behaves when it exceeds its bounds.';
+    Object.assign(ovHint.style, {
+      fontSize: '.75rem',
+      color: 'var(--secondary-text-color, #9ca3af)',
+      marginTop: '2px'
+    });
+    menu.appendChild(ovHint);
+
+    // Append menu to wrapper
+    wrap.appendChild(menu);
   }
   
 /* ------------------------------ Edit mode ------------------------------ */
@@ -5788,6 +6042,18 @@ _syncEmptyStateUI() {
       </button>
     `;
 
+    // Append a settings button to the chip. This button opens a small
+    // configuration menu for the card (e.g. overflow options). It is
+    // implemented separately rather than baked into the HTML string so the
+    // dataset properties and event handlers work correctly.
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'mini';
+    settingsBtn.dataset.act = 'settings';
+    settingsBtn.setAttribute('title', 'Settings');
+    settingsBtn.setAttribute('aria-label', 'Settings');
+    settingsBtn.innerHTML = '<ha-icon icon="mdi:cog"></ha-icon><span>Settings</span>';
+    chip.appendChild(settingsBtn);
+
     // Create a dedicated delete handle that sits in the top‑left corner. This
     // replaces the delete button in the chip and mimics the resize handle in
     // style. Clicking it will remove the card (or multiple cards if a group
@@ -5838,6 +6104,24 @@ _syncEmptyStateUI() {
           const w2 = this._makeWrapper(dup);
           w2.style.width  = t.style.width;
           w2.style.height = t.style.height;
+          // Preserve per-card overflow setting on duplicates. Without this
+          // duplication would revert to default overflow auto even when the
+          // source card had overflow visible or hidden. Copy both the
+          // wrapper’s overflow and the card element’s overflow so that
+          // dropdowns/tooltips maintain correct clipping behaviour.
+          try {
+            if (t.style && t.style.overflow) {
+              w2.style.overflow = t.style.overflow;
+            }
+            if (t.dataset && t.dataset.overflow) {
+              w2.dataset.overflow = t.dataset.overflow;
+            }
+            const origCard = t.firstElementChild;
+            const dupCard = w2.firstElementChild;
+            if (origCard && dupCard && origCard.style && origCard.style.overflow) {
+              dupCard.style.overflow = origCard.style.overflow;
+            }
+          } catch {}
           const x = (parseFloat(t.getAttribute('data-x')) || 0) + this.gridSize;
           const y = (parseFloat(t.getAttribute('data-y')) || 0) + this.gridSize;
           this._setCardPosition(w2, x, y);
@@ -5945,6 +6229,14 @@ _syncEmptyStateUI() {
 
           window.location.reload();                  // force refresh so edited card appears
         });
+      } else if (act === 'settings') {
+        // Open or toggle the per-card settings menu (e.g. overflow options).
+        try {
+          // Open the per-card settings menu which now contains both the
+          // overflow toggle and a tab selector. The old _openOverflowMenu
+          // method has been replaced by _openCardSettingsMenu.
+          this._openCardSettingsMenu?.(wrap);
+        } catch {}
       }
     });
 
@@ -5974,6 +6266,23 @@ _syncEmptyStateUI() {
     wrap.append(cardEl, shield, chip, delHandle, handle);
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
+
+    // Enable double-click on a card wrapper to open the card editor when
+    // already in edit mode. This does not toggle edit mode; instead it
+    // delegates to the existing Edit button, ensuring the same commit
+    // behaviour and callback chain are used. Only plain double-clicks
+    // outside of control elements (resize handle, delete handle, chip) are
+    // intercepted.
+    wrap.addEventListener('dblclick', (ev) => {
+      if (!this.editMode) return;
+      // Ignore double clicks originating from controls within the wrapper
+      if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip')) return;
+      ev.stopPropagation();
+      try {
+        const btn = wrap.querySelector('.chip button[data-act="edit"]');
+        if (btn) btn.click();
+      } catch {}
+    });
     return wrap;
   }
 
@@ -6712,7 +7021,18 @@ _applyAutoFillNoScale() {
     // attempt to read the card's own config
     const cfg = cardEl._config || cardEl.config;
     if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
-      return cfg;
+      // Always return a deep clone of the config so editing one card cannot
+      // inadvertently mutate the config of another. Use structuredClone when
+      // available for fidelity; fall back to JSON serialization otherwise.
+      try {
+        if (typeof structuredClone === 'function') {
+          return structuredClone(cfg);
+        }
+        return JSON.parse(JSON.stringify(cfg));
+      } catch {
+        // As a last resort perform a shallow copy
+        return { ...cfg };
+      }
     }
     // fallback: if the wrapper cached a config, use it
     try {
@@ -6721,7 +7041,10 @@ _applyAutoFillNoScale() {
       const raw  = wrap?.dataset?.cfg;
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') return parsed;
+        if (parsed && typeof parsed === 'object') {
+          // parsed is already a deep clone via JSON.parse
+          return parsed;
+        }
       }
     } catch {}
     return {};
@@ -9715,12 +10038,17 @@ _applyAutoFillNoScale() {
       return firstRecent || 'entities';
     };
 
-    await selectType(pickDefaultType());
-    enableCommit(true);
-
-    // default selection
+    // When editing an existing card, load its type immediately instead of
+    // selecting a default first. Selecting two card types in succession can
+    // race, causing the YAML editor to display the wrong configuration. See
+    // issue: sometimes the YAML from the previous card would appear. By
+    // selecting only once here we ensure the initial configuration is the
+    // correct one.
     if (mode === 'edit' && initialCfg) {
       await selectType(initialCfg.type || 'entities');
+      enableCommit(true);
+    } else {
+      await selectType(pickDefaultType());
       enableCommit(true);
     }
   }
@@ -11792,14 +12120,32 @@ modal.innerHTML = `
         // Disable overlap
         this.disableOverlap = newOverlap;
         // Container background
+        // When the input has a value, apply it; otherwise reset to an empty string.
         if (newCBg) {
           this.containerBackground = newCBg;
           this.style.setProperty('--ddc-bg', this.containerBackground);
+          // reflect into config immediately so exportable options include it
+          this._config = this._config || {};
+          this._config.container_background = this.containerBackground;
+        } else {
+          // Reset: remove inline style and persist an empty string to override any YAML value
+          this.containerBackground = '';
+          try { this.style.removeProperty('--ddc-bg'); } catch {}
+          this._config = this._config || {};
+          this._config.container_background = this.containerBackground;
         }
         // Card background
         if (newCardBg) {
           this.cardBackground = newCardBg;
           this.style.setProperty('--ddc-card-bg', this.cardBackground);
+          this._config = this._config || {};
+          this._config.card_background = this.cardBackground;
+        } else {
+          // Reset card background: remove inline style and store empty string
+          this.cardBackground = '';
+          try { this.style.removeProperty('--ddc-card-bg'); } catch {}
+          this._config = this._config || {};
+          this._config.card_background = this.cardBackground;
         }
         // Background image (only src)
         // Background image (only src) — immutable update (avoids "read-only" error)
@@ -11906,8 +12252,20 @@ modal.innerHTML = `
           this._config.container_fixed_height  = this.containerFixedHeight;
           this._config.container_preset        = this.containerPreset;
           this._config.disable_overlap         = !!this.disableOverlap;
-          this._config.container_background    = this.containerBackground;
-          this._config.card_background         = this.cardBackground;
+          // Only persist backgrounds when defined; otherwise remove from the config so YAML
+          // can fall back to defaults. Note that undefined backgrounds are not exported
+          // by _exportableOptions(), so leaving the keys deleted ensures old YAML
+          // values are overwritten when we persist options.
+          if (this.containerBackground !== undefined) {
+            this._config.container_background = this.containerBackground;
+          } else if (this._config) {
+            delete this._config.container_background;
+          }
+          if (this.cardBackground !== undefined) {
+            this._config.card_background = this.cardBackground;
+          } else if (this._config) {
+            delete this._config.card_background;
+          }
           // Persist card shadow setting
           this._config.card_shadow            = !!this.cardShadowEnabled;
           this._config.debug                   = !!this.debug;
@@ -11922,13 +12280,30 @@ modal.innerHTML = `
           console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
         }
         // Persist changes
-        // Persist changes exactly like the Visual Editor (Storage dashboards)
-        this._persistThisCardConfigToStorage_()
-          .catch((e) => {
-            console.warn('[drag-and-drop-card] Storage save failed (is this a YAML dashboard?)', e);
-            // Optional: toast for the user:
-            // this._showToast_?.('Could not save to dashboard storage. Is this a YAML dashboard?');
-          });
+        // Persist changes both to the Lovelace storage (when available) and to the YAML config.
+        // Calling both persistence helpers ensures that any changed settings override the
+        // YAML definitions on reload, and that storage dashboards remain in sync.
+        try {
+          const opts = this._exportableOptions?.() || {};
+          // Attempt to persist this card config into the Lovelace storage (visual editor).
+          const storagePromise = this._persistThisCardConfigToStorage_?.();
+          if (storagePromise && typeof storagePromise.catch === 'function') {
+            storagePromise.catch((err) => {
+              console.warn('[drag-and-drop-card] Storage save failed (is this a YAML dashboard?)', err);
+            });
+          }
+          // Independently persist the updated options into YAML. This is harmless on storage
+          // dashboards and will noop if the YAML is not editable. Suppress downloads to avoid
+          // prompting the user for backups during normal settings changes.
+          const yamlPromise = this._persistOptionsToYaml?.(opts, { noDownload: true });
+          if (yamlPromise && typeof yamlPromise.catch === 'function') {
+            yamlPromise.catch((yamlErr) => {
+              console.warn('[drag-and-drop-card] YAML persist failed', yamlErr);
+            });
+          }
+        } catch (persErr) {
+          console.warn('[drag-and-drop-card] Unexpected error persisting settings', persErr);
+        }
       } catch (err) {
         console.warn('[drag-and-drop-card] Failed to apply settings', err);
       }
@@ -12138,8 +12513,9 @@ modal.innerHTML = `
     const wraps = Array.from(
       this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
     );
-    const saved = wraps.map((w) => { // DDC tabs
-        
+    const saved = wraps.map((w) => {
+      // Persist core card geometry and configuration. TabId defaults to the
+      // current active default tab when not explicitly set on the wrapper.
       const x = parseFloat(w.getAttribute('data-x')) || 0;
       const y = parseFloat(w.getAttribute('data-y')) || 0;
       const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
@@ -12147,7 +12523,17 @@ modal.innerHTML = `
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
       const tabId = w.dataset.tabId || this.defaultTab;
-        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
+      const entry = { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
+      // Persist explicit overflow setting on export. This mirrors the
+      // behaviour of _saveLayout which includes overflow when set on
+      // the wrapper style. Some cards require overflow visible or hidden
+      // to show dropdowns or tooltips correctly. Only include it when
+      // explicitly set to avoid writing default empty strings.
+      const ov = w.style.overflow;
+      if (ov && ov !== '') {
+        entry.overflow = ov;
+      }
+      return entry;
     });
 
     const payload = {
@@ -12413,6 +12799,16 @@ _importDesign() {
           wrap.style.width  = `${w}px`;
           wrap.style.height = `${h}px`;
           if (z != null) wrap.style.zIndex = String(z);
+          // Apply explicit overflow if provided in the import. Persist both
+          // on the wrapper style and dataset so the settings menu and save
+          // functions can detect and re-export the value. Absence of the
+          // property implies default overflow behaviour.
+          if (conf.overflow) {
+            wrap.style.overflow = conf.overflow;
+            wrap.dataset.overflow = conf.overflow;
+            const cardEl = wrap.firstElementChild;
+            if (cardEl) cardEl.style.overflow = conf.overflow;
+          }
           this.cardContainer.appendChild(wrap);
 
           try { this._rebuildOnce(wrap.firstElementChild); } catch {}
@@ -12548,17 +12944,29 @@ _importDesign() {
          // Resolve the YAML object to patch
          let ref = cfg;
          for (const seg of t.path) ref = ref[seg];
- 
+
          // Remember the card’s existing key (support legacy camelCase & nested)
          const existingKey =
            ref?.storage_key ?? ref?.storageKey ?? ref?.options?.storage_key ?? ref?.options?.storageKey ?? null;
- 
+
          // Decide if this specific card is being renamed (only when prevKey→newKey and it matches)
          const shouldRename = !!(prevKey && newKey && existingKey === prevKey && newKey !== prevKey);
- 
+
          // Apply options WITHOUT a key
+         // Merge options onto the card itself
          Object.assign(ref, basePatch);
- 
+
+         // Additionally merge into nested `options` object if present. Some YAML dashboards
+         // wrap card options under an `options` key; updating both ensures screen saver
+         // and other settings persist regardless of structure. Note: do not copy type or
+         // storage_key into nested options.
+         if (ref && typeof ref.options === 'object' && ref.options !== null) {
+           for (const [k, v] of Object.entries(opts || {})) {
+             if (k === 'storage_key' || k === 'storageKey' || k === 'type') continue;
+             ref.options[k] = v;
+           }
+         }
+
          // Restore / set the right key per-card
          if (shouldRename) {
            ref.storage_key = String(newKey);
@@ -12594,15 +13002,21 @@ _importDesign() {
 
   async _saveLayout(silent = true) {
     const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
-    const saved = wraps.map((w)=>{
+    const saved = wraps.map((w) => {
       const x = parseFloat(w.getAttribute('data-x')) || 0;
       const y = parseFloat(w.getAttribute('data-y')) || 0;
-      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
+      const width = parseFloat(w.style.width) || w.getBoundingClientRect().width;
       const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
       const z = parseInt(w.style.zIndex || '1', 10);
       const cardCfg = this._extractCardConfig(w.firstElementChild);
       const tabId = w.dataset.tabId || this.defaultTab;
-        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
+      // Persist custom overflow per-card so it can be restored on reload. If
+      // no explicit overflow is set on the wrapper we omit the field. Some
+      // cards require overflow visible to show dropdowns or tooltips.
+      const overflow = (w.style.overflow && w.style.overflow !== '') ? w.style.overflow : null;
+      const entry = { card: cardCfg, position: { x, y }, size: { width, height }, z, tabId };
+      if (overflow) entry.overflow = overflow;
+      return entry;
     });
     const payload = {
        version: 2,
@@ -14372,9 +14786,26 @@ async function _persistOptionsToYaml(opts, {
       btn.type = 'button';
       btn.style.padding = '6px 10px';
       btn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon><span style="margin-left:6px">Refresh</span>';
+      // Create a delete button to remove the selected layout (except the current one)
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn secondary';
+      deleteBtn.type = 'button';
+      deleteBtn.style.padding = '6px 10px';
+      // Use a trash can icon for delete
+      deleteBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+      deleteBtn.title = 'Delete selected layout';
+      // Create an undo button to restore the most recently deleted layouts
+      const undoBtn = document.createElement('button');
+      undoBtn.className = 'btn secondary';
+      undoBtn.type = 'button';
+      undoBtn.style.padding = '6px 10px';
+      undoBtn.innerHTML = '<ha-icon icon="mdi:undo"></ha-icon>';
+      undoBtn.title = 'Undo last delete';
       wrap.appendChild(label);
       wrap.appendChild(select);
       wrap.appendChild(btn);
+      wrap.appendChild(deleteBtn);
+      wrap.appendChild(undoBtn);
       toolbar.appendChild(wrap);
       this._ddcSwitcherInstalled = true;
       const fill = async () => {
@@ -14383,11 +14814,13 @@ async function _persistOptionsToYaml(opts, {
         const backupKeys = _collectBackupKeys();
         const recentKeys = _getRecentKeys();
         const toUnique = (arr) => Array.from(new Set(arr.filter(Boolean)));
-        const server = toUnique(serverKeys);
-        const backups = toUnique(backupKeys);
-        const recent = toUnique(recentKeys);
+        // Filter out any keys that have been marked as deleted during this session
+        const deletedKeys = (this._ddcDeletedKeys || []);
+        const server = toUnique(serverKeys).filter(k => !deletedKeys.includes(k));
+        const backups = toUnique(backupKeys).filter(k => !deletedKeys.includes(k));
+        const recent = toUnique(recentKeys).filter(k => !deletedKeys.includes(k));
         select.innerHTML = '';
-        if (current && !server.includes(current) && !backups.includes(current) && !recent.includes(current)) {
+        if (current && !deletedKeys.includes(current) && !server.includes(current) && !backups.includes(current) && !recent.includes(current)) {
           const opt = document.createElement('option');
           opt.value = current;
           opt.textContent = `${current} (current)`;
@@ -14398,7 +14831,11 @@ async function _persistOptionsToYaml(opts, {
           if (!list.length) return;
           const og = document.createElement('optgroup'); og.label = label;
           list.forEach(k => {
-            const o = document.createElement('option'); o.value = k; o.textContent = k; if (k===current) o.selected = true;
+            const o = document.createElement('option');
+            o.value = k;
+            // Append a trash can emoji to visually indicate deletable layouts
+            o.textContent = `${k} \u{1F5D1}`;
+            if (k === current) o.selected = true;
             og.appendChild(o);
           });
           select.appendChild(og);
@@ -14411,9 +14848,137 @@ async function _persistOptionsToYaml(opts, {
           select.appendChild(none);
         }
         _updateSwitcherVisibility.call(this);
+        // Disable delete button when no layout is selected
+        try {
+          const selectedKey = select.value || '';
+          deleteBtn.disabled = !selectedKey;
+          // Disable undo button when there is nothing to restore
+          undoBtn.disabled = !(this._ddcDeletedLayouts && this._ddcDeletedLayouts.length);
+        } catch (err) {
+          /* no-op */
+        }
       };
       fill();
       btn.addEventListener('click', fill);
+
+      // When delete is clicked, remove the selected layout (including the current one)
+      deleteBtn.addEventListener('click', async () => {
+        const key = select.value || '';
+        if (!key) {
+          this._toast?.('No layout selected.');
+          return;
+        }
+        // confirm the deletion with the user
+        try {
+          if (typeof window !== 'undefined' && window.confirm) {
+            const ok = window.confirm(`Delete layout "${key}"?`);
+            if (!ok) return;
+          }
+        } catch {}
+        // fetch the design before deletion for undo functionality
+        let design = null;
+        try { design = await _fetchLayoutByKey.call(this, key); } catch(e) {}
+        if (design) {
+          if (!this._ddcDeletedLayouts) this._ddcDeletedLayouts = [];
+          this._ddcDeletedLayouts.unshift({ key, design });
+          this._ddcDeletedLayouts = this._ddcDeletedLayouts.slice(0, 5);
+        }
+        // Track this key in a list of deleted keys so it doesn’t appear in the dropdown again
+        try {
+          if (!this._ddcDeletedKeys) this._ddcDeletedKeys = [];
+          if (!this._ddcDeletedKeys.includes(key)) this._ddcDeletedKeys.push(key);
+        } catch {}
+        let okDelete = false;
+        // Attempt to delete via Home Assistant API (DELETE method)
+        try {
+          if (this?.hass?.callApi) {
+            await this.hass.callApi('delete', `dragdrop_storage/${encodeURIComponent(key)}`);
+            okDelete = true;
+          }
+        } catch(e) {}
+        // Fallback: attempt via direct fetch (DELETE)
+        if (!okDelete) {
+          try {
+            const resp = await fetch(`/api/dragdrop_storage/${encodeURIComponent(key)}`, { method: 'DELETE' });
+            if (resp && resp.ok) okDelete = true;
+          } catch(e) {}
+        }
+        // Additional fallback: attempt to call a delete endpoint via POST
+        if (!okDelete) {
+          try {
+            if (this?.hass?.callApi) {
+              await this.hass.callApi('post', 'dragdrop_storage/delete', { key });
+              okDelete = true;
+            }
+          } catch(e) {}
+        }
+        // Fallback: attempt to POST to /api/dragdrop_storage/delete
+        if (!okDelete) {
+          try {
+            const resp = await fetch('/api/dragdrop_storage/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key })
+            });
+            if (resp && resp.ok) okDelete = true;
+          } catch(e) {}
+        }
+        // Remove any local backup copy
+        try { localStorage.removeItem(`ddc_local_${key}`); } catch(e) {}
+        // Notify user
+        if (okDelete) {
+          this._toast?.(`Deleted layout "${key}"`);
+        } else {
+          this._toast?.(`Failed to delete layout "${key}"`);
+        }
+        // Refresh the dropdown list
+        await fill();
+      });
+
+      // When undo is clicked, restore the most recently deleted layout (up to 5)
+      undoBtn.addEventListener('click', async () => {
+        if (!this._ddcDeletedLayouts || this._ddcDeletedLayouts.length === 0) {
+          this._toast?.('Nothing to restore.');
+          return;
+        }
+        const item = this._ddcDeletedLayouts.shift();
+        const restoreKey = item.key;
+        const design = item.design;
+        let okRestore = false;
+        // Attempt to restore via Home Assistant API
+        try {
+          if (this?.hass?.callApi) {
+            await this.hass.callApi('post', `dragdrop_storage/${encodeURIComponent(restoreKey)}`, design);
+            okRestore = true;
+          }
+        } catch(e) {}
+        // Fallback: POST directly via fetch
+        if (!okRestore) {
+          try {
+            const resp = await fetch(`/api/dragdrop_storage/${encodeURIComponent(restoreKey)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(design)
+            });
+            if (resp && resp.ok) okRestore = true;
+          } catch(e) {}
+        }
+        // Save a local copy as well
+        try { localStorage.setItem(`ddc_local_${restoreKey}`, JSON.stringify(design)); } catch(e) {}
+        if (okRestore) {
+          this._toast?.(`Restored layout "${restoreKey}"`);
+        } else {
+          this._toast?.(`Failed to restore layout "${restoreKey}"`);
+        }
+        // Remove from the list of deleted keys so it appears in the dropdown again
+        try {
+          if (this._ddcDeletedKeys) {
+            this._ddcDeletedKeys = this._ddcDeletedKeys.filter(k => k !== restoreKey);
+          }
+        } catch {}
+        // Refresh dropdown and update button states
+        await fill();
+      });
       
       select.addEventListener('change', async (e) => {
         const newKey = String(e.target.value || '');
