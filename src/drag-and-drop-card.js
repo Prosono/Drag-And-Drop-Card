@@ -3964,7 +3964,12 @@ _applyGridVars() {
 
   display: flex;
   align-items: flex-end;
-  justify-content: center;          /* center when there’s room */
+  /* When there is enough room the tabs bar will naturally center its
+     children, but centering by default on narrow viewports means the
+     first tab can be pushed partially off screen. Use flex‑start to
+     anchor the tabs to the left; a later script adjusts this back to
+     center when the bar does not overflow. */
+  justify-content: flex-start;
   column-gap: var(--gap);
   padding: 0 12px;
   width: 100%;
@@ -3980,8 +3985,16 @@ _applyGridVars() {
   scrollbar-gutter: stable;
 
   /* discoverable overflow edges */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
-          mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  /* The default implementation used a horizontal mask on the tabs strip to fade
+     the outer edges (transparent at the start/end and opaque in the middle).
+     While this looked slick it caused the first and last tabs to appear
+     clipped when they were partially scrolled off screen. This card needs
+     to present the active tab clearly, even when the tabs overflow. To make
+     this more responsive and to avoid visual cropping of the first tab,
+     remove the mask entirely. The mask-image properties are set to none
+     here rather than a gradient so there is no fading effect on either edge. */
+  -webkit-mask-image: none;
+          mask-image: none;
 }
 .ddc-tabs::-webkit-scrollbar{ height: 8px; }
 .ddc-tabs::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--fg) 30%, transparent); border-radius: 999px; }
@@ -4008,6 +4021,13 @@ _applyGridVars() {
   color: color-mix(in oklab, var(--fg) 92%, transparent);
   cursor: pointer;
   user-select: none;
+
+  /* Ensure the entire tab is clickable.  Without explicitly setting
+     pointer-events the clickable region may be limited to the tab’s
+     inline content, especially in browsers that collapse the button’s
+     hit area to its children.  Setting pointer-events to auto
+     guarantees the full padded area responds to clicks. */
+  pointer-events: auto;
 
   /* Fill with “carved” concave bottom corners:
      we paint the BAR color into the corner arcs, which visually cuts inward */
@@ -4080,11 +4100,21 @@ _applyGridVars() {
 
 /* Optional small accent tick under the active tab */
 .ddc-tab::after{
-  content:"";
-  position:absolute; left: 24px; right: 24px; bottom: -2px;
-  height: 2px; border-radius: 2px;
+  content: "";
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
   background: color-mix(in oklab, var(--accent) 72%, transparent);
-  opacity: 0; transition: opacity .18s ease;
+  opacity: 0;
+  transition: opacity .18s ease;
+  /* Ensure the decorative underline never interferes with pointer
+     interactions. Without disabling pointer events on this pseudo
+     element it may inadvertently capture clicks, especially on
+     touch devices where subpixel offsets can misregister. */
+  pointer-events: none;
 }
 .ddc-tab.active::after{ opacity: 1; }
 
@@ -4888,29 +4918,36 @@ if (this.__ddcOnWinResize) {
     // with the drag-and-drop container.
     try { this._syncTabsWidth_?.(); } catch {}
 
-    // On narrow viewports the tabs bar becomes horizontally scrollable.  When
-    // switching to a tab that lies outside the current viewport, the scroll
-    // position should update so that the newly active tab is brought into
-    // view.  Without this the bar may snap back to an arbitrary midpoint,
-    // particularly on mobile devices.  We only scroll when the content
-    // actually overflows to avoid unnecessary jitter on wide screens.
+    // Ensure the active tab is visible whenever tabs overflow.  Without this
+    // behaviour the bar may keep the active tab partially clipped or hidden
+    // behind the scroll mask.  Always bring the active tab into view
+    // regardless of viewport size if the bar overflows horizontally.  This
+    // uses `scrollIntoView({block:'nearest',inline:'nearest'})` which scrolls
+    // just enough to reveal the element without recentring the entire list.
     try {
       const activeBtn = bar.querySelector?.('.ddc-tab.active');
       if (activeBtn && bar.scrollWidth > bar.clientWidth) {
-        let vw = 0;
-        try {
-          vw = window.innerWidth || document.documentElement?.clientWidth || 0;
-        } catch {}
+        activeBtn.scrollIntoView({
+          behavior: 'auto',
+          block: 'nearest',
+          inline: 'nearest',
+        });
+      }
+    } catch {}
 
-        // On small screens let the user control the scroll position manually.
-        if (!vw || vw > 768) {
-          // Desktop / wide: still auto-scroll the active tab into view.
-          activeBtn.scrollIntoView({
-            behavior: 'auto',
-            block: 'nearest',
-            inline: 'nearest',
-          });
-        }
+    // Adjust alignment: if the tabs bar does not overflow, centre its
+    // contents; otherwise anchor them to the start so the first tab is
+    // always visible.  Without this check the bar may remain centred
+    // causing the leftmost part of the bar to be clipped off when it
+    // overflows.  Reset any inline style first, then set justifyContent.
+    try {
+      // remove previously set inline justifyContent to allow recomputation
+      bar.style.justifyContent = '';
+      // Use flex-start by default; switch to center when the contents fit
+      if (bar.scrollWidth <= bar.clientWidth) {
+        bar.style.justifyContent = 'center';
+      } else {
+        bar.style.justifyContent = 'flex-start';
       }
     } catch {}
   }
