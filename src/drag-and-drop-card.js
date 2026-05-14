@@ -203,7 +203,7 @@ _ensureToolbarStyles_() {
     s.id = 'ddc-toolbar-styles';
     s.textContent = `/* ===== Edit toolbar ===== */
   .ddc-toolbar{
-    position: sticky; top:0; z-index: 50;
+    position: sticky; top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px)); z-index: 50;
     display:grid; grid-template-columns: 1fr auto 1fr; align-items:center;
     gap: 12px; padding: 10px 14px;
     backdrop-filter: blur(8px);
@@ -285,13 +285,31 @@ _ensureSettingsStyles_() {
   const style = document.createElement('style');
   style.id = 'ddc-settings-styles';
   style.textContent = `
-  .dialog.modern { max-width: 1920px; width: min(92vw, 1080px); border-radius: 14px; overflow: hidden; }
+  .dialog.modern {
+    width: min(calc(100vw - clamp(14px, 3vw, 40px)), 1720px);
+    height: min(calc(100vh - clamp(16px, 4vw, 44px)), 1100px);
+    max-width: 1720px;
+    max-height: 1100px;
+    display:flex;
+    flex-direction:column;
+    border-radius: 18px;
+    overflow: hidden;
+  }
   .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--primary-color); color:#fff; }
   .dlg-head h3 { margin:0; font-size:1.1rem; font-weight:700; }
   .icon-btn { border:0; background:transparent; color:inherit; cursor:pointer; display:grid; place-items:center; }
-  .settings-body { display:grid; gap:16px; padding:16px; max-height:70vh; overflow:auto; grid-template-columns: 1fr; }
-  @media (min-width: 720px){ .settings-body { grid-template-columns: 1fr 1fr; } }
-  .card { background:var(--ha-card-background, #fff); border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .settings-body {
+    flex:1 1 auto;
+    min-height:0;
+    display:grid;
+    row-gap:clamp(18px, 2vw, 26px);
+    column-gap:clamp(68px, 8vw, 144px);
+    padding:clamp(14px, 1.8vw, 22px);
+    overflow:auto;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+    align-content:start;
+  }
+  .card { background:var(--ha-card-background, #fff); border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:12px 14px; display:flex; flex-direction:column; gap:10px; min-width:0; }
   .card h4 { margin:0; font-size:1rem; font-weight:700; color:var(--primary-text-color); }
   .row { display:flex; align-items:center; gap:12px; }
   .row label { flex:1; font-size:.95rem; }
@@ -395,6 +413,326 @@ _ensureSettingsStyles_() {
     .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
     .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
     .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+    .packages-list { display:flex; flex-direction:column; gap:14px; }
+    .package-tools {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:4px;
+    }
+    .feature-quick-actions {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:2px;
+    }
+    .feature-quick-actions .mini-action {
+      border-radius:999px;
+    }
+    .package-sync-status {
+      border:1px dashed var(--divider-color, rgba(255,255,255,.16));
+      border-radius:12px;
+      padding:10px 12px;
+      color:var(--secondary-text-color);
+      font-size:.88rem;
+      line-height:1.45;
+      background:color-mix(in srgb, var(--card-background-color, #111) 90%, transparent);
+      white-space:pre-line;
+    }
+    .package-empty {
+      padding:18px 16px;
+      border:1px dashed var(--divider-color, rgba(255,255,255,.16));
+      border-radius:14px;
+      color:var(--secondary-text-color);
+      background:color-mix(in oklab, var(--primary-background-color, #0f1117) 24%, transparent);
+    }
+    .package-reload-note {
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid color-mix(in srgb, var(--warning-color, #f59e0b) 35%, transparent);
+      background:color-mix(in srgb, var(--warning-color, #f59e0b) 9%, transparent);
+      color:var(--secondary-text-color);
+      font-size:.9rem;
+      line-height:1.45;
+    }
+    .package-reload-note ha-icon {
+      color:var(--warning-color, #f59e0b);
+      margin-top:2px;
+      flex:0 0 auto;
+    }
+    .package-card {
+      border:1px solid var(--divider-color, rgba(255,255,255,.12));
+      border-radius:16px;
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      background:color-mix(in oklab, var(--ha-card-background, #111827) 94%, transparent);
+    }
+    .package-head {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .package-head-main {
+      flex:1 1 260px;
+      min-width:220px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .package-title-input,
+    .package-file-input,
+    .package-yaml-textarea {
+      width:100%;
+      box-sizing:border-box;
+      padding:10px 12px;
+      border:1px solid var(--divider-color, rgba(255,255,255,.16));
+      border-radius:12px;
+      background:color-mix(in oklab, var(--primary-background-color, #0e1116) 20%, transparent);
+      color:inherit;
+      font:inherit;
+    }
+    .package-title-input { font-weight:700; }
+    .package-file-row {
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto;
+      gap:12px;
+      align-items:center;
+    }
+    .package-toggle {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+      color:var(--secondary-text-color);
+      font-size:.9rem;
+    }
+    .package-actions {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .package-yaml-wrap {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .package-yaml-wrap > span,
+    .package-file-row > label {
+      font-size:.84rem;
+      font-weight:700;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:var(--secondary-text-color);
+    }
+    .package-yaml-textarea {
+      min-height:220px;
+      resize:vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:.89rem;
+      line-height:1.5;
+      white-space:pre;
+      tab-size:2;
+    }
+    .feature-list {
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .feature-card {
+      border:1px solid var(--divider-color, rgba(255,255,255,.12));
+      border-radius:16px;
+      padding:14px 15px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      background:color-mix(in oklab, var(--ha-card-background, #111827) 94%, transparent);
+    }
+    .feature-card-main {
+      min-width:0;
+      flex:1 1 auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .feature-card-head {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .feature-type-badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:.76rem;
+      font-weight:700;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      background:color-mix(in srgb, var(--primary-color, #3b82f6) 16%, transparent);
+      color:var(--primary-color, #3b82f6);
+      border:1px solid color-mix(in srgb, var(--primary-color, #3b82f6) 24%, transparent);
+      white-space:nowrap;
+    }
+    .feature-card-title {
+      min-width:0;
+      font-size:1rem;
+      font-weight:700;
+      color:var(--primary-text-color);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .feature-card-meta {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      color:var(--secondary-text-color);
+      font-size:.86rem;
+    }
+    .feature-card-meta code {
+      font-size:.82rem;
+    }
+    .feature-card-summary {
+      color:var(--secondary-text-color);
+      font-size:.9rem;
+      line-height:1.45;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      word-break:break-word;
+    }
+    .feature-card-actions {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      flex:0 0 auto;
+    }
+    .feature-editor-shell {
+      position:fixed;
+      inset:0;
+      z-index:10020;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:22px;
+    }
+    .feature-editor-backdrop {
+      position:absolute;
+      inset:0;
+      background:rgba(5, 8, 16, .62);
+      backdrop-filter:blur(5px);
+    }
+    .feature-editor-modal {
+      position:relative;
+      z-index:1;
+      width:min(760px, calc(100vw - 32px));
+      max-height:min(88vh, 920px);
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+      padding:18px;
+      border-radius:22px;
+      border:1px solid var(--divider-color, rgba(255,255,255,.14));
+      background:color-mix(in oklab, var(--card-background-color, #111827) 98%, black 2%);
+      box-shadow:0 28px 70px rgba(0,0,0,.45);
+    }
+    .feature-editor-head {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .feature-editor-head h5 {
+      margin:0 0 4px;
+      font-size:1.15rem;
+    }
+    .feature-editor-head p {
+      margin:0;
+      color:var(--secondary-text-color);
+      font-size:.92rem;
+      line-height:1.45;
+    }
+    .feature-editor-grid {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+    .feature-editor-field {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .feature-editor-field.full {
+      grid-column:1 / -1;
+    }
+    .feature-editor-field label {
+      font-size:.8rem;
+      font-weight:700;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:var(--secondary-text-color);
+    }
+    .feature-editor-field textarea {
+      min-height:300px;
+      resize:vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:.9rem;
+      line-height:1.55;
+      white-space:pre;
+      tab-size:2;
+    }
+    .feature-editor-footer {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .feature-editor-toggle {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:var(--secondary-text-color);
+      font-size:.92rem;
+    }
+    .feature-editor-actions {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-left:auto;
+    }
+    @media (max-width: 760px) {
+      .feature-card {
+        flex-direction:column;
+      }
+      .feature-card-actions {
+        width:100%;
+        justify-content:flex-start;
+      }
+      .feature-editor-grid {
+        grid-template-columns:1fr;
+      }
+    }
     .icon-btn.danger { color: var(--error-color, #b00020); }
 
     /* gradient swatches */
@@ -448,7 +786,8 @@ _ensureSettingsStyles_() {
     .modern select,
     .modern input[type="text"],
     .modern input[type="number"],
-    .modern input[type="password"] {
+    .modern input[type="password"],
+    .modern textarea {
       padding:8px 10px;
       border:2px solid var(--divider-color,rgba(0,0,0,.25));
       border-radius:10px;
@@ -553,7 +892,7 @@ _ensureSettingsStyles_() {
     .file-btn:hover { filter: brightness(1.05); }
 
     /* BG option controls */
-    .bg-opts { display:grid; grid-template-columns: 220px 1fr; gap:10px 12px; margin-top:8px; }
+    .bg-opts { display:grid; grid-template-columns: minmax(138px, 168px) minmax(0, 1fr); gap:12px 18px; margin-top:8px; }
     .bg-opts label { display:flex; align-items:center; gap:8px; font-weight:600; }
     .bg-opts select, .bg-opts input[type="range"] {
       width: 100%; padding:8px 10px; border:1px solid var(--divider-color,rgba(0,0,0,.25));
@@ -566,6 +905,129 @@ _ensureSettingsStyles_() {
       width: 72px; height: 42px; border-radius: 8px;
       background-size: cover; background-position: center center;
       border: 1px solid var(--divider-color, rgba(0,0,0,.25));
+    }
+
+    .media-browser-dialog{
+      width:min(calc(100vw - 32px), 980px);
+      height:min(calc(100vh - 32px), 760px);
+      display:flex;
+      flex-direction:column;
+    }
+
+    .media-browser-toolbar{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12));
+    }
+
+    .media-browser-path{
+      flex:1;
+      min-width:0;
+      font-size:.92rem;
+      color:var(--secondary-text-color);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .media-browser-status{
+      min-height:20px;
+      padding:10px 18px 0;
+      font-size:.88rem;
+      color:var(--secondary-text-color);
+    }
+
+    .media-browser-status.is-error{
+      color:var(--error-color, #ef4444);
+    }
+
+    .media-browser-list{
+      flex:1;
+      min-height:0;
+      overflow:auto;
+      padding:14px 18px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .media-browser-empty{
+      padding:22px 16px;
+      border:1px dashed var(--divider-color, rgba(0,0,0,.16));
+      border-radius:14px;
+      color:var(--secondary-text-color);
+      text-align:center;
+    }
+
+    .media-browser-item{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto;
+      gap:10px;
+      align-items:center;
+    }
+
+    .media-browser-primary{
+      appearance:none;
+      -webkit-appearance:none;
+      width:100%;
+      border:1px solid var(--divider-color, rgba(0,0,0,.16));
+      background:var(--ha-card-background, rgba(0,0,0,.12));
+      border-radius:14px;
+      padding:10px 12px;
+      display:grid;
+      grid-template-columns:56px minmax(0, 1fr) auto;
+      gap:12px;
+      align-items:center;
+      text-align:left;
+      color:inherit;
+      cursor:pointer;
+    }
+
+    .media-browser-primary:hover{
+      border-color:color-mix(in oklab, var(--primary-color, #ff9800) 26%, transparent);
+      background:color-mix(in oklab, var(--primary-color, #ff9800) 10%, var(--ha-card-background, rgba(0,0,0,.12)));
+    }
+
+    .media-browser-preview{
+      width:56px;
+      height:44px;
+      border-radius:12px;
+      display:grid;
+      place-items:center;
+      border:1px solid var(--divider-color, rgba(0,0,0,.16));
+      background:color-mix(in oklab, var(--primary-background-color, #101318) 82%, transparent);
+      background-size:cover;
+      background-position:center;
+      overflow:hidden;
+    }
+
+    .media-browser-preview ha-icon{
+      --mdc-icon-size:22px;
+      opacity:.78;
+    }
+
+    .media-browser-copy{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .media-browser-title{
+      font-weight:700;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .media-browser-meta{
+      font-size:.82rem;
+      color:var(--secondary-text-color);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     /* ---- Render the background image via a pseudo element so opacity doesn't fade content ---- */
@@ -636,6 +1098,57 @@ _ensureSettingsStyles_() {
       gap:8px;
     }
 
+    .setting-actions{
+      display:flex;
+      justify-content:flex-end;
+      margin-bottom:4px;
+    }
+
+    .section-actions{
+      display:flex;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+      gap:10px;
+      margin:0 0 8px;
+    }
+
+    .mini-action{
+      appearance:none;
+      -webkit-appearance:none;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      height:32px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid var(--divider-color, rgba(255,255,255,.14));
+      background:color-mix(in oklab, var(--primary-background-color, #0e1116) 18%, transparent);
+      color:var(--primary-text-color, #e5e7eb);
+      font:inherit;
+      font-size:.86rem;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .08s ease, background .16s ease, border-color .16s ease;
+    }
+
+    .mini-action:hover{
+      transform:translateY(-1px);
+      background:color-mix(in oklab, var(--primary-color, #ff9800) 22%, transparent);
+      border-color:color-mix(in oklab, var(--primary-color, #ff9800) 38%, transparent);
+    }
+
+    .mini-action.primary{
+      background:color-mix(in oklab, var(--primary-color, #ff9800) 78%, rgba(255,255,255,.08));
+      border-color:color-mix(in oklab, var(--primary-color, #ff9800) 52%, transparent);
+      color:var(--text-primary-color, #fff);
+    }
+
+    .mini-action.primary:hover{
+      background:color-mix(in oklab, var(--primary-color, #ff9800) 88%, rgba(255,255,255,.06));
+    }
+
+    .mini-action ha-icon{ --mdc-icon-size:16px; }
+
     .color-group {
       padding:8px 10px;
       border-radius:10px;
@@ -661,9 +1174,47 @@ _ensureSettingsStyles_() {
       margin-top:4px;
     }
 
-  .footer { display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  .footer { display:flex; justify-content:flex-end; gap:10px; padding:14px 18px; border-top:1px solid var(--divider-color, rgba(0,0,0,.12)); flex-wrap:wrap; }
   .btn.primary { background:var(--primary-color); color:#fff; border:0; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; }
   .btn.secondary { background:transparent; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; padding:8px 16px; cursor:pointer; }
+
+  @media (min-width: 1380px) {
+    .settings-body{
+      grid-template-columns:minmax(340px, 0.9fr) minmax(620px, 1.28fr);
+      column-gap:clamp(96px, 11vw, 208px);
+    }
+    .card[aria-labelledby="behaviour-head"],
+    .tabs-card,
+    .packages-card{
+      grid-column:1 / -1;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .tabs-card, .packages-card { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 899px){
+    .dialog.modern{
+      width:min(calc(100vw - 12px), 1540px);
+      height:min(calc(100vh - 12px), 1100px);
+      border-radius:16px;
+    }
+    .settings-body{ grid-template-columns: 1fr; }
+    .setting .row{ flex-direction:column; align-items:stretch; gap:10px; }
+    .setting .title{ flex:0 0 auto; min-width:0; }
+    .setting .hint{ margin-left:0; }
+    .bg-opts{ grid-template-columns: 1fr; }
+    .footer > .btn{ flex:1 1 160px; }
+    .media-browser-dialog{ width:min(calc(100vw - 12px), 980px); height:min(calc(100vh - 12px), 760px); }
+    .media-browser-item{ grid-template-columns:1fr; }
+    .media-browser-item > .mini-action{ justify-self:flex-start; }
+    .media-browser-primary{ grid-template-columns:48px minmax(0, 1fr) auto; }
+    .media-browser-preview{ width:48px; height:40px; }
+    .media-browser-toolbar{ flex-wrap:wrap; }
+    .package-file-row{ grid-template-columns:1fr; }
+    .package-tools{ flex-direction:column; align-items:stretch; }
+  }
   `;
   this.shadowRoot.appendChild(style);
 }
@@ -823,6 +1374,11 @@ _applyHaChromeVisibility_() {
     else this._setSidebarVisible_(false);
 
   } catch {}
+  requestAnimationFrame(() => {
+    try { this._computeHaSidebarGutters_?.(); } catch {}
+    try { this._computeHaTopGutter_?.(); } catch {}
+    try { this._refreshToolbarOpenHeight_?.(); } catch {}
+  });
 }
 
 
@@ -842,6 +1398,10 @@ try {
   const bg = cfg.background_image || cfg.bg_image || null;
   const cont = this.cardContainer;
   if (!cont) return;
+  const usePageImageOnly = !!(
+    this.applyBackgroundToPage &&
+    (((cfg.background_mode || '').toLowerCase() === 'image') || bg?.src)
+  );
 
   if (bg && bg.src) {
     const url = String(bg.src).trim();
@@ -852,14 +1412,27 @@ try {
     const attachment = bg.attachment || 'scroll';
     const filter = bg.filter || 'none';
 
-    cont.style.setProperty('--ddc-bg-image', url ? `url("${url.replace(/"/g, '\"')}")` : 'none');
-    cont.style.setProperty('--ddc-bg-repeat', repeat);
-    cont.style.setProperty('--ddc-bg-opacity', String(opacity));
-    cont.style.setProperty('--ddc-bg-size', size);
-    cont.style.setProperty('--ddc-bg-position', position);
-    cont.style.setProperty('--ddc-bg-attachment', attachment);
-    cont.style.setProperty('--ddc-bg-filter', filter);
-    cont.classList.add('has-bg-image');
+    if (usePageImageOnly) {
+      cont.style.removeProperty('--ddc-bg-image');
+      cont.style.removeProperty('--ddc-bg-repeat');
+      cont.style.removeProperty('--ddc-bg-opacity');
+      cont.style.removeProperty('--ddc-bg-size');
+      cont.style.removeProperty('--ddc-bg-position');
+      cont.style.removeProperty('--ddc-bg-attachment');
+      cont.style.removeProperty('--ddc-bg-filter');
+      cont.classList.remove('has-bg-image');
+      cont.classList.add('ddc-page-bg-image-active');
+    } else {
+      cont.style.setProperty('--ddc-bg-image', url ? `url("${url.replace(/"/g, '\"')}")` : 'none');
+      cont.style.setProperty('--ddc-bg-repeat', repeat);
+      cont.style.setProperty('--ddc-bg-opacity', String(opacity));
+      cont.style.setProperty('--ddc-bg-size', size);
+      cont.style.setProperty('--ddc-bg-position', position);
+      cont.style.setProperty('--ddc-bg-attachment', attachment);
+      cont.style.setProperty('--ddc-bg-filter', filter);
+      cont.classList.add('has-bg-image');
+      cont.classList.remove('ddc-page-bg-image-active');
+    }
   } else {
     cont.style.removeProperty('--ddc-bg-image');
     cont.style.removeProperty('--ddc-bg-repeat');
@@ -869,6 +1442,7 @@ try {
     cont.style.removeProperty('--ddc-bg-attachment');
     cont.style.removeProperty('--ddc-bg-filter');
     cont.classList.remove('has-bg-image');
+    cont.classList.remove('ddc-page-bg-image-active');
   }
 }
 
@@ -881,9 +1455,23 @@ _applyBackgroundFromConfig() {
     const mode = (this._config?.background_mode)
       || (this._config?.background_image?.src ? 'image' : 'none');
 
+    if (mode === 'youtube') {
+      const cfg = this._config?.background_youtube || {};
+      const host = this.applyBackgroundToPage ? this._ensurePageBgHost_?.() : this._ensureBgHost_?.();
+      const signature = this._getYouTubeBackgroundSignature_?.(cfg, { host });
+      if (host && signature && this.__ytWrap && this.__ytWrap.parentNode === host && this.__ytBackgroundSignature === signature) {
+        try { host.style.display = 'block'; } catch {}
+        try { this.__ytWrap.style.display = ''; } catch {}
+        this._layoutYtBackground_?.();
+        this._syncPageBackgroundToView_?.();
+        return;
+      }
+    }
+
     // Always clear dynamic layers first
     this._destroyParticles_?.();
     this._destroyYouTube_?.();
+    this._clearPageDynamicBackground_?.();
 
     // Clear CSS image if we’re not in image mode
     if (mode !== 'image') {
@@ -903,27 +1491,730 @@ _applyBackgroundFromConfig() {
     // Route to the correct backend
     if (mode === 'image') {
       this._applyBackgroundImageFromConfig?.();
+      this._syncPageBackgroundToView_?.();
       return;
     }
 
     if (mode === 'particles') {
       const cfg = this._config?.background_particles || {};
-      this._attachParticlesBackground_(cfg);
+      const host = this.applyBackgroundToPage ? this._ensurePageBgHost_?.() : null;
+      this._attachParticlesBackground_(cfg, host);
+      this._syncPageBackgroundToView_?.();
       return;
     }
 
     if (mode === 'youtube') {
       const cfg = this._config?.background_youtube || {};
-      this._attachYouTubeBackground_(cfg);
+      const host = this.applyBackgroundToPage ? this._ensurePageBgHost_?.() : null;
+      this._attachYouTubeBackground_(cfg, host);
+      this._syncPageBackgroundToView_?.();
       return;
     }
 
     // mode === 'none'
     // nothing to do
+    this._syncPageBackgroundToView_?.();
 
   } catch (e) {
     console.warn('[drag-and-drop-card] _applyBackgroundFromConfig failed:', e);
   }
+}
+
+_getYouTubeBackgroundSignature_(cfg = {}, opts = {}) {
+  try {
+    const videoId = this._parseYouTubeId_(cfg.video_id || cfg.url);
+    if (!videoId) return '';
+    const hostMode = opts?.host?.id === 'ddcPageBgHost' || this.applyBackgroundToPage ? 'page' : 'card';
+    const start = Number.isFinite(cfg.start) ? Number(cfg.start) : null;
+    const end = Number.isFinite(cfg.end) ? Number(cfg.end) : null;
+    const opacity = cfg.opacity != null ? Math.max(0, Math.min(1, Number(cfg.opacity))) : 1;
+    return JSON.stringify({
+      hostMode,
+      videoId,
+      start,
+      end,
+      mute: cfg.mute !== false,
+      loop: cfg.loop !== false,
+      size: String(cfg.size || 'cover'),
+      position: String(cfg.position || 'center'),
+      attachment: String(cfg.attachment || 'scroll'),
+      opacity,
+    });
+  } catch {
+    return '';
+  }
+}
+
+_getAvailableDashboardThemeNames_() {
+  try {
+    const themes = this.hass?.themes?.themes;
+    if (!themes || typeof themes !== 'object') return [];
+    return Object.keys(themes).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  } catch {
+    return [];
+  }
+}
+
+_getEffectiveDashboardThemeMode_() {
+  try {
+    const explicitDark = this.hass?.selectedTheme?.dark;
+    if (typeof explicitDark === 'boolean') return explicitDark ? 'dark' : 'light';
+  } catch {}
+  try {
+    return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+_getDashboardThemeDefinition_(themeName = this.dashboardTheme) {
+  try {
+    const raw = this.hass?.themes?.themes?.[themeName];
+    if (!raw || typeof raw !== 'object') return null;
+    if (raw.modes && typeof raw.modes === 'object') {
+      const mode = this._getEffectiveDashboardThemeMode_();
+      const scoped = raw.modes?.[mode]
+        || raw.modes?.light
+        || raw.modes?.dark
+        || Object.values(raw.modes || {}).find((v) => v && typeof v === 'object');
+      return scoped && typeof scoped === 'object' ? scoped : null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+_isDashboardThemeOverrideAllDesignActive_() {
+  return !!(this.dashboardThemeEnabled && this.dashboardThemeOverrideAllDesign && this.dashboardTheme);
+}
+
+_getVisualRefreshSignature_() {
+  try {
+    const cfg = this._config || {};
+    const bg = cfg.background_image || cfg.bg_image || {};
+    const particles = cfg.background_particles || {};
+    const youtube = cfg.background_youtube || {};
+    const themeName = this.dashboardThemeEnabled ? String(this.dashboardTheme || '').trim() : '';
+    const themeDefinition = themeName ? (this._getDashboardThemeDefinition_(themeName) || null) : null;
+    const mode = String(
+      cfg.background_mode
+      || (bg?.src ? 'image'
+        : (youtube && Object.keys(youtube).length ? 'youtube'
+          : (particles && Object.keys(particles).length ? 'particles' : 'none')))
+    ).toLowerCase();
+
+    return JSON.stringify({
+      dashboardThemeEnabled: !!this.dashboardThemeEnabled,
+      dashboardTheme: themeName,
+      dashboardThemeOverrideAllDesign: !!this.dashboardThemeOverrideAllDesign,
+      effectiveThemeMode: this._getEffectiveDashboardThemeMode_?.() || 'light',
+      themeDefinition,
+      containerBackground: String(this.containerBackground ?? ''),
+      cardBackground: String(this.cardBackground ?? ''),
+      cardShadowEnabled: !!this.cardShadowEnabled,
+      applyBackgroundToPage: !!this.applyBackgroundToPage,
+      backgroundMode: mode,
+      backgroundImage: mode === 'image'
+        ? {
+            src: String(bg?.src || ''),
+            repeat: String(bg?.repeat || ''),
+            size: String(bg?.size || ''),
+            position: String(bg?.position || ''),
+            attachment: String(bg?.attachment || ''),
+            opacity: String(bg?.opacity ?? '')
+          }
+        : null,
+      backgroundParticles: mode === 'particles'
+        ? {
+            config_url: String(particles?.config_url || ''),
+            pointer_events: !!particles?.pointer_events,
+            config: particles?.config || null,
+          }
+        : null,
+      backgroundYoutube: mode === 'youtube'
+        ? {
+            video_id: String(youtube?.video_id || ''),
+            start: String(youtube?.start ?? ''),
+            end: String(youtube?.end ?? ''),
+            mute: !!youtube?.mute,
+            controls: !!youtube?.controls,
+            autoplay: youtube?.autoplay !== false,
+            playback_rate: String(youtube?.playback_rate ?? ''),
+          }
+        : null,
+    });
+  } catch {
+    return '';
+  }
+}
+
+_scheduleVisibilityRefresh_() {
+  if (this.__visibilityRefreshRAF) return;
+  this.__visibilityRefreshRAF = requestAnimationFrame(() => {
+    this.__visibilityRefreshRAF = 0;
+    try { this._applyVisibility_?.(); } catch {}
+  });
+}
+
+_scheduleVisualRefresh_(force = false) {
+  const signature = this._getVisualRefreshSignature_?.() || '';
+  if (!force && signature && signature === this.__lastVisualRefreshSig) return;
+  this.__queuedVisualRefreshSig = signature;
+  this.__queuedVisualRefreshForce = !!(this.__queuedVisualRefreshForce || force);
+  if (this.__visualRefreshRAF) return;
+
+  this.__visualRefreshRAF = requestAnimationFrame(() => {
+    this.__visualRefreshRAF = 0;
+    const shouldForce = !!this.__queuedVisualRefreshForce;
+    this.__queuedVisualRefreshForce = false;
+    const nextSignature = this.__queuedVisualRefreshSig ?? this._getVisualRefreshSignature_?.() ?? '';
+    this.__queuedVisualRefreshSig = '';
+    if (!shouldForce && nextSignature && nextSignature === this.__lastVisualRefreshSig) return;
+    try { this._applyDashboardThemeStyling_?.(); } catch {}
+    this.__lastVisualRefreshSig = nextSignature;
+  });
+}
+
+_refreshAllPerCardStyles_() {
+  try {
+    const wraps = Array.from(this.cardContainer?.children || []);
+    wraps.forEach((wrap) => {
+      if (!(wrap instanceof HTMLElement) || !wrap.classList?.contains('card-wrapper')) return;
+      this._applyPerCardStyle_?.(wrap, this._extractPerCardStyle_?.(wrap), { persist: false });
+    });
+  } catch {}
+}
+
+_applyDashboardThemeStyling_() {
+  try {
+    const host = this;
+    const previouslyApplied = Array.isArray(this.__dashboardThemeAppliedVars) ? this.__dashboardThemeAppliedVars : [];
+    previouslyApplied.forEach((prop) => {
+      try { host.style.removeProperty(prop); } catch {}
+    });
+    this.__dashboardThemeAppliedVars = [];
+
+    const themeName = this.dashboardThemeEnabled ? String(this.dashboardTheme || '').trim() : '';
+    if (themeName) {
+      const themeVars = this._getDashboardThemeDefinition_(themeName);
+      if (themeVars && typeof themeVars === 'object') {
+        for (const [key, value] of Object.entries(themeVars)) {
+          if (!String(key || '').startsWith('--')) continue;
+          if (value == null || typeof value === 'object') continue;
+          try {
+            host.style.setProperty(key, String(value));
+            this.__dashboardThemeAppliedVars.push(key);
+          } catch {}
+        }
+      }
+    }
+
+    const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_();
+    host.style.setProperty(
+      '--ddc-bg',
+      themeOwnsDesign
+        ? 'var(--lovelace-background, var(--primary-background-color, transparent))'
+        : (this.containerBackground ?? 'transparent')
+    );
+    host.style.setProperty(
+      '--ddc-card-bg',
+      themeOwnsDesign
+        ? 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color, rgba(255,255,255,.06))))'
+        : (this.cardBackground ?? 'var(--ha-card-background, var(--card-background-color))')
+    );
+
+    if (themeOwnsDesign) {
+      host.style.setProperty('--ddc-card-shadow', 'var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,.18))');
+    } else if (this.cardShadowEnabled) {
+      host.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+    } else {
+      host.style.removeProperty('--ddc-card-shadow');
+    }
+
+    this._refreshAllPerCardStyles_?.();
+    this._syncPageBackgroundToView_?.();
+    this.__lastVisualRefreshSig = this._getVisualRefreshSignature_?.() || '';
+  } catch (e) {
+    console.warn('[drag-and-drop-card] Failed to apply dashboard theme styling', e);
+  }
+}
+
+_getPageBackgroundTargets_() {
+  const targets = [];
+  const seen = new Set();
+  const add = (el) => {
+    if (!el || seen.has(el)) return;
+    seen.add(el);
+    targets.push(el);
+  };
+
+  try {
+    const huiRoot = this._huiRoot?.();
+    add(huiRoot);
+    add(huiRoot?.shadowRoot?.querySelector?.('#view'));
+    add(huiRoot?.shadowRoot?.querySelector?.('ha-app-layout'));
+  } catch {}
+
+  try {
+    [
+      'ha-panel-lovelace',
+      'hui-root',
+      '#view',
+      'hui-view',
+      'hui-panel-view',
+      'hui-masonry-view',
+      'hui-sections-view',
+      'ha-app-layout',
+      'partial-panel-resolver'
+    ].forEach((selector) => {
+      (this._deepQueryAll?.(selector) || []).forEach(add);
+    });
+  } catch {}
+
+  try {
+    let node = this;
+    while (node) {
+      if (node instanceof HTMLElement) add(node);
+      const root = node.getRootNode?.();
+      const host = root?.host;
+      if (!host || host === node) break;
+      node = host;
+    }
+  } catch {}
+
+  return targets.filter((el) => {
+    const tag = String(el?.tagName || '').toLowerCase();
+    return (
+      el?.id === 'view' ||
+      tag === 'ha-panel-lovelace' ||
+      tag === 'hui-root' ||
+      tag === 'hui-view' ||
+      tag === 'hui-panel-view' ||
+      tag === 'hui-masonry-view' ||
+      tag === 'hui-sections-view' ||
+      tag === 'ha-app-layout' ||
+      tag === 'partial-panel-resolver'
+    );
+  });
+}
+
+_rememberPageBackgroundTarget_(el) {
+  if (!el) return;
+  if (!this.__pageBackgroundPrev) this.__pageBackgroundPrev = new WeakMap();
+  if (!this.__pageBackgroundTouched) this.__pageBackgroundTouched = new Set();
+  if (!this.__pageBackgroundPrev.has(el)) {
+    this.__pageBackgroundPrev.set(el, {
+      background: el.style.getPropertyValue('background') || '',
+      backgroundColor: el.style.getPropertyValue('background-color') || '',
+      backgroundImage: el.style.getPropertyValue('background-image') || '',
+      backgroundSize: el.style.getPropertyValue('background-size') || '',
+      backgroundRepeat: el.style.getPropertyValue('background-repeat') || '',
+      backgroundPosition: el.style.getPropertyValue('background-position') || '',
+      backgroundAttachment: el.style.getPropertyValue('background-attachment') || '',
+      minHeight: el.style.getPropertyValue('min-height') || '',
+      lovelaceBg: el.style.getPropertyValue('--lovelace-background') || '',
+    });
+  }
+  this.__pageBackgroundTouched.add(el);
+}
+
+_clearPageBackground_() {
+  try {
+    clearTimeout(this.__pageBackgroundRetryT);
+    this.__pageBackgroundRetryT = null;
+    this._clearPageDynamicBackground_?.();
+    const touched = Array.from(this.__pageBackgroundTouched || []);
+    touched.forEach((el) => {
+      if (!el) return;
+      const prev = this.__pageBackgroundPrev?.get?.(el);
+      if (!prev) return;
+      if (prev.background) el.style.setProperty('background', prev.background);
+      else el.style.removeProperty('background');
+      if (prev.backgroundColor) el.style.setProperty('background-color', prev.backgroundColor);
+      else el.style.removeProperty('background-color');
+      if (prev.backgroundImage) el.style.setProperty('background-image', prev.backgroundImage);
+      else el.style.removeProperty('background-image');
+      if (prev.backgroundSize) el.style.setProperty('background-size', prev.backgroundSize);
+      else el.style.removeProperty('background-size');
+      if (prev.backgroundRepeat) el.style.setProperty('background-repeat', prev.backgroundRepeat);
+      else el.style.removeProperty('background-repeat');
+      if (prev.backgroundPosition) el.style.setProperty('background-position', prev.backgroundPosition);
+      else el.style.removeProperty('background-position');
+      if (prev.backgroundAttachment) el.style.setProperty('background-attachment', prev.backgroundAttachment);
+      else el.style.removeProperty('background-attachment');
+      if (prev.minHeight) el.style.setProperty('min-height', prev.minHeight);
+      else el.style.removeProperty('min-height');
+      if (prev.lovelaceBg) el.style.setProperty('--lovelace-background', prev.lovelaceBg);
+      else el.style.removeProperty('--lovelace-background');
+    });
+    this.__pageBackgroundTouched = new Set();
+  } catch {}
+}
+
+_syncPageBackgroundToView_(attempt = 0) {
+  try {
+    clearTimeout(this.__pageBackgroundRetryT);
+    this.__pageBackgroundRetryT = null;
+
+    const enabled = !!this.applyBackgroundToPage;
+    const mode = (this._config?.background_mode) || (this._config?.background_image?.src ? 'image' : 'none');
+    const hasDynamicPageLayer = enabled && (mode === 'particles' || mode === 'youtube');
+    const visual = enabled ? this._getPageBackgroundVisual_?.() : null;
+    if (!enabled) {
+      this._clearPageBackground_?.();
+      return;
+    }
+    if (!visual) {
+      if (!hasDynamicPageLayer) this._clearPageBackground_?.();
+      return;
+    }
+
+    const targets = this._getPageBackgroundTargets_?.() || [];
+    if (!targets.length) {
+      if (this.isConnected && attempt < 8) {
+        this.__pageBackgroundRetryT = setTimeout(() => this._syncPageBackgroundToView_?.(attempt + 1), 180);
+      }
+      return;
+    }
+
+    targets.forEach((el) => {
+      this._rememberPageBackgroundTarget_?.(el);
+      if (visual.kind === 'image') {
+        el.style.removeProperty('background');
+        if (visual.backgroundColor) el.style.setProperty('background-color', visual.backgroundColor, 'important');
+        else el.style.removeProperty('background-color');
+        el.style.setProperty('background-image', visual.backgroundImage, 'important');
+        el.style.setProperty('background-repeat', visual.backgroundRepeat, 'important');
+        el.style.setProperty('background-size', visual.backgroundSize, 'important');
+        el.style.setProperty('background-position', visual.backgroundPosition, 'important');
+        el.style.setProperty('background-attachment', visual.backgroundAttachment, 'important');
+      } else {
+        el.style.setProperty('background', visual.background, 'important');
+        el.style.removeProperty('background-image');
+        el.style.removeProperty('background-size');
+        el.style.removeProperty('background-repeat');
+        el.style.removeProperty('background-position');
+        el.style.removeProperty('background-attachment');
+        if (!/gradient\(|url\(/i.test(visual.background)) {
+          el.style.setProperty('background-color', visual.background, 'important');
+        } else {
+          el.style.removeProperty('background-color');
+        }
+      }
+      el.style.setProperty('--lovelace-background', visual.lovelaceBackground || '');
+      const tag = String(el.tagName || '').toLowerCase();
+      if (el.id === 'view' || tag === 'hui-view' || tag === 'hui-panel-view' || tag === 'hui-masonry-view' || tag === 'hui-sections-view') {
+        el.style.setProperty('min-height', '100%');
+      }
+    });
+  } catch (e) {
+    console.warn('[drag-and-drop-card] _syncPageBackgroundToView failed:', e);
+  }
+}
+
+_normalizeMediaUrl_(rawUrl = '') {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  try {
+    if (typeof this.hass?.hassUrl === 'function') return this.hass.hassUrl(value);
+  } catch {}
+  return value;
+}
+
+_getPageBackgroundVisual_() {
+  const base = String(this.containerBackground ?? '').trim();
+  const mode = (this._config?.background_mode) || (this._config?.background_image?.src ? 'image' : 'none');
+
+  if (mode === 'image') {
+    const bg = this._config?.background_image || this._config?.bg_image || null;
+    const rawUrl = String(bg?.src || '').trim();
+    const imageUrl = this._normalizeMediaUrl_(rawUrl);
+    if (imageUrl) {
+      const repeat = (bg?.repeat === true || bg?.repeat === 'repeat') ? 'repeat' : String(bg?.repeat || 'no-repeat');
+      const size = String(bg?.size || 'cover');
+      const position = String(bg?.position || 'center center');
+      const attachment = String(bg?.attachment || 'scroll');
+      const gradientBase = /gradient\(/i.test(base) ? base : '';
+      const layers = [`url("${imageUrl.replace(/"/g, '\\"')}")`];
+      if (gradientBase) layers.push(gradientBase);
+      return {
+        kind: 'image',
+        backgroundColor: (!gradientBase && base && !/^transparent$/i.test(base)) ? base : '',
+        backgroundImage: layers.join(', '),
+        backgroundRepeat: gradientBase ? `${repeat}, no-repeat` : repeat,
+        backgroundSize: gradientBase ? `${size}, auto` : size,
+        backgroundPosition: gradientBase ? `${position}, center center` : position,
+        backgroundAttachment: gradientBase ? `${attachment}, scroll` : attachment,
+        lovelaceBackground: base || imageUrl,
+      };
+    }
+  }
+
+  if (!base || /^transparent$/i.test(base)) return null;
+  return {
+    kind: 'fill',
+    background: base,
+    lovelaceBackground: base,
+  };
+}
+
+async _browseMediaSource_(mediaContentId = undefined) {
+  if (!this.hass || typeof this.hass.callWS !== 'function') {
+    throw new Error('Home Assistant media browser is not available here.');
+  }
+  const payload = { type: 'media_source/browse_media' };
+  if (mediaContentId) payload.media_content_id = mediaContentId;
+  try {
+    return await this.hass.callWS(payload);
+  } catch (err) {
+    if (mediaContentId) throw err;
+    return await this.hass.callWS({ type: 'media_source/browse_media', media_content_id: 'media-source://' });
+  }
+}
+
+async _resolveMediaSourceUrl_(mediaContentId) {
+  if (!mediaContentId) throw new Error('Missing media item to resolve.');
+  const result = await this.hass.callWS({
+    type: 'media_source/resolve_media',
+    media_content_id: mediaContentId,
+  });
+  const resolved = this._normalizeMediaUrl_(result?.url || '');
+  if (!resolved) throw new Error('Home Assistant did not return a usable media URL.');
+  return resolved;
+}
+
+_isMediaImageItem_(item) {
+  const mediaType = String(item?.media_content_type || '').toLowerCase();
+  const mediaClass = String(item?.media_class || '').toLowerCase();
+  const raw = `${item?.title || ''} ${item?.media_content_id || ''}`.toLowerCase();
+  return (
+    mediaType.startsWith('image/') ||
+    mediaClass === 'image' ||
+    /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|\?)/i.test(raw)
+  );
+}
+
+async _openMediaLibraryBrowser_(onSelect) {
+  this._ensureSettingsStyles_?.();
+  if (!this.hass || typeof this.hass.callWS !== 'function') {
+    this._toast?.('Media library is not available in this view.');
+    return;
+  }
+
+  try { this.__mediaBrowserModal?.remove?.(); } catch {}
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.id = 'ddc-media-browser-modal';
+  modal.innerHTML = `
+    <div class="dialog modern media-browser-dialog" role="dialog" aria-modal="true" aria-labelledby="ddc-media-browser-title">
+      <div class="dlg-head">
+        <h3 id="ddc-media-browser-title">Browse Media Library</h3>
+        <button class="icon-btn" id="ddc-media-browser-close" title="Close" aria-label="Close dialog">
+          <ha-icon icon="mdi:close"></ha-icon>
+        </button>
+      </div>
+      <div class="media-browser-toolbar">
+        <button type="button" class="btn secondary" id="ddc-media-browser-back">Back</button>
+        <div class="media-browser-path" id="ddc-media-browser-path">Media</div>
+        <button type="button" class="btn secondary" id="ddc-media-browser-refresh">Refresh</button>
+      </div>
+      <div class="media-browser-status" id="ddc-media-browser-status" aria-live="polite"></div>
+      <div class="media-browser-list" id="ddc-media-browser-list"></div>
+      <div class="footer">
+        <button type="button" class="btn secondary" id="ddc-media-browser-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  this.__mediaBrowserModal = modal;
+  this.shadowRoot.appendChild(modal);
+
+  const listEl = modal.querySelector('#ddc-media-browser-list');
+  const pathEl = modal.querySelector('#ddc-media-browser-path');
+  const statusEl = modal.querySelector('#ddc-media-browser-status');
+  const backBtn = modal.querySelector('#ddc-media-browser-back');
+  const refreshBtn = modal.querySelector('#ddc-media-browser-refresh');
+  const closeBtn = modal.querySelector('#ddc-media-browser-close');
+  const cancelBtn = modal.querySelector('#ddc-media-browser-cancel');
+
+  let currentNode = null;
+  const stack = [];
+  let requestId = 0;
+
+  const close = () => {
+    try { modal.remove(); } catch {}
+    if (this.__mediaBrowserModal === modal) this.__mediaBrowserModal = null;
+    document.removeEventListener('keydown', onKey);
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+    }
+  };
+
+  const setStatus = (message = '', isError = false) => {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.classList.toggle('is-error', !!isError);
+  };
+
+  const sortItems = (items = []) => {
+    return [...items].sort((a, b) => {
+      const aDir = !!a?.can_expand;
+      const bDir = !!b?.can_expand;
+      if (aDir !== bDir) return aDir ? -1 : 1;
+      return String(a?.title || '').localeCompare(String(b?.title || ''), undefined, { sensitivity: 'base', numeric: true });
+    });
+  };
+
+  const renderBreadcrumb = () => {
+    const titles = ['Media', ...stack.map((entry) => entry?.title).filter(Boolean)];
+    if (currentNode?.title && currentNode.title !== titles[titles.length - 1]) titles.push(currentNode.title);
+    pathEl.textContent = titles.join(' / ');
+    backBtn.disabled = stack.length === 0;
+  };
+
+  const selectImage = async (item) => {
+    try {
+      setStatus(`Resolving ${item?.title || 'image'}...`);
+      const resolved = await this._resolveMediaSourceUrl_(item?.media_content_id);
+      onSelect?.(resolved, item);
+      close();
+    } catch (err) {
+      setStatus(err?.message || 'Could not resolve selected media item.', true);
+    }
+  };
+
+  const renderNode = (node) => {
+    currentNode = node || null;
+    renderBreadcrumb();
+    listEl.innerHTML = '';
+    const items = sortItems(node?.children || []);
+    if (!items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'media-browser-empty';
+      empty.textContent = 'No media items found here.';
+      listEl.appendChild(empty);
+      setStatus('');
+      return;
+    }
+
+    items.forEach((item) => {
+      const canExpand = !!item?.can_expand;
+      const isImage = this._isMediaImageItem_(item);
+      const row = document.createElement('div');
+      row.className = 'media-browser-item';
+
+      const primary = document.createElement('button');
+      primary.type = 'button';
+      primary.className = 'media-browser-primary';
+
+      const preview = document.createElement('div');
+      preview.className = 'media-browser-preview';
+      const thumbUrl = this._normalizeMediaUrl_(item?.thumbnail || '');
+      if (thumbUrl) {
+        preview.style.backgroundImage = `url("${thumbUrl.replace(/"/g, '\\"')}")`;
+        preview.classList.add('has-thumb');
+      } else {
+        preview.innerHTML = `<ha-icon icon="${canExpand ? 'mdi:folder-outline' : (isImage ? 'mdi:image-outline' : 'mdi:file-outline')}"></ha-icon>`;
+      }
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'media-browser-copy';
+      const title = document.createElement('div');
+      title.className = 'media-browser-title';
+      title.textContent = item?.title || item?.media_content_id || 'Untitled';
+      const meta = document.createElement('div');
+      meta.className = 'media-browser-meta';
+      const metaParts = [
+        canExpand ? 'Folder' : 'File',
+        item?.media_class || '',
+        item?.media_content_type || '',
+      ].filter(Boolean);
+      meta.textContent = metaParts.join(' · ');
+      textWrap.append(title, meta);
+
+      const icon = document.createElement('ha-icon');
+      icon.setAttribute('icon', canExpand ? 'mdi:chevron-right' : (isImage ? 'mdi:check-circle-outline' : 'mdi:minus-circle-outline'));
+      primary.append(preview, textWrap, icon);
+
+      primary.addEventListener('click', async () => {
+        if (canExpand) {
+          stack.push(currentNode);
+          await loadNode(item?.media_content_id, item?.title || 'Folder');
+          return;
+        }
+        if (isImage) {
+          await selectImage(item);
+          return;
+        }
+        setStatus('Only image files can be used as background images.', true);
+      });
+
+      row.appendChild(primary);
+
+      if (isImage && !canExpand) {
+        const useBtn = document.createElement('button');
+        useBtn.type = 'button';
+        useBtn.className = 'mini-action primary';
+        useBtn.innerHTML = '<ha-icon icon="mdi:image-check-outline"></ha-icon><span>Use</span>';
+        useBtn.addEventListener('click', async (evt) => {
+          evt.stopPropagation();
+          await selectImage(item);
+        });
+        row.appendChild(useBtn);
+      } else if (canExpand) {
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'mini-action';
+        openBtn.innerHTML = '<ha-icon icon="mdi:folder-open-outline"></ha-icon><span>Open</span>';
+        openBtn.addEventListener('click', async (evt) => {
+          evt.stopPropagation();
+          stack.push(currentNode);
+          await loadNode(item?.media_content_id, item?.title || 'Folder');
+        });
+        row.appendChild(openBtn);
+      }
+
+      listEl.appendChild(row);
+    });
+    setStatus('');
+  };
+
+  const loadNode = async (mediaContentId = undefined) => {
+    const currentRequest = ++requestId;
+    listEl.innerHTML = '<div class="media-browser-empty">Loading media…</div>';
+    setStatus('');
+    try {
+      const node = await this._browseMediaSource_(mediaContentId);
+      if (currentRequest !== requestId) return;
+      renderNode(node);
+    } catch (err) {
+      if (currentRequest !== requestId) return;
+      listEl.innerHTML = '<div class="media-browser-empty">Could not load media items.</div>';
+      setStatus(err?.message || 'Could not load media items from Home Assistant.', true);
+    }
+  };
+
+  backBtn?.addEventListener('click', () => {
+    if (!stack.length) return;
+    const prev = stack.pop();
+    renderNode(prev);
+  });
+  refreshBtn?.addEventListener('click', () => loadNode(currentNode?.media_content_id));
+  closeBtn?.addEventListener('click', close);
+  cancelBtn?.addEventListener('click', close);
+  modal.addEventListener('click', (evt) => {
+    if (evt.target === modal) close();
+  });
+  document.addEventListener('keydown', onKey);
+
+  await loadNode();
 }
 
 _ensureBgHost_() {
@@ -936,11 +2227,32 @@ _ensureBgHost_() {
     host.id = 'ddcBgHost';
     host.setAttribute('aria-hidden','true');
     cont.prepend(host);
-  } else {
-    // clear any previous dynamic children
-    host.innerHTML = '';
   }
   return host;
+}
+
+_ensurePageBgHost_() {
+  const root = this.shadowRoot;
+  if (!root) return null;
+  let host = root.querySelector('#ddcPageBgHost');
+  if (!host) {
+    host = document.createElement('div');
+    host.className = 'ddc-page-bg-host';
+    host.id = 'ddcPageBgHost';
+    host.setAttribute('aria-hidden', 'true');
+    root.insertBefore(host, root.firstChild || null);
+  }
+  host.style.display = 'block';
+  return host;
+}
+
+_clearPageDynamicBackground_() {
+  try {
+    const host = this.shadowRoot?.querySelector?.('#ddcPageBgHost');
+    if (!host) return;
+    host.innerHTML = '';
+    host.style.display = 'none';
+  } catch {}
 }
 
 /* ---------- tiny loader with cache ---------- */
@@ -1019,8 +2331,8 @@ async _ensureParticles_() {
   return this.__particlesLoadPromise;
 }
 
-_attachParticlesBackground_(cfg = {}) {
-  const host = this._ensureBgHost_?.();
+_attachParticlesBackground_(cfg = {}, mountHost = null) {
+  const host = mountHost || this._ensureBgHost_?.();
   if (!host) return;
 
   // Destroy any existing instance and ensure an empty mount each time
@@ -1135,7 +2447,12 @@ _destroyParticles_() {
       window.pJSDom.length = 0;
     }
   } catch {}
-  if (this.__particlesHost) this.__particlesHost.innerHTML = '';
+  if (this.__particlesHost) {
+    this.__particlesHost.innerHTML = '';
+    if (this.__particlesHost.id === 'ddcPageBgHost') {
+      this.__particlesHost.style.display = 'none';
+    }
+  }
   this.__particlesHost = null;
   this.__particlesInst = null;
 }
@@ -1201,7 +2518,7 @@ _attachYouTubeIframeDirect_(wrap, videoId, { start, end, mute = true, loop = tru
   this._layoutYtBackground_?.();
 }
 
-_attachYouTubeBackground_(cfg = {}) {
+_attachYouTubeBackground_(cfg = {}, mountHost = null) {
   this.__ytSize = (cfg.size || 'cover');
   this.__ytPosition = (cfg.position || 'center');
   this.__ytOpacity = (cfg.opacity != null ? Math.max(0, Math.min(1, Number(cfg.opacity))) : 1);
@@ -1216,11 +2533,12 @@ _attachYouTubeBackground_(cfg = {}) {
   if (posStr === 'center' || posStr === 'centre' || posStr === 'middle') { ax = 0.5; ay = 0.5; }
   this.__ytAx = ax; this.__ytAy = ay;
 
-  const host = this._ensureBgHost_();
+  const host = mountHost || this._ensureBgHost_();
   if (!host) return;
 
   const videoId = this._parseYouTubeId_(cfg.video_id || cfg.url);
   if (!videoId) { console.warn('[drag-and-drop-card] No YouTube video id'); return; }
+  this.__ytBackgroundSignature = this._getYouTubeBackgroundSignature_?.(cfg, { host }) || '';
 
   // wrapper we can size/center for “cover”
   const wrap = document.createElement('div');
@@ -1330,6 +2648,45 @@ _attachYouTubeBackground_(cfg = {}) {
 _layoutYtBackground_() {  // Fit a 16:9 iframe according to selected size
   try {
     if (!this.__ytWrap) return;
+    const pageMode = this.__ytWrap?.parentElement?.id === 'ddcPageBgHost';
+    if (pageMode) {
+      const vw = Math.max(window.innerWidth || 0, 1);
+      const vh = Math.max(window.innerHeight || 0, 1);
+      const size = this.__ytSize || 'cover';
+      const videoAR = 16 / 9;
+      const contAR = vw / vh;
+      let w = vw;
+      let h = vh;
+
+      if (size === 'contain') {
+        if (contAR > videoAR) {
+          h = vh;
+          w = h * videoAR;
+        } else {
+          w = vw;
+          h = w / videoAR;
+        }
+      } else if (!(size === '100% 100%' || size === 'fill' || size === 'stretch')) {
+        if (contAR > videoAR) {
+          w = vw;
+          h = w / videoAR;
+        } else {
+          h = vh;
+          w = h * videoAR;
+        }
+      }
+
+      const ax = (this.__ytAx != null) ? this.__ytAx : 0.5;
+      const ay = (this.__ytAy != null) ? this.__ytAy : 0.5;
+      const left = (vw - w) * ax;
+      const top = (vh - h) * ay;
+      const el = this.__ytWrap.querySelector('iframe') || this.__ytWrap;
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      return;
+    }
     // In auto size mode the card container’s natural width may be
     // larger than the visible viewport.  When computing the video
     // background dimensions we should use the visible container (the
@@ -1429,6 +2786,8 @@ _layoutYtBackground_() {  // Fit a 16:9 iframe according to selected size
     }
 
 _destroyYouTube_() {
+  let parentHost = null;
+  try { parentHost = this.__ytWrap?.parentNode || null; } catch {}
   try { this.__ytPlayer?.destroy?.(); } catch {}
   this.__ytPlayer = null;
 
@@ -1442,7 +2801,11 @@ _destroyYouTube_() {
   }
 
   if (this.__ytWrap?.parentNode) this.__ytWrap.parentNode.removeChild(this.__ytWrap);
+  try {
+    if (parentHost?.id === 'ddcPageBgHost') parentHost.style.display = 'none';
+  } catch {}
   this.__ytWrap = null;
+  this.__ytBackgroundSignature = '';
 }
 
 
@@ -1555,7 +2918,9 @@ _applyVisibility_() {
       // Leave wrappers on other tabs untouched so that _applyActiveTab can
       // control their display property.
       const tabId = this._normalizeTabId(wrap.dataset.tabId);
-      if (tabId !== currentTabId) {
+      const passesActiveTab = !this.tabs || !this.tabs.length || tabId === currentTabId;
+      const passesLayers = this._isWrapVisibleForActiveLayers_(wrap);
+      if (!passesActiveTab || !passesLayers) {
         continue;
       }
       const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
@@ -1725,15 +3090,27 @@ _applyVisibility_() {
 
 _syncTabsWidth_() {
   try {
+    this._syncTabsPlacement_?.();
+    this._syncViewportPreviewUI_?.();
+    this._syncLeftRailViewportPosition_?.();
     const mode = String(
       (this.containerSizeMode || this.container_size_mode || 'dynamic')
     ).toLowerCase();
     if (mode === 'auto') {
+      this._syncLeftRailViewportPosition_?.();
       return;
     }
 
     const bar = this.tabsBar;
     if (!bar) return;
+
+    if (this._isExplicitViewportPreview_?.()) {
+      bar.style.width = '';
+      bar.style.maxWidth = '';
+      bar.style.marginInline = 'auto';
+      this._refreshTabsAlignment_?.();
+      return;
+    }
 
     // 📱 On narrow viewports, don't clamp the bar at all.
     // Let CSS handle width and scrolling so you can reach all tabs.
@@ -1745,14 +3122,19 @@ _syncTabsWidth_() {
       if (vw && vw <= 768) {
         bar.style.width = '';
         bar.style.maxWidth = '';
+        this._refreshTabsAlignment_?.();
+        this._syncLeftRailViewportPosition_?.();
         return;
       }
     } catch {}
 
-    // For left-side tabs the width should not be clamped; reset and bail.
-    if (this.tabsPosition === 'left') {
+    // Left, top, and bottom placements should size naturally from their content.
+    if (this.tabsPosition === 'left' || this.tabsPosition === 'top' || this.tabsPosition === 'bottom') {
       bar.style.width = '';
       bar.style.maxWidth = '';
+      bar.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
+      this._refreshTabsAlignment_?.();
+      this._syncLeftRailViewportPosition_?.();
       return;
     }
 
@@ -1770,8 +3152,97 @@ _syncTabsWidth_() {
       } catch {}
     }
     if (width > 0) {
-      bar.style.width = `${width}px`;
-      bar.style.maxWidth = `${width}px`;
+      const preview = this._getViewportPreviewPreset_?.();
+      const targetWidth = preview
+        ? Math.min(width, this._getEffectivePreviewWidth_?.(width) || width)
+        : width;
+      bar.style.width = `${targetWidth}px`;
+      bar.style.maxWidth = `${targetWidth}px`;
+    }
+    bar.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
+    this._refreshTabsAlignment_?.();
+    this._syncLeftRailViewportPosition_?.();
+  } catch {}
+}
+
+_syncTabsPlacement_() {
+  try {
+    const bar = this.tabsBar;
+    const root = this.rootEl;
+    const anchor = this.__scaleOuter || this.cardContainer;
+    if (!bar || !root || !anchor || anchor.parentNode !== root) {
+      root?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+      root?.classList?.toggle?.('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
+      return;
+    }
+
+    if (this._isExplicitViewportPreview_?.()) {
+      if (anchor.nextSibling !== bar) root.insertBefore(bar, anchor.nextSibling);
+      root.classList.remove('ddc-tabs-left-layout');
+      root.classList.remove('ddc-tabs-bottom-layout');
+      return;
+    }
+
+    if (this.tabsPosition === 'bottom') {
+      if (anchor.nextSibling !== bar) root.insertBefore(bar, anchor.nextSibling);
+    } else {
+      if (bar.nextSibling !== anchor) root.insertBefore(bar, anchor);
+    }
+
+    root.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+    root.classList.toggle('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
+  } catch {}
+}
+
+_syncLeftRailViewportPosition_() {
+  try {
+    if (this.tabsPosition !== 'left') {
+      this.style?.removeProperty?.('--ddc-left-rail-left');
+      return;
+    }
+
+    const vw = window.innerWidth || document.documentElement?.clientWidth || 0;
+    if (vw && vw <= 980) {
+      this.style?.removeProperty?.('--ddc-left-rail-left');
+      return;
+    }
+
+    const root = this.rootEl;
+    const bar = this.tabsBar;
+    if (!root || !bar) return;
+
+    const rootRect = root.getBoundingClientRect?.();
+    if (!rootRect || !Number.isFinite(rootRect.left)) return;
+
+    const styles = getComputedStyle(this);
+    const railWidth =
+      bar.getBoundingClientRect?.().width ||
+      parseFloat(styles.getPropertyValue('--ddc-left-rail-width')) ||
+      92;
+    const gutter = parseFloat(styles.getPropertyValue('--ddc-left-gutter')) || 0;
+    const viewportWidth = vw || rootRect.left + rootRect.width;
+    const minLeft = gutter + (railWidth / 2) + 12;
+    const maxLeft = viewportWidth - (railWidth / 2) - 12;
+    const proposedLeft = rootRect.left + (railWidth / 2);
+    const clampedLeft = Math.max(minLeft, Math.min(maxLeft, proposedLeft));
+
+    this.style.setProperty('--ddc-left-rail-left', `${Math.round(clampedLeft)}px`);
+  } catch {}
+}
+
+_refreshTabsAlignment_() {
+  try {
+    const bar = this.tabsBar;
+    if (!bar) return;
+    bar.style.justifyContent = '';
+    if (this.tabsPosition === 'left') {
+      bar.style.justifyContent = 'flex-start';
+      return;
+    }
+    if (bar.scrollWidth <= bar.clientWidth) {
+      bar.style.justifyContent = 'center';
+    } else {
+      bar.style.justifyContent = 'flex-start';
     }
   } catch {}
 }
@@ -2038,6 +3509,22 @@ async _onToolbarAction_(action, ctx = {}) {
     super();
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this.__rebuiltCards = new WeakSet();
+    this.viewportPreviewMode = 'live';
+    this._activeResponsiveProfile = 'desktop';
+    this._activeResponsiveLayoutKey = 'desktop_landscape';
+    this._responsiveLayouts = null;
+    this._dashboardPackages = [];
+    this.layers = [];
+    this.activeLayerIds = [];
+    this.__dashboardThemeAppliedVars = [];
+    this._responsivePreviewOrientations = {
+      desktop: 'landscape',
+      tablet: 'landscape',
+      mobile: 'portrait',
+    };
+    this.responsiveViewportProfiles = this._defaultResponsiveViewportProfiles_();
+    this.__responsiveSwitchSeq = 0;
+    this.__toolbarExpanded = false;
   }
   // === GRID SELECT PATCH START (fields) ===
   _gridCanvas = null;
@@ -2089,20 +3576,34 @@ async _onToolbarAction_(action, ctx = {}) {
   // Deep query across shadow roots
   _deepQueryAll(selector, root = document) {
     const results = [];
+    const visited = new WeakSet();
+    const pushed = new WeakSet();
     const visit = (node) => {
-      if (!node) return;
+      if (!node || visited.has(node)) return;
+      visited.add(node);
       if (node.querySelectorAll) {
         try {
-          node.querySelectorAll(selector).forEach(el => results.push(el));
+          node.querySelectorAll(selector).forEach((el) => {
+            if (!el || pushed.has(el)) return;
+            pushed.add(el);
+            results.push(el);
+          });
         } catch {}
       }
       // Recurse into shadow roots
-      const treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
+      let treeWalker = null;
+      try {
+        treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
+      } catch {}
       let el = node;
       while (el) {
         const sr = el.shadowRoot;
         if (sr) visit(sr);
-        el = treeWalker.nextNode();
+        try {
+          el = treeWalker?.nextNode?.() || null;
+        } catch {
+          break;
+        }
       }
     };
     visit(root);
@@ -2192,6 +3693,19 @@ async _onToolbarAction_(action, ctx = {}) {
       auto_resize_cards: true,
       background_mode: 'none',
       animate_cards: true,
+      optimize_for_mobile: false,
+      mobile_dynamic_behavior: 'native',
+      responsive_viewports: {
+        desktop: { width: 1430, height: 896 },
+        tablet: {
+          landscape: { width: 1295, height: 923 },
+          portrait: { width: 923, height: 1295 },
+        },
+        mobile: {
+          landscape: { width: 1080, height: 500 },
+          portrait: { width: 500, height: 1080 },
+        },
+      },
       container_preset_orientation: 'auto',
       edit_mode_pin: '',
       container_fixed_width: null,
@@ -2205,7 +3719,8 @@ async _onToolbarAction_(action, ctx = {}) {
       tabs: [
         { id: 'home', label: 'Home', icon: 'mdi:home', label_mode: 'both' }
       ],
-      default_tab: 'home'
+      default_tab: 'home',
+      layers: [],
     };
   }
 
@@ -2564,6 +4079,2119 @@ static _sizePresets() {
   ];
 }
 
+_cloneJson_(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value ?? null;
+  }
+}
+
+_genLayoutCardId_() {
+  const token =
+    globalThis.crypto?.randomUUID?.() ||
+    `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  return `ddc_card_${token}`;
+}
+
+_responsiveProfileKeys_() {
+  return ['desktop', 'tablet', 'mobile'];
+}
+
+_responsiveLayoutVariantKeys_() {
+  return [
+    'desktop_landscape',
+    'tablet_landscape',
+    'tablet_portrait',
+    'mobile_landscape',
+    'mobile_portrait',
+  ];
+}
+
+_defaultResponsivePreviewOrientations_() {
+  return {
+    desktop: 'landscape',
+    tablet: 'landscape',
+    mobile: 'portrait',
+  };
+}
+
+_normalizeResponsiveOrientation_(profile = 'desktop', orientation = null) {
+  if (profile === 'desktop') return 'landscape';
+  return String(orientation || '').toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
+}
+
+_getResponsiveLayoutKey_(profile = 'desktop', orientation = null) {
+  const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : 'desktop';
+  return `${baseProfile}_${this._normalizeResponsiveOrientation_(baseProfile, orientation)}`;
+}
+
+_splitResponsiveLayoutKey_(layoutKey = 'desktop_landscape') {
+  const [rawProfile = 'desktop', rawOrientation = 'landscape'] = String(layoutKey || 'desktop_landscape').split('_');
+  const profile = this._responsiveProfileKeys_().includes(rawProfile) ? rawProfile : 'desktop';
+  const orientation = this._normalizeResponsiveOrientation_(profile, rawOrientation);
+  return { profile, orientation, key: this._getResponsiveLayoutKey_(profile, orientation) };
+}
+
+_getPrimaryResponsiveLayoutKey_() {
+  return 'desktop_landscape';
+}
+
+_ensureResponsivePreviewOrientations_() {
+  const defaults = this._defaultResponsivePreviewOrientations_();
+  const next = { ...defaults, ...(this._responsivePreviewOrientations || {}) };
+  next.desktop = 'landscape';
+  next.tablet = this._normalizeResponsiveOrientation_('tablet', next.tablet);
+  next.mobile = this._normalizeResponsiveOrientation_('mobile', next.mobile);
+  this._responsivePreviewOrientations = next;
+  return next;
+}
+
+_getStoredResponsivePreviewOrientation_(profile = 'desktop') {
+  const orientations = this._ensureResponsivePreviewOrientations_();
+  return this._normalizeResponsiveOrientation_(profile, orientations?.[profile]);
+}
+
+_setStoredResponsivePreviewOrientation_(profile = 'desktop', orientation = null) {
+  const orientations = this._ensureResponsivePreviewOrientations_();
+  const nextOrientation = this._normalizeResponsiveOrientation_(profile, orientation);
+  this._responsivePreviewOrientations = {
+    ...orientations,
+    [profile]: nextOrientation,
+  };
+  return nextOrientation;
+}
+
+_defaultResponsiveViewportProfiles_() {
+  return {
+    desktop_landscape: { width: 1430, height: 896 },
+    tablet_landscape: { width: 1295, height: 923 },
+    tablet_portrait: { width: 923, height: 1295 },
+    mobile_landscape: { width: 1080, height: 500 },
+    mobile_portrait: { width: 500, height: 1080 },
+  };
+}
+
+_getDefaultResponsiveViewportProfile_(profile = 'desktop', orientation = null) {
+  const defaults = this._defaultResponsiveViewportProfiles_();
+  return defaults[this._getResponsiveLayoutKey_(profile, orientation)] || defaults[this._getPrimaryResponsiveLayoutKey_()];
+}
+
+_normalizeResponsiveViewportProfiles_(profiles = null) {
+  const source = (profiles && typeof profiles === 'object') ? profiles : {};
+  const out = {};
+
+  const resolveSource = (profile, orientation) => {
+    const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+    const direct = source?.[variantKey];
+    if (direct && typeof direct === 'object') return direct;
+
+    const grouped = source?.[profile];
+    if (grouped && typeof grouped === 'object') {
+      const nested = grouped?.[orientation];
+      if (nested && typeof nested === 'object') return nested;
+      if (
+        Number.isFinite(Number(grouped.width))
+        || Number.isFinite(Number(grouped.height))
+      ) {
+        return grouped;
+      }
+    }
+
+    return null;
+  };
+
+  this._responsiveLayoutVariantKeys_().forEach((variantKey) => {
+    const { profile, orientation } = this._splitResponsiveLayoutKey_(variantKey);
+    const fallback = this._getDefaultResponsiveViewportProfile_(profile, orientation);
+    const raw = resolveSource(profile, orientation) || fallback;
+    const locked = this._getLockedResponsiveViewportProfile_(
+      profile,
+      {
+        width: Number(raw?.width ?? fallback.width) || fallback.width,
+        height: Number(raw?.height ?? fallback.height) || fallback.height,
+      },
+      'width',
+      orientation
+    );
+    out[variantKey] = { width: locked.width, height: locked.height };
+  });
+  return out;
+}
+
+_legacyResponsiveViewportProfiles_() {
+  return {
+    desktop: { width: 1440, height: 900 },
+    tablet: { width: 834, height: 1194 },
+    mobile: { width: 390, height: 844 },
+  };
+}
+
+_isLegacyResponsiveViewportProfiles_(profiles = null) {
+  try {
+    if (!profiles || typeof profiles !== 'object') return false;
+    if (this._responsiveLayoutVariantKeys_().some((key) => Object.prototype.hasOwnProperty.call(profiles, key))) {
+      return false;
+    }
+    const legacy = this._legacyResponsiveViewportProfiles_();
+    return this._responsiveProfileKeys_().every((profile) => {
+      const current = profiles?.[profile] || {};
+      const prev = legacy?.[profile] || {};
+      return Number(current.width) === Number(prev.width) && Number(current.height) === Number(prev.height);
+    });
+  } catch {
+    return false;
+  }
+}
+
+_lockResponsiveViewportValue_(value = 0) {
+  return Math.max(240, Math.min(6000, Math.round(Number(value || 0) || 0)));
+}
+
+_getLockedResponsiveViewportProfile_(profile = 'desktop', viewport = null, preferAxis = 'width', orientation = null) {
+  const split = this._splitResponsiveLayoutKey_(profile);
+  const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : split.profile;
+  const nextOrientation = this._normalizeResponsiveOrientation_(baseProfile, orientation ?? split.orientation);
+  const fallback = this._getDefaultResponsiveViewportProfile_(baseProfile, nextOrientation);
+  const raw = viewport || fallback || {};
+  let width = this._lockResponsiveViewportValue_(raw.width || fallback.width || 0);
+  let height = this._lockResponsiveViewportValue_(raw.height || fallback.height || 0);
+  if (!width) width = fallback.width || 390;
+  if (!height) height = fallback.height || 844;
+  if (nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
+  if (nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
+  const lock = this._getPreviewDeviceFrameLock_?.(baseProfile, width, height, { orientation: nextOrientation });
+  if (lock?.ratio) {
+    if (preferAxis === 'height') {
+      width = this._lockResponsiveViewportValue_(height * lock.ratio);
+    } else {
+      height = this._lockResponsiveViewportValue_(width / lock.ratio);
+    }
+  }
+  if (nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
+  if (nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
+  return {
+    width,
+    height,
+    orientation: lock?.orientation || nextOrientation,
+    ratio: lock?.ratio || null,
+  };
+}
+
+_ensureResponsiveViewportProfileLock_(profile = 'desktop', preferAxis = 'width', orientation = null) {
+  if (!this._responsiveProfileKeys_().includes(profile)) return null;
+  const nextOrientation = this._normalizeResponsiveOrientation_(profile, orientation ?? this._getRequestedResponsiveOrientation_?.(profile));
+  const key = this._getResponsiveLayoutKey_(profile, nextOrientation);
+  const current = this._normalizeResponsiveViewportProfiles_(this.responsiveViewportProfiles)?.[key] || {};
+  const locked = this._getLockedResponsiveViewportProfile_(profile, current, preferAxis, nextOrientation);
+  const needsUpdate =
+    Number(current.width) !== Number(locked.width)
+    || Number(current.height) !== Number(locked.height);
+  if (needsUpdate) {
+    const next = this._normalizeResponsiveViewportProfiles_({
+      ...(this.responsiveViewportProfiles || {}),
+      [key]: { width: locked.width, height: locked.height },
+    });
+    this.responsiveViewportProfiles = next;
+    this._config = {
+      ...(this._config || {}),
+      responsive_viewports: this._cloneJson_(this._serializeResponsiveViewportProfiles_(next)),
+    };
+  }
+  return locked;
+}
+
+_getResponsiveViewportProfile_(profile = 'desktop', orientation = null) {
+  const normalized = this._normalizeResponsiveViewportProfiles_(this.responsiveViewportProfiles);
+  const split = this._splitResponsiveLayoutKey_(profile);
+  const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : split.profile;
+  const nextOrientation = this._normalizeResponsiveOrientation_(baseProfile, orientation ?? split.orientation ?? this._getRequestedResponsiveOrientation_?.(baseProfile));
+  const key = this._getResponsiveLayoutKey_(baseProfile, nextOrientation);
+  return this._getLockedResponsiveViewportProfile_(
+    baseProfile,
+    normalized[key] || normalized[this._getPrimaryResponsiveLayoutKey_()],
+    'width',
+    nextOrientation
+  );
+}
+
+_serializeResponsiveViewportProfiles_(profiles = null) {
+  const normalized = this._normalizeResponsiveViewportProfiles_(profiles || this.responsiveViewportProfiles);
+  return {
+    desktop: {
+      landscape: this._cloneJson_(normalized.desktop_landscape),
+    },
+    tablet: {
+      landscape: this._cloneJson_(normalized.tablet_landscape),
+      portrait: this._cloneJson_(normalized.tablet_portrait),
+    },
+    mobile: {
+      landscape: this._cloneJson_(normalized.mobile_landscape),
+      portrait: this._cloneJson_(normalized.mobile_portrait),
+    },
+  };
+}
+
+_normalizeSavedCardEntry_(entry = {}, fallback = null) {
+  const normalized = this._cloneJson_(entry) || {};
+  const fallbackEntry = fallback || {};
+  const defaultWidth = 14 * Math.max(1, Number(this.gridSize || 10) || 10);
+  const defaultHeight = 10 * Math.max(1, Number(this.gridSize || 10) || 10);
+  const id = normalized.id || fallbackEntry.id || this._genLayoutCardId_();
+  const x = Number(normalized?.position?.x ?? fallbackEntry?.position?.x ?? 0) || 0;
+  const y = Number(normalized?.position?.y ?? fallbackEntry?.position?.y ?? 0) || 0;
+  const width = Math.max(
+    1,
+    Number(normalized?.size?.width ?? fallbackEntry?.size?.width ?? defaultWidth) || defaultWidth
+  );
+  const height = Math.max(
+    1,
+    Number(normalized?.size?.height ?? fallbackEntry?.size?.height ?? defaultHeight) || defaultHeight
+  );
+  const zRaw = Number(normalized?.z ?? fallbackEntry?.z ?? 6);
+  const z = Number.isFinite(zRaw) ? Math.max(1, Math.round(zRaw)) : 6;
+  const tabId = this._normalizeTabId(
+    normalized.tabId
+    || normalized.tab_id
+    || fallbackEntry.tabId
+    || fallbackEntry.tab_id
+    || this.defaultTab
+  );
+  const layerIds = this._normalizeCardLayerIds_(
+    normalized.layerIds
+    || normalized.layer_ids
+    || fallbackEntry.layerIds
+    || fallbackEntry.layer_ids
+    || []
+  );
+  const out = {
+    ...normalized,
+    id,
+    position: { x, y },
+    size: { width, height },
+    z,
+    tabId,
+  };
+  if (layerIds.length) out.layerIds = layerIds;
+  else {
+    delete out.layerIds;
+    delete out.layer_ids;
+  }
+  if (!out.card && fallbackEntry.card) out.card = this._cloneJson_(fallbackEntry.card);
+  if (!out.card_style && fallbackEntry.card_style) out.card_style = this._cloneJson_(fallbackEntry.card_style);
+  if (!out.cardStyle && fallbackEntry.cardStyle) out.cardStyle = this._cloneJson_(fallbackEntry.cardStyle);
+  if (!out.overflow && fallbackEntry.overflow) out.overflow = fallbackEntry.overflow;
+  return out;
+}
+
+_normalizeResponsiveLayouts_(cards = [], responsiveLayouts = null) {
+  const variants = this._responsiveLayoutVariantKeys_();
+  const baseCards = Array.isArray(cards) ? cards : [];
+  const sourceLayouts = responsiveLayouts || {};
+  const normalized = {};
+
+  const resolveVariantEntries = (profile, orientation) => {
+    const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+    const direct = sourceLayouts?.[variantKey];
+    if (Array.isArray(direct)) return direct;
+    if (Array.isArray(direct?.cards)) return direct.cards;
+
+    const grouped = sourceLayouts?.[profile];
+    const nested = grouped?.[orientation];
+    if (Array.isArray(nested)) return nested;
+    if (Array.isArray(nested?.cards)) return nested.cards;
+
+    if (Array.isArray(grouped)) return grouped;
+    if (Array.isArray(grouped?.cards)) return grouped.cards;
+    return null;
+  };
+
+  const buildVariant = (profile, orientation, fallbacks = []) => {
+    const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+    const source = resolveVariantEntries(profile, orientation);
+    const working =
+      (Array.isArray(source) && source.length)
+      ? source
+      : fallbacks
+          .map((fallbackKey) => normalized?.[fallbackKey])
+          .find((candidate) => Array.isArray(candidate) && candidate.length)
+        || normalized[this._getPrimaryResponsiveLayoutKey_()]
+        || baseCards;
+    normalized[variantKey] = (Array.isArray(working) ? working : []).map((entry) => {
+      const fallback = normalized[this._getPrimaryResponsiveLayoutKey_()]?.find?.((candidate) => candidate.id === entry?.id) || null;
+      return this._normalizeSavedCardEntry_(entry, fallback);
+    });
+  };
+
+  const desktopSource = resolveVariantEntries('desktop', 'landscape') || baseCards;
+  normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeSavedCardEntry_(entry));
+  buildVariant('tablet', 'landscape', ['tablet_portrait', 'desktop_landscape']);
+  buildVariant('tablet', 'portrait', ['tablet_landscape', 'desktop_landscape']);
+  buildVariant('mobile', 'landscape', ['mobile_portrait', 'desktop_landscape']);
+  buildVariant('mobile', 'portrait', ['mobile_landscape', 'desktop_landscape']);
+
+  const allIds = new Set();
+  variants.forEach((variantKey) => {
+    (normalized[variantKey] || []).forEach((entry) => allIds.add(entry.id));
+  });
+
+  variants.forEach((variantKey) => {
+    const map = new Map((normalized[variantKey] || []).map((entry) => [entry.id, entry]));
+    allIds.forEach((id) => {
+      if (map.has(id)) return;
+      const fallback = variants
+        .map((candidate) => normalized[candidate]?.find?.((entry) => entry.id === id))
+        .find(Boolean);
+      if (fallback) map.set(id, this._normalizeSavedCardEntry_(fallback, fallback));
+    });
+    normalized[variantKey] = Array.from(map.values());
+  });
+
+  return normalized;
+}
+
+_serializeResponsiveLayouts_(layouts = null, fallbackCards = null) {
+  const normalized = this._normalizeResponsiveLayouts_(fallbackCards || [], layouts || this._responsiveLayouts);
+  const desktopLandscape = normalized.desktop_landscape || fallbackCards || [];
+  const tabletLandscape = normalized.tablet_landscape || desktopLandscape;
+  const tabletPortrait = normalized.tablet_portrait || tabletLandscape;
+  const mobileLandscape = normalized.mobile_landscape || desktopLandscape;
+  const mobilePortrait = normalized.mobile_portrait || mobileLandscape;
+  return {
+    desktop: {
+      cards: this._cloneJson_(desktopLandscape),
+      landscape: { cards: this._cloneJson_(desktopLandscape) },
+    },
+    tablet: {
+      cards: this._cloneJson_(tabletLandscape),
+      landscape: { cards: this._cloneJson_(tabletLandscape) },
+      portrait: { cards: this._cloneJson_(tabletPortrait) },
+    },
+    mobile: {
+      cards: this._cloneJson_(mobileLandscape),
+      landscape: { cards: this._cloneJson_(mobileLandscape) },
+      portrait: { cards: this._cloneJson_(mobilePortrait) },
+    },
+  };
+}
+
+_normalizeLayerId_(value, fallback = 'layer') {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return raw || fallback;
+}
+
+_normalizeDashboardLayers_(layers = []) {
+  const source = Array.isArray(layers) ? layers : [];
+  const seen = new Set();
+  return source
+    .map((layer, index) => {
+      if (!layer || typeof layer !== 'object') return null;
+      const fallbackId = `layer-${index + 1}`;
+      let id = this._normalizeLayerId_(
+        layer.id || layer.layer_id || layer.label || layer.name || fallbackId,
+        fallbackId
+      );
+      let suffix = 2;
+      while (seen.has(id)) id = `${this._normalizeLayerId_(id, fallbackId)}-${suffix++}`;
+      seen.add(id);
+      const label = String(layer.label || layer.name || id).trim() || id;
+      const icon = String(layer.icon || 'mdi:layers-outline').trim() || 'mdi:layers-outline';
+      const color = String(layer.color || '#60a5fa').trim() || '#60a5fa';
+      return {
+        ...this._cloneJson_(layer),
+        id,
+        label,
+        icon,
+        color,
+        default_active: layer.default_active !== false,
+      };
+    })
+    .filter(Boolean);
+}
+
+_normalizeCardLayerIds_(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value ?? '')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+  const validIds = new Set((Array.isArray(this.layers) ? this.layers : []).map((layer) => layer.id));
+  const shouldFilter = validIds.size > 0;
+  const next = [];
+  source.forEach((layerId, index) => {
+    const normalized = this._normalizeLayerId_(layerId, `layer-${index + 1}`);
+    if (!normalized) return;
+    if (shouldFilter && !validIds.has(normalized)) return;
+    if (!next.includes(normalized)) next.push(normalized);
+  });
+  return next;
+}
+
+_getDefaultActiveLayerIds_() {
+  const layers = Array.isArray(this.layers) ? this.layers : [];
+  if (!layers.length) return [];
+  const defaults = layers.filter((layer) => layer.default_active !== false).map((layer) => layer.id);
+  return defaults.length ? defaults : layers.map((layer) => layer.id);
+}
+
+_getStoredActiveLayerIds_() {
+  try {
+    const raw = localStorage.getItem(`ddc_layers_${this.storageKey || 'default'}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const next = this._normalizeCardLayerIds_(parsed);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+_persistActiveLayerIds_() {
+  try {
+    localStorage.setItem(
+      `ddc_layers_${this.storageKey || 'default'}`,
+      JSON.stringify(Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [])
+    );
+  } catch {}
+}
+
+_setDashboardLayers_(layers = [], { refresh = true, persist = true } = {}) {
+  const normalized = this._normalizeDashboardLayers_(layers);
+  this.layers = normalized;
+  const validIds = new Set(normalized.map((layer) => layer.id));
+  const stored = this._getStoredActiveLayerIds_();
+  const current = Array.isArray(this.activeLayerIds) ? this.activeLayerIds.filter((id) => validIds.has(id)) : [];
+  const nextActive = (stored && stored.filter((id) => validIds.has(id)).length)
+    ? stored.filter((id) => validIds.has(id))
+    : (current.length ? current : this._getDefaultActiveLayerIds_());
+  this.activeLayerIds = nextActive;
+  if (persist) this._persistActiveLayerIds_();
+  this._sanitizeResponsiveLayoutLayerMembership_?.();
+  if (refresh) {
+    this._renderLayersBar_?.();
+    this._applyActiveTab?.();
+    this._applyVisibility_?.();
+  }
+  return normalized;
+}
+
+_setActiveLayerIds_(ids = [], { persist = true, refresh = true } = {}) {
+  const validIds = new Set((Array.isArray(this.layers) ? this.layers : []).map((layer) => layer.id));
+  const next = this._normalizeCardLayerIds_(ids).filter((id) => validIds.has(id));
+  this.activeLayerIds = next;
+  if (persist) this._persistActiveLayerIds_();
+  if (refresh) {
+    this._renderLayersBar_?.();
+    this._applyActiveTab?.();
+    this._applyVisibility_?.();
+  }
+  return next;
+}
+
+_getWrapperLayerIds_(wrap) {
+  if (!wrap) return [];
+  const raw = wrap.dataset.layerIds;
+  if (!raw) return [];
+  try {
+    return this._normalizeCardLayerIds_(JSON.parse(raw));
+  } catch {
+    return this._normalizeCardLayerIds_(raw);
+  }
+}
+
+_setWrapperLayerIds_(wrap, ids = []) {
+  if (!wrap) return [];
+  const next = this._normalizeCardLayerIds_(ids);
+  if (next.length) wrap.dataset.layerIds = JSON.stringify(next);
+  else delete wrap.dataset.layerIds;
+  return next;
+}
+
+_isWrapVisibleForActiveLayers_(wrap) {
+  const layerIds = this._getWrapperLayerIds_(wrap);
+  if (!layerIds.length) return true;
+  const active = Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [];
+  if (!active.length) return false;
+  return layerIds.some((id) => active.includes(id));
+}
+
+_sanitizeResponsiveLayoutLayerMembership_() {
+  if (!this._responsiveLayouts) return;
+  const variants = this._responsiveLayoutVariantKeys_();
+  variants.forEach((variantKey) => {
+    const entries = Array.isArray(this._responsiveLayouts?.[variantKey]) ? this._responsiveLayouts[variantKey] : [];
+    this._responsiveLayouts[variantKey] = entries.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+  });
+}
+
+_renderLayersBar_() {
+  const bar = this.layersBar;
+  if (!bar) return;
+  const layers = Array.isArray(this.layers) ? this.layers : [];
+  if (!layers.length) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+  bar.style.display = '';
+  bar.className = 'ddc-layers';
+  bar.innerHTML = '';
+
+  const activeIds = Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [];
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `ddc-layer-btn ${activeIds.length === layers.length ? 'active' : ''}`.trim();
+  allBtn.innerHTML = '<ha-icon icon="mdi:layers-triple-outline"></ha-icon><span>All</span>';
+  allBtn.title = 'Show all layers';
+  allBtn.addEventListener('click', () => {
+    this._setActiveLayerIds_(layers.map((layer) => layer.id));
+  });
+  bar.appendChild(allBtn);
+
+  layers.forEach((layer) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `ddc-layer-btn ${activeIds.includes(layer.id) ? 'active' : ''}`.trim();
+    btn.dataset.layerId = layer.id;
+    btn.title = layer.label || layer.id;
+    btn.style.setProperty('--ddc-layer-accent', layer.color || '#60a5fa');
+    btn.innerHTML = `${layer.icon ? `<ha-icon icon="${layer.icon}"></ha-icon>` : ''}<span>${layer.label || layer.id}</span>`;
+    btn.addEventListener('click', () => {
+      const set = new Set(Array.isArray(this.activeLayerIds) ? this.activeLayerIds : []);
+      if (set.has(layer.id)) set.delete(layer.id);
+      else set.add(layer.id);
+      this._setActiveLayerIds_(Array.from(set));
+    });
+    bar.appendChild(btn);
+  });
+}
+
+_defaultConnectorConfig_() {
+  return {
+    entity: '',
+    active_states: 'on,home,open,playing,charging,active,>0',
+    arrows: 'end',
+    flow_direction: 'auto',
+    line_style: 'solid',
+    thickness: 10,
+    animate_mode: 'active',
+    animation_speed: 1.8,
+    active_color: 'var(--primary-color, #ff9800)',
+    inactive_color: 'rgba(148, 163, 184, 0.42)',
+    glow: true,
+    rounded: true,
+  };
+}
+
+_normalizeConnectorPoint_(point = {}, fallback = null) {
+  const source = point || fallback || {};
+  const x = Number(source.x ?? fallback?.x ?? 0) || 0;
+  const y = Number(source.y ?? fallback?.y ?? 0) || 0;
+  return { x, y };
+}
+
+_normalizeConnectorEntry_(entry = {}, fallback = null) {
+  const source = this._cloneJson_(entry) || {};
+  const fallbackEntry = fallback || {};
+  const defaults = this._defaultConnectorConfig_();
+  const id = String(source.id || fallbackEntry.id || `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`);
+  const tabId = this._normalizeTabId(
+    source.tabId
+    || source.tab_id
+    || fallbackEntry.tabId
+    || fallbackEntry.tab_id
+    || this.activeTab
+    || this.defaultTab
+  );
+  const rawPoints = Array.isArray(source.points) && source.points.length
+    ? source.points
+    : (Array.isArray(fallbackEntry.points) ? fallbackEntry.points : []);
+  const points = rawPoints
+    .map((point, index) => this._normalizeConnectorPoint_(point, rawPoints[index]))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  const normalizedPoints = points.length >= 2
+    ? points
+    : [
+        this._normalizeConnectorPoint_(points[0] || { x: 0, y: 0 }),
+        this._normalizeConnectorPoint_(points[1] || points[0] || { x: this.gridSize * 6, y: 0 }, { x: this.gridSize * 6, y: 0 })
+      ];
+  const out = {
+    ...defaults,
+    ...fallbackEntry,
+    ...source,
+    id,
+    tabId,
+    points: normalizedPoints,
+  };
+  out.thickness = Math.max(2, Math.min(28, Number(out.thickness) || defaults.thickness));
+  out.animation_speed = Math.max(0.4, Math.min(8, Number(out.animation_speed) || defaults.animation_speed));
+  out.entity = String(out.entity || '').trim();
+  out.active_states = String(out.active_states || defaults.active_states).trim();
+  out.arrows = ['none', 'start', 'end', 'both'].includes(String(out.arrows || '').toLowerCase())
+    ? String(out.arrows).toLowerCase()
+    : defaults.arrows;
+  out.flow_direction = ['auto', 'forward', 'reverse'].includes(String(out.flow_direction || '').toLowerCase())
+    ? String(out.flow_direction).toLowerCase()
+    : defaults.flow_direction;
+  out.line_style = ['solid', 'dashed', 'dotted'].includes(String(out.line_style || '').toLowerCase())
+    ? String(out.line_style).toLowerCase()
+    : defaults.line_style;
+  out.animate_mode = ['never', 'active', 'always'].includes(String(out.animate_mode || '').toLowerCase())
+    ? String(out.animate_mode).toLowerCase()
+    : defaults.animate_mode;
+  out.glow = out.glow !== false;
+  out.rounded = out.rounded !== false;
+  return out;
+}
+
+_normalizeResponsiveConnectorLayouts_(connectors = [], responsiveConnectors = null) {
+  const variants = this._responsiveLayoutVariantKeys_();
+  const baseConnectors = Array.isArray(connectors) ? connectors : [];
+  const sourceLayouts = responsiveConnectors || {};
+  const normalized = {};
+
+  const resolveVariantEntries = (profile, orientation) => {
+    const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+    const direct = sourceLayouts?.[variantKey];
+    if (Array.isArray(direct)) return direct;
+    if (Array.isArray(direct?.connectors)) return direct.connectors;
+    const grouped = sourceLayouts?.[profile];
+    const nested = grouped?.[orientation];
+    if (Array.isArray(nested)) return nested;
+    if (Array.isArray(nested?.connectors)) return nested.connectors;
+    if (Array.isArray(grouped)) return grouped;
+    if (Array.isArray(grouped?.connectors)) return grouped.connectors;
+    return null;
+  };
+
+  const buildVariant = (profile, orientation, fallbacks = []) => {
+    const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+    const source = resolveVariantEntries(profile, orientation);
+    const working =
+      (Array.isArray(source) && source.length)
+        ? source
+        : fallbacks
+            .map((fallbackKey) => normalized?.[fallbackKey])
+            .find((candidate) => Array.isArray(candidate) && candidate.length)
+          || normalized[this._getPrimaryResponsiveLayoutKey_()]
+          || baseConnectors;
+    normalized[variantKey] = (Array.isArray(working) ? working : []).map((entry) => {
+      const fallbackEntry = normalized[this._getPrimaryResponsiveLayoutKey_()]?.find?.((candidate) => candidate.id === entry?.id) || null;
+      return this._normalizeConnectorEntry_(entry, fallbackEntry);
+    });
+  };
+
+  const desktopSource = resolveVariantEntries('desktop', 'landscape') || baseConnectors;
+  normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeConnectorEntry_(entry));
+  buildVariant('tablet', 'landscape', ['tablet_portrait', 'desktop_landscape']);
+  buildVariant('tablet', 'portrait', ['tablet_landscape', 'desktop_landscape']);
+  buildVariant('mobile', 'landscape', ['mobile_portrait', 'desktop_landscape']);
+  buildVariant('mobile', 'portrait', ['mobile_landscape', 'desktop_landscape']);
+
+  variants.forEach((variantKey) => {
+    normalized[variantKey] = (normalized[variantKey] || []).map((entry) => this._normalizeConnectorEntry_(entry));
+  });
+
+  return normalized;
+}
+
+_serializeResponsiveConnectorLayouts_(layouts = null, fallbackConnectors = null) {
+  const normalized = this._normalizeResponsiveConnectorLayouts_(fallbackConnectors || [], layouts || this._responsiveConnectors);
+  const desktopLandscape = normalized.desktop_landscape || fallbackConnectors || [];
+  const tabletLandscape = normalized.tablet_landscape || desktopLandscape;
+  const tabletPortrait = normalized.tablet_portrait || tabletLandscape;
+  const mobileLandscape = normalized.mobile_landscape || desktopLandscape;
+  const mobilePortrait = normalized.mobile_portrait || mobileLandscape;
+  return {
+    desktop: {
+      connectors: this._cloneJson_(desktopLandscape),
+      landscape: { connectors: this._cloneJson_(desktopLandscape) },
+    },
+    tablet: {
+      connectors: this._cloneJson_(tabletLandscape),
+      landscape: { connectors: this._cloneJson_(tabletLandscape) },
+      portrait: { connectors: this._cloneJson_(tabletPortrait) },
+    },
+    mobile: {
+      connectors: this._cloneJson_(mobileLandscape),
+      landscape: { connectors: this._cloneJson_(mobileLandscape) },
+      portrait: { connectors: this._cloneJson_(mobilePortrait) },
+    },
+  };
+}
+
+_syncConnectorLayoutsToConfig_() {
+  try {
+    if (!this._config) this._config = {};
+    const serialized = this._serializeResponsiveConnectorLayouts_(this._responsiveConnectors);
+    this._config.connectors = this._cloneJson_(serialized?.desktop?.landscape?.connectors || serialized?.desktop?.connectors || []);
+    this._config.responsive_connectors = this._cloneJson_(serialized);
+  } catch (err) {
+    console.warn('[ddc] Failed to sync connector layouts to config', err);
+  }
+}
+
+_getCurrentConnectorLayoutKey_() {
+  return this._activeResponsiveLayoutKey
+    || this._getRequestedResponsiveLayoutKey_?.()
+    || this._getPrimaryResponsiveLayoutKey_();
+}
+
+_getCurrentConnectorEntries_() {
+  if (!this._responsiveConnectors) {
+    this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(this._config?.connectors || [], this._config?.responsive_connectors || null);
+  }
+  const layoutKey = this._getCurrentConnectorLayoutKey_();
+  if (!Array.isArray(this._responsiveConnectors[layoutKey])) {
+    this._responsiveConnectors[layoutKey] = [];
+  }
+  return this._responsiveConnectors[layoutKey];
+}
+
+_setCurrentConnectorEntries_(entries, { reason = 'connector-change', render = true } = {}) {
+  if (!this._responsiveConnectors) {
+    this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(this._config?.connectors || [], this._config?.responsive_connectors || null);
+  }
+  const layoutKey = this._getCurrentConnectorLayoutKey_();
+  this._responsiveConnectors[layoutKey] = (Array.isArray(entries) ? entries : []).map((entry) => this._normalizeConnectorEntry_(entry));
+  this._syncConnectorLayoutsToConfig_?.();
+  if (render) this._renderConnectors_?.();
+  if (reason) this._queueSave?.(reason);
+  return this._responsiveConnectors[layoutKey];
+}
+
+_updateCurrentConnectorEntries_(updater, { reason = 'connector-change', render = true } = {}) {
+  const current = this._cloneJson_(this._getCurrentConnectorEntries_()) || [];
+  const next = typeof updater === 'function' ? updater(current) : updater;
+  return this._setCurrentConnectorEntries_(Array.isArray(next) ? next : current, { reason, render });
+}
+
+_slugifyPackageToken_(value, fallback = 'package') {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.ya?ml$/i, '');
+  const slug = raw.replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  return slug || fallback;
+}
+
+_normalizeDashboardPackages_(packages = []) {
+  if (!Array.isArray(packages)) return [];
+  const usedFilenames = new Set();
+
+  return packages
+    .map((pkg, index) => {
+      if (!pkg || typeof pkg !== 'object') return null;
+
+      const rawId = pkg.id || pkg.package_id || `package_${index + 1}`;
+      const id = String(rawId).trim() || `package_${index + 1}`;
+      const rawName = pkg.name || pkg.title || pkg.filename || id;
+      const name = String(rawName).trim() || id;
+      const filenameBase = this._slugifyPackageToken_(
+        pkg.filename || name || id,
+        `package_${index + 1}`
+      );
+
+      let filename = `${filenameBase}.yaml`;
+      let suffix = 2;
+      while (usedFilenames.has(filename)) {
+        filename = `${filenameBase}_${suffix++}.yaml`;
+      }
+      usedFilenames.add(filename);
+
+      const yaml = String(pkg.yaml ?? pkg.content ?? pkg.body ?? '').replace(/\r\n/g, '\n');
+
+      return {
+        ...this._cloneJson_(pkg),
+        id,
+        name,
+        filename,
+        yaml,
+        enabled: pkg.enabled !== false,
+      };
+    })
+    .filter(Boolean);
+}
+
+_setDashboardPackages_(packages = []) {
+  this._dashboardPackages = this._normalizeDashboardPackages_(packages);
+  return this._dashboardPackages;
+}
+
+_exportDashboardPackages_() {
+  return this._cloneJson_(this._normalizeDashboardPackages_(this._dashboardPackages));
+}
+
+_captureCurrentLayoutEntries_() {
+  if (!this.cardContainer) return [];
+  return Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')).map((w) => {
+    const x = parseFloat(w.getAttribute('data-x')) || 0;
+    const y = parseFloat(w.getAttribute('data-y')) || 0;
+    const width = parseFloat(w.style.width) || w.getBoundingClientRect().width;
+    const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
+    const z = parseInt(w.style.zIndex || '1', 10);
+    const cardCfg = this._extractCardConfig(w.firstElementChild);
+    const tabId = w.dataset.tabId || this.defaultTab;
+    const overflow = (w.style.overflow && w.style.overflow !== '') ? w.style.overflow : null;
+    const layerIds = this._getWrapperLayerIds_(w);
+    const entry = {
+      id: w.dataset.layoutCardId || this._genLayoutCardId_(),
+      card: cardCfg,
+      position: { x, y },
+      size: { width, height },
+      z,
+      tabId,
+    };
+    if (layerIds.length) entry.layerIds = layerIds;
+    const cardStyle = this._extractPerCardStyle_(w);
+    if (Object.keys(cardStyle).length) entry.card_style = cardStyle;
+    if (overflow) entry.overflow = overflow;
+    return entry;
+  });
+}
+
+_syncResponsiveLayoutMembership_(sourceLayoutKey = null) {
+  if (!this._responsiveLayouts) return;
+  const variants = this._responsiveLayoutVariantKeys_();
+  const origin = variants.includes(sourceLayoutKey)
+    ? sourceLayoutKey
+    : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_());
+  const sourceEntries = Array.isArray(this._responsiveLayouts?.[origin]) ? this._responsiveLayouts[origin] : [];
+  const sourceIds = new Set(sourceEntries.map((entry) => entry.id));
+  const sourceMap = new Map(sourceEntries.map((entry) => [entry.id, entry]));
+
+  variants.forEach((variantKey) => {
+    if (variantKey === origin) return;
+    const current = Array.isArray(this._responsiveLayouts?.[variantKey]) ? this._responsiveLayouts[variantKey] : [];
+    const next = current
+      .filter((entry) => sourceIds.has(entry.id))
+      .map((entry) => this._normalizeSavedCardEntry_(entry, sourceMap.get(entry.id)));
+    sourceEntries.forEach((entry) => {
+      if (next.some((candidate) => candidate.id === entry.id)) return;
+      next.push(this._normalizeSavedCardEntry_(entry, entry));
+    });
+    this._responsiveLayouts[variantKey] = next;
+  });
+}
+
+_persistCurrentResponsiveProfileToMemory_({ syncMembership = true } = {}) {
+  if (this._loading || !this.cardContainer) return;
+  if (!this._responsiveLayouts && !this.cardContainer.querySelector('.card-wrapper:not(.ddc-placeholder)')) return;
+  const layoutKey = this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_();
+  if (!layoutKey) return;
+  if (!this._responsiveLayouts) {
+    this._responsiveLayouts = this._normalizeResponsiveLayouts_(this._captureCurrentLayoutEntries_(), null);
+  }
+  this._responsiveLayouts[layoutKey] = this._captureCurrentLayoutEntries_();
+  if (syncMembership) this._syncResponsiveLayoutMembership_(layoutKey);
+}
+
+_getRealViewportMetrics_() {
+  const vv = window.visualViewport;
+  const width = Math.max(
+    1,
+    Math.round(vv?.width || window.innerWidth || document.documentElement?.clientWidth || 1)
+  );
+  const height = Math.max(
+    1,
+    Math.round(vv?.height || window.innerHeight || document.documentElement?.clientHeight || 1)
+  );
+  return {
+    width,
+    height,
+    shortEdge: Math.min(width, height),
+    longEdge: Math.max(width, height),
+    isPortrait: height >= width,
+  };
+}
+
+_getResponsiveProfileLabel_(profile = 'desktop') {
+  return ({
+    desktop: 'Desktop',
+    tablet: 'Tablet',
+    mobile: 'Mobile',
+  })[profile] || 'Desktop';
+}
+
+_getActualResponsiveProfile_() {
+  const viewport = this._getRealViewportMetrics_?.() || { width: 0, height: 0, shortEdge: 0, longEdge: 0 };
+  const width = Math.max(1, Number(viewport.width || 0) || 0);
+  const shortEdge = Math.max(1, Number(viewport.shortEdge || Math.min(viewport.width || 0, viewport.height || 0)) || 0);
+  const longEdge = Math.max(1, Number(viewport.longEdge || Math.max(viewport.width || 0, viewport.height || 0)) || 0);
+
+  let touchLikeDevice = false;
+  try {
+    const coarse = !!window.matchMedia?.('(pointer: coarse)')?.matches;
+    const noHover = !!window.matchMedia?.('(hover: none)')?.matches;
+    const touchPoints = Number(navigator?.maxTouchPoints || 0) || 0;
+    touchLikeDevice = (coarse || touchPoints > 1) && noHover;
+  } catch {}
+
+  // On real handheld / tablet devices we classify by the shortest edge so
+  // phones stay "mobile" even in landscape, and tablets stay "tablet" even
+  // in portrait. Width-only logic caused orientation flips to load the wrong
+  // responsive layout on actual devices.
+  if (touchLikeDevice) {
+    if (shortEdge < 600) return 'mobile';
+    if (shortEdge < 1024 || longEdge < 1400) return 'tablet';
+    return 'desktop';
+  }
+
+  // Fallback for desktop browsers and non-touch environments: width-based
+  // breakpoints still make sense there because the browser window itself is
+  // usually the thing we want to adapt to.
+  if (width < 768) return 'mobile';
+  if (width < 1180) return 'tablet';
+  return 'desktop';
+}
+
+_getRequestedResponsiveProfile_() {
+  const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
+  if (this.editMode && (previewMode === 'desktop' || previewMode === 'tablet' || previewMode === 'mobile')) {
+    return previewMode;
+  }
+  return this._getActualResponsiveProfile_?.() || 'desktop';
+}
+
+_getRequestedResponsiveOrientation_(profile = null) {
+  const baseProfile = this._responsiveProfileKeys_().includes(profile)
+    ? profile
+    : (this._getRequestedResponsiveProfile_?.() || 'desktop');
+  if (baseProfile === 'desktop') return 'landscape';
+
+  const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
+  if (this.editMode && previewMode === baseProfile) {
+    return this._getStoredResponsivePreviewOrientation_(baseProfile);
+  }
+
+  return (this._getRealViewportMetrics_?.()?.isPortrait ?? true) ? 'portrait' : 'landscape';
+}
+
+_getRequestedResponsiveLayoutKey_() {
+  const profile = this._getRequestedResponsiveProfile_?.() || 'desktop';
+  const orientation = this._getRequestedResponsiveOrientation_?.(profile) || 'landscape';
+  return this._getResponsiveLayoutKey_(profile, orientation);
+}
+
+_ensureConnectorsLayer_() {
+  if (!this.cardContainer) return null;
+  let layer = this.cardContainer.querySelector('#ddcConnectorsLayer');
+  if (!layer) {
+    layer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    layer.setAttribute('id', 'ddcConnectorsLayer');
+    layer.setAttribute('class', 'ddc-connectors-layer');
+    layer.setAttribute('aria-hidden', 'true');
+    this.cardContainer.appendChild(layer);
+  }
+  return layer;
+}
+
+_getConnectorCanvasSize_() {
+  const c = this.cardContainer;
+  if (!c) return { width: 1, height: 1 };
+  const width = Math.max(
+    1,
+    parseFloat(c.style.width) || c.scrollWidth || c.offsetWidth || c.getBoundingClientRect?.().width || 1
+  );
+  const height = Math.max(
+    1,
+    parseFloat(c.style.height) || c.scrollHeight || c.offsetHeight || c.getBoundingClientRect?.().height || 1
+  );
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+  };
+}
+
+_eventToConnectorPoint_(ev) {
+  const layer = this._ensureConnectorsLayer_?.();
+  const rect = layer?.getBoundingClientRect?.() || this.cardContainer?.getBoundingClientRect?.();
+  if (!rect) return { x: 0, y: 0 };
+  const sx = this.__pointerScaleX || 1;
+  const sy = this.__pointerScaleY || 1;
+  return {
+    x: ((ev.clientX - rect.left) / sx),
+    y: ((ev.clientY - rect.top) / sy),
+  };
+}
+
+_snapConnectorPoint_(point) {
+  const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+  return {
+    x: Math.round((Number(point?.x) || 0) / gs) * gs,
+    y: Math.round((Number(point?.y) || 0) / gs) * gs,
+  };
+}
+
+_snapConnectorPointToCellOrigin_(point) {
+  const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+  return {
+    x: Math.floor((Number(point?.x) || 0) / gs) * gs,
+    y: Math.floor((Number(point?.y) || 0) / gs) * gs,
+  };
+}
+
+_buildConnectorPathData_(points = []) {
+  if (!Array.isArray(points) || points.length < 2) return '';
+  return points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Number(point.x) || 0} ${Number(point.y) || 0}`)
+    .join(' ');
+}
+
+_getConnectorResolvedState_(connector = {}) {
+  const entityId = String(connector.entity || '').trim();
+  const entity = entityId ? this.hass?.states?.[entityId] : null;
+  const stateValue = entity?.state ?? '';
+  const active = entityId ? __ddcLineIsActive__(stateValue, connector.active_states) : true;
+  const numericState = Number(stateValue);
+  const flowDirection = String(connector.flow_direction || 'auto').toLowerCase();
+  const reverse = flowDirection === 'reverse'
+    || (flowDirection === 'auto' && Number.isFinite(numericState) && numericState < 0);
+  const animateMode = String(connector.animate_mode || 'active').toLowerCase();
+  const animate = animateMode === 'always' || (animateMode === 'active' && active);
+  return { active, reverse, animate, stateValue };
+}
+
+_pointToSegmentDistance_(point, start, end) {
+  const dx = (end.x - start.x);
+  const dy = (end.y - start.y);
+  if (!dx && !dy) {
+    const px = point.x - start.x;
+    const py = point.y - start.y;
+    return { distanceSq: px * px + py * py, t: 0 };
+  }
+  const tRaw = (((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / ((dx * dx) + (dy * dy));
+  const t = Math.max(0, Math.min(1, tRaw));
+  const projX = start.x + (dx * t);
+  const projY = start.y + (dy * t);
+  const px = point.x - projX;
+  const py = point.y - projY;
+  return { distanceSq: px * px + py * py, t };
+}
+
+_insertConnectorPointAtEvent_(connectorId, ev) {
+  const point = this._snapConnectorPointToCellOrigin_(this._eventToConnectorPoint_(ev));
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    if (entry.id !== connectorId) return entry;
+    const next = this._normalizeConnectorEntry_(entry);
+    const points = Array.isArray(next.points) ? [...next.points] : [];
+    if (points.length < 2) return next;
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+    for (let i = 0; i < points.length - 1; i++) {
+      const probe = this._pointToSegmentDistance_(point, points[i], points[i + 1]);
+      if (probe.distanceSq < bestDistance) {
+        bestDistance = probe.distanceSq;
+        bestIndex = i;
+      }
+    }
+    points.splice(bestIndex + 1, 0, point);
+    changed = true;
+    return { ...next, points };
+  }), { reason: changed ? 'connector-junction-add' : null, render: true });
+  if (changed) this._selectedConnectorId = connectorId;
+}
+
+_insertConnectorMidpoint_(connectorId) {
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    if (entry.id !== connectorId) return entry;
+    const next = this._normalizeConnectorEntry_(entry);
+    const points = Array.isArray(next.points) ? [...next.points] : [];
+    if (points.length < 2) return next;
+    let bestIndex = 0;
+    let bestLengthSq = -1;
+    for (let i = 0; i < points.length - 1; i++) {
+      const dx = (points[i + 1].x - points[i].x);
+      const dy = (points[i + 1].y - points[i].y);
+      const lenSq = (dx * dx) + (dy * dy);
+      if (lenSq > bestLengthSq) {
+        bestLengthSq = lenSq;
+        bestIndex = i;
+      }
+    }
+    const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+    const start = points[bestIndex];
+    const end = points[bestIndex + 1];
+    const midpoint = this._snapConnectorPoint_({
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2,
+    });
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    let bendPoint = midpoint;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const offset = Math.max(gs * 2, Math.round(Math.abs(dx) / 6 / gs) * gs || (gs * 2));
+      bendPoint = this._snapConnectorPoint_({
+        x: midpoint.x,
+        y: midpoint.y + (offset * (bestIndex % 2 === 0 ? 1 : -1)),
+      });
+    } else {
+      const offset = Math.max(gs * 2, Math.round(Math.abs(dy) / 6 / gs) * gs || (gs * 2));
+      bendPoint = this._snapConnectorPoint_({
+        x: midpoint.x + (offset * (bestIndex % 2 === 0 ? 1 : -1)),
+        y: midpoint.y,
+      });
+    }
+    if (points.some((point) => point.x === bendPoint.x && point.y === bendPoint.y)) {
+      bendPoint = this._snapConnectorPoint_({
+        x: midpoint.x + gs,
+        y: midpoint.y + gs,
+      });
+    }
+    points.splice(bestIndex + 1, 0, bendPoint);
+    changed = true;
+    return { ...next, points };
+  }), { reason: changed ? 'connector-junction-add' : null, render: true });
+  if (changed) this._selectedConnectorId = connectorId;
+}
+
+_getConnectorById_(connectorId) {
+  return (this._getCurrentConnectorEntries_() || []).find((entry) => entry.id === connectorId) || null;
+}
+
+_getConnectorVisibleRect_() {
+  const container = this.cardContainer;
+  const { width, height } = this._getConnectorCanvasSize_();
+  if (!container) {
+    return { left: 0, top: 0, width, height };
+  }
+  return {
+    left: Math.max(0, Number(container.scrollLeft || 0) || 0),
+    top: Math.max(0, Number(container.scrollTop || 0) || 0),
+    width: Math.max(1, Math.min(width, Number(container.clientWidth || width) || width)),
+    height: Math.max(1, Math.min(height, Number(container.clientHeight || height) || height)),
+  };
+}
+
+_createConnectorAtViewport_({ openSettings = true } = {}) {
+  if (!this.editMode) return null;
+  const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
+  const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+  const { left, top, width, height } = this._getConnectorVisibleRect_();
+  const span = Math.max(gs * 6, Math.min(gs * 16, Math.round((width * 0.26) / gs) * gs || (gs * 8)));
+  const centerX = left + (width / 2);
+  const centerY = top + (height / 2);
+  const start = this._snapConnectorPoint_({ x: centerX - (span / 2), y: centerY });
+  const end = this._snapConnectorPoint_({ x: centerX + (span / 2), y: centerY });
+  const connector = this._normalizeConnectorEntry_({
+    ...this._defaultConnectorConfig_(),
+    id: `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
+    tabId: currentTab,
+    points: [start, end],
+  });
+  this._connectorDraft = null;
+  this._connectorDrawMode = false;
+  this._selectedConnectorId = connector.id;
+  this._setCurrentConnectorEntries_(
+    [...this._getCurrentConnectorEntries_(), connector],
+    { reason: 'connector-add', render: true }
+  );
+  if (openSettings) {
+    requestAnimationFrame(() => this._openConnectorSettings_?.(connector.id));
+  }
+  return connector.id;
+}
+
+_isConnectorSettingsOpen_() {
+  const panel = this.shadowRoot?.querySelector?.('#connectorInspector');
+  return !!panel && !panel.hidden && panel.classList.contains('is-open');
+}
+
+_setConnectorDrawMode_(on, { finalize = true } = {}) {
+  const next = !!on;
+  if (!next && this._connectorDraft?.points?.length >= 2 && finalize) {
+    this._finalizeConnectorDraft_({ openSettings: false });
+  } else if (!next) {
+    this._cancelConnectorDraft_({ keepMode: true });
+  }
+  this._connectorDrawMode = next;
+  if (!next) this._connectorDraft = null;
+  this._syncConnectorUiState_?.();
+  this._renderConnectors_?.();
+}
+
+_toggleConnectorDrawMode_() {
+  if (!this.editMode) return;
+  this._createConnectorAtViewport_({ openSettings: true });
+}
+
+_cancelConnectorDraft_({ keepMode = false } = {}) {
+  this._connectorDraft = null;
+  if (!keepMode) this._connectorDrawMode = false;
+  this._syncConnectorUiState_?.();
+  this._renderConnectors_?.();
+}
+
+_finalizeConnectorDraft_({ openSettings = true } = {}) {
+  const draft = this._connectorDraft;
+  if (!draft || !Array.isArray(draft.points) || draft.points.length < 2) {
+    this._cancelConnectorDraft_();
+    return;
+  }
+  const connector = this._normalizeConnectorEntry_({
+    ...this._defaultConnectorConfig_(),
+    ...(draft.settings || {}),
+    id: `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
+    tabId: this._normalizeTabId(draft.tabId || this.activeTab || this.defaultTab),
+    points: draft.points,
+  });
+  this._selectedConnectorId = connector.id;
+  this._connectorDraft = null;
+  this._connectorDrawMode = false;
+  this._setCurrentConnectorEntries_([
+    ...this._getCurrentConnectorEntries_(),
+    connector,
+  ], { reason: 'connector-add', render: true });
+  this._syncConnectorUiState_?.();
+  if (openSettings) {
+    requestAnimationFrame(() => this._openConnectorSettings_?.(connector.id));
+  }
+}
+
+_syncConnectorUiState_() {
+  const btn = this.lineModeBtn;
+  this.cardContainer?.classList.toggle('ddc-connector-draw-mode', !!this._connectorDrawMode);
+  if (!btn) return;
+  const active = !!this._connectorDrawMode;
+  btn.classList.toggle('is-active', active);
+  btn.setAttribute('aria-pressed', String(active));
+  btn.setAttribute('data-tooltip', active ? 'Finish connector' : 'Add connector line');
+  btn.setAttribute('title', active ? 'Finish connector' : 'Add connector line');
+  const label = btn.querySelector('.label');
+  if (label) label.textContent = active ? 'Finish Line' : 'Add Line';
+}
+
+_openConnectorSettings_(connectorId) {
+  const connector = this._getCurrentConnectorEntries_().find((entry) => entry.id === connectorId);
+  if (!connector) return;
+  const panel = this.shadowRoot?.querySelector?.('#connectorInspector');
+  if (!panel) return;
+  try { this.__connectorInspectorCleanup?.(); } catch {}
+  this.__connectorInspectorCleanup = null;
+  const resolved = this._getConnectorResolvedState_?.(connector) || { active: true, animate: false };
+  const lineStyle = String(connector.line_style || 'solid').toLowerCase();
+  const previewColor = String(
+    (resolved.active ? connector.active_color : connector.inactive_color)
+    || (resolved.active ? 'var(--primary-color, #ff9800)' : 'rgba(148,163,184,.48)')
+  ).trim();
+  const previewFill = (() => {
+    if (lineStyle === 'dotted') {
+      return `repeating-linear-gradient(90deg, ${previewColor} 0 8px, transparent 8px 20px)`;
+    }
+    if (lineStyle === 'dashed') {
+      return `repeating-linear-gradient(90deg, ${previewColor} 0 26px, transparent 26px 40px)`;
+    }
+    return previewColor;
+  })();
+  const previewSummary = connector.entity
+    ? `${resolved.active ? 'Currently active' : 'Currently idle'} · ${resolved.animate ? 'animated' : 'static'}`
+    : `Manual connector · ${resolved.animate ? 'animated' : 'static'}`;
+  const pointCount = Array.isArray(connector.points) ? connector.points.length : 0;
+  const entityOptions = Object.keys(this.hass?.states || {})
+    .sort((a, b) => a.localeCompare(b));
+  const buildEntityOptionMarkup = () => entityOptions
+    .map((entityId) => `<option value="${this._safe(entityId)}"></option>`)
+    .join('');
+  const getConnectorStateSuggestions = (entityId = '') => {
+    const safeEntityId = String(entityId || '').trim();
+    const entity = safeEntityId ? this.hass?.states?.[safeEntityId] : null;
+    if (!entity) return [];
+    const suggestions = [];
+    const seen = new Set();
+    const add = (value) => {
+      const token = String(value ?? '').trim();
+      if (!token) return;
+      const key = token.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      suggestions.push(token);
+    };
+    const domain = String((safeEntityId.split('.')[0] || '')).toLowerCase();
+    const stateValue = String(entity.state ?? '').trim();
+    const loweredState = stateValue.toLowerCase();
+    if (stateValue && !['unknown', 'unavailable', 'none', 'null'].includes(loweredState)) add(stateValue);
+    if (Array.isArray(entity.attributes?.options)) {
+      entity.attributes.options.forEach(add);
+    }
+    switch (domain) {
+      case 'binary_sensor':
+      case 'input_boolean':
+      case 'switch':
+      case 'light':
+      case 'fan':
+      case 'automation':
+      case 'script':
+        ['on', 'off'].forEach(add);
+        break;
+      case 'lock':
+        ['locked', 'unlocking', 'unlocked', 'locking', 'jammed'].forEach(add);
+        break;
+      case 'cover':
+        ['open', 'opening', 'closed', 'closing'].forEach(add);
+        break;
+      case 'person':
+      case 'device_tracker':
+        ['home', 'not_home'].forEach(add);
+        break;
+      case 'media_player':
+        ['playing', 'paused', 'idle', 'off', 'standby', 'buffering'].forEach(add);
+        break;
+      case 'alarm_control_panel':
+        ['disarmed', 'armed_home', 'armed_away', 'armed_night', 'armed_vacation', 'triggered'].forEach(add);
+        break;
+      case 'climate':
+        ['off', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only'].forEach(add);
+        break;
+      case 'sun':
+        ['above_horizon', 'below_horizon'].forEach(add);
+        break;
+      default:
+        break;
+    }
+    const numericState = Number(stateValue);
+    if (Number.isFinite(numericState)) {
+      ['>0', '=0', '<0', '!=0'].forEach(add);
+    }
+    return suggestions.slice(0, 18);
+  };
+  const describeConnectorEntity = (entityId = '') => {
+    const safeEntityId = String(entityId || '').trim();
+    const entity = safeEntityId ? this.hass?.states?.[safeEntityId] : null;
+    if (!safeEntityId) {
+      return {
+        entityText: 'Browse Home Assistant entities and bind this connector to one of them.',
+        stateText: 'Pick an entity to get smart state suggestions from Home Assistant.',
+      };
+    }
+    if (!entity) {
+      return {
+        entityText: 'Entity not found in Home Assistant right now.',
+        stateText: 'You can still type custom state rules manually, for example on, open, or >0.',
+      };
+    }
+    const domain = String((safeEntityId.split('.')[0] || '')).replace(/_/g, ' ');
+    const stateValue = String(entity.state ?? '').trim() || 'unknown';
+    const unit = String(entity.attributes?.unit_of_measurement || '').trim();
+    const optionCount = Array.isArray(entity.attributes?.options) ? entity.attributes.options.length : 0;
+    return {
+      entityText: `${domain.charAt(0).toUpperCase()}${domain.slice(1)} entity${optionCount ? ` • ${optionCount} option${optionCount === 1 ? '' : 's'}` : ''}`,
+      stateText: `Current state: ${stateValue}${unit ? ` ${unit}` : ''}. Use suggestions below or type custom rules like >0.`,
+    };
+  };
+  const toggleConnectorStateToken = (value, token) => {
+    const safeToken = String(token || '').trim();
+    const tokens = (__ddcLineSplitTokens__(value) || []).map((entry) => String(entry || '').trim()).filter(Boolean);
+    const existingIndex = tokens.findIndex((entry) => entry.toLowerCase() === safeToken.toLowerCase());
+    if (existingIndex >= 0) {
+      tokens.splice(existingIndex, 1);
+    } else {
+      tokens.push(safeToken);
+    }
+    return tokens.join(',');
+  };
+  this.__connectorSettingsModal = panel;
+  this.__connectorInspectorId = connectorId;
+  panel.hidden = false;
+  panel.classList.add('is-open');
+  panel.innerHTML = `
+    <div class="ddc-connector-inspector-card">
+      <div class="ddc-connector-inspector-head">
+        <div>
+          <div class="ddc-connector-inspector-kicker">Line editor</div>
+          <h3>Connector</h3>
+          <p>Fine-tune flow, styling, and bends without leaving edit mode.</p>
+        </div>
+        <button class="icon-btn ddc-connector-close" id="connectorCloseBtn" type="button" title="Close">
+          <ha-icon icon="mdi:close"></ha-icon>
+        </button>
+      </div>
+      <div class="ddc-connector-preview">
+        <div class="ddc-connector-preview-line">
+          <span
+            class="ddc-connector-preview-stroke${connector.glow !== false ? ' is-glow' : ''}${resolved.animate ? ' is-animated' : ''}"
+            style="height:${Math.max(4, Number(connector.thickness || 10))}px;color:${this._safe(previewColor)};background:${this._safe(previewFill)};"
+          ></span>
+        </div>
+        <div class="ddc-connector-preview-copy">
+          <strong>${this._safe(previewSummary)}</strong>
+          <span>${pointCount} point${pointCount === 1 ? '' : 's'} · ${this._safe(String(connector.arrows || 'end'))} arrow${String(connector.arrows || 'end') === 'both' ? 's' : ''}</span>
+        </div>
+      </div>
+
+      <section class="ddc-connector-section">
+        <div class="ddc-connector-section-head">
+          <div class="ddc-connector-section-title">Behavior</div>
+          <p>Drive line activity from Home Assistant state and control flow direction.</p>
+        </div>
+        <datalist id="connectorEntityList">${buildEntityOptionMarkup()}</datalist>
+        <datalist id="connectorStateList"></datalist>
+        <div class="ddc-connector-inspector-grid">
+          <div class="ddc-connector-field full">
+            <span>Entity</span>
+            <div class="ddc-connector-entity-host" id="connectorEntityHost"></div>
+            <div class="ddc-connector-entity-meta" id="connectorEntityMeta"></div>
+          </div>
+          <label class="ddc-connector-field full">
+            <span>Active states</span>
+            <input id="connectorStates" class="input" type="text" list="connectorStateList" value="${this._safe(connector.active_states || '')}" placeholder="on,>0,charging" />
+            <div class="ddc-connector-state-meta" id="connectorStateMeta"></div>
+            <div class="ddc-connector-state-suggestions" id="connectorStateSuggestions"></div>
+          </label>
+          <label class="ddc-connector-field">
+            <span>Arrows</span>
+            <select id="connectorArrows" class="input">
+              <option value="none">None</option>
+              <option value="start">Start</option>
+              <option value="end">End</option>
+              <option value="both">Both</option>
+            </select>
+          </label>
+          <label class="ddc-connector-field">
+            <span>Flow direction</span>
+            <select id="connectorFlowDirection" class="input">
+              <option value="auto">Auto</option>
+              <option value="forward">Forward</option>
+              <option value="reverse">Reverse</option>
+            </select>
+          </label>
+          <label class="ddc-connector-field">
+            <span>Animate</span>
+            <select id="connectorAnimateMode" class="input">
+              <option value="never">Never</option>
+              <option value="active">When active</option>
+              <option value="always">Always</option>
+            </select>
+          </label>
+          <label class="ddc-connector-field">
+            <span>Animation speed</span>
+            <input id="connectorSpeed" class="input" type="number" min="0.4" max="8" step="0.1" value="${Number(connector.animation_speed || 1.8)}" />
+          </label>
+        </div>
+      </section>
+
+      <section class="ddc-connector-section">
+        <div class="ddc-connector-section-head">
+          <div class="ddc-connector-section-title">Appearance</div>
+          <p>Match the connector to the dashboard style and make active states easier to read.</p>
+        </div>
+        <div class="ddc-connector-inspector-grid">
+          <label class="ddc-connector-field">
+            <span>Line style</span>
+            <select id="connectorLineStyle" class="input">
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </label>
+          <label class="ddc-connector-field">
+            <span>Thickness</span>
+            <input id="connectorThickness" class="input" type="number" min="2" max="28" step="1" value="${Number(connector.thickness || 10)}" />
+          </label>
+          <label class="ddc-connector-field">
+            <span>Active color</span>
+            <input id="connectorActiveColor" class="input" type="text" value="${this._safe(connector.active_color || '')}" />
+          </label>
+          <label class="ddc-connector-field">
+            <span>Inactive color</span>
+            <input id="connectorInactiveColor" class="input" type="text" value="${this._safe(connector.inactive_color || '')}" />
+          </label>
+        </div>
+        <div class="ddc-connector-toggles">
+          <label class="ddc-toggle-row">
+            <input id="connectorGlow" type="checkbox" ${connector.glow !== false ? 'checked' : ''} />
+            <span>Glow</span>
+          </label>
+          <label class="ddc-toggle-row">
+            <input id="connectorRounded" type="checkbox" ${connector.rounded !== false ? 'checked' : ''} />
+            <span>Rounded corners</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="ddc-connector-section">
+        <div class="ddc-connector-section-head">
+          <div class="ddc-connector-section-title">Shape</div>
+          <p>Add bends, refine the route, or remove the connector entirely.</p>
+        </div>
+        <div class="ddc-connector-actions">
+          <button class="btn secondary" id="connectorAddBendBtn" type="button">
+            <ha-icon icon="mdi:vector-polyline-edit"></ha-icon><span>Add bend</span>
+          </button>
+          <button class="btn danger" id="connectorDeleteBtn" type="button">
+            <ha-icon icon="mdi:trash-can-outline"></ha-icon><span>Delete line</span>
+          </button>
+        </div>
+        <p class="ddc-connector-help">Click the line to select it. Shift-click or double-click the line to add a bend. Drag the handles to fine-tune. Double-click a middle handle to remove it.</p>
+      </section>
+    </div>`;
+
+  const $ = (sel) => panel.querySelector(sel);
+  $('#connectorArrows').value = String(connector.arrows || 'end');
+  $('#connectorFlowDirection').value = String(connector.flow_direction || 'auto');
+  $('#connectorLineStyle').value = String(connector.line_style || 'solid');
+  $('#connectorAnimateMode').value = String(connector.animate_mode || 'active');
+  const entityHost = $('#connectorEntityHost');
+  const entityMeta = $('#connectorEntityMeta');
+  const statesInput = $('#connectorStates');
+  const stateMeta = $('#connectorStateMeta');
+  const stateSuggestions = $('#connectorStateSuggestions');
+  const stateList = $('#connectorStateList');
+  let entityInput = null;
+  let currentConnector = this._getConnectorById_(connectorId) || connector;
+  panel.dataset.connectorId = connectorId;
+
+  const patchConnector = (patch, reason = 'connector-update') => {
+    this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+      if (entry.id !== connectorId) return entry;
+      const nextPatch = typeof patch === 'function' ? patch(entry) : patch;
+      return { ...entry, ...nextPatch };
+    }), { reason, render: true });
+    currentConnector = this._getConnectorById_(connectorId) || currentConnector;
+    this._selectedConnectorId = connectorId;
+  };
+  const readEntityValue = () => {
+    if (!entityInput) return '';
+    return String(entityInput.value || entityInput.getAttribute?.('value') || '').trim();
+  };
+  const renderConnectorStateHelpers = (entityId = readEntityValue()) => {
+    const info = describeConnectorEntity(entityId);
+    if (entityMeta) entityMeta.textContent = info.entityText;
+    if (stateMeta) stateMeta.textContent = info.stateText;
+    const suggestions = getConnectorStateSuggestions(entityId);
+    if (stateList) {
+      stateList.innerHTML = suggestions
+        .map((token) => `<option value="${this._safe(token)}"></option>`)
+        .join('');
+    }
+    if (!stateSuggestions || !statesInput) return;
+    const activeTokens = (__ddcLineSplitTokens__(statesInput.value || '') || [])
+      .map((entry) => String(entry || '').trim().toLowerCase())
+      .filter(Boolean);
+    stateSuggestions.innerHTML = suggestions.length
+      ? suggestions.map((token) => {
+          const active = activeTokens.includes(String(token).toLowerCase());
+          return `<button type="button" class="ddc-connector-state-chip${active ? ' is-active' : ''}" data-token="${this._safe(token)}">${this._safe(token)}</button>`;
+        }).join('')
+      : `<div class="ddc-connector-state-empty">No obvious state choices found for this entity yet.</div>`;
+    stateSuggestions.querySelectorAll('.ddc-connector-state-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const token = btn.dataset.token || '';
+        const nextValue = toggleConnectorStateToken(statesInput.value || '', token);
+        statesInput.value = nextValue;
+        patchConnector({ active_states: nextValue || '' });
+        renderConnectorStateHelpers(entityId);
+      });
+    });
+  };
+
+  if (entityHost) {
+    try {
+      if (customElements.get('ha-entity-picker')) {
+        const picker = document.createElement('ha-entity-picker');
+        picker.hass = this.hass;
+        picker.value = String(currentConnector.entity || '');
+        picker.setAttribute('label', 'Choose entity');
+        picker.removeAttribute('hide-clear-icon');
+        entityInput = picker;
+        entityHost.appendChild(picker);
+        picker.addEventListener('value-changed', (ev) => {
+          ev.stopPropagation();
+          const nextValue = String(ev.detail?.value || ev.detail || ev.target?.value || '').trim();
+          patchConnector({ entity: nextValue || '' });
+          renderConnectorStateHelpers(nextValue);
+        });
+      } else {
+        throw new Error('ha-entity-picker unavailable');
+      }
+    } catch (err) {
+      const input = document.createElement('input');
+      input.id = 'connectorEntity';
+      input.className = 'input';
+      input.type = 'text';
+      input.value = String(currentConnector.entity || '');
+      input.placeholder = 'sensor.example_power';
+      input.setAttribute('list', 'connectorEntityList');
+      entityInput = input;
+      entityHost.appendChild(input);
+      input.addEventListener('input', (ev) => {
+        const nextValue = String(ev.target?.value || '').trim();
+        patchConnector({ entity: nextValue || '' });
+        renderConnectorStateHelpers(nextValue);
+      });
+      if (err?.message && err.message !== 'ha-entity-picker unavailable') {
+        console.warn('[ddc] Falling back to text entity input in connector editor', err);
+      }
+    }
+  }
+  const applyConnectorFieldChange = (target, eventType = 'input') => {
+    if (!target || !target.id) return false;
+    switch (target.id) {
+      case 'connectorStates':
+        patchConnector({ active_states: target.value || '' });
+        renderConnectorStateHelpers();
+        return true;
+      case 'connectorArrows':
+        patchConnector({ arrows: target.value || 'end' });
+        return true;
+      case 'connectorFlowDirection':
+        patchConnector({ flow_direction: target.value || 'auto' });
+        return true;
+      case 'connectorLineStyle':
+        patchConnector({ line_style: target.value || 'solid' });
+        return true;
+      case 'connectorAnimateMode':
+        patchConnector({ animate_mode: target.value || 'active' });
+        return true;
+      case 'connectorThickness':
+        patchConnector({ thickness: Number(target.value) || currentConnector.thickness });
+        return true;
+      case 'connectorSpeed':
+        patchConnector({ animation_speed: Number(target.value) || currentConnector.animation_speed });
+        return true;
+      case 'connectorActiveColor':
+        patchConnector({ active_color: target.value || currentConnector.active_color });
+        return true;
+      case 'connectorInactiveColor':
+        patchConnector({ inactive_color: target.value || currentConnector.inactive_color });
+        return true;
+      case 'connectorGlow':
+        if (eventType !== 'change') return false;
+        patchConnector({ glow: !!target.checked });
+        return true;
+      case 'connectorRounded':
+        if (eventType !== 'change') return false;
+        patchConnector({ rounded: !!target.checked });
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const delegatedConnectorInputHandler = (ev) => {
+    if (!ev.target || !panel.contains(ev.target)) return;
+    applyConnectorFieldChange(ev.target, 'input');
+  };
+  const delegatedConnectorChangeHandler = (ev) => {
+    if (!ev.target || !panel.contains(ev.target)) return;
+    applyConnectorFieldChange(ev.target, 'change');
+  };
+
+  panel.addEventListener('input', delegatedConnectorInputHandler);
+  panel.addEventListener('change', delegatedConnectorChangeHandler);
+  this.__connectorInspectorCleanup = () => {
+    try { panel.removeEventListener('input', delegatedConnectorInputHandler); } catch {}
+    try { panel.removeEventListener('change', delegatedConnectorChangeHandler); } catch {}
+  };
+
+  try {
+    renderConnectorStateHelpers(String(currentConnector.entity || '').trim());
+  } catch (err) {
+    console.warn('[ddc] Failed to render connector entity/state helpers', err);
+  }
+
+  $('#connectorCloseBtn')?.addEventListener('click', () => this._closeConnectorSettings_?.());
+  $('#connectorDeleteBtn')?.addEventListener('click', () => {
+    this._setCurrentConnectorEntries_(
+      this._getCurrentConnectorEntries_().filter((entry) => entry.id !== connectorId),
+      { reason: 'connector-delete', render: true }
+    );
+    this._selectedConnectorId = null;
+    this._closeConnectorSettings_?.();
+  });
+  $('#connectorAddBendBtn')?.addEventListener('click', () => {
+    this._insertConnectorMidpoint_?.(connectorId);
+    this._selectedConnectorId = connectorId;
+    this._renderConnectors_?.();
+    requestAnimationFrame(() => this._openConnectorSettings_?.(connectorId));
+  });
+}
+
+_closeConnectorSettings_() {
+  const panel = this.shadowRoot?.querySelector?.('#connectorInspector');
+  if (panel) {
+    panel.hidden = true;
+    panel.classList.remove('is-open');
+    panel.innerHTML = '';
+  }
+  try { this.__connectorInspectorCleanup?.(); } catch {}
+  this.__connectorInspectorCleanup = null;
+  this.__connectorSettingsModal = null;
+  this.__connectorInspectorId = null;
+}
+
+_renderConnectors_() {
+  const layer = this._ensureConnectorsLayer_();
+  if (!layer) return;
+  const { width, height } = this._getConnectorCanvasSize_();
+  layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  layer.innerHTML = '';
+
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const defs = document.createElementNS(svgNs, 'defs');
+  layer.appendChild(defs);
+
+  const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
+  const connectors = (this._getCurrentConnectorEntries_() || []).filter((entry) => {
+    return this._normalizeTabId(entry.tabId || currentTab) === currentTab;
+  });
+  if (this._selectedConnectorId && !connectors.some((entry) => entry.id === this._selectedConnectorId)) {
+    this._selectedConnectorId = null;
+    this._closeConnectorSettings_?.();
+  }
+
+  if (this.editMode && this._connectorDrawMode) {
+    const capture = document.createElementNS(svgNs, 'rect');
+    capture.setAttribute('x', '0');
+    capture.setAttribute('y', '0');
+    capture.setAttribute('width', String(width));
+    capture.setAttribute('height', String(height));
+    capture.setAttribute('class', 'ddc-connector-capture');
+    capture.addEventListener('pointermove', (ev) => {
+      if (!this._connectorDrawMode) return;
+      if (!this._connectorDraft?.points?.length) return;
+      this._connectorDraft.cursor = this._snapConnectorPointToCellOrigin_(this._eventToConnectorPoint_(ev));
+      this._renderConnectors_();
+    });
+    capture.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const point = this._snapConnectorPointToCellOrigin_(this._eventToConnectorPoint_(ev));
+      if (!this._connectorDraft?.points?.length) {
+        this._connectorDraft = {
+          tabId: currentTab,
+          points: [point],
+          cursor: point,
+          settings: this._defaultConnectorConfig_(),
+        };
+      } else {
+        const points = [...this._connectorDraft.points];
+        const last = points[points.length - 1];
+        if (!last || last.x !== point.x || last.y !== point.y) points.push(point);
+        this._connectorDraft = { ...this._connectorDraft, points, cursor: point };
+      }
+      this._renderConnectors_();
+    });
+    capture.addEventListener('dblclick', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (this._connectorDraft?.points?.length >= 2) {
+        this._finalizeConnectorDraft_({ openSettings: true });
+      }
+    });
+    layer.appendChild(capture);
+  }
+
+  const renderConnector = (connector, { draft = false } = {}) => {
+    const points = Array.isArray(connector.points) ? connector.points : [];
+    if (points.length < 2) return;
+    const state = draft
+      ? { active: true, reverse: false, animate: true }
+      : this._getConnectorResolvedState_(connector);
+    const color = state.active ? String(connector.active_color || this._defaultConnectorConfig_().active_color) : String(connector.inactive_color || this._defaultConnectorConfig_().inactive_color);
+    const thickness = Math.max(2, Math.min(28, Number(connector.thickness) || 10));
+    const rounded = connector.rounded !== false;
+    const strokeLinecap = (rounded || String(connector.line_style || '').toLowerCase() === 'dotted') ? 'round' : 'square';
+    const strokeLinejoin = rounded ? 'round' : 'miter';
+    const dasharray = String(connector.line_style || '').toLowerCase() === 'dashed'
+      ? `${Math.max(8, thickness * 1.65)} ${Math.max(6, thickness * 1.05)}`
+      : (String(connector.line_style || '').toLowerCase() === 'dotted'
+          ? `0 ${Math.max(8, thickness * 1.35)}`
+          : '');
+    const d = this._buildConnectorPathData_(points);
+    const key = String(connector.id || `draft_${Math.random().toString(36).slice(2)}`);
+    const markerBase = `ddc_connector_${key}`;
+
+    const markerStartDef = document.createElementNS(svgNs, 'marker');
+    markerStartDef.setAttribute('id', `${markerBase}_start`);
+    markerStartDef.setAttribute('markerWidth', '12');
+    markerStartDef.setAttribute('markerHeight', '12');
+    markerStartDef.setAttribute('refX', '1.6');
+    markerStartDef.setAttribute('refY', '6');
+    markerStartDef.setAttribute('orient', 'auto-start-reverse');
+    markerStartDef.setAttribute('markerUnits', 'strokeWidth');
+    markerStartDef.innerHTML = `<path d="M 12 0 L 0 6 L 12 12 z" fill="${color.replace(/"/g, '&quot;')}"></path>`;
+    defs.appendChild(markerStartDef);
+
+    const markerEndDef = document.createElementNS(svgNs, 'marker');
+    markerEndDef.setAttribute('id', `${markerBase}_end`);
+    markerEndDef.setAttribute('markerWidth', '12');
+    markerEndDef.setAttribute('markerHeight', '12');
+    markerEndDef.setAttribute('refX', '10.4');
+    markerEndDef.setAttribute('refY', '6');
+    markerEndDef.setAttribute('orient', 'auto');
+    markerEndDef.setAttribute('markerUnits', 'strokeWidth');
+    markerEndDef.innerHTML = `<path d="M 0 0 L 12 6 L 0 12 z" fill="${color.replace(/"/g, '&quot;')}"></path>`;
+    defs.appendChild(markerEndDef);
+
+    const group = document.createElementNS(svgNs, 'g');
+    group.setAttribute('class', `ddc-connector ${state.active ? 'is-active' : 'is-idle'} ${draft ? 'is-draft' : ''} ${this._selectedConnectorId === connector.id ? 'is-selected' : ''}`);
+
+    const track = document.createElementNS(svgNs, 'path');
+    track.setAttribute('class', 'ddc-connector-track');
+    track.setAttribute('d', d);
+    track.setAttribute('stroke-width', String(thickness));
+    track.setAttribute('stroke-linecap', strokeLinecap);
+    track.setAttribute('stroke-linejoin', strokeLinejoin);
+    if (dasharray) track.setAttribute('stroke-dasharray', dasharray);
+    group.appendChild(track);
+
+    const line = document.createElementNS(svgNs, 'path');
+    line.setAttribute('class', `ddc-connector-line ${connector.glow !== false ? 'is-glow' : ''}`);
+    line.setAttribute('d', d);
+    line.setAttribute('stroke', color);
+    line.setAttribute('color', color);
+    line.setAttribute('stroke-width', String(thickness));
+    line.setAttribute('stroke-linecap', strokeLinecap);
+    line.setAttribute('stroke-linejoin', strokeLinejoin);
+    if (dasharray) line.setAttribute('stroke-dasharray', dasharray);
+    if (connector.arrows === 'start' || connector.arrows === 'both') line.setAttribute('marker-start', `url(#${markerBase}_start)`);
+    if (connector.arrows === 'end' || connector.arrows === 'both') line.setAttribute('marker-end', `url(#${markerBase}_end)`);
+    group.appendChild(line);
+
+    const hit = document.createElementNS(svgNs, 'path');
+    hit.setAttribute('class', 'ddc-connector-hit');
+    hit.setAttribute('d', d);
+    hit.setAttribute('stroke-width', String(Math.max(18, thickness + 14)));
+    hit.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!this.editMode || draft) return;
+      this._selectedConnectorId = connector.id;
+      if (draft) return;
+      if (ev.shiftKey) {
+        this._insertConnectorPointAtEvent_(connector.id, ev);
+        this._selectedConnectorId = connector.id;
+        this._openConnectorSettings_?.(connector.id);
+        this._renderConnectors_();
+        return;
+      }
+      this._openConnectorSettings_?.(connector.id);
+      this._renderConnectors_();
+    });
+    hit.addEventListener('dblclick', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!this.editMode || draft) return;
+      this._insertConnectorPointAtEvent_(connector.id, ev);
+      this._selectedConnectorId = connector.id;
+      this._openConnectorSettings_?.(connector.id);
+      this._renderConnectors_();
+    });
+    group.appendChild(hit);
+
+    if (state.animate) {
+      const flow = document.createElementNS(svgNs, 'path');
+      flow.setAttribute('class', `ddc-connector-flow ${state.reverse ? 'reverse' : 'forward'}`);
+      flow.setAttribute('d', d);
+      flow.setAttribute('stroke-width', String(Math.max(2, thickness * 0.48)));
+      flow.setAttribute('stroke-linecap', strokeLinecap);
+      flow.setAttribute('stroke-linejoin', strokeLinejoin);
+      flow.setAttribute('stroke-dasharray', `${Math.max(18, thickness * 2.4)} ${Math.max(10, thickness * 1.35)}`);
+      flow.style.animationDuration = `${Math.max(0.4, Math.min(8, Number(connector.animation_speed) || 1.8))}s`;
+      group.appendChild(flow);
+    }
+
+    const selected = this._selectedConnectorId === connector.id;
+    if ((selected && this.editMode) || draft) {
+      points.forEach((point, index) => {
+        const handle = document.createElementNS(svgNs, 'circle');
+        handle.setAttribute('class', 'ddc-connector-handle');
+        handle.setAttribute('cx', String(point.x));
+        handle.setAttribute('cy', String(point.y));
+        handle.setAttribute('r', String(Math.max(6, thickness * 0.72)));
+        if (!draft) {
+          handle.addEventListener('pointerdown', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.__connectorPointDrag = { connectorId: connector.id, pointIndex: index };
+            const onMove = (moveEv) => {
+              if (!this.__connectorPointDrag) return;
+              const nextPoint = this._snapConnectorPointToCellOrigin_(this._eventToConnectorPoint_(moveEv));
+              this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+                if (entry.id !== connector.id) return entry;
+                const nextPoints = Array.isArray(entry.points) ? [...entry.points] : [];
+                nextPoints[index] = nextPoint;
+                return { ...entry, points: nextPoints };
+              }), { reason: null, render: true });
+            };
+            const onUp = () => {
+              window.removeEventListener('pointermove', onMove, true);
+              window.removeEventListener('pointerup', onUp, true);
+              window.removeEventListener('pointercancel', onUp, true);
+              this.__connectorPointDrag = null;
+              this._queueSave?.('connector-point-move');
+            };
+            window.addEventListener('pointermove', onMove, true);
+            window.addEventListener('pointerup', onUp, true);
+            window.addEventListener('pointercancel', onUp, true);
+          });
+          handle.addEventListener('dblclick', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (index === 0 || index === points.length - 1 || points.length <= 2) return;
+            this._setCurrentConnectorEntries_((this._getCurrentConnectorEntries_() || []).map((entry) => {
+              if (entry.id !== connector.id) return entry;
+              const nextPoints = [...entry.points];
+              nextPoints.splice(index, 1);
+              return { ...entry, points: nextPoints };
+            }), { reason: 'connector-junction-remove', render: true });
+          });
+        }
+        group.appendChild(handle);
+      });
+    }
+
+    layer.appendChild(group);
+  };
+
+  connectors.forEach((connector) => renderConnector(connector));
+
+  if (this._connectorDraft?.points?.length) {
+    const draftConnector = {
+      ...this._defaultConnectorConfig_(),
+      ...(this._connectorDraft.settings || {}),
+      id: 'draft',
+      points: this._connectorDraft.cursor
+        ? [...this._connectorDraft.points, this._connectorDraft.cursor]
+        : [...this._connectorDraft.points],
+    };
+    renderConnector(draftConnector, { draft: true });
+  }
+}
+
+_restoreBackgroundHostToContainer_() {
+  if (!this.cardContainer) return;
+  let bgHost = this.cardContainer.querySelector('#ddcBgHost');
+  if (!bgHost) {
+    bgHost = document.createElement('div');
+    bgHost.className = 'ddc-bg-host';
+    bgHost.id = 'ddcBgHost';
+    bgHost.setAttribute('aria-hidden', 'true');
+  }
+  this.cardContainer.innerHTML = '';
+  this.cardContainer.appendChild(bgHost);
+  this._ensureConnectorsLayer_();
+}
+
+async _buildCardsFromEntries_(entries = [], ticket = 0) {
+  this._restoreBackgroundHostToContainer_();
+  this._clearSelection?.();
+
+  let builtAny = false;
+  for (const conf of Array.isArray(entries) ? entries : []) {
+    if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+    const normalized = this._normalizeSavedCardEntry_(conf);
+    if (!normalized?.card || (typeof normalized.card === 'object' && Object.keys(normalized.card).length === 0)) {
+      const wrap = this._makePlaceholderAt(
+        normalized.position?.x || 0,
+        normalized.position?.y || 0,
+        normalized.size?.width || 200,
+        normalized.size?.height || 200
+      );
+      wrap.dataset.layoutCardId = normalized.id;
+      wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+      this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+      this.cardContainer.appendChild(wrap);
+      try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+      builtAny = true;
+      continue;
+    }
+
+    const cardEl = await this._createCard(normalized.card);
+    const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
+    if (this.editMode) wrap.classList.add('editing');
+    wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+    this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+
+    this._setCardPosition(wrap, normalized.position?.x || 0, normalized.position?.y || 0);
+    wrap.style.width = `${normalized.size?.width ?? 14 * this.gridSize}px`;
+    wrap.style.height = `${normalized.size?.height ?? 10 * this.gridSize}px`;
+    if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
+    if (normalized.overflow) {
+      try {
+        wrap.style.overflow = normalized.overflow;
+        wrap.dataset.overflow = normalized.overflow;
+        const inner = wrap.firstElementChild;
+        if (inner) inner.style.overflow = normalized.overflow;
+      } catch {}
+    }
+    try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
+
+    this.cardContainer.appendChild(wrap);
+    try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+    this._initCardInteract(wrap);
+    builtAny = true;
+  }
+
+  if (!builtAny) {
+    this._showEmptyPlaceholder();
+    this._applyAutoScale?.();
+  } else {
+    this._resizeContainer();
+    this._applyAutoScale?.();
+  }
+
+  this._syncEmptyStateUI?.();
+  try {
+    this._renderTabs?.();
+    this._renderLayersBar_?.();
+    this._applyActiveTab?.();
+  } catch {}
+  try { this._renderConnectors_?.(); } catch {}
+}
+
+async _activateResponsiveProfile_(profile, { force = false } = {}) {
+  const next = this._responsiveProfileKeys_().includes(profile) ? profile : 'desktop';
+  const nextOrientation = this._getRequestedResponsiveOrientation_?.(next) || 'landscape';
+  const nextLayoutKey = this._getResponsiveLayoutKey_(next, nextOrientation);
+  const prev = this._activeResponsiveProfile || null;
+  const prevLayoutKey = this._activeResponsiveLayoutKey || this._getResponsiveLayoutKey_(prev || 'desktop', 'landscape');
+  if (!force && prevLayoutKey === nextLayoutKey) {
+    this._syncViewportPreviewUI_?.();
+    return;
+  }
+
+  if (prevLayoutKey && prevLayoutKey !== nextLayoutKey) {
+    this._persistCurrentResponsiveProfileToMemory_();
+  }
+
+  this._activeResponsiveProfile = next;
+  this._activeResponsiveLayoutKey = nextLayoutKey;
+  this._setStoredResponsivePreviewOrientation_(next, nextOrientation);
+  const ticket = ++this.__responsiveSwitchSeq;
+  if (!this._responsiveLayouts) {
+    this._responsiveLayouts = this._normalizeResponsiveLayouts_(this._captureCurrentLayoutEntries_(), null);
+  }
+  const entries = this._responsiveLayouts?.[nextLayoutKey] || [];
+  await this._buildCardsFromEntries_(entries, ticket);
+  if (ticket !== this.__responsiveSwitchSeq) return;
+  this._syncViewportPreviewUI_?.();
+}
+
+async _syncResponsiveProfileForViewport_({ force = false } = {}) {
+  if (this.__booting) return;
+  if (!this._responsiveLayouts && !this.cardContainer?.querySelector?.('.card-wrapper')) {
+    this._syncViewportPreviewUI_?.();
+    return;
+  }
+  const next = this._getRequestedResponsiveProfile_?.() || 'desktop';
+  const nextLayoutKey = this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_();
+  if (!force && nextLayoutKey === this._activeResponsiveLayoutKey) {
+    this._syncViewportPreviewUI_?.();
+    return;
+  }
+  await this._activateResponsiveProfile_(next, { force });
+}
+
 _isContainerFixed() { return (this.containerSizeMode === 'fixed_custom' || this.containerSizeMode === 'preset' || this.containerSizeMode === 'fixed'); }
 
 _resolveFixedSize() {
@@ -2611,6 +6239,11 @@ _getContainerSize() {
   const w = parseFloat(getComputedStyle(c).width) || c.getBoundingClientRect().width;
   const h = parseFloat(getComputedStyle(c).height) || c.getBoundingClientRect().height;
   return { w, h };
+}
+
+_getOuterGridBufferPx_() {
+  if (!this.outerGridBuffer) return 0;
+  return Math.max(0, Number(this.gridSize || this._config?.grid || 0) || 0);
 }
 
 _clampAllCardsInside() {
@@ -2664,12 +6297,661 @@ _computeHaSidebarGutters_() {
   } catch {}
 }
 
+_computeHaTopGutter_() {
+  let top = 0;
+  const toPx = (value) => {
+    const n = parseFloat(String(value ?? '').trim());
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  };
+  try {
+    const roots = [
+      document.documentElement,
+      document.body,
+      ...(this._deepQueryAll?.('ha-app-layout, home-assistant-main') || [])
+    ].filter(Boolean);
+    roots.forEach((node) => {
+      try {
+        const cs = getComputedStyle(node);
+        top = Math.max(
+          top,
+          toPx(cs.getPropertyValue('--header-height')),
+          toPx(cs.getPropertyValue('--ha-header-height')),
+          toPx(cs.getPropertyValue('--app-header-height')),
+          toPx(cs.getPropertyValue('--mdc-top-app-bar-height'))
+        );
+      } catch {}
+    });
+  } catch {}
+  try {
+    const headers = this._deepQueryAll?.(
+      'app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar, ha-toolbar'
+    ) || [];
+    headers.forEach((el) => {
+      try {
+        if (!el) return;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const rect = el.getBoundingClientRect?.();
+        if (!rect || rect.height < 8 || rect.width < 120) return;
+        if (rect.bottom <= 0) return;
+        if (rect.top >= Math.max(window.innerHeight || 0, 1)) return;
+        top = Math.max(top, Math.round(rect.bottom));
+      } catch {}
+    });
+  } catch {}
+  try {
+    this.style.setProperty('--ddc-top-gutter', `${Math.max(0, Math.round(top))}px`);
+  } catch {}
+}
+
 _applyGridVars() {
   const sz = `${this.gridSize || 10}px`;
   // host (inherits down)
   this.style.setProperty('--ddc-grid-size', sz);
   // container (extra robust)
   this.cardContainer?.style.setProperty('--ddc-grid-size', sz);
+}
+
+_getViewportPreviewPreset_() {
+  const mode = String(this.viewportPreviewMode || 'live').toLowerCase();
+  if (!this.editMode || mode === 'live') return null;
+  if (!this._responsiveProfileKeys_().includes(mode)) return null;
+  const orientation = this._getRequestedResponsiveOrientation_?.(mode) || 'landscape';
+  const viewport = this._getResponsiveViewportProfile_(mode, orientation);
+  return {
+    id: mode,
+    width: viewport.width,
+    height: viewport.height,
+    label: this._getResponsiveProfileLabel_(mode),
+    orientation,
+  };
+}
+
+_isExplicitViewportPreview_() {
+  return !!this._getViewportPreviewPreset_?.();
+}
+
+_getViewportMetrics_() {
+  const preview = this._getViewportPreviewPreset_?.();
+  if (preview?.width && preview?.height) {
+    return {
+      width: preview.width,
+      height: preview.height,
+      shortEdge: Math.min(preview.width, preview.height),
+      longEdge: Math.max(preview.width, preview.height),
+      isPortrait: preview.height >= preview.width,
+      preview: preview.id,
+    };
+  }
+  return this._getRealViewportMetrics_?.() || {
+    width: 1,
+    height: 1,
+    shortEdge: 1,
+    longEdge: 1,
+    isPortrait: true,
+  };
+}
+
+_getEffectivePreviewWidth_(measuredWidth = 1) {
+  const width = Math.max(1, Number(measuredWidth || 1) || 1);
+  const preview = this._getViewportPreviewPreset_?.();
+  if (!preview?.width) return width;
+  const previewId = String(preview?.id || '').toLowerCase();
+  const gutter =
+    previewId === 'desktop'
+      ? (width <= 1600 ? 72 : Math.min(680, width * 0.34))
+      : previewId === 'tablet'
+        ? (width <= 1200 ? 64 : Math.min(460, width * 0.28))
+        : (width <= 720 ? 24 : Math.min(120, width * 0.12));
+  const room = Math.max(1, width - gutter);
+  return Math.max(1, Math.min(room, preview.width));
+}
+
+_getEffectivePreviewHeight_() {
+  const preview = this._getViewportPreviewPreset_?.();
+  if (!preview?.height) return 0;
+  return Math.max(1, Number(preview.height) || 1);
+}
+
+_getPreviewDeviceFrameOrientation_(deviceId = null, width = 0, height = 0, forcedOrientation = null) {
+  const id = String(deviceId || this._getViewportPreviewPreset_?.()?.id || '').toLowerCase();
+  if (id === 'desktop') return 'landscape';
+  if (forcedOrientation) return this._normalizeResponsiveOrientation_(id, forcedOrientation);
+  const w = Math.max(1, Number(width || this._getViewportPreviewPreset_?.()?.width || 1) || 1);
+  const h = Math.max(1, Number(height || this._getViewportPreviewPreset_?.()?.height || 1) || 1);
+  return h >= w ? 'portrait' : 'landscape';
+}
+
+_rotatePreviewDeviceFrameConfig_(config = null, targetOrientation = 'portrait') {
+  if (!config) return null;
+  const baseOrientation = String(
+    config.viewportOrientation
+    || ((Number(config.innerHeight || 0) || 0) >= (Number(config.innerWidth || 0) || 0) ? 'portrait' : 'landscape')
+  ).toLowerCase();
+  const orientation = String(targetOrientation || baseOrientation).toLowerCase();
+
+  const base = {
+    ...config,
+    baseViewportOrientation: baseOrientation,
+    orientation,
+    displayAssetWidth: Number(config.assetWidth || 1280) || 1280,
+    displayAssetHeight: Number(config.assetHeight || 960) || 960,
+    displayViewportLeft: Number(config.measuredViewportLeft || 0) || 0,
+    displayViewportTop: Number(config.measuredViewportTop || 0) || 0,
+    displayViewportWidth: Number(config.measuredViewportWidth || 1) || 1,
+    displayViewportHeight: Number(config.measuredViewportHeight || 1) || 1,
+    assetRotation: 0,
+    viewportInnerWidth: Math.max(1, Number(config.innerWidth || 1) || 1),
+    viewportInnerHeight: Math.max(1, Number(config.innerHeight || 1) || 1),
+  };
+
+  if (orientation === baseOrientation || base.id === 'desktop') return base;
+
+  const assetWidth = Math.max(1, Number(config.assetWidth || 1280) || 1280);
+  const assetHeight = Math.max(1, Number(config.assetHeight || 960) || 960);
+  const viewportLeft = Math.max(0, Number(config.measuredViewportLeft || 0) || 0);
+  const viewportTop = Math.max(0, Number(config.measuredViewportTop || 0) || 0);
+  const viewportWidth = Math.max(1, Number(config.measuredViewportWidth || 1) || 1);
+  const viewportHeight = Math.max(1, Number(config.measuredViewportHeight || 1) || 1);
+
+  return {
+    ...base,
+    orientation,
+    displayAssetWidth: assetHeight,
+    displayAssetHeight: assetWidth,
+    displayViewportLeft: Math.max(0, assetHeight - (viewportTop + viewportHeight)),
+    displayViewportTop: viewportLeft,
+    displayViewportWidth: viewportHeight,
+    displayViewportHeight: viewportWidth,
+    assetRotation: 90,
+    viewportInnerWidth: Math.max(1, Number(config.innerHeight || 1) || 1),
+    viewportInnerHeight: Math.max(1, Number(config.innerWidth || 1) || 1),
+  };
+}
+
+_lockPreviewDeviceFrameViewportRect_(config = null) {
+  if (!config) return null;
+  const next = { ...config };
+  const innerWidth = Math.max(1, Number(next.viewportInnerWidth || next.innerWidth || 1) || 1);
+  const innerHeight = Math.max(1, Number(next.viewportInnerHeight || next.innerHeight || 1) || 1);
+  const targetRatio = innerWidth / Math.max(1, innerHeight);
+  const currentWidth = Math.max(1, Number(next.displayViewportWidth || next.measuredViewportWidth || 1) || 1);
+  const currentHeight = Math.max(1, Number(next.displayViewportHeight || next.measuredViewportHeight || 1) || 1);
+  const widthFromHeight = Math.max(1, currentHeight * targetRatio);
+  const heightFromWidth = Math.max(1, currentWidth / Math.max(0.0001, targetRatio));
+  const widthDelta = Math.abs(widthFromHeight - currentWidth);
+  const heightDelta = Math.abs(heightFromWidth - currentHeight);
+
+  if (widthDelta < heightDelta) {
+    const lockedWidth = Math.max(1, Math.round(widthFromHeight));
+    next.displayViewportWidth = lockedWidth;
+    next.measuredViewportWidth = lockedWidth;
+    next.displayViewportHeight = currentHeight;
+    next.measuredViewportHeight = currentHeight;
+  } else {
+    const lockedHeight = Math.max(1, Math.round(heightFromWidth));
+    next.displayViewportWidth = currentWidth;
+    next.measuredViewportWidth = currentWidth;
+    next.displayViewportHeight = lockedHeight;
+    next.measuredViewportHeight = lockedHeight;
+  }
+
+  return next;
+}
+
+_getPreviewDeviceFrameLock_(deviceId = null, width = 0, height = 0, opts = {}) {
+  const config = this._getPreviewDeviceFrameConfig_?.(deviceId, width, height, opts);
+  if (!config) return null;
+  const viewportWidth = Math.max(1, Number(config.viewportInnerWidth || config.innerWidth || width || 1) || 1);
+  const viewportHeight = Math.max(1, Number(config.viewportInnerHeight || config.innerHeight || height || 1) || 1);
+  return {
+    id: config.id,
+    orientation: config.orientation || 'landscape',
+    width: viewportWidth,
+    height: viewportHeight,
+    ratio: Math.max(0.0001, viewportWidth / Math.max(1, viewportHeight)),
+  };
+}
+
+_getPreviewDeviceFrameConfig_(deviceId = null, screenWidth = 0, screenHeight = 0, opts = {}) {
+  const id = String(deviceId || this._getViewportPreviewPreset_?.()?.id || '').toLowerCase();
+  const presets = {
+    mobile: {
+      id: 'mobile',
+      imageUrl: 'https://i.postimg.cc/9QgSw3WG/iphone-frame.png',
+      assetWidth: 1280,
+      assetHeight: 960,
+      viewportOrientation: 'portrait',
+      measuredViewportLeft: 474,
+      measuredViewportTop: 120,
+      measuredViewportWidth: 332,
+      measuredViewportHeight: 721,
+      innerWidth: 500,
+      innerHeight: 1080,
+    },
+    tablet: {
+      id: 'tablet',
+      imageUrl: 'https://i.postimg.cc/137TVx9w/ipad_frame.png',
+      assetWidth: 1280,
+      assetHeight: 960,
+      viewportOrientation: 'landscape',
+      measuredViewportLeft: 207,
+      measuredViewportTop: 155,
+      measuredViewportWidth: 866,
+      measuredViewportHeight: 651,
+      innerWidth: 1295,
+      innerHeight: 923,
+    },
+    desktop: {
+      id: 'desktop',
+      imageUrl: 'https://i.postimg.cc/DwpD4V21/macbook_frame.png',
+      assetWidth: 1280,
+      assetHeight: 960,
+      viewportOrientation: 'landscape',
+      measuredViewportLeft: 162,
+      measuredViewportTop: 181,
+      measuredViewportWidth: 956,
+      measuredViewportHeight: 598,
+      innerWidth: 1430,
+      innerHeight: 896,
+    },
+  };
+  const base = presets[id] || null;
+  if (!base) return null;
+  const orientation = this._getPreviewDeviceFrameOrientation_?.(id, screenWidth, screenHeight, opts?.orientation) || base.viewportOrientation || 'landscape';
+  const rotated = this._rotatePreviewDeviceFrameConfig_?.(base, orientation) || base;
+  return this._lockPreviewDeviceFrameViewportRect_?.(rotated) || rotated;
+}
+
+_getPreviewDeviceFrameMetrics_(screenWidth = 0, screenHeight = 0, deviceId = null, opts = {}) {
+  const config = this._getPreviewDeviceFrameConfig_?.(deviceId, screenWidth, screenHeight, opts);
+  if (!config) return null;
+
+  const safeScreenWidth = Math.max(1, Number(screenWidth || this._getViewportPreviewPreset_?.()?.width || 1) || 1);
+  const safeScreenHeight = Math.max(1, Number(screenHeight || this._getViewportPreviewPreset_?.()?.height || 1) || 1);
+  const displayWidth = Math.max(1, Number(opts?.displayWidth || safeScreenWidth) || safeScreenWidth);
+  const displayHeight = Math.max(1, Number(opts?.displayHeight || safeScreenHeight) || safeScreenHeight);
+  const innerWidth = Math.max(1, Number(config.viewportInnerWidth || config.innerWidth || safeScreenWidth) || safeScreenWidth);
+  const innerHeight = Math.max(1, Number(config.viewportInnerHeight || config.innerHeight || safeScreenHeight) || safeScreenHeight);
+  const measuredViewportWidth = Math.max(1, Number(config.displayViewportWidth || config.measuredViewportWidth || safeScreenWidth) || safeScreenWidth);
+  const measuredViewportHeight = Math.max(1, Number(config.displayViewportHeight || config.measuredViewportHeight || safeScreenHeight) || safeScreenHeight);
+  const measuredViewportLeft = Math.max(0, Number(config.displayViewportLeft || config.measuredViewportLeft || 0) || 0);
+  const measuredViewportTop = Math.max(0, Number(config.displayViewportTop || config.measuredViewportTop || 0) || 0);
+
+  const assetWidth = Math.max(1, Number(config.assetWidth || 1280) || 1280);
+  const assetHeight = Math.max(1, Number(config.assetHeight || 960) || 960);
+  const displayAssetWidth = Math.max(1, Number(config.displayAssetWidth || assetWidth) || assetWidth);
+  const displayAssetHeight = Math.max(1, Number(config.displayAssetHeight || assetHeight) || assetHeight);
+  const intrinsicScaleX = measuredViewportWidth / innerWidth;
+  const intrinsicScaleY = measuredViewportHeight / innerHeight;
+  const intrinsicScale = Math.max(
+    0.0001,
+    ((Number.isFinite(intrinsicScaleX) ? intrinsicScaleX : 0) + (Number.isFinite(intrinsicScaleY) ? intrinsicScaleY : 0)) / 2
+      || intrinsicScaleX
+      || intrinsicScaleY
+      || 1
+  );
+  const frameScale = Math.max(0.0001, displayWidth / measuredViewportWidth || 1);
+  const frameHeightScale = Math.max(0.0001, displayHeight / measuredViewportHeight || frameScale);
+  const logicalAssetWidth = Math.max(1, displayAssetWidth / intrinsicScale);
+  const logicalAssetHeight = Math.max(1, displayAssetHeight / intrinsicScale);
+  const logicalOriginalAssetWidth = Math.max(1, assetWidth / intrinsicScale);
+  const logicalOriginalAssetHeight = Math.max(1, assetHeight / intrinsicScale);
+  const renderedViewportWidth = displayWidth;
+  const renderedViewportHeight = displayHeight;
+  const viewportOffsetX = 0;
+  const viewportOffsetY = 0;
+  const frameWidth = Math.max(1, displayAssetWidth * frameScale);
+  const frameHeight = Math.max(1, displayAssetHeight * frameHeightScale);
+  const renderedAssetWidth = Math.max(1, assetWidth * frameScale);
+  const renderedAssetHeight = Math.max(1, assetHeight * frameHeightScale);
+  const renderedViewportLeft = Math.max(0, measuredViewportLeft * frameScale);
+  const renderedViewportTop = Math.max(0, measuredViewportTop * frameHeightScale);
+
+  return {
+    ...config,
+    screenWidth: safeScreenWidth,
+    screenHeight: safeScreenHeight,
+    displayWidth,
+    displayHeight,
+    assetWidth,
+    assetHeight,
+    displayAssetWidth,
+    displayAssetHeight,
+    innerWidth,
+    innerHeight,
+    measuredViewportLeft,
+    measuredViewportTop,
+    measuredViewportWidth,
+    measuredViewportHeight,
+    viewportLeft: measuredViewportLeft,
+    viewportTop: measuredViewportTop,
+    viewportWidth: innerWidth,
+    viewportHeight: innerHeight,
+    logicalAssetWidth,
+    logicalAssetHeight,
+    intrinsicScaleX,
+    intrinsicScaleY,
+    intrinsicScale,
+    renderScale: frameScale,
+    renderScaleX: frameScale,
+    renderScaleY: frameHeightScale,
+    renderedViewportWidth,
+    renderedViewportHeight,
+    viewportOffsetX,
+    viewportOffsetY,
+    frameWidth,
+    frameHeight,
+    logicalOriginalAssetWidth,
+    logicalOriginalAssetHeight,
+    renderedAssetWidth,
+    renderedAssetHeight,
+    renderedViewportLeft,
+    renderedViewportTop,
+  };
+}
+
+_applyPreviewDeviceFrame_(screenWidth = 0, screenHeight = 0, deviceId = null, opts = {}) {
+  const outer = this.__scaleOuter;
+  const root = this.rootEl;
+  try { outer?.classList?.remove?.('ddc-preview-shell'); } catch {}
+
+  const rootRect = root?.getBoundingClientRect?.() || { left: 0, top: 0 };
+  const outerRect = outer?.getBoundingClientRect?.() || {
+    left: outer?.offsetLeft || 0,
+    top: outer?.offsetTop || 0,
+    width: outer?.offsetWidth || Math.max(1, Number(screenWidth || 1) || 1),
+    height: outer?.offsetHeight || Math.max(1, Number(screenHeight || 1) || 1),
+  };
+  const metrics = this._getPreviewDeviceFrameMetrics_?.(screenWidth, screenHeight, deviceId, {
+    ...opts,
+    displayWidth: Math.max(1, Number(outerRect.width || 1) || 1),
+    displayHeight: Math.max(1, Number(outerRect.height || 1) || 1),
+  });
+
+  if (root) {
+    root.classList.toggle('ddc-preview-device-active', !!metrics);
+    root.classList.toggle('ddc-preview-device-mobile', metrics?.id === 'mobile');
+    root.classList.toggle('ddc-preview-device-tablet', metrics?.id === 'tablet');
+    root.classList.toggle('ddc-preview-device-desktop', metrics?.id === 'desktop');
+  }
+
+  if (!root || !outer || !metrics) {
+    if (this.__previewDeviceFrameEl?.isConnected) this.__previewDeviceFrameEl.remove();
+    this.__previewDeviceFrameEl = null;
+    return metrics || null;
+  }
+
+  let frame = this.__previewDeviceFrameEl;
+  if (!frame || !frame.isConnected) {
+    frame = document.createElement('div');
+    frame.className = 'ddc-preview-device-frame';
+    frame.setAttribute('aria-hidden', 'true');
+    const viewportBox = document.createElement('div');
+    viewportBox.className = 'ddc-preview-frame-viewport-box';
+    frame.appendChild(viewportBox);
+    root.insertBefore(frame, outer);
+    this.__previewDeviceFrameEl = frame;
+  } else if (frame.nextSibling !== outer) {
+    root.insertBefore(frame, outer);
+  }
+
+  const viewportBox = frame.querySelector('.ddc-preview-frame-viewport-box');
+  const frameStyle = frame.style;
+  frame.dataset.device = metrics.id;
+  frame.dataset.orientation = metrics.orientation || 'landscape';
+  frameStyle.width = `${Math.max(1, metrics.frameWidth)}px`;
+  frameStyle.height = `${Math.max(1, metrics.frameHeight)}px`;
+  frameStyle.left = `${Math.round((outerRect.left - rootRect.left) + (metrics.viewportOffsetX || 0) - (metrics.viewportLeft * (metrics.renderScaleX || metrics.renderScale || 1)))}px`;
+  frameStyle.top = `${Math.round((outerRect.top - rootRect.top) + (metrics.viewportOffsetY || 0) - (metrics.viewportTop * (metrics.renderScaleY || metrics.renderScale || 1)))}px`;
+  frameStyle.setProperty('--ddc-preview-frame-url', `url("${metrics.imageUrl}")`);
+  frameStyle.setProperty('--ddc-preview-asset-width', `${Math.max(1, metrics.renderedAssetWidth || metrics.frameWidth)}px`);
+  frameStyle.setProperty('--ddc-preview-asset-height', `${Math.max(1, metrics.renderedAssetHeight || metrics.frameHeight)}px`);
+  frameStyle.setProperty('--ddc-preview-asset-left', `${Math.round((metrics.frameWidth - (metrics.renderedAssetWidth || metrics.frameWidth)) / 2)}px`);
+  frameStyle.setProperty('--ddc-preview-asset-top', `${Math.round((metrics.frameHeight - (metrics.renderedAssetHeight || metrics.frameHeight)) / 2)}px`);
+  frameStyle.setProperty('--ddc-preview-asset-rotation', `${Number(metrics.assetRotation || 0) || 0}deg`);
+  if (viewportBox) {
+    viewportBox.style.left = `${Math.round(metrics.renderedViewportLeft || 0)}px`;
+    viewportBox.style.top = `${Math.round(metrics.renderedViewportTop || 0)}px`;
+    viewportBox.style.width = `${Math.max(1, metrics.renderedViewportWidth || metrics.screenWidth || 1)}px`;
+    viewportBox.style.height = `${Math.max(1, metrics.renderedViewportHeight || metrics.screenHeight || 1)}px`;
+    viewportBox.dataset.debug = `${this._getResponsiveProfileLabel_(metrics.id)} ${metrics.orientation || 'landscape'} · ${Math.round(metrics.screenWidth)}×${Math.round(metrics.screenHeight)}`;
+  }
+  return metrics;
+}
+
+_syncViewportPreviewUI_() {
+  try {
+    const group = this.shadowRoot?.querySelector?.('#previewModeControls');
+    const buttons = Array.from(this.shadowRoot?.querySelectorAll?.('[data-preview-mode]') || []);
+    const preview = this._getViewportPreviewPreset_?.();
+    const active = preview?.id || 'live';
+    const liveProfile = this._getActualResponsiveProfile_?.() || 'desktop';
+
+    if (group) group.style.display = '' ;
+    buttons.forEach((btn) => {
+      const on = String(btn.dataset.previewMode || 'live') === active;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (btn.dataset.previewMode === 'live') {
+        btn.dataset.profile = liveProfile;
+        btn.title = `Live viewport (${this._getResponsiveProfileLabel_(liveProfile)})`;
+      } else {
+        btn.removeAttribute('data-profile');
+        btn.title = this._getResponsiveProfileLabel_(btn.dataset.previewMode || 'desktop');
+      }
+    });
+
+    if (this.rootEl) {
+      this.rootEl.classList.toggle('ddc-preview-active', !!preview);
+      this.rootEl.classList.toggle('ddc-preview-docked-tabs', !!preview);
+      if (preview?.width) this.rootEl.style.setProperty('--ddc-preview-width', `${preview.width}px`);
+      else this.rootEl.style.removeProperty('--ddc-preview-width');
+      if (preview?.height) this.rootEl.style.setProperty('--ddc-preview-height', `${preview.height}px`);
+      else this.rootEl.style.removeProperty('--ddc-preview-height');
+    }
+
+    if (this.__scaleOuter) {
+      this.__scaleOuter.style.marginInline = preview ? 'auto' : '';
+      this.__scaleOuter.style.maxWidth = preview ? '100%' : '';
+    }
+
+    this._applyPreviewDeviceFrame_?.(
+      preview?.width || 0,
+      preview?.height || 0,
+      preview?.id || null,
+      { orientation: preview?.orientation || null }
+    );
+
+    if (this.tabsBar && this.tabsPosition !== 'left') {
+      this.tabsBar.style.marginInline = preview ? 'auto' : '';
+    }
+
+    this._syncResponsiveViewportFields_?.();
+  } catch {}
+}
+
+async _setViewportPreviewMode_(mode = 'live') {
+  const normalized = (mode === 'desktop' || mode === 'mobile' || mode === 'tablet') ? mode : 'live';
+  this._persistCurrentResponsiveProfileToMemory_();
+  this.viewportPreviewMode = normalized;
+  if (normalized !== 'live') {
+    const orientation = this._getRequestedResponsiveOrientation_?.(normalized) || 'landscape';
+    this._ensureResponsiveViewportProfileLock_?.(normalized, 'width', orientation);
+  }
+  this.__ddcTextLockDirty = true;
+  await this._syncResponsiveProfileForViewport_({ force: true });
+  this._applyAutoScale?.();
+  this._syncTabsWidth_?.();
+  this._scheduleTextResizeLockRefresh_?.(true);
+}
+
+_syncResponsiveViewportFields_() {
+  try {
+    const widthInput = this.previewWidthInput;
+    const heightInput = this.previewHeightInput;
+    const swapButton = this.previewSwapButton;
+    const meta = this.previewMeta;
+    if (!widthInput || !heightInput) return;
+    const activeEl = this.shadowRoot?.activeElement;
+
+    const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
+    const editingProfile = this._responsiveProfileKeys_().includes(previewMode) ? previewMode : null;
+    const activeProfile = editingProfile || this._activeResponsiveProfile || this._getActualResponsiveProfile_?.() || 'desktop';
+    const activeOrientation = this._getRequestedResponsiveOrientation_?.(activeProfile) || 'landscape';
+    if (editingProfile) this._ensureResponsiveViewportProfileLock_?.(editingProfile, 'width', activeOrientation);
+    const viewport = this._getResponsiveViewportProfile_(activeProfile, activeOrientation);
+    const frameLock = this._getPreviewDeviceFrameLock_?.(activeProfile, viewport.width, viewport.height, { orientation: activeOrientation });
+    if (activeEl !== widthInput) widthInput.value = String(Math.round(viewport.width));
+    if (activeEl !== heightInput) heightInput.value = String(Math.round(viewport.height));
+
+    const isLive = !editingProfile;
+    const canRotate = !!editingProfile && editingProfile !== 'desktop';
+    widthInput.disabled = isLive;
+    heightInput.disabled = isLive;
+    if (swapButton) {
+      swapButton.disabled = !canRotate;
+      swapButton.hidden = !canRotate;
+      swapButton.setAttribute('aria-hidden', canRotate ? 'false' : 'true');
+      swapButton.title = canRotate ? 'Swap orientation' : 'Orientation swap is only available for mobile and tablet';
+    }
+    if (meta) {
+      meta.textContent = isLive
+        ? `Auto: ${this._getResponsiveProfileLabel_(this._getActualResponsiveProfile_?.() || 'desktop')}`
+        : `Editing ${this._getResponsiveProfileLabel_(editingProfile)} · ${frameLock?.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${Math.round(viewport.width)}×${Math.round(viewport.height)} · locked ratio`;
+    }
+  } catch {}
+}
+
+_commitResponsiveViewportField_(axis = 'width') {
+  try {
+    const profile = String(this.viewportPreviewMode || 'live').toLowerCase();
+    if (!this._responsiveProfileKeys_().includes(profile)) return;
+    const input = axis === 'height' ? this.previewHeightInput : this.previewWidthInput;
+    if (!input) return;
+    const raw = String(input.value || '').trim();
+    if (!raw) {
+      this._syncResponsiveViewportFields_?.();
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      this._syncResponsiveViewportFields_?.();
+      return;
+    }
+    const value = Math.max(240, Math.min(6000, Math.round(parsed)));
+    this._updateResponsiveViewportProfile_(profile, { [axis]: value }, {
+      preferAxis: axis === 'height' ? 'height' : 'width',
+      orientation: this._getRequestedResponsiveOrientation_?.(profile) || 'landscape',
+    });
+    this._syncResponsiveViewportFields_?.();
+  } catch {}
+}
+
+_updateResponsiveViewportProfile_(profile, patch = {}, opts = {}) {
+  if (!this._responsiveProfileKeys_().includes(profile)) return;
+  const orientation = this._normalizeResponsiveOrientation_(
+    profile,
+    opts?.orientation ?? this._getRequestedResponsiveOrientation_?.(profile)
+  );
+  const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
+  const current = this._getResponsiveViewportProfile_(profile, orientation);
+  const preferAxis = opts?.preferAxis === 'height' ? 'height' : 'width';
+  const nextPatch = { ...patch };
+  if (profile === 'desktop') {
+    const width = Number(nextPatch.width ?? current.width) || current.width;
+    const height = Number(nextPatch.height ?? current.height) || current.height;
+    nextPatch.width = Math.max(width, height);
+    nextPatch.height = Math.min(width, height);
+  }
+  const locked = this._getLockedResponsiveViewportProfile_(
+    profile,
+    {
+      ...current,
+      ...nextPatch,
+    },
+    preferAxis,
+    orientation
+  );
+  const next = this._normalizeResponsiveViewportProfiles_({
+    ...(this.responsiveViewportProfiles || {}),
+    [variantKey]: {
+      ...locked,
+    },
+  });
+  this.responsiveViewportProfiles = next;
+  this._config = {
+    ...(this._config || {}),
+    responsive_viewports: this._cloneJson_(this._serializeResponsiveViewportProfiles_(next)),
+  };
+  this._syncViewportPreviewUI_?.();
+  this._applyAutoScale?.();
+  this._syncTabsWidth_?.();
+  try { if (!this._isInHaEditorPreview()) this._queueSave?.('responsive-viewports'); } catch {}
+}
+
+_swapResponsiveViewportOrientation_() {
+  const profile = String(this.viewportPreviewMode || 'live').toLowerCase();
+  if (!this._responsiveProfileKeys_().includes(profile) || profile === 'desktop') return;
+  const currentOrientation = this._getStoredResponsivePreviewOrientation_(profile);
+  const nextOrientation = currentOrientation === 'portrait' ? 'landscape' : 'portrait';
+  this._setStoredResponsivePreviewOrientation_(profile, nextOrientation);
+  this._ensureResponsiveViewportProfileLock_?.(profile, 'width', nextOrientation);
+  this._syncResponsiveProfileForViewport_?.({ force: true });
+  this._syncResponsiveViewportFields_?.();
+  this._syncViewportPreviewUI_?.();
+  this._applyAutoScale?.();
+}
+
+_shouldUseUnscaledPreviewCanvas_() {
+  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+  if (mode !== 'dynamic') return false;
+  if (String(this.mobileDynamicBehavior || 'native').toLowerCase() !== 'native') return false;
+  const profile = this._getRequestedResponsiveProfile_?.() || this._activeResponsiveProfile || this._getActualResponsiveProfile_?.() || 'desktop';
+  return profile === 'mobile';
+}
+
+_isMobileOptimizeActive_() {
+  try {
+    if (!this.optimizeForMobile) return false;
+    if (this._shouldUseUnscaledPreviewCanvas_?.()) return false;
+    const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+    if (mode !== 'dynamic' || !this.autoResizeCards) return false;
+    const vp = this._getViewportMetrics_?.() || { width: 0, shortEdge: 0, isPortrait: false };
+    const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+    return vp.shortEdge <= 900 && (coarse || vp.width <= 820 || vp.isPortrait);
+  } catch {
+    return false;
+  }
+}
+
+_getMobileScalePlan_(designWidth = 1, baseScale = 1) {
+  const vp = this._getViewportMetrics_?.() || { width: 0, isPortrait: false };
+  const width = Math.max(1, vp.width || 1);
+  const readableFloor = vp.isPortrait
+    ? (width <= 390 ? 0.48 : width <= 430 ? 0.52 : width <= 520 ? 0.58 : 0.64)
+    : (width <= 820 ? 0.64 : 0.7);
+  const maxPanFactor = vp.isPortrait ? 1.85 : 1.45;
+  const maxPanScale = Math.max(baseScale, baseScale * maxPanFactor);
+  const preferredScale = Math.min(readableFloor, maxPanScale);
+  const scale = Math.max(baseScale, preferredScale);
+  return {
+    scale,
+    allowPanX: scale > (baseScale + 1e-3),
+  };
+}
+
+_getMobileTextAssistScale_() {
+  const vp = this._getViewportMetrics_?.() || { width: 0, isPortrait: false };
+  const width = Math.max(1, vp.width || 1);
+  if (vp.isPortrait) {
+    if (width <= 390) return 0.78;
+    if (width <= 430) return 0.82;
+    if (width <= 520) return 0.86;
+    return 0.9;
+  }
+  if (width <= 820) return 0.88;
+  return 0.92;
 }
 
   /* ---------------------------- debug helpers ---------------------------- */
@@ -2729,6 +7011,11 @@ _applyGridVars() {
     this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
     this.containerBackground      = config.container_background ?? 'transparent';
     this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    this.applyBackgroundToPage    = !!(config.apply_background_to_page ?? config.applyBackgroundToPage ?? false);
+    this.dashboardThemeEnabled    = !!(config.dashboard_theme_enabled ?? config.theme_enabled ?? false);
+    this.dashboardTheme           = String(config.dashboard_theme ?? config.theme_name ?? '').trim();
+    this.dashboardThemeOverrideAllDesign = !!(config.dashboard_theme_override_all_design ?? config.theme_override_all_design ?? false);
+    this.outerGridBuffer          = !!(config.outer_grid_buffer ?? false);
 
     // Whether to apply a drop shadow to card wrappers (defaults to false)
     this.cardShadowEnabled        = !!config.card_shadow;
@@ -2740,6 +7027,23 @@ _applyGridVars() {
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
     this.containerSizeMode        = config.container_size_mode || 'dynamic';
+    this.doNotResizeText          = !!(config.do_not_resize_text ?? config.doNotResizeText ?? false);
+    this.optimizeForMobile        = !!(config.optimize_for_mobile ?? config.optimizeForMobile ?? false);
+    this.mobileDynamicBehavior    = String(config.mobile_dynamic_behavior ?? config.mobileDynamicBehavior ?? 'native').toLowerCase() === 'scale'
+      ? 'scale'
+      : 'native';
+    const providedResponsiveViewports = config.responsive_viewports || this.responsiveViewportProfiles;
+    this.responsiveViewportProfiles = this._isLegacyResponsiveViewportProfiles_(providedResponsiveViewports)
+      ? this._defaultResponsiveViewportProfiles_()
+      : this._normalizeResponsiveViewportProfiles_(providedResponsiveViewports);
+    this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(
+      config.connectors || [],
+      config.responsive_connectors || null
+    );
+    this._connectorDrawMode = false;
+    this._connectorDraft = null;
+    this._selectedConnectorId = null;
+    this.__connectorPointDrag = null;
     
 
     const sizeModeLower           = String(this.containerSizeMode || 'dynamic').toLowerCase();
@@ -2772,13 +7076,17 @@ _applyGridVars() {
     this.heroImage = config?.hero_image || "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png";
     // Tabs options
     this.tabs               = Array.isArray(config.tabs) ? config.tabs : [];
-    this.tabsPosition       = (config.tabs_position === 'left') ? 'left' : 'top';
+    {
+      const tabsPosition = String(config.tabs_position || 'top').toLowerCase();
+      this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
+    }
+    this._setDashboardLayers_(config.layers || [], { refresh: false });
     this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
     this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
     this.activeTab          = this.defaultTab;
     try { const lastT = localStorage.getItem(`ddc_lasttab_${this.storageKey}`);
       if (lastT && this.tabs.some(t=>t.id===lastT)) this.activeTab = lastT; } catch {}
-    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+    this._syncTabsPlacement_?.();
 
 
 
@@ -2821,14 +7129,7 @@ _applyGridVars() {
       grid: this.gridSize
     });
 
-    this.style.setProperty('--ddc-bg', this.containerBackground);
-    this.style.setProperty('--ddc-card-bg', this.cardBackground);
-
-    // Apply initial card drop shadow if enabled
-    if (this.cardShadowEnabled) {
-      // Set a more prominent drop shadow by default
-      this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
-    }
+    this._applyDashboardThemeStyling_?.();
 
     // preload libs
     if (!window.jsyaml) {
@@ -2855,14 +7156,63 @@ _applyGridVars() {
 
 .ddc-root{
   position:relative;
+  z-index: 1;
   /* JS will keep this in sync with your “Grid (px)” */
   --ddc-grid-size: 10px;
   /* Good contrast on light/dark themes */
   --ddc-grid-color: color-mix(in srgb, var(--primary-text-color) 22%, transparent);
+  --ddc-left-rail-width: clamp(84px, 7vw, 104px);
+  --ddc-left-rail-gap: clamp(18px, 2.6vw, 30px);
 
   /* Container we query for width */
   container-type: inline-size;
   container-name: ddc-root;
+}
+
+.ddc-root.ddc-tabs-left-layout{
+  display:grid;
+  grid-template-columns: var(--ddc-left-rail-width) minmax(0, 1fr);
+  grid-template-areas:
+    "toolbar toolbar"
+    "tabs canvas";
+  column-gap: var(--ddc-left-rail-gap);
+  align-items:start;
+}
+
+.ddc-root.ddc-tabs-left-layout > .ddc-toolbar{
+  grid-area: toolbar;
+}
+
+.ddc-root.ddc-tabs-left-layout > .ddc-tabs{
+  grid-area: tabs;
+  justify-self: center;
+  align-self: start;
+}
+
+.ddc-root.ddc-tabs-left-layout > .ddc-scale-outer,
+.ddc-root.ddc-tabs-left-layout > .card-container{
+  grid-area: canvas;
+  min-width: 0;
+}
+
+.ddc-root.ddc-tabs-bottom-layout .ddc-scale-outer,
+.ddc-root.ddc-tabs-bottom-layout .card-container{
+  margin-bottom: 86px;
+}
+
+@container ddc-root (max-width: 980px){
+  .ddc-root.ddc-tabs-left-layout{
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "toolbar"
+      "tabs"
+      "canvas";
+    row-gap: 12px;
+  }
+
+  .ddc-root.ddc-tabs-left-layout > .ddc-tabs{
+    align-self: start;
+  }
 }
 
 /* ===== DDC Toolbar and tabs when auto sieze is off ===== */
@@ -2878,13 +7228,22 @@ _applyGridVars() {
   width: var(--ddc-ui-width, auto);
   max-width: calc(100vw - var(--ddc-left-gutter, 56px) - var(--ddc-right-gutter, 0px));
   box-sizing: border-box;
-  z-index: 3; /* above canvas, below dialogs */
   pointer-events: auto;
 }
 
 /* Vertical placement */
-:host([ddc-fixed-ui]) .ddc-toolbar { top: 0; }
-:host([ddc-fixed-ui]) .ddc-tabs { top: var(--ddc-toolbar-height, 0px); }
+:host([ddc-fixed-ui]) .ddc-toolbar {
+  top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px));
+  z-index: 8;
+}
+:host([ddc-fixed-ui]) .ddc-tabs {
+  top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
+  z-index: 5;
+}
+:host([ddc-fixed-ui]) .ddc-tabs.ddc-tabs-bottom {
+  top: auto;
+  bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
 
 /* Make tabs horizontally scrollable when narrow */
 :host([ddc-fixed-ui]) .ddc-tabs {
@@ -2902,25 +7261,44 @@ _applyGridVars() {
   white-space: nowrap;
 }
 
-/* Mobile: make toolbar & tabs full-width and not offset */
-/* Mobile: tabs should not be centered with left/translate. Just full-width & scrollable */
+/* Mobile: force sticky top behavior instead of fixed centering */
 @media (max-width: 768px) {
+  :host([ddc-fixed-ui]) .ddc-toolbar,
+  :host([ddc-fixed-ui]) .ddc-tabs,
   .ddc-tabs {
-    position: sticky;
-    top: var(--ddc-toolbar-height, 0px);
+    position: sticky !important;
     left: 0 !important;
     transform: none !important;
     width: 100% !important;
-    max-width: 100vw !important;
+    max-width: 100% !important;
     margin: 0;
+  }
+
+  :host([ddc-fixed-ui]) .ddc-toolbar {
+    top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px)) !important;
+  }
+
+  :host([ddc-fixed-ui]) .ddc-tabs,
+  .ddc-tabs {
+    top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px)) !important;
     padding-inline: 0;
-    justify-content: flex-start !important;
-    /* make the whole strip scrollable, nothing faded away at edges */
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     -webkit-mask-image: none;
     mask-image: none;
+  }
+
+  :host([ddc-fixed-ui]) .ddc-tabs.ddc-tabs-bottom,
+  .ddc-tabs.ddc-tabs-bottom {
+    position: fixed !important;
+    top: auto !important;
+    bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
@@ -2932,20 +7310,30 @@ _applyGridVars() {
 /* scope to either version */
 .ddc-toolbar.streamlined.v2,
 .ddc-toolbar.streamlined.v3{
-  --ddc-bg: color-mix(in oklab, var(--card-background-color, #0d0f12) 88%, transparent);
-  --ddc-border: color-mix(in oklab, #fff 14%, transparent);
-  --ddc-soft: color-mix(in oklab, #fff 7%, transparent);
-  --ddc-shadow: 0 10px 30px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.22);
+  --ddc-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--card-background-color, #11151a) 92%, rgba(255,255,255,.02)),
+      color-mix(in oklab, var(--primary-background-color, #0c1014) 78%, rgba(255,255,255,.01))
+    );
+  --ddc-border: color-mix(in oklab, #fff 12%, transparent);
+  --ddc-soft: color-mix(in oklab, #fff 6%, transparent);
+  --ddc-shadow: 0 14px 36px rgba(0,0,0,.28), 0 4px 14px rgba(0,0,0,.18);
+  --ddc-shell-highlight: linear-gradient(90deg, rgba(255,255,255,.045), transparent 24%, transparent 76%, rgba(255,255,255,.025));
+  --ddc-btn-border: color-mix(in oklab, #fff 14%, transparent);
+  --ddc-btn-surface:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 24%, transparent);
 
   /* section accent colors */
-  --sec-primary: #3b82f6;
-  --sec-clip:    #a855f7;
-  --sec-share:   #4fb6ff;
-  --sec-utils:   #10b981;
-  --sec-status:  #ef4444;
+  --sec-primary: #6f859c;
+  --sec-clip:    #877d8f;
+  --sec-share:   #6d8f94;
+  --sec-utils:   #738975;
+  --sec-status:  #a37067;
 
-  --btn-h: 36px;
-  --btn-r: 12px;
+  --btn-h: 40px;
+  --btn-r: 14px;
   --btn-gap: 8px;
 
   /* animation vars */
@@ -2953,25 +7341,36 @@ _applyGridVars() {
   --ddc-dur: 260ms;
   --open-h: 0px; /* JS sets this to scrollHeight */
 
-  position: sticky; top: 0; z-index: 3;
+  position: sticky;
+  top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px));
+  z-index: 8;
+  isolation: isolate;
   background: var(--ddc-bg);
-  border-bottom: 1px solid var(--ddc-border);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ddc-border);
+  border-top: 0;
+  border-radius: 0 0 28px 28px;
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
   box-shadow: var(--ddc-shadow);
-  padding: 12px 14px 10px;
+  padding: 14px clamp(14px, 1.8vw, 22px) 14px;
 
   /* never exceed the root’s width */
   max-width: 100%;
 
   /* GRID (kept ready) */
   display: none;
-  grid-template-columns: repeat(4, minmax(0,1fr)) auto; /* Status at the end */
+  grid-template-columns:
+    minmax(240px, 1.08fr)
+    minmax(200px, .9fr)
+    minmax(290px, 1.14fr)
+    minmax(240px, .98fr)
+    minmax(170px, .68fr);
   grid-template-areas:
     "primary clip share utils status"
     "layouts layouts layouts layouts status";
-  column-gap: 18px;
-  row-gap: 10px;
-  align-items: start;
+  column-gap: 12px;
+  row-gap: 12px;
+  align-items: stretch;
 
   /* Visibility is animated — NOT display */
   opacity: 0;
@@ -2992,6 +7391,26 @@ _applyGridVars() {
   container-name: ddc;
 }
 
+.ddc-toolbar.streamlined.v2::before,
+.ddc-toolbar.streamlined.v3::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,.05), transparent 34%),
+    radial-gradient(circle at top right, rgba(255,255,255,.035), transparent 34%),
+    var(--ddc-shell-highlight);
+  opacity:.88;
+  pointer-events:none;
+}
+
+.ddc-toolbar.streamlined.v2 > *,
+.ddc-toolbar.streamlined.v3 > *{
+  position:relative;
+  z-index:1;
+}
+
 /* OPEN state (set by JS) */
 .ddc-toolbar.streamlined.v2.is-open,
 .ddc-toolbar.streamlined.v3.is-open{
@@ -3005,6 +7424,147 @@ _applyGridVars() {
     transform var(--ddc-dur) var(--ddc-ease),
     max-height var(--ddc-dur) var(--ddc-ease),
     visibility 0s; /* visible immediately */
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-toggle,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-toggle{
+  position:absolute;
+  top:12px;
+  right:12px;
+  z-index:3;
+  appearance:none;
+  -webkit-appearance:none;
+  width:40px;
+  height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  border:1px solid color-mix(in oklab, #fff 14%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 26%, transparent);
+  color:var(--primary-text-color, #eef2f7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 18px rgba(0,0,0,.18);
+  cursor:pointer;
+  transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
+}
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-toggle:hover,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-toggle:hover{
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--sec-share) 26%, rgba(255,255,255,.14));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 30%, transparent);
+}
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-toggle ha-icon,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-toggle ha-icon{
+  --mdc-icon-size:18px;
+  width:18px;
+  height:18px;
+}
+
+.ddc-toolbar.streamlined.v2.is-collapsed,
+.ddc-toolbar.streamlined.v3.is-collapsed{
+  display:flex !important;
+  flex-wrap:nowrap;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  width:100% !important;
+  min-width:0;
+  max-width:100%;
+  margin-inline:0;
+  padding:12px 14px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed::-webkit-scrollbar,
+.ddc-toolbar.streamlined.v3.is-collapsed::-webkit-scrollbar{
+  display:none;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed::before,
+.ddc-toolbar.streamlined.v3.is-collapsed::before{
+  opacity:.72;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-sec,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-sec{
+  display:flex;
+  flex-direction:row;
+  margin:0;
+  align-items:center;
+  gap:4px;
+  flex:0 0 auto;
+  min-width:0;
+  padding:0;
+  border:0;
+  background:none;
+  box-shadow:none;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-sec-head,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-sec-head,
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-preview-stack,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-preview-stack,
+.ddc-toolbar.streamlined.v2.is-collapsed .sec-layouts,
+.ddc-toolbar.streamlined.v3.is-collapsed .sec-layouts,
+.ddc-toolbar.streamlined.v2.is-collapsed .sec-status,
+.ddc-toolbar.streamlined.v3.is-collapsed .sec-status{
+  display:none !important;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-row,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-row{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:4px;
+  grid-template-columns:none;
+  margin:0;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-toolbar-toggle,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-toolbar-toggle{
+  position:static;
+  top:auto;
+  right:auto;
+  flex:0 0 auto;
+  order:99;
+  margin:0 0 0 4px;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .btn,
+.ddc-toolbar.streamlined.v3.is-collapsed .btn{
+  width:40px;
+  min-width:40px;
+  flex:0 0 auto;
+  height:40px;
+  padding:0;
+  border-radius:13px;
+  gap:0;
+  justify-content:center;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .btn .label,
+.ddc-toolbar.streamlined.v3.is-collapsed .btn .label{
+  display:none !important;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .btn.cta-add,
+.ddc-toolbar.streamlined.v3.is-collapsed .btn.cta-add,
+.ddc-toolbar.streamlined.v2.is-collapsed #applyLayoutBtn,
+.ddc-toolbar.streamlined.v3.is-collapsed #applyLayoutBtn,
+.ddc-toolbar.streamlined.v2.is-collapsed #settingsBtn,
+.ddc-toolbar.streamlined.v3.is-collapsed #settingsBtn{
+  grid-column:auto;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .btn.cta-add::after,
+.ddc-toolbar.streamlined.v3.is-collapsed .btn.cta-add::after{
+  display:none;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed .btn.cta-add,
+.ddc-toolbar.streamlined.v3.is-collapsed .btn.cta-add{
+  height:40px;
+  padding:0;
+  border-radius:13px;
+  box-shadow:0 8px 16px color-mix(in oklab, var(--sec-primary) 22%, transparent);
 }
 
 /* Always hide when closed, no matter what other rules say */
@@ -3036,18 +7596,23 @@ _applyGridVars() {
 .ddc-toolbar.streamlined.v3 .ddc-sec{
   --pill-accent: #6b7280;            /* default; overridden per-section below */
 
-  display: flex; flex-direction: column; gap: 10px; min-width: 0;
-  padding: 12px 14px;
-  border-radius: 16px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 20px;
 
   /* accent-tinted background & border */
   background:
     linear-gradient(180deg,
-      color-mix(in oklab, var(--pill-accent) 12%, transparent),
-      transparent),
-    color-mix(in oklab, var(--primary-background-color, #0e1116) 22%, transparent);
-  border: 1px solid color-mix(in oklab, var(--pill-accent) 26%, transparent);
-  box-shadow: inset 0 1px 2px rgba(255,255,255,.04);
+      color-mix(in oklab, var(--pill-accent) 10%, transparent),
+      transparent 52%),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--pill-accent) 18%, rgba(255,255,255,.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 10px 22px rgba(0,0,0,.16);
 }
 
 /* per-section tint */
@@ -3063,7 +7628,12 @@ _applyGridVars() {
   background: transparent; border: 0; padding: 0; border-radius: 0;
   color: var(--accent, #9aa0a6);
   display: inline-flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: .92rem; letter-spacing: .2px;
+  min-height: 18px;
+  font-weight: 700;
+  font-size: .72rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  opacity: .96;
 }
 .ddc-toolbar.streamlined.v2 .sec-primary .ddc-sec-head{ --accent: var(--sec-primary); color: var(--sec-primary); }
 .ddc-toolbar.streamlined.v2 .sec-clip    .ddc-sec-head{ --accent: var(--sec-clip);    color: var(--sec-clip); }
@@ -3074,48 +7644,73 @@ _applyGridVars() {
 
 .ddc-toolbar.streamlined.v2 .ddc-sec-dot{
   width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .95;
+  box-shadow: 0 0 0 6px color-mix(in oklab, currentColor 14%, transparent);
 }
 
 /* row of actions inside the pill */
-.ddc-toolbar.streamlined.v2 .ddc-row{ display: flex; flex-wrap: wrap; align-items: center; gap: var(--btn-gap); margin: 0; }
+.ddc-toolbar.streamlined.v2 .ddc-row{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: var(--btn-gap);
+  margin: 0;
+}
 
 /* buttons (reset native look + style) */
 .ddc-toolbar.streamlined.v2 .btn{
   appearance:none; -webkit-appearance:none;
-  display:inline-flex; align-items:center; gap:8px;
-  height:var(--btn-h); padding:8px 12px; border-radius:var(--btn-r);
-  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 14%, transparent);
-  border:1px solid var(--ddc-border);
+  width: 100%;
+  min-width: 0;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  height:var(--btn-h); padding:0 12px; border-radius:var(--btn-r);
+  background: var(--ddc-btn-surface);
+  border:1px solid var(--ddc-btn-border);
   color: var(--primary-text-color, #e5e7eb);
   cursor:pointer; font:inherit; white-space:nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
   transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
-  flex: 1 1 220px;           /* equal-ish width buttons and wrap nicely */
-  min-width: 160px;
 }
 .ddc-toolbar.streamlined.v2 .btn ha-icon{ --mdc-icon-size:18px; width:18px; height:18px; display:inline-block; }
-.ddc-toolbar.streamlined.v2 .btn:hover{ transform: translateY(-1px); background: color-mix(in oklab, var(--primary-background-color) 22%, transparent); }
+.ddc-toolbar.streamlined.v2 .btn:hover{
+  transform: translateY(-1px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.025)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 28%, transparent);
+  border-color: color-mix(in oklab, var(--pill-accent) 22%, rgba(255,255,255,.14));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 16px rgba(0,0,0,.14);
+}
 .ddc-toolbar.streamlined.v2 .btn:active{ transform: translateY(0); }
 .ddc-toolbar.streamlined.v2 .btn:focus-visible{ outline:none; box-shadow:0 0 0 2px color-mix(in oklab, #fff 15%, transparent); }
-.ddc-toolbar.streamlined.v2 .btn.secondary{ background:transparent; }
+.ddc-toolbar.streamlined.v2 .btn.secondary{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)),
+    transparent;
+}
 .ddc-toolbar.streamlined.v2 .btn.info{
-  background: color-mix(in oklab, var(--sec-share) 92%, transparent); color:#0b2537;
-  border-color: color-mix(in oklab, var(--sec-share) 55%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.03)),
+    color-mix(in oklab, var(--sec-share) 60%, rgba(255,255,255,.12));
+  color:#10252a;
+  border-color: color-mix(in oklab, var(--sec-share) 30%, transparent);
 }
 .ddc-toolbar.streamlined.v2 .btn.danger{
-  background: color-mix(in oklab, #ff5d5d 92%, transparent); color:#2b0b0b;
-  border-color: color-mix(in oklab, #ff5d5d 55%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.03)),
+    color-mix(in oklab, var(--sec-status) 72%, rgba(255,255,255,.08));
+  color:#2d120e;
+  border-color: color-mix(in oklab, var(--sec-status) 30%, transparent);
 }
 
 /* >>> Make "Add Card" extra prominent */
 .ddc-toolbar.streamlined.v2 .btn.cta-add{
   --glow: color-mix(in oklab, var(--sec-primary) 65%, #fff 0%);
-  height: 40px; padding: 10px 14px; border-radius: 14px;
+  grid-column: 1 / -1;
+  height: 44px; padding: 0 16px; border-radius: 16px;
   font-weight: 800; letter-spacing: .2px;
   background: linear-gradient(135deg, var(--sec-primary), color-mix(in oklab, var(--sec-primary) 60%, #fff 0%));
   color:#fff;
   border-color: color-mix(in oklab, var(--sec-primary) 55%, #000);
-  box-shadow: 0 10px 24px rgba(59,130,246,.34), 0 0 0 2px color-mix(in oklab, var(--sec-primary) 22%, transparent) inset;
-  flex-basis: 100%;  /* spans full row when wrapping */
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--sec-primary) 34%, transparent), 0 0 0 2px color-mix(in oklab, var(--sec-primary) 22%, transparent) inset;
 }
 .ddc-toolbar.streamlined.v2 .btn.cta-add::after{
   content:""; position:absolute; inset:-4px; border-radius:16px;
@@ -3123,13 +7718,21 @@ _applyGridVars() {
   opacity:.6; pointer-events:none;
 }
 
+.ddc-toolbar.streamlined.v2 #applyLayoutBtn,
+.ddc-toolbar.streamlined.v2 #settingsBtn{
+  grid-column: 1 / -1;
+}
+
 /* status: dot above text, HIGH-CONTRAST text */
 .ddc-toolbar.streamlined.v2 .ddc-t-status{
+  width: 100%;
   display:flex; flex-direction: column; align-items:center; justify-content:center;
   gap: 4px; text-align: center;
-  min-width: 120px; height: auto; padding: 10px 12px; border-radius: 999px;
-  background: color-mix(in oklab, var(--primary-background-color, #0b0d10) 28%, transparent);
-  border: 1px solid color-mix(in oklab, #ffffff 28%, transparent);
+  min-width: 0; min-height: 54px; padding: 10px 12px; border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+    color-mix(in oklab, var(--primary-background-color, #0b0d10) 30%, transparent);
+  border: 1px solid color-mix(in oklab, #ffffff 18%, transparent);
   color: #f8fbff;  /* brighter default */
   font-size: .9rem; line-height: 1.25; font-weight: 700;
   text-shadow: 0 1px 1px rgba(0,0,0,.45);
@@ -3144,40 +7747,382 @@ _applyGridVars() {
 .ddc-toolbar.streamlined.v2 .store-badge {
   display: inline-flex;
   align-items: center;
-  height: var(--btn-h);
-  border: 1px solid var(--ddc-border);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: .85rem;
-  background: color-mix(in oklab, #ffc107 22%, transparent);
-  color: #fff; /* ← white text */
-  flex: 1 1 220px;
-  min-width: 160px;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  border: 1px solid color-mix(in oklab, var(--sec-utils) 30%, transparent);
+  border-radius: 16px;
+  padding: 8px 12px;
+  font-size: .88rem;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+    color-mix(in oklab, var(--sec-utils) 18%, transparent);
+  color: #f8fbff;
+  text-align:center;
 }
 
+.ddc-toolbar.streamlined.v2 .sec-status{
+  align-content: start;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-status .ddc-row{
+  grid-template-columns: 1fr;
+}
 
 /* Layouts: inline switcher styling */
-.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{ display:flex; justify-content:center; gap:12px; flex-wrap: wrap; }
-.ddc-toolbar.streamlined.v2 .sec-layouts .layout-host{ display:inline-flex; align-items:center; gap:10px; color:#cfd6de; }
+.ddc-toolbar.streamlined.v2 .sec-layouts{
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px 18px;
+}
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center{
+  display:block;
+  margin: 0;
+}
+.ddc-toolbar.streamlined.v2 .sec-layouts .layout-host{
+  display:flex; align-items:center; gap:10px; color:#cfd6de;
+  width:100%;
+}
 .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline{
-  display:inline-flex; align-items:center; gap:10px; flex-wrap: wrap;
-  padding:8px 10px; border-radius:12px;
-  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 14%, transparent);
-  border: 1px solid color-mix(in oklab, #ffffff 14%, transparent);
+  display:grid;
+  grid-template-columns: auto minmax(240px, 1fr) auto auto auto;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 20%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sec-clip) 16%, rgba(255,255,255,.12));
+  width:100%;
+  box-sizing:border-box;
 }
 .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline .label{
-  color:#cfd6de; font-size:.9rem; letter-spacing:.2px;
+  color:#cfd6de;
+  font-size:.72rem;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline select{
+  appearance:none; -webkit-appearance:none;
+  min-width: 0;
+  width: 100%;
+  height: 40px;
+  padding: 0 38px 0 12px;
+  border-radius: 12px;
+  border:1px solid color-mix(in oklab, #ffffff 14%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+    var(--primary-background-color, #0e1116);
+  color: var(--primary-text-color, #e5e7eb);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.04);
 }
 .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline button,
 .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline .btn{
   appearance:none; -webkit-appearance:none;
-  display:inline-flex; align-items:center; gap:8px;
-  height:32px; padding:6px 10px; border-radius:10px;
-  background: color-mix(in oklab, var(--primary-background-color, #0e1116) 10%, transparent);
+  width:auto;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  height:36px; padding:0 12px; border-radius:12px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 16%, transparent);
   border:1px solid color-mix(in oklab, #ffffff 12%, transparent);
   color: var(--primary-text-color, #e5e7eb);
   cursor:pointer; font:inherit; white-space:nowrap;
   transition: transform .08s, background .16s, border-color .16s, box-shadow .16s;
+  flex: 0 0 auto;
+  min-width: fit-content;
+}
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline .btn[disabled]{
+  opacity:.45;
+  cursor:not-allowed;
+  transform:none;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-stack{
+  grid-column: 1 / -1;
+  display:grid;
+  gap:10px;
+  margin-top: 2px;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-label{
+  font-size:.68rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color: color-mix(in oklab, var(--primary-text-color, #e5e7eb) 68%, transparent);
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-meta{
+  font-size:.74rem;
+  font-weight:700;
+  color: color-mix(in oklab, var(--primary-text-color, #e5e7eb) 84%, transparent);
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-modes{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap:8px;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip{
+  appearance:none;
+  -webkit-appearance:none;
+  min-width:0;
+  height:36px;
+  padding:0 10px;
+  border-radius:12px;
+  border:1px solid color-mix(in oklab, #ffffff 12%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 18%, transparent);
+  color: var(--primary-text-color, #e5e7eb);
+  font: inherit;
+  font-size:.82rem;
+  font-weight:700;
+  cursor:pointer;
+  transition: transform .08s, background .16s, border-color .16s, color .16s;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip--icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:42px;
+  padding:0;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip--icon ha-icon{
+  --mdc-icon-size: 18px;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip:hover{
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--sec-share) 22%, rgba(255,255,255,.14));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 24%, transparent);
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip.is-active{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.03)),
+    color-mix(in oklab, var(--sec-share) 58%, rgba(255,255,255,.12));
+  border-color: color-mix(in oklab, var(--sec-share) 34%, transparent);
+  color:#10252a;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  transform:none;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-dimensions{
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap:8px;
+  align-items:end;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-field{
+  display:grid;
+  gap:6px;
+  min-width:0;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-field span{
+  font-size:.66rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color: color-mix(in oklab, var(--primary-text-color, #e5e7eb) 66%, transparent);
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-field input{
+  appearance:none;
+  -webkit-appearance:none;
+  width:100%;
+  min-width:0;
+  height:38px;
+  padding:0 12px;
+  border-radius:12px;
+  border:1px solid color-mix(in oklab, #ffffff 12%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 18%, transparent);
+  color: var(--primary-text-color, #e5e7eb);
+  font: inherit;
+  box-sizing:border-box;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-field input:disabled{
+  opacity:.55;
+}
+
+@media (max-width: 720px){
+  .ddc-toolbar.streamlined.v2 .ddc-preview-modes{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ddc-toolbar.streamlined.v2 .ddc-preview-dimensions{
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .ddc-toolbar.streamlined.v2 .ddc-preview-chip--icon{
+    grid-column: 1 / -1;
+  }
+}
+
+.ddc-root.ddc-preview-active .ddc-scale-outer{
+  padding: 0;
+  margin: clamp(24px, 3.4vw, 56px) auto clamp(48px, 6vw, 92px);
+}
+
+.ddc-preview-device-frame{
+  position: relative;
+  pointer-events:none;
+  z-index:0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ddc-preview-device-frame{
+  position:absolute;
+  z-index:0;
+  pointer-events:none;
+}
+
+.ddc-preview-device-frame::before{
+  content:none;
+}
+
+.ddc-preview-device-frame::after{
+  content:"";
+  position:absolute;
+  left: var(--ddc-preview-asset-left, 0px);
+  top: var(--ddc-preview-asset-top, 0px);
+  width: var(--ddc-preview-asset-width, 100%);
+  height: var(--ddc-preview-asset-height, 100%);
+  z-index:0;
+  pointer-events:none;
+  background-image: var(--ddc-preview-frame-url, none);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center;
+  transform: rotate(var(--ddc-preview-asset-rotation, 0deg));
+  transform-origin: center center;
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,.18));
+}
+
+.ddc-preview-frame-viewport-box{
+  position:absolute;
+  z-index:1;
+  pointer-events:none;
+  border-radius: 18px;
+  border: 2px dashed rgba(102, 225, 255, 0.88);
+  background: rgba(102, 225, 255, 0.04);
+  box-shadow:
+    inset 0 0 0 1px rgba(102, 225, 255, 0.18),
+    0 0 0 1px rgba(7, 23, 31, 0.12);
+}
+
+.ddc-preview-frame-viewport-box::after{
+  content: attr(data-debug);
+  position:absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(6, 20, 28, 0.72);
+  border: 1px solid rgba(102, 225, 255, 0.34);
+  color: rgba(208, 247, 255, 0.96);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.ddc-root.ddc-preview-device-active .ddc-scale-outer{
+  position: relative;
+  z-index:1;
+}
+
+.ddc-root.ddc-preview-device-mobile.ddc-preview-active .ddc-scale-outer{
+  margin-top: clamp(20px, 3vw, 34px);
+  margin-bottom: clamp(56px, 7vw, 104px);
+}
+
+.ddc-root.ddc-preview-device-tablet.ddc-preview-active .ddc-scale-outer{
+  margin-top: clamp(26px, 3.6vw, 48px);
+  margin-bottom: clamp(52px, 6.6vw, 98px);
+}
+
+.ddc-root.ddc-preview-device-desktop.ddc-preview-active .ddc-scale-outer{
+  margin-top: clamp(22px, 3vw, 40px);
+  margin-bottom: clamp(48px, 6vw, 88px);
+}
+
+.ddc-root.ddc-edit-mode-active .ddc-scale-outer{
+  position: relative;
+}
+
+.ddc-root.ddc-edit-mode-active .ddc-scale-outer::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:5;
+  pointer-events:none;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 196, 92, 0.96),
+    0 0 0 1px rgba(255, 196, 92, 0.32);
+}
+
+.ddc-root.ddc-edit-mode-active.ddc-preview-active .ddc-scale-outer::before{
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 196, 92, 0.98),
+    0 0 0 1px rgba(255, 196, 92, 0.38),
+    0 0 0 10px rgba(255, 196, 92, 0.08);
+}
+
+.ddc-root.ddc-edit-mode-active .ddc-scale-outer::after{
+  content:"Active Viewport";
+  position:absolute;
+  top:12px;
+  left:12px;
+  z-index:6;
+  pointer-events:none;
+  padding:6px 10px;
+  border-radius:999px;
+  background: rgba(255, 196, 92, 0.14);
+  border:1px solid rgba(255, 196, 92, 0.42);
+  color: rgba(255, 228, 176, 0.96);
+  font-size:.72rem;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* JS shim to override default hidden state purely for measuring/animating */
@@ -3187,147 +8132,98 @@ _applyGridVars() {
 }
 
 /* ===== STACK WHEN ROOT IS NARROW (uses .ddc-root width) ===== */
-@container ddc-root (max-width: 900px){
+@container ddc-root (max-width: 1480px){
   .ddc-toolbar.streamlined.v2,
   .ddc-toolbar.streamlined.v3{
-    position: static !important;     /* turn off sticky */
-    top: auto !important;
-    inset: auto !important;
-    z-index: auto !important;
-
-    max-width: 100%;                  /* never exceed .ddc-root */
-    margin: 8px 0 12px 0;             /* breathing room above card */
-    box-shadow: 0 4px 12px rgba(0,0,0,.18); /* lighter shadow on mobile */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "primary clip share status"
+      "utils utils layouts layouts";
   }
 }
 
-
-
-  .ddc-toolbar.streamlined.v2 > .ddc-sec,
-  .ddc-toolbar.streamlined.v3 > .ddc-sec{
-    display: block;
-    width: 100%;
-    margin: 0 0 12px 0;
-    grid-area: auto !important;  /* neutralize named areas */
+@container ddc-root (max-width: 1120px){
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "primary share"
+      "clip utils"
+      "status status"
+      "layouts layouts";
   }
+}
 
+@container ddc-root (max-width: 860px){
   .ddc-toolbar.streamlined.v2 .ddc-row,
   .ddc-toolbar.streamlined.v3 .ddc-row{
-    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; width: 100%;
+    grid-template-columns: 1fr;
   }
 
-  .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
-  .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
-  .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
-  .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
-    flex: 1 1 calc(50% - 8px);
-    min-width: 160px;
+  .ddc-toolbar.streamlined.v2 .sec-layouts{
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
-  .ddc-toolbar.streamlined.v2 .ddc-row > .btn.cta-add,
-  .ddc-toolbar.streamlined.v3 .ddc-row > .btn.cta-add{
-    flex-basis: 100%;
+  .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline{
+    grid-template-columns: 1fr;
   }
 
-  .ddc-toolbar.streamlined.v2 .btn,
-  .ddc-toolbar.streamlined.v3 .btn{ height: 44px; }
-}
-
-@container ddc-root (max-width: 560px){
   .ddc-toolbar.streamlined.v2,
   .ddc-toolbar.streamlined.v3{
-    position: static !important;
-    top: auto !important;
-    inset: auto !important;
-    z-index: auto !important;
     max-width: 100%;
+    margin: 10px 0 12px 0;
+    border-radius: 22px;
   }
 }
 
 /* Fallback for environments without container queries */
 @supports not (container-type: inline-size){
-  @media (max-width: 900px){
+  @media (max-width: 1480px){
     .ddc-toolbar.streamlined.v2,
     .ddc-toolbar.streamlined.v3{
-      display: block;
-      padding: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-areas:
+        "primary clip share status"
+        "utils utils layouts layouts";
     }
-    .ddc-toolbar.streamlined.v2 > .ddc-sec,
-    .ddc-toolbar.streamlined.v3 > .ddc-sec{
-      display: block; width: 100%; margin: 0 0 12px 0; grid-area: auto !important;
+  }
+  @media (max-width: 1120px){
+    .ddc-toolbar.streamlined.v2,
+    .ddc-toolbar.streamlined.v3{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas:
+        "primary share"
+        "clip utils"
+        "status status"
+        "layouts layouts";
     }
+  }
+  @media (max-width: 860px){
     .ddc-toolbar.streamlined.v2 .ddc-row,
     .ddc-toolbar.streamlined.v3 .ddc-row{
-      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; width: 100%;
+      grid-template-columns: 1fr;
     }
-    .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
-    .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
-    .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
-    .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
-      flex: 1 1 calc(50% - 8px); min-width: 160px;
+    .ddc-toolbar.streamlined.v2 .sec-layouts,
+    .ddc-toolbar.streamlined.v3 .sec-layouts{
+      grid-template-columns: 1fr;
+      align-items: stretch;
     }
-    @media (max-width: 560px){
-      .ddc-toolbar.streamlined.v2 .ddc-row > .btn,
-      .ddc-toolbar.streamlined.v3 .ddc-row > .btn,
-      .ddc-toolbar.streamlined.v2 .ddc-row > .store-badge,
-      .ddc-toolbar.streamlined.v3 .ddc-row > .store-badge{
-        flex: 1 1 100%;
-      }
+    .ddc-toolbar.streamlined.v2 .sec-layouts .ddc-switcher-inline,
+    .ddc-toolbar.streamlined.v3 .sec-layouts .ddc-switcher-inline{
+      grid-template-columns: 1fr;
+    }
+    .ddc-toolbar.streamlined.v2,
+    .ddc-toolbar.streamlined.v3{
+      margin: 10px 0 12px 0;
+      border-radius: 22px;
     }
   }
 }
 
 /* Optional: make sure all children use border-box inside the toolbar */
-.ddc-toolbar.streamlined.v2 * ,
+.ddc-toolbar.streamlined.v2 *,
 .ddc-toolbar.streamlined.v3 * { box-sizing: border-box; }
-
-/* === SIMPLE RESPONSIVE STACKING FOR MOBILE (NO CONTAINER Q) === */
-/* ===== FORCE STACK ON NARROW — driven by .ddc-root width ============ */
-/* At <= 900px root width: stack pills; inside each pill use 2-up buttons */
-@container ddc-root (max-width: 900px){
-  .ddc-toolbar.streamlined.v2.is-open:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3.is-open:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v2[data-force-open="1"]:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3[data-force-open="1"]:has(.btn[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v2.is-open:has(.store-badge[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3.is-open:has(.store-badge[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v2[data-force-open="1"]:has(.store-badge[style*="inline-block"]),
-  .ddc-toolbar.streamlined.v3[data-force-open="1"]:has(.store-badge[style*="inline-block"]) {
-    display: block !important; /* only when open/measuring */
-  }
-}
-
-
-  .ddc-toolbar.streamlined.v2:has(.btn[style*="inline-block"]) > .ddc-sec,
-  .ddc-toolbar.streamlined.v3:has(.btn[style*="inline-block"]) > .ddc-sec,
-  .ddc-toolbar.streamlined.v2:has(.store-badge[style*="inline-block"]) > .ddc-sec,
-  .ddc-toolbar.streamlined.v3:has(.store-badge[style*="inline-block"]) > .ddc-sec{
-    display:block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 0 12px 0;
-    grid-area: auto !important; /* neutralize named areas */
-  }
-
-  /* equal buttons: hard 2-up */
-  .ddc-toolbar.streamlined.v2 .ddc-row,
-  .ddc-toolbar.streamlined.v3  .ddc-row{
-    --btn-min: 0px;
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  /* bigger touch targets */
-  .ddc-toolbar.streamlined.v2 .btn,
-  .ddc-toolbar.streamlined.v3  .btn{ height: 44px; }
-}
-
-/* At <= 560px root width: buttons full-width (1 per row) */
-@container ddc-root (max-width: 560px){
-  .ddc-toolbar.streamlined.v2 .ddc-row,
-  .ddc-toolbar.streamlined.v3  .ddc-row{
-    grid-template-columns: 1fr;
-  }
-}
 
 /* ===== DDC Toolbar — END ===== */
 
@@ -3354,8 +8250,7 @@ _applyGridVars() {
           linear-gradient(var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
           linear-gradient(90deg, var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px);
         background-size: var(--ddc-grid-size) var(--ddc-grid-size);
-        background-origin: content-box;
-        background-clip: content-box;
+        background-position: 0 0;
         pointer-events:none;
         opacity:0;
         transition: opacity .15s;
@@ -3398,17 +8293,35 @@ _applyGridVars() {
       /* When an image background is active, we don’t need the dynamic host */
       .card-container.has-bg-image .ddc-bg-host{ display: none; }
 
+      .ddc-page-bg-host{
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+        opacity: var(--ddc-bg-opacity, 1);
+        display: none;
+      }
+
+      .ddc-page-bg-host > *{
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
       .card-wrapper{
         position:absolute;
         left: 0; top: 0;
         box-sizing: border-box;
-        border:2px solid transparent;
-        background:var(--ddc-card-bg, var(--card-background-color));
+        border:2px solid var(--ddc-card-border-color, transparent);
+        background:var(--ddc-card-local-bg, var(--ddc-card-bg, var(--card-background-color)));
         cursor:grab;
         overflow:auto;
         border-radius:14px;
         /* Allow a custom drop shadow via --ddc-card-shadow. Fallback to the HA default if unset */
-        box-shadow: var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18)));
+        box-shadow: var(--ddc-card-local-shadow, var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18))));
         will-change:transform,width,height,box-shadow; touch-action:auto;
         /*
          * Ensure cards are always layered above the interactive grid overlay.  The
@@ -3439,22 +8352,22 @@ _applyGridVars() {
       .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle) {
         /* Critical: do NOT give the card a background via this variable.
           Some headers read --ha-card-background when header-color is unset. */
-        --ha-card-background: transparent !important;
+        --ha-card-background: var(--ddc-card-inner-bg, transparent) !important;
 
         /* Many cards also set a background on the host element; neutralize it. */
-        background: transparent !important;
+        background: var(--ddc-card-inner-bg, transparent) !important;
       }
 
       /* Ensure <ha-card> itself doesn't repaint a body background */
       .card-wrapper ha-card {
-        background: transparent !important;
+        background: var(--ddc-card-inner-bg, transparent) !important;
       }
 
       /* Make header strips transparent regardless of how they are implemented */
       .card-wrapper ::part(header),
       .card-wrapper ::part(card-header),
       .card-wrapper .card-header {
-        background: transparent !important;
+        background: var(--ddc-card-inner-bg, transparent) !important;
         box-shadow: none !important;
         border-bottom: none !important;
       }
@@ -3495,8 +8408,18 @@ _applyGridVars() {
       /* ---- chip ---- */
       .chip{
         position:absolute;
-        bottom:48px; left:50%; transform:translateX(-50%);
+        top:50%; left:50%; transform:translate(-50%, -50%);
         display:flex; gap:6px; flex-wrap:wrap;
+        justify-content:center;
+        align-items:center;
+        width:max-content;
+        max-width:calc(100% - 28px);
+        padding:8px 10px;
+        border-radius:16px;
+        background:linear-gradient(135deg, rgba(13,18,28,.78) 0%, rgba(29,36,48,.88) 100%);
+        border:1px solid rgba(255,255,255,.16);
+        box-shadow:0 10px 28px rgba(0,0,0,.28);
+        backdrop-filter:blur(10px);
         opacity:0; transition:opacity .15s;
         z-index:30; pointer-events: none;
       }
@@ -3563,9 +8486,27 @@ _applyGridVars() {
 
       /* modal */
       .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:9000 }
+      .smart-picker-modal{
+        background:rgba(6,10,18,.62);
+        backdrop-filter: blur(16px) saturate(1.06);
+      }
       .dialog{
         width:min(1220px,96%); max-height:min(90vh, 900px); display:flex; flex-direction:column;
         background:var(--card-background-color); border-radius:20px; padding:0; border:1px solid var(--divider-color); overflow:visible;
+      }
+      .smart-picker-dialog{
+        width:min(1320px,96vw);
+        max-height:min(92vh, 920px);
+        border-radius:28px;
+        overflow:hidden;
+        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.2));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)),
+          color-mix(in oklab, var(--card-background-color, #111827) 88%, rgba(7,10,18,.82));
+        box-shadow:
+          0 28px 90px rgba(0,0,0,.42),
+          0 8px 24px rgba(0,0,0,.22),
+          inset 0 1px 0 rgba(255,255,255,.04);
       }
       .dlg-head{
         display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--divider-color);
@@ -3576,11 +8517,133 @@ _applyGridVars() {
       .dlg-head h3{ margin:0; font-size:1.1rem; letter-spacing:.2px }
       .dlg-foot{ display:flex; gap:10px; justify-content:flex-end; padding:12px; border-top:1px solid var(--divider-color); background:var(--primary-background-color) }
       .btn:disabled{ opacity:.6; cursor:not-allowed }
+      .smart-picker-dialog .dlg-head{
+        gap:18px;
+        padding:18px 22px;
+        border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 72%, rgba(255,255,255,.1));
+        background:
+          radial-gradient(900px 180px at 10% -70px, rgba(255,157,0,.26), transparent 62%),
+          radial-gradient(720px 160px at 90% -80px, rgba(255,120,40,.2), transparent 64%),
+          linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+      }
+      .smart-picker-dialog .dlg-head h3{
+        font-size:1.22rem;
+        font-weight:760;
+        letter-spacing:.01em;
+        white-space:nowrap;
+      }
+      .smart-picker-dialog .dlg-foot{
+        align-items:center;
+        gap:12px;
+        padding:14px 20px 18px;
+        border-top:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 72%, rgba(255,255,255,.1));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.012)),
+          color-mix(in oklab, var(--primary-background-color, #0f172a) 94%, rgba(0,0,0,.08));
+      }
+      .picker-search-wrap{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        flex:1;
+        min-width:0;
+      }
+      .picker-search{
+        width:100%;
+        min-width:0;
+        height:54px;
+        padding:0 18px;
+        border-radius:18px;
+        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, rgba(255,255,255,.08));
+        background:rgba(7,10,18,.78);
+        color:var(--primary-text-color);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.04),
+          0 10px 24px rgba(0,0,0,.16);
+        outline:none;
+        font-size:1rem;
+      }
+      .picker-search::placeholder{
+        color:color-mix(in oklab, var(--secondary-text-color, #94a3b8) 88%, rgba(255,255,255,.2));
+      }
+      .picker-search:focus{
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 72%, #fff 14%);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.06),
+          0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 22%, transparent),
+          0 14px 28px rgba(0,0,0,.18);
+      }
+      .picker-actions{
+        display:flex;
+        align-items:center;
+        gap:10px;
+      }
+      .picker-btn{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:10px;
+        min-height:48px;
+        padding:0 18px;
+        border-radius:16px;
+        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 76%, rgba(255,255,255,.08));
+        background:rgba(255,255,255,.03);
+        color:var(--primary-text-color);
+        font-weight:700;
+        letter-spacing:.01em;
+        transition: transform .12s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease;
+      }
+      .picker-btn ha-icon{
+        --mdc-icon-size:20px;
+      }
+      .picker-btn:hover{
+        transform:translateY(-1px);
+        background:rgba(255,255,255,.06);
+        border-color:color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 58%, rgba(255,255,255,.16));
+        box-shadow:0 10px 22px rgba(0,0,0,.16);
+      }
+      .picker-btn:active{
+        transform:translateY(0);
+      }
+      .picker-btn:focus-visible{
+        outline:none;
+        box-shadow:0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 24%, transparent);
+      }
+      .picker-btn.secondary{
+        background:rgba(255,255,255,.025);
+        color:color-mix(in oklab, var(--primary-text-color, #fff) 92%, rgba(255,255,255,.6));
+      }
+      .picker-btn.primary{
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 64%, rgba(255,255,255,.1));
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #ff9800) 82%, #fff 10%), color-mix(in oklab, var(--primary-color, #ff9800) 92%, #000 4%));
+        color:#fff;
+        box-shadow:0 14px 28px color-mix(in oklab, var(--primary-color, #ff9800) 28%, transparent);
+      }
+      .picker-btn.primary:hover{
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #ff9800) 88%, #fff 12%), color-mix(in oklab, var(--primary-color, #ff9800) 96%, #000 4%));
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 82%, rgba(255,255,255,.1));
+      }
+      .picker-btn[disabled]{
+        box-shadow:none;
+      }
+      .picker-footnote{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex:1;
+        opacity:.8;
+        font-size:.88rem;
+      }
+      .picker-footnote ha-icon{
+        --mdc-icon-size:18px;
+      }
 
       .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
           /* picker layout */
-          .layout{display:grid;height:min(84vh,820px);grid-template-columns:260px 1fr}
+          .layout{display:grid;height:min(84vh,820px);grid-template-columns:280px 1fr}
           #leftPane{
             border-right:1px solid var(--divider-color);
             overflow:auto;
@@ -3630,6 +8693,73 @@ _applyGridVars() {
             background:var(--primary-background-color);color:var(--primary-text-color);cursor:pointer
           }
           .tab.active{background:var(--primary-color);color:#fff;border-color:var(--primary-color)}
+          .picker-category{
+            padding:14px 14px 12px;
+            border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 82%, transparent);
+          }
+          .picker-category-title{
+            margin:0 0 10px 0;
+            font-size:.92rem;
+            font-weight:760;
+            letter-spacing:.01em;
+            opacity:.9;
+          }
+          .picker-category-note{
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+            padding:12px 14px;
+            border-radius:14px;
+            border:1px dashed color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 72%, rgba(255,255,255,.08));
+            background:rgba(255,255,255,.025);
+            color:color-mix(in oklab, var(--secondary-text-color, #94a3b8) 90%, rgba(255,255,255,.2));
+            font-size:.86rem;
+            line-height:1.45;
+          }
+          .picker-category-note strong{
+            color:var(--primary-text-color);
+            font-size:.88rem;
+          }
+          .picker-item{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            width:100%;
+            text-align:left;
+            border:none;
+            background:transparent;
+            padding:10px 12px;
+            border-radius:14px;
+            cursor:pointer;
+            color:inherit;
+            transition: background .16s ease, color .16s ease, transform .12s ease, box-shadow .16s ease;
+          }
+          .picker-item:hover{
+            background:rgba(255,255,255,.045);
+            transform:translateX(1px);
+          }
+          .picker-item.active{
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 16%, rgba(255,255,255,.03));
+            color:var(--primary-text-color);
+            box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #ff9800) 45%, transparent);
+          }
+          .picker-item-meta{
+            display:flex;
+            flex-direction:column;
+            gap:2px;
+            min-width:0;
+          }
+          .picker-item-name{
+            font-size:.98rem;
+            font-weight:650;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+          }
+          .picker-item-subtitle{
+            font-size:.78rem;
+            opacity:.65;
+          }
           .cm-editor{height: 100%}
           /* --- FIX: YAML/Visual editor: ensure the entire content is visible --- */
           /*
@@ -3832,298 +8962,408 @@ _applyGridVars() {
 /*
  * Tabs bar: stick below the toolbar when edit mode is active.
  * The top offset uses a CSS custom property --ddc-toolbar-height set via
- * JavaScript when toggling edit mode.  This ensures that in both
- * dynamic and auto modes the tabs bar always sits directly beneath
- * the toolbar whenever it is visible.  When the toolbar is hidden,
- * --ddc-toolbar-height defaults to 0 so the tabs bar sticks to the
- * very top of the viewport.  We also include env(safe-area-inset-top)
- * to respect devices with notches/safe areas.
+ * JavaScript when toggling edit mode. This keeps the tabs visually docked
+ * beneath the edit toolbar without giving the whole strip a heavy solid bar.
  */
-.ddc-tabs {
+.ddc-tabs{
   --bg: var(--card-background-color, #16181c);
   --fg: var(--primary-text-color, #e6e8ea);
-  --accent: var(--primary-color, #6aa4ff);
-  --hair: color-mix(in oklab, var(--fg) 16%, transparent);
-
-  --h: 42px;
-  --gap: 16px;
-  --r-top: 14px;
-  --padX: 18px;
+  --accent: color-mix(
+    in oklab,
+    var(--state-icon-active-color, var(--primary-color, #6aa4ff)) 68%,
+    var(--primary-color, #6aa4ff) 32%
+  );
+  --tab-surface: color-mix(in oklab, var(--card-background-color, #16181c) 90%, rgba(255,255,255,.06));
+  --tab-border: color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
+  --tab-shadow: 0 18px 34px rgba(16,18,23,.18);
+  --tab-dock-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--card-background-color, #16181c) 94%, rgba(255,255,255,.05)),
+      color-mix(in oklab, var(--primary-background-color, #0f1216) 92%, rgba(255,255,255,.02))
+    );
+  --tab-dock-border: color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 76%, transparent);
+  --tab-dock-fg: color-mix(in oklab, var(--primary-text-color, #e6e8ea) 94%, transparent);
+  --tab-idle-bg: transparent;
+  --tab-idle-hover: color-mix(in oklab, var(--primary-color, #6aa4ff) 10%, transparent);
+  --tab-active-fg: color-mix(in oklab, var(--primary-text-color, #ffffff) 96%, rgba(0,0,0,.04));
+  --tab-active-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--accent) 88%, rgba(255,255,255,.16)),
+      color-mix(in oklab, var(--accent) 78%, rgba(0,0,0,.06))
+    );
+  --tab-active-shadow:
+    0 14px 24px color-mix(in oklab, var(--accent) 24%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.18);
 
   position: sticky;
-  top: calc(max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
-  z-index: 3;
-
+  top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
+  z-index: 5;
   display: flex;
-  align-items: flex-end;
-  column-gap: var(--gap);
-  padding: 0 12px;
-  width: 100%;
+  align-items: center;
+  justify-content: center;
+  column-gap: clamp(10px, 1.5vw, 16px);
+  width: fit-content;
+  max-width: min(100%, calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px));
   box-sizing: border-box;
-
-  background: var(--bg);
-  border-bottom: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  padding: 10px clamp(12px, 2vw, 18px);
+  border-radius: 28px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--tab-dock-fg);
+  backdrop-filter: blur(14px) saturate(1.02);
+  -webkit-backdrop-filter: blur(14px) saturate(1.02);
+  margin-inline: auto;
+  isolation: isolate;
 
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
   scrollbar-gutter: stable;
-
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    #000 16px,
-    #000 calc(100% - 16px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    #000 16px,
-    #000 calc(100% - 16px),
-    transparent 100%
-  );
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
-
-
-.ddc-tabs::-webkit-scrollbar {
-  height: 8px;
+.ddc-tabs::before,
+.ddc-tabs::after{
+  display:none;
 }
-.ddc-tabs::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--fg) 30%, transparent);
+
+.ddc-tabs:not(.ddc-tabs-left)::before{
+  content:"";
+  display:block;
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background: var(--tab-dock-bg);
+  border: 1px solid var(--tab-dock-border);
+  box-shadow: var(--tab-shadow);
+  pointer-events:none;
+  z-index:-1;
+}
+
+.ddc-tabs::-webkit-scrollbar{ height: 8px; }
+.ddc-tabs::-webkit-scrollbar-thumb{
+  background: color-mix(in oklab, var(--fg) 26%, transparent);
   border-radius: 999px;
 }
-.ddc-tabs::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-
-/* Mobile: simple full-width tabs, no centering, no edge fade */
-@media (max-width: 768px) {
-  :host([ddc-fixed-ui]) .ddc-tabs,
-  .ddc-tabs {
-    position: sticky;
-    top: calc(
-      max(env(safe-area-inset-top, 0px), 0px) +
-      var(--ddc-toolbar-height, 0px)
-    );
-    left: 0;
-    transform: none;
-    width: 100%;
-    max-width: 100vw;
-    margin: 0;
-
-    justify-content: flex-start;     /* 👈 stop centering on mobile */
-    padding-left: 0;
-    padding-right: 0;
-    padding-inline-end: 0;
-
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-
-    /* 🔑 remove the mask so the first tabs are fully visible */
-    -webkit-mask-image: none;
-    mask-image: none;
-
-    /* optional: avoid weird snapping on tiny screens */
-    scroll-snap-type: none;
-  }
-}
-
-
-/* ---------- TAB (Chrome-like shape) ---------- */
-/* ====================================================================
-   CHROME-LIKE TABS • centered + concave bottoms (sticky, CSS-only)
-   ==================================================================== */
-/* ====================================================================
-   CHROME-LIKE TABS • centered • concave bottoms • light active
-   Markup stays: <div class="ddc-tabs"> … .ddc-tab(.active) … </div>
-   ==================================================================== */
-
-/* ---------- BAR (sticky baseline) ---------- */
-.ddc-tabs{
-  /* Theme tokens (HA-aware) */
-  --bg: var(--card-background-color, #16181c);
-  --fg: var(--primary-text-color, #e6e8ea);
-  --accent: var(--primary-color, #6aa4ff);
-  --hair: color-mix(in oklab, var(--fg) 16%, transparent);
-
-  /* Geometry knobs */
-  --h: 42px;       /* tab height */
-  --gap: 18px;     /* space between tabs */
-  --r-top: 14px;   /* top radius */
-  --cut: 22px;     /* concave cut depth at bottom corners (18–26 good) */
-  --padX: 18px;    /* horizontal padding */
-
-  position: sticky;
-  top: calc(max(env(safe-area-inset-top,0px), 0px) + var(--ddc-toolbar-height, 0px));
-  z-index: 3;
-
-  display: flex;
-  align-items: flex-end;
-  /* When there is enough room the tabs bar will naturally center its
-     children, but centering by default on narrow viewports means the
-     first tab can be pushed partially off screen. Use flex‑start to
-     anchor the tabs to the left; a later script adjusts this back to
-     center when the bar does not overflow. */
-  justify-content: flex-start;
-  column-gap: var(--gap);
-  padding: 0 12px;
-  width: 100%;
-  box-sizing: border-box;
-
-  background: var(--bg);
-  border-bottom: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
-
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-  scrollbar-gutter: stable;
-
-  /* discoverable overflow edges */
-  /* The default implementation used a horizontal mask on the tabs strip to fade
-     the outer edges (transparent at the start/end and opaque in the middle).
-     While this looked slick it caused the first and last tabs to appear
-     clipped when they were partially scrolled off screen. This card needs
-     to present the active tab clearly, even when the tabs overflow. To make
-     this more responsive and to avoid visual cropping of the first tab,
-     remove the mask entirely. The mask-image properties are set to none
-     here rather than a gradient so there is no fading effect on either edge. */
-  -webkit-mask-image: none;
-          mask-image: none;
-}
-.ddc-tabs::-webkit-scrollbar{ height: 8px; }
-.ddc-tabs::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--fg) 30%, transparent); border-radius: 999px; }
 .ddc-tabs::-webkit-scrollbar-track{ background: transparent; }
 
-/* ---------- TAB (concave corners painted; no masks required) ---------- */
 .ddc-tab{
   -webkit-tap-highlight-color: transparent;
   position: relative;
   flex: 0 0 auto;
-  align-self: flex-end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-
-  height: var(--h);
-  min-width: clamp(120px, 18ch, 280px);
-  padding: 0 var(--padX);
+  gap: 10px;
+  min-width: clamp(56px, 5vw, 64px);
+  max-width: min(260px, 46vw);
+  height: 56px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 20px;
   scroll-snap-align: start;
 
-  font: 600 13.5px/1 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-  letter-spacing: .2px;
-  color: color-mix(in oklab, var(--fg) 92%, transparent);
+  font: 600 14px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: .02em;
+  color: color-mix(in oklab, var(--tab-dock-fg) 92%, rgba(0,0,0,.18));
   cursor: pointer;
   user-select: none;
-
-  /* Ensure the entire tab is clickable.  Without explicitly setting
-     pointer-events the clickable region may be limited to the tab’s
-     inline content, especially in browsers that collapse the button’s
-     hit area to its children.  Setting pointer-events to auto
-     guarantees the full padded area responds to clicks. */
   pointer-events: auto;
 
-  /* Fill with “carved” concave bottom corners:
-     we paint the BAR color into the corner arcs, which visually cuts inward */
-  background:
-    radial-gradient(120% 140% at 0 100%,     var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) left  bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
-    radial-gradient(120% 140% at 100% 100%,  var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) right bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
-    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-
-  /* Border drawn as inset so it follows the carve perfectly */
-  box-shadow:
-    0 0 0 1px var(--hair) inset,
-    0 2px 8px rgba(0,0,0,.22);
-
-  border: none;
-  border-top-left-radius: var(--r-top);
-  border-top-right-radius: var(--r-top);
-
-  /* sit slightly above the baseline so the concave is visible */
-  transform: translateY(4px);
+  background: var(--tab-idle-bg);
+  box-shadow: none;
   transition:
     transform .16s cubic-bezier(.2,.6,.2,1),
     box-shadow .18s ease,
     color .16s ease,
-    background-color .18s ease,
-    filter .18s ease;
+    background .18s ease,
+    opacity .16s ease;
 }
 
-/* icon + label */
-.ddc-tab ha-icon{ --mdc-icon-size: 18px; opacity: .95; }
-.ddc-tab .ddc-tab-label{ max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.ddc-tab ha-icon{
+  --mdc-icon-size: 24px;
+  opacity: .96;
+}
 
-/* Hover: gentle raise and slightly clearer edge */
+.ddc-tab .ddc-tab-label{
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ddc-tab.ddc-tab--has-icon{
+  width: 56px;
+  min-width: 56px;
+  padding: 0;
+}
+
+.ddc-tab.ddc-tab--has-icon .ddc-tab-label{
+  display:none;
+}
+
 .ddc-tab:hover{
-  transform: translateY(2px);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--fg) 24%, transparent) inset,
-    0 6px 12px rgba(0,0,0,.18);
+  transform: translateY(-1px);
+  background: var(--tab-idle-hover);
+  box-shadow: inset 0 0 0 1px rgba(40,44,52,.06);
 }
 
-/* Pressed */
-.ddc-tab:active{ transform: translateY(4px) scale(.99); }
+.ddc-tab:active{
+  transform: translateY(0) scale(.985);
+}
 
-/* Focus ring */
 .ddc-tab:focus-visible{
   outline: none;
   box-shadow:
     0 0 0 2px color-mix(in oklab, var(--accent) 60%, transparent),
-    0 0 0 6px color-mix(in oklab, var(--fg) 18%, transparent),
-    0 2px 8px rgba(0,0,0,.22);
+    0 0 0 6px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
-/* ---------- ACTIVE (lighter background, connected to bar) ---------- */
-.ddc-tab.active{
-  z-index: 2;
-  transform: translateY(0);
-  color: var(--fg);
-
-  /* lighter body like your reference */
-  background:
-    radial-gradient(120% 140% at 0 100%,     var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) left  bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
-    radial-gradient(120% 140% at 100% 100%,  var(--bg) 0 calc(var(--cut)), transparent calc(var(--cut) + 1px)) right bottom / var(--cut) calc(var(--cut) + 6px) no-repeat,
-    linear-gradient(180deg,
-      color-mix(in oklab, #fff 20%, var(--bg) 80%),
-      color-mix(in oklab, #fff 10%, var(--bg) 90%));
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--fg) 26%, transparent) inset,
-    0 10px 16px rgba(0,0,0,.16),
-    0 2px 0 0 var(--bg);   /* hide the blue baseline under the active tab */
-}
-
-/* Optional small accent tick under the active tab */
 .ddc-tab::after{
-  content: "";
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: -2px;
-  height: 2px;
-  border-radius: 2px;
-  background: color-mix(in oklab, var(--accent) 72%, transparent);
-  opacity: 0;
-  transition: opacity .18s ease;
-  /* Ensure the decorative underline never interferes with pointer
-     interactions. Without disabling pointer events on this pseudo
-     element it may inadvertently capture clicks, especially on
-     touch devices where subpixel offsets can misregister. */
-  pointer-events: none;
-}
-.ddc-tab.active::after{ opacity: 1; }
-
-/* Disabled */
-.ddc-tab[disabled], .ddc-tab[aria-disabled="true"]{
-  opacity:.55; cursor:not-allowed; filter: saturate(.75);
+  display:none;
 }
 
-/* Dark-mode base (kept HA-aware) */
+.ddc-tab.active{
+  color: var(--tab-active-fg);
+  background: var(--tab-active-bg);
+  box-shadow: var(--tab-active-shadow);
+}
+
+.ddc-tab[disabled],
+.ddc-tab[aria-disabled="true"]{
+  opacity:.55;
+  cursor:not-allowed;
+  filter:saturate(.75);
+}
+
+.ddc-tabs.ddc-tabs-left{
+  position: fixed;
+  left: var(--ddc-left-rail-left, calc(var(--ddc-left-gutter, 0px) + (var(--ddc-left-rail-width) / 2) + 16px));
+  top: 50vh;
+  transform: translate(-50%, -50%);
+  align-self: auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: var(--ddc-left-rail-width);
+  min-width: var(--ddc-left-rail-width);
+  max-width: var(--ddc-left-rail-width);
+  padding: 14px 10px;
+  overflow: visible;
+  background: var(--tab-dock-bg);
+  border: 1px solid var(--tab-dock-border);
+  border-radius: 30px;
+  box-shadow: 0 24px 42px rgba(8,10,14,.22);
+  backdrop-filter: blur(10px) saturate(1.02);
+  -webkit-backdrop-filter: blur(10px) saturate(1.02);
+  margin-inline: 0;
+  z-index: 6;
+}
+
+.ddc-tabs.ddc-tabs-bottom{
+  position: fixed;
+  left: calc(var(--ddc-left-gutter, 0px) + 50%);
+  right: auto;
+  top: auto;
+  bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  transform: translateX(-50%);
+  width: fit-content;
+  max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px);
+  justify-content: center;
+  padding: 10px clamp(12px, 2vw, 18px);
+  z-index: 6;
+}
+
+.ddc-tabs.ddc-tabs-left::before,
+.ddc-tabs.ddc-tabs-left::after{
+  display:none;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab{
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 60px;
+  height: 60px;
+  padding: 0 10px;
+  border-radius: 18px;
+  flex-direction: row;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  color: color-mix(in oklab, var(--tab-dock-fg) 78%, transparent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab ha-icon{
+  --mdc-icon-size: 24px;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab .ddc-tab-label{
+  font-size: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab.active{
+  color: var(--tab-active-fg);
+  background: var(--tab-active-bg);
+  box-shadow: var(--tab-active-shadow);
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
+  width: 60px;
+  min-width: 60px;
+  align-self: center;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon .ddc-tab-label{
+  display:none;
+}
+
+.ddc-tabs.ddc-tabs-left .ddc-tab:not(.ddc-tab--has-icon){
+  min-height: 66px;
+  height: auto;
+  padding-block: 12px;
+}
+
+@container ddc-root (max-width: 980px){
+  .ddc-tabs.ddc-tabs-left{
+    position: sticky;
+    left: auto;
+    top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
+    transform: none;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-inline: auto;
+    z-index: 5;
+  }
+
+  .ddc-tabs.ddc-tabs-left .ddc-tab{
+    min-width: 56px;
+    width: auto;
+    min-height: 56px;
+    height: 56px;
+    padding: 0 16px;
+    flex-direction: row;
+    gap: 10px;
+    color: color-mix(in oklab, var(--tab-dock-fg) 92%, rgba(0,0,0,.18));
+  }
+
+  .ddc-tabs.ddc-tabs-left .ddc-tab .ddc-tab-label{
+    white-space: nowrap;
+  }
+
+  .ddc-tabs.ddc-tabs-left .ddc-tab.active{
+    transform: none;
+  }
+
+  .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
+    width: 56px;
+    min-width: 56px;
+    align-self: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  :host([ddc-fixed-ui]) .ddc-tabs,
+  .ddc-tabs{
+    left: 0;
+    transform: none;
+    width: fit-content;
+    max-width: calc(100vw - 20px);
+    margin: 0 auto;
+    padding-inline: 10px;
+    scroll-snap-type: none;
+  }
+
+  .ddc-tabs:not(.ddc-tabs-left)::before{
+    inset: 0;
+  }
+
+  .ddc-tab{
+    min-width: 56px;
+    height: 54px;
+    padding-inline: 14px;
+  }
+}
+
+.ddc-root.ddc-preview-docked-tabs{
+  row-gap: clamp(12px, 2vw, 24px);
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs,
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left,
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-bottom{
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: min(100%, calc(var(--ddc-preview-width, 100%) + 48px)) !important;
+  margin: 26px auto 0 !important;
+  padding: 10px clamp(12px, 2vw, 18px) !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(14px) saturate(1.02) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.02) !important;
+  z-index: 4 !important;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left::before,
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-bottom::before,
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs::before{
+  display: block;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-tab{
+  width: auto;
+  max-width: min(260px, 46vw);
+  min-width: clamp(56px, 5vw, 64px);
+  min-height: 56px;
+  height: 56px;
+  padding: 0 16px;
+  border-radius: 20px;
+  gap: 10px;
+  color: color-mix(in oklab, var(--tab-dock-fg) 92%, rgba(0,0,0,.18));
+  background: var(--tab-idle-bg);
+  box-shadow: none;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-tab.active{
+  color: var(--tab-active-fg);
+  background: var(--tab-active-bg);
+  box-shadow: var(--tab-active-shadow);
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
+  width: 56px;
+  min-width: 56px;
+  align-self: auto;
+}
+
 @media (prefers-color-scheme: dark){
   .ddc-tabs{
     --bg: var(--card-background-color, #0f1216);
@@ -4131,19 +9371,16 @@ _applyGridVars() {
   }
 }
 
-/* Reduced motion */
 @media (prefers-reduced-motion: reduce){
-  .ddc-tab{ transition: none !important; }
+  .ddc-tab,
+  .ddc-tab::after{
+    transition: none !important;
+  }
 }
 
-/* Fallback for older engines */
 @supports not (scrollbar-gutter: stable){
-  .ddc-tabs{ padding-inline-end: 16px; }
+  .ddc-tabs{ padding-inline-end: 24px; }
 }
-
-
-
-
 
 /* ===== DDC Tabs —END ==================== */
 
@@ -4171,11 +9408,425 @@ _applyGridVars() {
   pointer-events: auto;     /* receives events only on empty space since it's behind cards */
   z-index: 5;               /* above visual grid, but behind draggable cards */
 }
+.ddc-connectors-layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:5;
+  overflow:visible;
+  pointer-events:none;
+}
+.ddc-connectors-layer .ddc-connector-track,
+.ddc-connectors-layer .ddc-connector-line,
+.ddc-connectors-layer .ddc-connector-flow,
+.ddc-connectors-layer .ddc-connector-hit,
+.ddc-connectors-layer .ddc-connector-handle{
+  fill:none;
+  vector-effect:non-scaling-stroke;
+}
+.ddc-connectors-layer .ddc-connector-track{
+  stroke:rgba(148, 163, 184, 0.22);
+}
+.ddc-connectors-layer .ddc-connector-line{
+  filter:none;
+}
+.ddc-connectors-layer .ddc-connector-line.is-glow,
+.ddc-connectors-layer .ddc-connector.is-active .ddc-connector-line.is-glow{
+  filter:drop-shadow(0 0 10px color-mix(in srgb, currentColor 36%, transparent));
+}
+.ddc-connectors-layer .ddc-connector-flow{
+  stroke:rgba(255,255,255,.92);
+  opacity:.92;
+  animation:ddc-connector-flow 1.8s linear infinite;
+}
+.ddc-connectors-layer .ddc-connector-flow.reverse{
+  animation-direction:reverse;
+}
+.ddc-connectors-layer .ddc-connector-hit{
+  stroke:transparent;
+  pointer-events:stroke;
+  cursor:pointer;
+}
+.ddc-connectors-layer .ddc-connector-handle{
+  fill:color-mix(in srgb, var(--primary-color, #ff9800) 82%, #ffffff 10%);
+  stroke:rgba(255,255,255,.92);
+  stroke-width:2;
+  pointer-events:all;
+  cursor:grab;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));
+}
+.ddc-connectors-layer .ddc-connector-handle:active{
+  cursor:grabbing;
+}
+.ddc-connectors-layer .ddc-connector.is-selected .ddc-connector-line{
+  filter:drop-shadow(0 0 12px color-mix(in srgb, currentColor 42%, transparent));
+}
+.ddc-connectors-layer .ddc-connector.is-draft .ddc-connector-line{
+  opacity:.92;
+}
+.ddc-connectors-layer .ddc-connector-capture{
+  fill:transparent;
+  pointer-events:all;
+}
+.card-container.ddc-connector-draw-mode{
+  cursor:crosshair;
+}
+.ddc-connector-inspector{
+  position:fixed;
+  right:max(16px, env(safe-area-inset-right, 0px));
+  top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 16px);
+  width:min(360px, calc(100vw - 24px));
+  max-height:calc(100vh - (var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 32px));
+  z-index:70;
+  display:none;
+}
+.ddc-connector-inspector.is-open{
+  display:block;
+}
+.ddc-connector-inspector-card{
+  display:grid;
+  gap:16px;
+  padding:18px;
+  border-radius:28px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 82%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-background-color, #151922) 92%, rgba(255,255,255,.08)) 0%, color-mix(in srgb, var(--card-background-color, #151922) 98%, rgba(0,0,0,.18)) 100%);
+  box-shadow:0 26px 72px rgba(0,0,0,.34);
+  backdrop-filter:blur(22px) saturate(1.08);
+  -webkit-backdrop-filter:blur(22px) saturate(1.08);
+  overflow:auto;
+  max-height:inherit;
+}
+.ddc-connector-inspector-head{
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 2px 2px;
+}
+.ddc-connector-close{
+  width:48px;
+  height:48px;
+  border-radius:16px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.025) 100%);
+  color:var(--primary-text-color, #fff);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 8px 18px rgba(0,0,0,.18);
+  transition:transform .16s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.ddc-connector-close:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 26%, rgba(255,255,255,.18));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.04) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 12px 24px rgba(0,0,0,.24);
+}
+.ddc-connector-close ha-icon{
+  --mdc-icon-size:22px;
+}
+.ddc-connector-inspector-head h3{
+  margin:4px 0 0;
+  font-size:1.18rem;
+  line-height:1.08;
+}
+.ddc-connector-inspector-head p{
+  margin:8px 0 0;
+  font-size:.88rem;
+  line-height:1.5;
+  color:var(--secondary-text-color, rgba(255,255,255,.72));
+}
+.ddc-connector-inspector-kicker{
+  font-size:.72rem;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--primary-text-color, #fff) 56%, transparent);
+}
+.ddc-connector-preview,
+.ddc-connector-section{
+  display:grid;
+  gap:12px;
+  padding:14px;
+  border-radius:22px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 72%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-background-color, #151922) 88%, rgba(255,255,255,.06)) 0%, color-mix(in srgb, var(--card-background-color, #151922) 95%, rgba(0,0,0,.12)) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.ddc-connector-preview{
+  gap:14px;
+}
+.ddc-connector-preview-line{
+  display:grid;
+  place-items:center;
+  min-height:58px;
+  padding:0 12px;
+  border-radius:18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.02) 100%);
+  overflow:hidden;
+}
+.ddc-connector-preview-stroke{
+  display:block;
+  width:100%;
+  min-height:4px;
+  border-radius:999px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.05);
+}
+.ddc-connector-preview-stroke.is-glow{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.05),
+    0 0 18px color-mix(in srgb, currentColor 32%, transparent);
+}
+.ddc-connector-preview-stroke.is-animated{
+  background-size:200% 100% !important;
+  animation:ddc-connector-preview-flow 2.1s linear infinite;
+}
+.ddc-connector-preview-copy{
+  display:grid;
+  gap:4px;
+}
+.ddc-connector-preview-copy strong{
+  font-size:.93rem;
+  font-weight:800;
+}
+.ddc-connector-preview-copy span{
+  font-size:.82rem;
+  line-height:1.45;
+  color:var(--secondary-text-color, rgba(255,255,255,.72));
+}
+.ddc-connector-section-head{
+  display:grid;
+  gap:5px;
+}
+.ddc-connector-section-title{
+  font-size:.86rem;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.ddc-connector-section-head p{
+  margin:0;
+  font-size:.8rem;
+  line-height:1.45;
+  color:var(--secondary-text-color, rgba(255,255,255,.68));
+}
+.ddc-connector-inspector-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+}
+.ddc-connector-field{
+  display:grid;
+  gap:7px;
+  min-width:0;
+}
+.ddc-connector-field.full{
+  grid-column:1 / -1;
+}
+.ddc-connector-field span{
+  font-size:.78rem;
+  font-weight:700;
+  letter-spacing:.04em;
+  color:color-mix(in srgb, var(--primary-text-color, #fff) 68%, transparent);
+}
+.ddc-connector-field .input{
+  width:100%;
+  min-height:48px;
+  box-sizing:border-box;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 72%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.025) 100%);
+  color:var(--primary-text-color, #fff);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 1px 0 rgba(0,0,0,.08);
+  outline:none;
+  transition:border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .18s ease;
+}
+.ddc-connector-field .input:hover{
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 16%, rgba(255,255,255,.18));
+}
+.ddc-connector-field .input:focus{
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 42%, rgba(255,255,255,.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 0 0 3px color-mix(in srgb, var(--primary-color, #ff9800) 18%, transparent),
+    0 14px 28px rgba(0,0,0,.18);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.03) 100%);
+}
+.ddc-connector-entity-host{
+  display:grid;
+}
+.ddc-connector-entity-host > *{
+  width:100%;
+}
+.ddc-connector-entity-host ha-entity-picker{
+  display:block;
+  --mdc-theme-primary: var(--primary-color, #ff9800);
+  --mdc-shape-small: 16px;
+  --mdc-text-field-fill-color: rgba(255,255,255,.025);
+}
+.ddc-connector-entity-meta,
+.ddc-connector-state-meta{
+  font-size:.79rem;
+  line-height:1.5;
+  color:var(--secondary-text-color, rgba(255,255,255,.72));
+}
+.ddc-connector-state-suggestions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.ddc-connector-state-chip{
+  appearance:none;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.02) 100%);
+  color:var(--primary-text-color, #fff);
+  min-height:34px;
+  padding:0 12px;
+  border-radius:999px;
+  font:inherit;
+  font-size:.78rem;
+  font-weight:700;
+  letter-spacing:.02em;
+  cursor:pointer;
+  transition:transform .16s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease, color .18s ease;
+}
+.ddc-connector-state-chip:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 28%, rgba(255,255,255,.18));
+  box-shadow:0 10px 18px rgba(0,0,0,.16);
+}
+.ddc-connector-state-chip.is-active{
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 42%, rgba(255,255,255,.22));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-color, #ff9800) 22%, rgba(255,255,255,.06)) 0%, color-mix(in srgb, var(--primary-color, #ff9800) 14%, rgba(255,255,255,.02)) 100%);
+  color:color-mix(in srgb, var(--primary-text-color, #fff) 92%, rgba(255,255,255,.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 10px 24px rgba(0,0,0,.18);
+}
+.ddc-connector-state-empty{
+  font-size:.78rem;
+  line-height:1.5;
+  color:var(--secondary-text-color, rgba(255,255,255,.68));
+}
+.ddc-connector-toggles{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px 12px;
+}
+.ddc-toggle-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:44px;
+  padding:10px 12px;
+  border-radius:16px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 68%, transparent);
+  background:rgba(255,255,255,.03);
+  font-size:.9rem;
+  font-weight:600;
+}
+.ddc-connector-actions{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+.ddc-connector-inspector .btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:48px;
+  width:100%;
+  padding:0 16px;
+  border-radius:16px;
+  font-size:.92rem;
+  font-weight:700;
+  letter-spacing:.01em;
+  transition:transform .16s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+.ddc-connector-inspector .btn:hover{
+  transform:translateY(-1px);
+}
+.ddc-connector-inspector .btn.secondary{
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.025) 100%);
+  color:var(--primary-text-color, #fff);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.05),
+    0 10px 20px rgba(0,0,0,.14);
+}
+.ddc-connector-inspector .btn.secondary:hover{
+  border-color:color-mix(in srgb, var(--primary-color, #ff9800) 24%, rgba(255,255,255,.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 14px 26px rgba(0,0,0,.18);
+}
+.ddc-connector-inspector .btn.danger{
+  border:1px solid color-mix(in srgb, var(--error-color, #ef4444) 48%, rgba(255,255,255,.18));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--error-color, #ef4444) 78%, rgba(255,255,255,.08)) 0%, color-mix(in srgb, var(--error-color, #ef4444) 62%, rgba(0,0,0,.06)) 100%);
+  color:#fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 12px 22px color-mix(in srgb, var(--error-color, #ef4444) 22%, transparent);
+}
+.ddc-connector-inspector .btn.danger:hover{
+  filter:brightness(1.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 14px 28px color-mix(in srgb, var(--error-color, #ef4444) 28%, transparent);
+}
+.ddc-connector-inspector .btn ha-icon{
+  --mdc-icon-size:18px;
+}
+.ddc-connector-help{
+  margin:0;
+  font-size:.82rem;
+  line-height:1.5;
+  color:var(--secondary-text-color, rgba(255,255,255,.72));
+}
+@media (max-width: 920px){
+  .ddc-connector-inspector{
+    right:12px;
+    left:12px;
+    width:auto;
+  }
+  .ddc-connector-inspector-grid{
+    grid-template-columns:1fr;
+  }
+}
+@keyframes ddc-connector-preview-flow{
+  from { background-position: 0% 0%; }
+  to   { background-position: 200% 0%; }
+}
+@keyframes ddc-connector-flow{
+  from { stroke-dashoffset: 56; }
+  to   { stroke-dashoffset: 0; }
+}
 /* === GRID SELECT PATCH END (styles) === */
 </style>
+        <div class="ddc-page-bg-host" id="ddcPageBgHost" aria-hidden="true"></div>
         <div class="ddc-root">
         
 <div class="toolbar ddc-toolbar streamlined v2" role="toolbar" aria-label="Layout editor">
+
+  <button class="ddc-toolbar-toggle" id="toolbarToggleBtn" style="display:none" data-tooltip="Expand toolbar" title="Expand toolbar" aria-label="Expand toolbar" aria-expanded="false">
+    <ha-icon icon="mdi:chevron-down"></ha-icon>
+  </button>
 
   <!-- Add & Save -->
   <section class="ddc-sec sec-primary" aria-label="Add & Save">
@@ -4245,9 +9896,37 @@ _applyGridVars() {
       <button class="btn secondary" id="diagBtn" style="display:none" data-tooltip="Diagnostics">
         <ha-icon icon="mdi:play-circle-outline"></ha-icon><span class="label">Diagnostics</span>
       </button>
+      <button class="btn secondary" id="lineModeBtn" style="display:none" data-tooltip="Draw connectors">
+        <ha-icon icon="mdi:vector-polyline-plus"></ha-icon><span class="label">Draw Line</span>
+      </button>
       <button class="btn secondary" id="settingsBtn" style="display:none" data-tooltip="Card Settings">
         <ha-icon icon="mdi:cog"></ha-icon><span class="label">Card Settings</span>
       </button>
+    </div>
+    <div class="ddc-preview-stack" id="previewModeControls">
+      <div class="ddc-preview-head">
+        <div class="ddc-preview-label">Responsive Layout</div>
+        <div class="ddc-preview-meta" id="previewModeMeta">Auto: Desktop</div>
+      </div>
+      <div class="ddc-preview-modes" role="group" aria-label="Viewport preview">
+        <button type="button" class="ddc-preview-chip" data-preview-mode="live">Live</button>
+        <button type="button" class="ddc-preview-chip" data-preview-mode="desktop">Desktop</button>
+        <button type="button" class="ddc-preview-chip" data-preview-mode="tablet">Tablet</button>
+        <button type="button" class="ddc-preview-chip" data-preview-mode="mobile">Mobile</button>
+      </div>
+      <div class="ddc-preview-dimensions">
+        <label class="ddc-preview-field" for="previewWidthInput">
+          <span>W</span>
+          <input type="number" id="previewWidthInput" min="240" max="6000" step="1" />
+        </label>
+        <label class="ddc-preview-field" for="previewHeightInput">
+          <span>H</span>
+          <input type="number" id="previewHeightInput" min="240" max="6000" step="1" />
+        </label>
+        <button type="button" class="ddc-preview-chip ddc-preview-chip--icon" id="previewSwapButton" title="Swap width and height" aria-label="Swap width and height">
+          <ha-icon icon="mdi:phone-rotate-landscape"></ha-icon>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -4275,6 +9954,7 @@ _applyGridVars() {
             <!-- host for particles.js / YouTube backgrounds -->
             <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
           </div>
+          <aside class="ddc-connector-inspector" id="connectorInspector" hidden aria-live="polite"></aside>
 
 
 
@@ -4294,86 +9974,173 @@ _applyGridVars() {
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
       this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
       this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
+      this.toolbarToggleBtn = this.shadowRoot.querySelector('#toolbarToggleBtn');
       // Copy and Paste buttons (for edit mode)
       this.copyBtn      = this.shadowRoot.querySelector('#copyBtn');
       this.pasteBtn     = this.shadowRoot.querySelector('#pasteBtn');
+      this.lineModeBtn  = this.shadowRoot.querySelector('#lineModeBtn');
       this.settingsBtn  = this.shadowRoot.querySelector('#settingsBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
+      this.previewModeControls = this.shadowRoot.querySelector('#previewModeControls');
+      this.previewModeButtons = Array.from(this.shadowRoot.querySelectorAll('[data-preview-mode]'));
+      this.previewMeta = this.shadowRoot.querySelector('#previewModeMeta');
+      this.previewWidthInput = this.shadowRoot.querySelector('#previewWidthInput');
+      this.previewHeightInput = this.shadowRoot.querySelector('#previewHeightInput');
+      this.previewSwapButton = this.shadowRoot.querySelector('#previewSwapButton');
+      this.shadowRoot.querySelectorAll('.ddc-toolbar [data-tooltip]').forEach((node) => {
+        try {
+          const text = String(node.getAttribute('data-tooltip') || '').trim();
+          if (text && !node.getAttribute('title')) node.setAttribute('title', text);
+        } catch {}
+      });
+      this.toolbarToggleBtn?.addEventListener('click', () => {
+        this._setToolbarExpanded_?.(!this.__toolbarExpanded);
+      });
+      try { this._ensureStreamlinedToolbarObserver_?.(); } catch {}
+      this.previewModeButtons.forEach((btn) => {
+        btn.addEventListener('click', () => this._setViewportPreviewMode_(btn.dataset.previewMode || 'live'));
+      });
+      const commitPreviewWidth = () => this._commitResponsiveViewportField_?.('width');
+      const commitPreviewHeight = () => this._commitResponsiveViewportField_?.('height');
+      this.previewWidthInput?.addEventListener('change', commitPreviewWidth);
+      this.previewWidthInput?.addEventListener('blur', commitPreviewWidth);
+      this.previewHeightInput?.addEventListener('change', commitPreviewHeight);
+      this.previewHeightInput?.addEventListener('blur', commitPreviewHeight);
+      this.previewWidthInput?.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          commitPreviewWidth();
+          this.previewWidthInput?.blur?.();
+        }
+      });
+      this.previewHeightInput?.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          commitPreviewHeight();
+          this.previewHeightInput?.blur?.();
+        }
+      });
+      this.previewWidthInput?.addEventListener('wheel', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }, { passive: false });
+      this.previewHeightInput?.addEventListener('wheel', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }, { passive: false });
+      this.previewSwapButton?.addEventListener('click', () => this._swapResponsiveViewportOrientation_?.());
+      try { this._syncViewportPreviewUI_?.(); } catch {}
       try { this._renderTabs(); this._applyActiveTab(); } catch {}
+      try { this._syncConnectorUiState_?.(); } catch {}
      
 
       this._applyGridVars();
-      
-      this.addButton.addEventListener('click', () => {
-        if (!this.editMode) this._toggleEditMode(true);
-        this._openCardManager();
-      });      
-      this.reloadBtn.addEventListener('click', () => this._initialLoad(true));
-      this.diagBtn.addEventListener('click', () => this._openDiagnostics());
-      this.exitEditBtn.addEventListener('click', () => this._toggleEditMode(false));
-      this.exportBtn.addEventListener('click', () => this._exportDesign());
-      this.importBtn.addEventListener('click', () => this._importDesign());
-      this.applyLayoutBtn.addEventListener('click', () => this._saveLayout(false));
 
-      // Wire up copy/paste handlers. Only enabled in edit mode; see _toggleEditMode.
-      if (this.copyBtn) this.copyBtn.addEventListener('click', () => this._copySelection());
-      if (this.pasteBtn) this.pasteBtn.addEventListener('click', () => this._pasteClipboard());
+      if (!this.__uiBindingsReady) {
+        this.addButton?.addEventListener('click', () => {
+          if (!this.editMode) this._toggleEditMode(true);
+          this._openCardManager();
+        });
+        this.reloadBtn?.addEventListener('click', () => this._initialLoad(true));
+        this.diagBtn?.addEventListener('click', () => this._openDiagnostics());
+        this.exitEditBtn?.addEventListener('click', () => this._toggleEditMode(false));
+        this.exportBtn?.addEventListener('click', () => this._exportDesign());
+        this.importBtn?.addEventListener('click', () => this._importDesign());
+        this.applyLayoutBtn?.addEventListener('click', () => this._saveLayout(false));
+        this.copyBtn?.addEventListener('click', () => this._copySelection());
+        this.pasteBtn?.addEventListener('click', () => this._pasteClipboard());
+        this.lineModeBtn?.addEventListener('click', () => this._toggleConnectorDrawMode_?.());
+        this.settingsBtn?.addEventListener('click', () => this._openDashboardSettings());
+        this.exploreBtn?.addEventListener('click', () =>
+          window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
+        );
 
-      // Open the dashboard settings menu when settings button is clicked
-      if (this.settingsBtn) this.settingsBtn.addEventListener('click', () => this._openDashboardSettings());
-       // Ctrl/Cmd + S to Apply while in DDC edit mode
-       window.addEventListener('keydown', (e) => {
-         if (!this.editMode) return;
-         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-           e.preventDefault();
-           this._saveLayout(false);
-         }
-    // Observe host size for auto scaling (legacy retention for compatibility)
-    if (!this.__ddcResizeObs && this.autoResizeCards) {
-      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
-      try { this.__ddcResizeObs.observe(this); } catch {}
-      try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
-      try { if (this.parentElement) this.__ddcResizeObs.observe(this.parentElement); } catch {}
-      try { if (this.offsetParent) this.__ddcResizeObs.observe(this.offsetParent); } catch {}
-      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
-    }
-    // initial scale (legacy)
-    this._applyAutoScale?.();
+        this.__saveShortcutHandler = (e) => {
+          if (!this.editMode) return;
+          if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            this._saveLayout(false);
+          }
+        };
+        window.addEventListener('keydown', this.__saveShortcutHandler);
 
-       });
+        this.__escapeShortcutHandler = (e) => {
+          if (!this.editMode) return;
+          const target = e.target;
+          const inField = !!target?.closest?.('input, textarea, select, ha-code-editor, .CodeMirror');
+          if (e.key === 'Escape') {
+            if (this._isConnectorSettingsOpen_?.()) {
+              e.preventDefault();
+              this._closeConnectorSettings_?.();
+              return;
+            }
+            if (this._connectorDrawMode || this._connectorDraft?.points?.length) {
+              e.preventDefault();
+              this._cancelConnectorDraft_?.();
+              return;
+            }
+            this._toggleEditMode(false);
+            return;
+          }
+          if (inField) return;
+          if (e.key === 'Enter' && this._connectorDrawMode && this._connectorDraft?.points?.length >= 2) {
+            e.preventDefault();
+            this._finalizeConnectorDraft_?.({ openSettings: true });
+            return;
+          }
+          if ((e.key === 'Delete' || e.key === 'Backspace') && this._selectedConnectorId) {
+            e.preventDefault();
+            const selectedId = this._selectedConnectorId;
+            this._selectedConnectorId = null;
+            this._setCurrentConnectorEntries_(
+              (this._getCurrentConnectorEntries_() || []).filter((entry) => entry.id !== selectedId),
+              { reason: 'connector-delete', render: true }
+            );
+            this._closeConnectorSettings_?.();
+          }
+        };
+        window.addEventListener('keydown', this.__escapeShortcutHandler);
 
-      this.exploreBtn.addEventListener('click', () =>
-        window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
-      );
+        this.__containerBlankMouseDown = (e) => {
+          if (!this.editMode) return;
+          if (e.target.closest('.card-wrapper')) return;
+          const connectorLayer = this._ensureConnectorsLayer_?.();
+          if (connectorLayer && connectorLayer.contains(e.target)) return;
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            this._clearSelection();
+            if (this._selectedConnectorId) {
+              this._selectedConnectorId = null;
+              this._closeConnectorSettings_?.();
+              this._renderConnectors_?.();
+            }
+          }
+        };
+        this.cardContainer?.addEventListener('mousedown', this.__containerBlankMouseDown);
 
-      // apply container sizing early
+        this.__uiBindingsReady = true;
+      }
+
+      if (!this.__ddcResizeObs && this.autoResizeCards) {
+        this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
+        try { this.__ddcResizeObs.observe(this); } catch {}
+        try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
+        try { if (this.parentElement) this.__ddcResizeObs.observe(this.parentElement); } catch {}
+        try { if (this.offsetParent) this.__ddcResizeObs.observe(this.offsetParent); } catch {}
+      } else if (this.__ddcResizeObs && !this.autoResizeCards) {
+        try { this.__ddcResizeObs.disconnect(); } catch {}
+        this.__ddcResizeObs = null;
+      }
+
       this._applyContainerSizingFromConfig(true);
       this._applyAutoScale?.();
-      // Long-press on blank space (4s) to enter edit; Esc exits
       this._installLongPressToEnterEdit();
       this._startScaleWatch?.();
 
-      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && this.editMode) this._toggleEditMode(false);
-    // Observe host size for auto scaling
-    // Observe host size only if auto-resize is enabled
-    if (!this.__ddcResizeObs && this.autoResizeCards) {
-      this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
-      try { this.__ddcResizeObs.observe(this); } catch {}
-      try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
-      window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
-    }
-    // initial scale
-    this._applyAutoScale?.();
- });
-
-      // selection interactions in container
-      this._installSelectionMarquee();
-      this.cardContainer.addEventListener('mousedown', (e) => {
-        if (!this.editMode) return;
-        if (e.target.closest('.card-wrapper')) return; // handled per-card
-        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) this._clearSelection();
-      });
+      if (!this.__selectionMarqueeInstalled) {
+        this._installSelectionMarquee();
+        this.__selectionMarqueeInstalled = true;
+      }
     }
 
     // Persist new option knobs into storage so next load matches the config.
@@ -4442,166 +10209,147 @@ _startInitialAutosize() {
 
 
 connectedCallback() {
-    try { this._installGridObservers_(); this._updateGridButtonsVisibility(); } catch {}this._startInitialAutosize?.();
-    try { this._applyHaChromeVisibility_?.(); 
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
-
-    // Setup screen saver styles and timers
     try {
+      this._installGridObservers_();
+      this._updateGridButtonsVisibility();
+    } catch {}
+
+    this._startInitialAutosize?.();
+
+    try {
+      this._applyHaChromeVisibility_?.();
+      requestAnimationFrame(() => this._syncPageBackgroundToView_?.());
       this._ensureScreenSaverStyles?.();
       this._updateScreensaverSettings?.();
     } catch {}
-} catch {
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
 
-}
-    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; 
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
+    if (!this.__autoFillAfterDragHandler) {
+      this.__autoFillAfterDragHandler = () => {
+        const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+        if (mode === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+      };
+    }
+    this.removeEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
+    this.addEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
 
-}
+    if (!this.__keyHandlerBound) {
+      this.__keyHandler = (e) => this._onKeyDown_(e);
+      window.addEventListener('keydown', this.__keyHandler);
+      this.__keyHandlerBound = true;
+    }
+
     if (!this.__boundExitEdit) {
       this.__boundExitEdit = () => this._toggleEditMode(false);
-    
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
-
-}
+    }
     window.addEventListener('pagehide', this.__boundExitEdit);
     window.addEventListener('beforeunload', this.__boundExitEdit);
-  
-    this.__onVis = () => { if (document.visibilityState === 'hidden') this._toggleEditMode(false); 
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
 
-};
+    if (!this.__onVis) {
+      this.__onVis = () => {
+        if (document.visibilityState === 'hidden') this._toggleEditMode(false);
+      };
+    }
     document.addEventListener('visibilitychange', this.__onVis);
-  
-    // NEW: ensure we never boot in edit mode
+
     this._toggleEditMode(false);
-  
 
-// Ensure scale reapplies when the card becomes visible (e.g., after a tab switch)
-if (!this.__visObs) {
-  const io = new IntersectionObserver((entries) => {
-    if (entries.some(e => e.isIntersecting)) {
-      requestAnimationFrame(() => this._applyAutoScale && this._applyAutoScale()); 
-
-
+    if (!this.__visObs) {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          requestAnimationFrame(() => this._applyAutoScale?.());
+        }
+      });
       io.observe(this);
       this.__visObs = io;
     }
+
+    this.__ddcOnWinResize = this.__ddcOnWinResize || (() => {
+      if (this.hasAttribute('ddc-fixed-ui')) {
+        try { this._computeHaSidebarGutters_?.(); } catch {}
+      }
+      try { this._computeHaTopGutter_?.(); } catch {}
+      this._syncResponsiveProfileForViewport_?.();
+      this._applyAutoScale?.();
+      this._refreshToolbarOpenHeight_?.();
+      this._refreshTabsAlignment_?.();
     });
 
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
+    try {
+      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      if (this.autoResizeCards || mode === 'auto') {
+        window.addEventListener('resize', this.__ddcOnWinResize);
+      } else {
+        window.removeEventListener('resize', this.__ddcOnWinResize);
+      }
+    } catch {}
 
-}
-
-// Also respond to window resizes
-// Respond to window resizes ONLY when scaling is active
-this.__ddcOnWinResize = this.__ddcOnWinResize || (() => {
-  if (this.hasAttribute('ddc-fixed-ui')) {
-    try { this._computeHaSidebarGutters_?.(); } catch {}
+    try { this.__ddcBindPointerListeners?.(); } catch {}
   }
-  this._applyAutoScale?.();
-});
-
-// Only attach when scaling is active (auto-resize ON or mode === 'auto')
-try {
-  const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (this.autoResizeCards || mode === 'auto') {
-    window.addEventListener('resize', this.__ddcOnWinResize);
-  } else {
-    window.removeEventListener('resize', this.__ddcOnWinResize);
-  }
-} catch {}
-
-    try { this.__ddcBindPointerListeners?.(); 
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
-
-} catch {
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
-
-}
-
-// After any card drop, re-apply auto fill (no-scale) when in Auto mode
-this.addEventListener('ddc:dragend', () => {
-  const m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-  if (m === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
-});
-
-}
   
   disconnectedCallback() {
-    try { this._uninstallGridObservers_(); } catch {}try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
+    try { this._uninstallGridObservers_(); } catch {}
+    try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
     try { this._applyHaChromeVisibility_?.(); } catch {}
-    if (this.__keyHandlerBound && this.__keyHandler) { window.removeEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = false; this.__keyHandler = null; }
-    if (!this.__keyHandlerBound) { this.__keyHandler = (e)=>this._onKeyDown_(e); window.addEventListener('keydown', this.__keyHandler); this.__keyHandlerBound = true; }
+    try { this._clearPageBackground_?.(); } catch {}
+
+    if (this.__keyHandlerBound && this.__keyHandler) {
+      window.removeEventListener('keydown', this.__keyHandler);
+      this.__keyHandlerBound = false;
+      this.__keyHandler = null;
+    }
+    if (this.__saveShortcutHandler) {
+      window.removeEventListener('keydown', this.__saveShortcutHandler);
+      this.__saveShortcutHandler = null;
+    }
+    if (this.__escapeShortcutHandler) {
+      window.removeEventListener('keydown', this.__escapeShortcutHandler);
+      this.__escapeShortcutHandler = null;
+    }
+    if (this.__containerBlankMouseDown) {
+      this.cardContainer?.removeEventListener('mousedown', this.__containerBlankMouseDown);
+      this.__containerBlankMouseDown = null;
+    }
+    this.__uiBindingsReady = false;
+
     try { this._destroyParticles_?.(); } catch {}
     try { this._destroyYouTube_?.(); } catch {}
+
     window.removeEventListener('pagehide', this.__boundExitEdit);
     window.removeEventListener('beforeunload', this.__boundExitEdit);
     document.removeEventListener('visibilitychange', this.__onVis);
 
-    // Clean up screensaver timers and listeners
+    if (this.__autoFillAfterDragHandler) {
+      this.removeEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
+    }
+
     try {
       if (this._screensaverTimer) { clearTimeout(this._screensaverTimer); this._screensaverTimer = null; }
       if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
       if (this._screensaverActivityHandler) {
         const _evs = this._screensaverEvents || [];
-        _evs.forEach(ev => {
+        _evs.forEach((ev) => {
           document.removeEventListener(ev, this._screensaverActivityHandler, true);
         });
       }
-      // Remove overlay element if present
       if (this.screenSaverOverlay && this.screenSaverOverlay.parentNode) {
         this.screenSaverOverlay.parentNode.removeChild(this.screenSaverOverlay);
       }
     } catch {}
 
-    // cleanup observers
     try { this.__ddcResizeObs?.disconnect(); } catch {}
     this.__ddcResizeObs = null;
 
-    // stop scale watcher
     this._stopScaleWatch?.();
 
-    // remove resize listener
     if (this.__ddcOnWinResize) {
       window.removeEventListener('resize', this.__ddcOnWinResize);
       this.__ddcOnWinResize = null;
     }
 
-    // NEW: remove long-press listeners if installed
+    try { this.__streamlinedToolbarRO?.disconnect(); } catch {}
+    this.__streamlinedToolbarRO = null;
+    this.__streamlinedToolbarROTarget = null;
+
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
       cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
@@ -4615,13 +10363,9 @@ this.addEventListener('ddc:dragend', () => {
       this.__lpInstalled = false;
       this.__lpHandlers = null;
     }
-  
 
-try { this.__visObs && this.__visObs.disconnect(); } catch(e) {}
-this.__visObs = null;
-if (this.__ddcOnWinResize) {
-  window.removeEventListener('resize', this.__ddcOnWinResize);
-}
+    try { this.__visObs?.disconnect?.(); } catch {}
+    this.__visObs = null;
 
     try {
       if (this.__ddcPtrBound) {
@@ -4632,12 +10376,11 @@ if (this.__ddcOnWinResize) {
         this.__ddcPtrBound = false;
       }
     } catch {}
-}
+  }
   
 
   set hass(hass) {
     this._hass = hass;
-    LOG('set hass');
     if (!this.__probed && hass) {
       this.__probed = true;
       this._probeBackend().then(() => { 
@@ -4661,7 +10404,8 @@ if (this.__ddcOnWinResize) {
     // After updating hass on all cards, re‑evaluate visibility so that state
     // conditions are applied when not editing. Visibility is not applied during
     // edit mode so that all cards remain visible while editing.
-    try { this._applyVisibility_(); } catch {}
+    this._scheduleVisibilityRefresh_?.();
+    this._scheduleVisualRefresh_?.();
   }
   
   get hass() { return this._hass; }
@@ -4677,7 +10421,7 @@ if (this.__ddcOnWinResize) {
       this._loading = true;
 
       if (force && this.cardContainer) {
-        this.cardContainer.innerHTML = '';
+        this._restoreBackgroundHostToContainer_?.();
       }
 
       this._dbgPush('boot', 'Initial load start', { force });
@@ -4724,6 +10468,8 @@ if (this.__ddcOnWinResize) {
         saved = { cards: this._config.cards };
       }
 
+      this._setDashboardPackages_(saved?.packages || []);
+
       // Snapshot of YAML before we overlay anything
       const yamlCfg = { ...(this._config || {}) };
 
@@ -4745,7 +10491,7 @@ if (this.__ddcOnWinResize) {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','card_shadow','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'background_mode', 'background_image', 'background_particles', 'background_youtube',
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
         // Ensure screen saver settings from YAML override persisted options on reload. Without
         // including these keys, the screensaver delay can become stuck because the overlay
         // of YAML values never occurs. Adding them keeps behaviour consistent with other
@@ -4760,61 +10506,27 @@ if (this.__ddcOnWinResize) {
         this._applyImportedOptions(cfgOpts, true);
       }
 
-      // Build cards
-      let builtAny = false;
+      this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
+        saved?.options?.responsive_viewports
+        || yamlCfg?.responsive_viewports
+        || this.responsiveViewportProfiles
+      );
+      this._responsiveLayouts = this._normalizeResponsiveLayouts_(saved?.cards || [], saved?.responsive_layouts || null);
+      const targetProfile = this._getRequestedResponsiveProfile_?.() || 'desktop';
+      const targetOrientation = this._getRequestedResponsiveOrientation_?.(targetProfile) || 'landscape';
+      const targetLayoutKey = this._getResponsiveLayoutKey_(targetProfile, targetOrientation);
+      this._activeResponsiveProfile = targetProfile;
+      this._activeResponsiveLayoutKey = targetLayoutKey;
+      const entriesToBuild = this._responsiveLayouts?.[targetLayoutKey] || [];
 
-      if (saved?.cards?.length) {
-        for (const conf of saved.cards) {
-          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            // empty/placeholder
-            const wrap = this._makePlaceholderAt(
-              conf.position?.x || 0,
-              conf.position?.y || 0,
-              conf.size?.width  || 200,
-              conf.size?.height || 200
-            );
-            this.cardContainer.appendChild(wrap);
-            try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-            builtAny = true;
-            continue;
-          }
+      await this._buildCardsFromEntries_(entriesToBuild);
 
-          const cardEl = await this._createCard(conf.card);
-          const wrap = this._makeWrapper(cardEl);
-          if (this.editMode) wrap.classList.add('editing');
-          wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
-
-          this._setCardPosition(wrap, conf.position?.x || 0, conf.position?.y || 0);
-          wrap.style.width  = `${conf.size?.width  ?? 14 * this.gridSize}px`;
-          wrap.style.height = `${conf.size?.height ?? 10 * this.gridSize}px`;
-          if (conf.z != null) wrap.style.zIndex = String(conf.z);
-          // Apply any per-card overflow override. When a card was saved with
-          // overflow explicitly set (e.g. "visible" or "hidden"), apply it
-          // to the wrapper. Persist it on the dataset as well for UI toggles.
-          if (conf.overflow) {
-            try {
-              wrap.style.overflow = conf.overflow;
-              wrap.dataset.overflow = conf.overflow;
-              const cardEl = wrap.firstElementChild;
-              if (cardEl) cardEl.style.overflow = conf.overflow;
-            } catch {}
-          }
-
-          this.cardContainer.appendChild(wrap);
-
-          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-          this._initCardInteract(wrap);
-          builtAny = true;
-        }
-
-        this._resizeContainer();
-        this._applyAutoScale?.();
-        this._dbgPush('boot', 'Layout applied', { count: saved.cards.length });
-      }
-
-      if (!builtAny) {
-        this._showEmptyPlaceholder();
-        this._applyAutoScale?.();
+      if (entriesToBuild.length) {
+        this._dbgPush('boot', 'Layout applied', {
+          count: entriesToBuild.length,
+          profile: targetLayoutKey,
+        });
+      } else {
         this._dbgPush('boot', 'No saved layout found; showing placeholder');
       }
 
@@ -4862,33 +10574,36 @@ if (this.__ddcOnWinResize) {
   _renderTabs() {
     const bar = this.tabsBar; if (!bar) return;
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+    this._syncTabsPlacement_?.();
     if (!tabs.length || (tabs.length === 1 && this.hideTabsWhenSingle)) {
       bar.style.display = 'none';
+      this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
+      this.rootEl?.classList?.remove?.('ddc-tabs-bottom-layout');
       return;
     }
     bar.style.display = '';
-    bar.className = 'ddc-tabs ' + (this.tabsPosition === 'left' ? 'ddc-tabs-left' : '');
+    const classes = ['ddc-tabs'];
+    if (this.tabsPosition === 'left') classes.push('ddc-tabs-left');
+    if (this.tabsPosition === 'bottom') classes.push('ddc-tabs-bottom');
+    bar.className = classes.join(' ');
     bar.innerHTML = '';
 
-    // In auto size mode the tabs bar should always span the viewport width.
-    // Reset any previously calculated width/maxWidth values (from dynamic mode
-    // or earlier interactions) back to 100% so that when switching between
-    // tabs with different card widths, the bar is guaranteed to stretch
-    // across the entire viewport and allow full horizontal scrolling.  Without
-    // this reset the bar may retain the width from the prior tab and clip
-    // the newly selected tab’s content until the page is refreshed.
+    // Let the common sizing logic decide width for all placements so top and
+    // bottom share the same dock treatment.
     try {
-      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-      if (mode === 'auto') {
-        bar.style.width = '100%';
-        bar.style.maxWidth = '100%';
-      }
+      bar.style.width = '';
+      bar.style.maxWidth = '';
     } catch {}
     for (const t of tabs) {
       const btn = document.createElement('button');
-      btn.className = 'ddc-tab' + (t.id === this.activeTab ? ' active' : '');
+      btn.className = [
+        'ddc-tab',
+        t.icon ? 'ddc-tab--has-icon' : '',
+        t.id === this.activeTab ? 'active' : ''
+      ].filter(Boolean).join(' ');
       btn.dataset.tabId = t.id;
       btn.title = t.label || t.id;
+      btn.setAttribute('aria-label', t.label || t.id);
       btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
       btn.addEventListener('click', () => {
         if (this.activeTab !== t.id) {
@@ -4908,7 +10623,7 @@ if (this.__ddcOnWinResize) {
       });
       bar.appendChild(btn);
     }
-    if (this.rootEl) this.rootEl.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+    this._syncTabsPlacement_?.();
   
     try { this._updateTabsA11y_?.(); } catch {}
 
@@ -4935,34 +10650,16 @@ if (this.__ddcOnWinResize) {
       }
     } catch {}
 
-    // Adjust alignment: if the tabs bar does not overflow, centre its
-    // contents; otherwise anchor them to the start so the first tab is
-    // always visible.  Without this check the bar may remain centred
-    // causing the leftmost part of the bar to be clipped off when it
-    // overflows.  Reset any inline style first, then set justifyContent.
-    try {
-      // remove previously set inline justifyContent to allow recomputation
-      bar.style.justifyContent = '';
-      // Use flex-start by default; switch to center when the contents fit
-      if (bar.scrollWidth <= bar.clientWidth) {
-        bar.style.justifyContent = 'center';
-      } else {
-        bar.style.justifyContent = 'flex-start';
-      }
-    } catch {}
+    try { this._refreshTabsAlignment_?.(); } catch {}
   }
   _applyActiveTab() {
     const current = this._normalizeTabId(this.activeTab);
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
     wraps.forEach(w => {
       const tabId = w.dataset.tabId ? this._normalizeTabId(w.dataset.tabId) : this.defaultTab;
-      if (!this.tabs || !this.tabs.length) {
-        w.style.display = '';
-        w.inert = false;
-        w.classList.remove('ddc-hidden');
-        return;
-      }
-      if (tabId === current) {
+      const passesActiveTab = !this.tabs || !this.tabs.length || tabId === current;
+      const passesLayers = this._isWrapVisibleForActiveLayers_(w);
+      if (passesActiveTab && passesLayers) {
         w.style.display = '';
         w.inert = false;
         w.classList.remove('ddc-hidden');
@@ -4986,11 +10683,8 @@ if (this.__ddcOnWinResize) {
 
     try { this._clearSelection(); } catch {}
     // When card animations are enabled, animate visible cards after switching tabs
-    try {
-      if (this.animateCards) {
-        this._animateCards?.();
-      }
-    } catch {}
+    try { this._animateCards?.(); } catch {}
+    try { this._renderConnectors_?.(); } catch {}
   }
 
   /**
@@ -5023,6 +10717,11 @@ _animateCards() {
         (cs && cs.display === 'none') ||
         w.classList.contains('ddc-hidden');
       if (isHidden) return;
+
+      const cardStyle = this._extractPerCardStyle_?.(w) || {};
+      const animatePref = String(cardStyle.animate_cards || '').toLowerCase();
+      const shouldAnimate = animatePref === 'on' || (animatePref !== 'off' && this.animateCards);
+      if (!shouldAnimate) return;
 
       // Preserve any existing transform from layout
       const base = (cs && cs.transform && cs.transform !== 'none') ? cs.transform : '';
@@ -5140,54 +10839,191 @@ _animateCards() {
     sel.addEventListener('touchstart', stop);
   }
 
+  _normalizePerCardStyle_(style = {}) {
+    const out = {};
+    for (const key of ['background', 'container_background', 'text_color', 'border_color']) {
+      const value = style?.[key];
+      if (value == null) continue;
+      const trimmed = String(value).trim();
+      if (trimmed) out[key] = trimmed;
+    }
+    for (const key of ['animate_cards', 'card_shadow']) {
+      const value = String(style?.[key] || '').trim().toLowerCase();
+      if (value === 'on' || value === 'off') out[key] = value;
+    }
+    return out;
+  }
+
+  _extractPerCardStyle_(wrap) {
+    if (!wrap) return {};
+    try {
+      return this._normalizePerCardStyle_(JSON.parse(wrap.dataset.cardStyle || '{}') || {});
+    } catch {
+      return {};
+    }
+  }
+
+  _applyPerCardStyle_(wrap, style = null, { persist = true } = {}) {
+    if (!wrap) return {};
+    const next = this._normalizePerCardStyle_(style || {});
+    const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_?.();
+    const resolvedOuterBackground = themeOwnsDesign ? '' : (next.background || next.container_background || '');
+    const resolvedInnerBackground = themeOwnsDesign ? '' : (next.container_background || next.background || '');
+
+    if (resolvedOuterBackground) wrap.style.setProperty('--ddc-card-local-bg', resolvedOuterBackground);
+    else wrap.style.removeProperty('--ddc-card-local-bg');
+
+    if (resolvedInnerBackground) {
+      wrap.style.setProperty('--ddc-card-inner-bg', resolvedInnerBackground);
+      wrap.style.setProperty('--ha-card-background', resolvedInnerBackground);
+      wrap.style.setProperty('--card-background-color', resolvedInnerBackground);
+      wrap.style.setProperty('--paper-card-background-color', resolvedInnerBackground);
+    } else {
+      wrap.style.removeProperty('--ddc-card-inner-bg');
+      wrap.style.removeProperty('--ha-card-background');
+      wrap.style.removeProperty('--card-background-color');
+      wrap.style.removeProperty('--paper-card-background-color');
+    }
+
+    if (!themeOwnsDesign && next.border_color) wrap.style.setProperty('--ddc-card-border-color', next.border_color);
+    else wrap.style.removeProperty('--ddc-card-border-color');
+
+    if (themeOwnsDesign) {
+      wrap.style.removeProperty('--ddc-card-local-shadow');
+    } else if (next.card_shadow === 'off') {
+      wrap.style.setProperty('--ddc-card-local-shadow', 'none');
+    } else if (next.card_shadow === 'on') {
+      wrap.style.setProperty('--ddc-card-local-shadow', '0 8px 24px rgba(0,0,0,.35)');
+    } else {
+      wrap.style.removeProperty('--ddc-card-local-shadow');
+    }
+
+    const textProps = [
+      '--primary-text-color',
+      '--text-primary-color',
+      '--paper-item-icon-color',
+      '--state-icon-color',
+      '--mdc-theme-text-primary-on-background'
+    ];
+    if (!themeOwnsDesign && next.text_color) {
+      wrap.style.color = next.text_color;
+      textProps.forEach((prop) => wrap.style.setProperty(prop, next.text_color));
+    } else {
+      wrap.style.removeProperty('color');
+      textProps.forEach((prop) => wrap.style.removeProperty(prop));
+    }
+
+    if (persist) {
+      if (Object.keys(next).length) wrap.dataset.cardStyle = JSON.stringify(next);
+      else delete wrap.dataset.cardStyle;
+    }
+
+    return next;
+  }
+
+  _closeCardSettingsMenu_() {
+    const state = this.__cardSettingsMenu;
+    if (!state) return;
+    try { state.cleanup?.(); } catch {}
+    try { state.menu?.remove?.(); } catch {}
+    this.__cardSettingsMenu = null;
+  }
+
+  _positionCardSettingsMenu_() {
+    const state = this.__cardSettingsMenu;
+    if (!state?.menu || !state?.wrap) return;
+    const { menu, wrap } = state;
+    if (!menu.isConnected || !wrap.isConnected) {
+      this._closeCardSettingsMenu_();
+      return;
+    }
+
+    const rect = wrap.getBoundingClientRect();
+    const margin = 12;
+    const viewportW = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+    const viewportH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+    const menuW = Math.max(220, menu.offsetWidth || 320);
+    const menuH = Math.max(120, menu.offsetHeight || 360);
+
+    let left = rect.left + ((rect.width - menuW) / 2);
+    let top = rect.top + ((rect.height - menuH) / 2);
+
+    if (rect.height < menuH * 0.6) {
+      top = rect.top + Math.min(40, rect.height * 0.5);
+    }
+
+    left = Math.min(Math.max(margin, left), Math.max(margin, viewportW - menuW - margin));
+    top = Math.min(Math.max(margin, top), Math.max(margin, viewportH - menuH - margin));
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
   /**
    * Open or toggle a small settings menu attached to a card wrapper. This menu
    * currently exposes an overflow option that allows the user to choose
    * between the default overflow behaviour, visible overflow or hidden
-   * overflow on a per-card basis. The menu is inserted as a child of the
-   * wrapper and removed when toggled off or when clicking outside it.
+   * overflow on a per-card basis. The menu is rendered as an overlay so it
+   * can extend outside short cards without being clipped.
    *
    * @param {HTMLElement} wrap The card wrapper to attach the settings menu to.
    */
   _openCardSettingsMenu(wrap) {
     if (!wrap) return;
-    // Toggle existing menu: if one is present on this wrapper, remove it.
-    const existing = wrap.querySelector('.ddc-card-settings');
-    if (existing) {
-      existing.remove();
+    if (this.__cardSettingsMenu?.wrap === wrap) {
+      this._closeCardSettingsMenu_();
       return;
     }
+    this._closeCardSettingsMenu_();
     // Create the menu container
     const menu = document.createElement('div');
     menu.className = 'ddc-card-settings';
+    const themeVars = getComputedStyle(this);
+    const resolveSolidSurface = (...vars) => {
+      for (const varName of vars) {
+        const value = String(themeVars.getPropertyValue(varName) || '').trim();
+        if (value && !/^transparent$/i.test(value) && !/rgba?\([^)]*,\s*0(?:\.0+)?\s*\)/i.test(value)) {
+          return value;
+        }
+      }
+      return '#1f2329';
+    };
+    const popupSurface = resolveSolidSurface('--ha-card-background', '--card-background-color', '--primary-background-color');
+    const popupFieldSurface = resolveSolidSurface('--secondary-background-color', '--card-background-color', '--primary-background-color');
     // Note: do not reset all styles here. The menu relies on the surrounding card theme
     // variables (like colors) for its look. Inheriting them is intentional.
     // Position and style the menu. Inline styles allow it to work without
     // relying on external CSS. The design aims to match the settings modal:
-    // solid background, drop shadow and clean spacing. Center the menu
-    // over the card by using 50% offsets and translate. A higher z-index
-    // ensures it overlays the card contents.
+    // solid background, drop shadow and clean spacing. Render it as a fixed
+    // overlay so it can escape the card bounds and stay fully visible.
     Object.assign(menu.style, {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      zIndex: '10000',
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      transform: 'none',
+      zIndex: '100000',
       // Use a non-transparent background. Fall back to a dark colour if theme
       // variables are unset. This makes the popup look like a standalone card.
-      background: 'var(--ha-card-background, var(--card-background-color, var(--primary-background-color, #1e1e1e)))',
+      background: popupSurface,
       border: '1px solid var(--divider-color, rgba(0,0,0,.3))',
       borderRadius: '12px',
       padding: '14px',
       boxShadow: '0 10px 24px rgba(0,0,0,.4)',
       color: 'var(--primary-text-color, #f5f5f5)',
       minWidth: '220px',
+      maxWidth: 'min(340px, calc(100vw - 24px))',
+      maxHeight: 'min(560px, calc(100vh - 24px))',
       display: 'flex',
       flexDirection: 'column',
       gap: '12px',
       fontSize: '.875rem',
       opacity: '1',
-      mixBlendMode: 'normal'
+      mixBlendMode: 'normal',
+      overflow: 'auto',
+      pointerEvents: 'auto',
+      overscrollBehavior: 'contain',
+      backdropFilter: 'none',
+      WebkitBackdropFilter: 'none'
     });
     // Intercept pointer events in the menu to prevent card drag when
     // interacting with dropdowns or other controls. Without stopping
@@ -5232,7 +11068,7 @@ _animateCards() {
     closeBtn.innerHTML = '<ha-icon icon="mdi:close"></ha-icon>';
     closeBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      menu.remove();
+      this._closeCardSettingsMenu_();
     });
     menu.appendChild(closeBtn);
 
@@ -5267,12 +11103,266 @@ _animateCards() {
         padding: '6px 8px',
         border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
         borderRadius: '8px',
-        background: 'var(--ha-card-background, var(--card-background-color, var(--primary-background-color, #fff)))',
+        background: popupFieldSurface,
         color: 'var(--primary-text-color, #000)',
         font: 'inherit',
         lineHeight: '1.4',
         width: '100%'
       });
+    };
+
+    const currentCardStyle = this._extractPerCardStyle_(wrap);
+    const quickBackgroundPresets = [
+      'transparent',
+      '#111827',
+      '#1f2937',
+      '#334155',
+      '#0f766e',
+      '#6b5b95',
+      'var(--ha-card-background)',
+      'rgba(255,255,255,0.24)'
+    ];
+    const quickBackgroundGradients = [
+      'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+      'linear-gradient(135deg, #111827, #1f2937)',
+      'linear-gradient(135deg, #0f766e, #22c55e)',
+      'linear-gradient(135deg, #7c3aed, #06b6d4)',
+      'linear-gradient(135deg, #f97316, #f43f5e)',
+      'radial-gradient(circle at 30% 20%, #2dd4bf, #1e293b)'
+    ];
+    const stopInteractive = (el) => {
+      if (!el) return el;
+      el.addEventListener('pointerdown', stopEvt);
+      el.addEventListener('mousedown', stopEvt);
+      el.addEventListener('touchstart', stopEvt);
+      return el;
+    };
+    const guessHex = (value, fallback = '#111827') => {
+      const match = String(value || '').trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      return match ? match[0] : fallback;
+    };
+    const resolvePreviewBackground = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return 'transparent';
+      if (raw.startsWith('var(')) {
+        try {
+          const varName = raw.slice(4, -1).trim();
+          return getComputedStyle(this).getPropertyValue(varName).trim() || 'transparent';
+        } catch {
+          return 'transparent';
+        }
+      }
+      return raw;
+    };
+    const saveCardStyle = (patch = {}) => {
+      const next = {
+        ...this._extractPerCardStyle_(wrap),
+        ...patch,
+      };
+      for (const key of Object.keys(next)) {
+        if (!String(next[key] || '').trim()) delete next[key];
+      }
+      this._applyPerCardStyle_(wrap, next);
+      try { this._queueSave('card-style-change'); } catch {}
+    };
+    const makeOverrideRow = (labelText, key, hintText) => {
+      const sel = document.createElement('select');
+      applySelectStyle(sel);
+      [
+        { value: '', label: 'Dashboard default' },
+        { value: 'on', label: 'Enabled' },
+        { value: 'off', label: 'Disabled' }
+      ].forEach(({ value, label }) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+      sel.value = currentCardStyle[key] || '';
+      stopInteractive(sel);
+      sel.addEventListener('change', () => {
+        saveCardStyle({ [key]: sel.value });
+      });
+      const row = makeRow(labelText, sel);
+      const group = document.createElement('div');
+      Object.assign(group.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px'
+      });
+      group.appendChild(row);
+      if (hintText) {
+        const hint = document.createElement('div');
+        hint.textContent = hintText;
+        Object.assign(hint.style, {
+          fontSize: '.75rem',
+          color: 'var(--secondary-text-color, #9ca3af)'
+        });
+        group.appendChild(hint);
+      }
+      return group;
+    };
+    const makeStyleField = (labelText, key, placeholder, hintText, options = {}) => {
+      const field = document.createElement('div');
+      Object.assign(field.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px'
+      });
+
+      const top = document.createElement('div');
+      Object.assign(top.style, {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px'
+      });
+
+      const label = document.createElement('span');
+      label.textContent = labelText;
+      Object.assign(label.style, {
+        color: 'var(--secondary-text-color, #9ca3af)',
+        fontWeight: '500'
+      });
+
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.textContent = 'Reset';
+      Object.assign(resetBtn.style, {
+        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
+        borderRadius: '999px',
+        padding: '4px 10px',
+        background: 'transparent',
+        color: 'var(--primary-text-color, #f5f5f5)',
+        cursor: 'pointer',
+        font: 'inherit'
+      });
+      stopInteractive(resetBtn);
+
+      const controls = document.createElement('div');
+      Object.assign(controls.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      });
+
+      const picker = document.createElement('input');
+      picker.type = 'color';
+      picker.value = guessHex(currentCardStyle[key], key === 'text_color' ? '#f8fafc' : '#111827');
+      Object.assign(picker.style, {
+        width: '36px',
+        height: '36px',
+        padding: '0',
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        flex: '0 0 36px'
+      });
+      stopInteractive(picker);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentCardStyle[key] || '';
+      input.placeholder = placeholder;
+      Object.assign(input.style, {
+        flex: '1 1 auto',
+        padding: '8px 10px',
+        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
+        borderRadius: '10px',
+        background: 'var(--ha-card-background, var(--card-background-color, #111827))',
+        color: 'var(--primary-text-color, #f5f5f5)',
+        font: 'inherit'
+      });
+      stopInteractive(input);
+      const updatePresetState = () => {
+        const current = input.value.trim();
+        field.querySelectorAll('[data-card-style-value]').forEach((btn) => {
+          const active = btn.getAttribute('data-card-style-value') === current;
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+          btn.style.outline = active ? '2px solid var(--primary-color, #03a9f4)' : 'none';
+        });
+      };
+
+      picker.addEventListener('input', () => {
+        input.value = picker.value;
+        saveCardStyle({ [key]: picker.value });
+        updatePresetState();
+      });
+      input.addEventListener('input', () => {
+        const val = input.value.trim();
+        const match = val.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (match) picker.value = match[0];
+        saveCardStyle({ [key]: val });
+        updatePresetState();
+      });
+      resetBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        input.value = '';
+        saveCardStyle({ [key]: '' });
+        updatePresetState();
+      });
+
+      top.appendChild(label);
+      top.appendChild(resetBtn);
+      controls.appendChild(picker);
+      controls.appendChild(input);
+      field.appendChild(top);
+      field.appendChild(controls);
+
+      if (hintText) {
+        const hint = document.createElement('div');
+        hint.textContent = hintText;
+        Object.assign(hint.style, {
+          fontSize: '.75rem',
+          color: 'var(--secondary-text-color, #9ca3af)'
+        });
+        field.appendChild(hint);
+      }
+
+      const appendPresetRow = (values, { gradient = false } = {}) => {
+        if (!Array.isArray(values) || !values.length) return;
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px'
+        });
+
+        values.forEach((value) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('data-card-style-value', value);
+          btn.setAttribute('aria-pressed', 'false');
+          Object.assign(btn.style, {
+            width: gradient ? '42px' : '26px',
+            height: '26px',
+            borderRadius: gradient ? '8px' : '7px',
+            border: '1px solid rgba(255,255,255,.18)',
+            background: resolvePreviewBackground(value),
+            cursor: 'pointer',
+            padding: '0'
+          });
+          btn.title = value;
+          stopInteractive(btn);
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            input.value = value;
+            const match = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+            if (match) picker.value = match[0];
+            saveCardStyle({ [key]: value });
+            updatePresetState();
+          });
+          row.appendChild(btn);
+        });
+
+        field.appendChild(row);
+      };
+
+      appendPresetRow(options.presets || []);
+      appendPresetRow(options.gradients || [], { gradient: true });
+      updatePresetState();
+
+      return field;
     };
 
     // Build Tab selector row if multiple tabs exist
@@ -5360,8 +11450,84 @@ _animateCards() {
     });
     menu.appendChild(ovHint);
 
-    // Append menu to wrapper
-    wrap.appendChild(menu);
+    const styleDivider = document.createElement('div');
+    Object.assign(styleDivider.style, {
+      height: '1px',
+      background: 'var(--divider-color, rgba(255,255,255,.12))',
+      margin: '2px 0'
+    });
+    menu.appendChild(styleDivider);
+
+    const styleTitle = document.createElement('div');
+    styleTitle.textContent = 'Per-card style';
+    Object.assign(styleTitle.style, {
+      fontWeight: '600',
+      color: 'var(--primary-text-color, #f5f5f5)'
+    });
+    menu.appendChild(styleTitle);
+
+    const styleHint = document.createElement('div');
+    styleHint.textContent = 'Overrides Dashboard Settings for this card only.';
+    Object.assign(styleHint.style, {
+      fontSize: '.75rem',
+      color: 'var(--secondary-text-color, #9ca3af)',
+      marginTop: '-6px'
+    });
+    menu.appendChild(styleHint);
+
+    menu.appendChild(makeStyleField(
+      'Container background',
+      'container_background',
+      'transparent · #123456 · var(--ha-card-background)',
+      'Sets the inner card surface for this card only.',
+      { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
+    ));
+    menu.appendChild(makeStyleField(
+      'Card background',
+      'background',
+      'transparent · #123456 · linear-gradient(...)',
+      'Sets the outer wrapper/background around this card.',
+      { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
+    ));
+    menu.appendChild(makeStyleField('Text color', 'text_color', '#f8fafc · var(--primary-text-color)', 'Applies to text and icons when the card supports inherited theme vars.'));
+    menu.appendChild(makeStyleField('Border color', 'border_color', '#38bdf8', 'Adds an optional border color around this card.'));
+    menu.appendChild(makeOverrideRow('Animate cards', 'animate_cards', 'Overrides the dashboard animation setting for this card.'));
+    menu.appendChild(makeOverrideRow('Drop shadow', 'card_shadow', 'Overrides the dashboard shadow setting for this card.'));
+
+    const overlayRoot = this.shadowRoot || this;
+    overlayRoot.appendChild(menu);
+
+    const reposition = () => this._positionCardSettingsMenu_?.();
+    const closeOnOutside = (ev) => {
+      const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+      if (path.includes(menu) || path.includes(wrap)) return;
+      this._closeCardSettingsMenu_();
+    };
+    const closeOnEscape = (ev) => {
+      if (ev.key === 'Escape') this._closeCardSettingsMenu_();
+    };
+
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    this.__scaleOuter?.addEventListener?.('scroll', reposition, { passive: true });
+    this.cardContainer?.addEventListener?.('scroll', reposition, { passive: true });
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+
+    this.__cardSettingsMenu = {
+      menu,
+      wrap,
+      cleanup: () => {
+        window.removeEventListener('resize', reposition);
+        window.removeEventListener('scroll', reposition, true);
+        this.__scaleOuter?.removeEventListener?.('scroll', reposition, { passive: true });
+        this.cardContainer?.removeEventListener?.('scroll', reposition, { passive: true });
+        document.removeEventListener('pointerdown', closeOnOutside, true);
+        document.removeEventListener('keydown', closeOnEscape, true);
+      }
+    };
+
+    requestAnimationFrame(() => this._positionCardSettingsMenu_?.());
   }
   
 /* ------------------------------ Edit mode ------------------------------ */
@@ -5405,7 +11571,9 @@ _toggleEditMode(force = null) {
     setDisplay(this.applyLayoutBtn, on);
     setDisplay(this.copyBtn, on);
     setDisplay(this.pasteBtn, on);
+    setDisplay(this.lineModeBtn, on);
     setDisplay(this.settingsBtn, on);
+    setDisplay(this.toolbarToggleBtn, 'inline-flex');
   };
 
   const hideButtons = () => {
@@ -5420,12 +11588,15 @@ _toggleEditMode(force = null) {
     setDisplay(this.applyLayoutBtn, off);
     setDisplay(this.copyBtn, off);
     setDisplay(this.pasteBtn, off);
+    setDisplay(this.lineModeBtn, off);
     setDisplay(this.settingsBtn, off);
+    setDisplay(this.toolbarToggleBtn, off);
   };
 
   // === Animate only if we actually found a toolbar ===
   if (toolbar) {
     const DUR = 260; // keep in sync with CSS --ddc-dur
+    try { this._computeHaTopGutter_?.(); } catch {}
 
     if (entering) {
       // Make sure it can be measured even if CSS says display:none !important
@@ -5435,12 +11606,15 @@ _toggleEditMode(force = null) {
 
       // Reveal buttons first so height is real
       showButtons();
+      this._setToolbarExpanded_?.(false, { toolbar });
 
       // Let layout settle, then measure & open
       requestAnimationFrame(() => {
         const h = toolbar.scrollHeight || 0;
         toolbar.style.setProperty('--open-h', h + 'px');
         toolbar.classList.add('is-open');
+        this._refreshToolbarOpenHeight_?.();
+        requestAnimationFrame(() => this._refreshToolbarOpenHeight_?.());
         // keep data-force-open; :has() + buttons will keep it visible
       });
 
@@ -5459,6 +11633,7 @@ _toggleEditMode(force = null) {
 
       // After the CSS transition ends, actually hide buttons and release shim
       setTimeout(() => {
+        this._setToolbarExpanded_?.(false, { toolbar });
         hideButtons();
         toolbar.removeAttribute('data-force-open');
         // Let your existing CSS take over (display:none when not in edit)
@@ -5471,6 +11646,14 @@ _toggleEditMode(force = null) {
 
   // === Your existing non-visual logic unchanged ===
   this.editMode = entering;
+  if (!entering) {
+    this._persistCurrentResponsiveProfileToMemory_();
+    this.viewportPreviewMode = 'live';
+    this._closeConnectorSettings_?.();
+    this._cancelConnectorDraft_?.();
+    this._selectedConnectorId = null;
+  }
+  try { this._syncViewportPreviewUI_?.(); } catch {}
   this._syncEmptyStateUI?.();
   this.cardContainer?.classList.toggle('grid-on', this.editMode);
 
@@ -5498,6 +11681,7 @@ _toggleEditMode(force = null) {
     this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
       .forEach(w => w.classList.remove('dragging'));
   }
+  this._syncConnectorUiState_?.();
 
   if (wasOff) {
     const ox = this.__lastHoldX ?? null;
@@ -5514,6 +11698,7 @@ _toggleEditMode(force = null) {
   try {
     const root = this.shadowRoot?.querySelector?.('.ddc-root') || this.renderRoot?.querySelector?.('.ddc-root') || null;
     if (root) {
+      root.classList.toggle('ddc-edit-mode-active', !!this.editMode);
       let h = 0;
       // If we are entering edit mode and have a toolbar element, read its
       // scrollHeight to include all buttons and margins.  If leaving edit
@@ -5546,6 +11731,7 @@ _toggleEditMode(force = null) {
   try {
     // Resize the container based on current card positions.  This
     // updates its width/height and refreshes the grid overlay.
+    this._syncResponsiveProfileForViewport_?.({ force: !entering });
     if (typeof this._resizeContainer === 'function') {
       this._resizeContainer();
     }
@@ -5742,6 +11928,7 @@ _syncEmptyStateUI() {
   toggle(this.exploreBtn);
   toggle(this.storeBadge);
   toggle(this.applyLayoutBtn);
+  toggle(this.lineModeBtn);
   }
 
     _updateApplyBtn() {
@@ -6021,8 +12208,32 @@ _syncEmptyStateUI() {
 
   /* ------------------------ Card creation & wrapper ------------------------ */
   async _createCard(cfg) {
+    const sourceCfg = (() => {
+      try {
+        if (typeof structuredClone === 'function') return structuredClone(cfg || {});
+        return JSON.parse(JSON.stringify(cfg || {}));
+      } catch {
+        return { ...(cfg || {}) };
+      }
+    })();
+    const type = String(cfg?.type || '');
+    if (type === 'custom:ddc-html-card') {
+      const el = document.createElement('ddc-html-card');
+      el.__ddcSourceConfig = sourceCfg;
+      el.setConfig?.(cfg);
+      el.hass = this.hass;
+      return el;
+    }
+    if (type === 'custom:ddc-line-card') {
+      const el = document.createElement('ddc-line-card');
+      el.__ddcSourceConfig = sourceCfg;
+      el.setConfig?.(cfg);
+      el.hass = this.hass;
+      return el;
+    }
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
+    el.__ddcSourceConfig = sourceCfg;
     el.hass = this.hass;
     
     // Special handling for mod-card
@@ -6042,10 +12253,11 @@ _syncEmptyStateUI() {
     return el;
   }
 
-  _makeWrapper(cardEl) {
+  _makeWrapper(cardEl, options = {}) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper');
     wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+    wrap.dataset.layoutCardId = options.layoutCardId || cardEl?.dataset?.layoutCardId || this._genLayoutCardId_();
     if (this.editMode) wrap.classList.add('editing');
     if (!wrap.style.zIndex) {
       // Compute the next z-index and ensure it is at least 6.  Without
@@ -6152,6 +12364,10 @@ _syncEmptyStateUI() {
             }
             if (t.dataset && t.dataset.overflow) {
               w2.dataset.overflow = t.dataset.overflow;
+            }
+            if (t.dataset && t.dataset.cardStyle) {
+              w2.dataset.cardStyle = t.dataset.cardStyle;
+              this._applyPerCardStyle_?.(w2, this._extractPerCardStyle_?.(t) || null);
             }
             const origCard = t.firstElementChild;
             const dupCard = w2.firstElementChild;
@@ -6303,6 +12519,8 @@ _syncEmptyStateUI() {
     wrap.append(cardEl, shield, chip, delHandle, handle);
     // DDC patch: trigger one-time rebuild so nested card_mod attaches
     try { this._rebuildOnce(cardEl); } catch {}
+    this.__ddcTextLockDirty = true;
+    try { this._scheduleTextResizeLockRefresh_?.(true); } catch {}
 
     // Enable double-click on a card wrapper to open the card editor when
     // already in edit mode. This does not toggle edit mode; instead it
@@ -6527,9 +12745,10 @@ _syncEmptyStateUI() {
     }
     // Round up to grid to avoid half pixels
     const gw = Math.max(1, this.gridSize || 10);
+    const outerBuffer = this._getOuterGridBufferPx_?.() || 0;
     maxX = Math.ceil(maxX / gw) * gw;
     maxY = Math.ceil(maxY / gw) * gw;
-    return { w: Math.max(1, maxX), h: Math.max(1, maxY) };
+    return { w: Math.max(1, maxX + outerBuffer), h: Math.max(1, maxY + outerBuffer) };
   }
 
 
@@ -6586,6 +12805,259 @@ _startScaleWatch() {
       this.__scaleRAF = null;
     }
   }
+
+_setToolbarExpanded_(expanded = false, opts = {}) {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = opts?.toolbar || host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!toolbar) return;
+    const next = !!expanded;
+    this.__toolbarExpanded = next;
+    toolbar.classList.toggle('is-collapsed', !next);
+    toolbar.setAttribute('data-toolbar-expanded', next ? '1' : '0');
+    const toggleBtn = this.toolbarToggleBtn || toolbar.querySelector('#toolbarToggleBtn');
+    if (toggleBtn) {
+      const label = next ? 'Collapse toolbar' : 'Expand toolbar';
+      toggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
+      toggleBtn.setAttribute('aria-label', label);
+      toggleBtn.setAttribute('title', label);
+      toggleBtn.setAttribute('data-tooltip', label);
+      const icon = toggleBtn.querySelector('ha-icon');
+      if (icon) icon.setAttribute('icon', next ? 'mdi:chevron-up' : 'mdi:chevron-down');
+    }
+    this._refreshToolbarOpenHeight_?.();
+    this._syncTabsWidth_?.();
+  } catch {}
+}
+
+_refreshToolbarOpenHeight_() {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    const root = host?.querySelector?.('.ddc-root') || null;
+    if (!toolbar) {
+      if (root) root.style.setProperty('--ddc-toolbar-height', '0px');
+      if (!this.autoResizeCards && this.cardContainer) this.cardContainer.style.marginTop = '';
+      return;
+    }
+    requestAnimationFrame(() => {
+      try {
+        const isOpen = toolbar.classList.contains('is-open') || toolbar.hasAttribute('data-force-open');
+        const h = isOpen ? (toolbar.scrollHeight || toolbar.offsetHeight || 0) : 0;
+        toolbar.style.setProperty('--open-h', `${h}px`);
+        if (root) root.style.setProperty('--ddc-toolbar-height', `${h}px`);
+        if (!this.autoResizeCards && this.cardContainer) {
+          this.cardContainer.style.marginTop = h > 0 ? `${h}px` : '';
+        }
+      } catch {}
+    });
+  } catch {}
+}
+
+_ensureStreamlinedToolbarObserver_() {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!toolbar) {
+      try { this.__streamlinedToolbarRO?.disconnect(); } catch {}
+      this.__streamlinedToolbarRO = null;
+      this.__streamlinedToolbarROTarget = null;
+      return;
+    }
+    if (this.__streamlinedToolbarRO && this.__streamlinedToolbarROTarget === toolbar) return;
+    try { this.__streamlinedToolbarRO?.disconnect(); } catch {}
+    this.__streamlinedToolbarRO = new ResizeObserver(() => {
+      this._refreshToolbarOpenHeight_?.();
+    });
+    this.__streamlinedToolbarRO.observe(toolbar);
+    this.__streamlinedToolbarROTarget = toolbar;
+  } catch {}
+}
+
+_scheduleTextResizeLockRefresh_(force = false) {
+  if (force) this.__ddcTextLockDirty = true;
+  if (this.__ddcTextLockRAF) return;
+  this.__ddcTextLockRAF = requestAnimationFrame(() => {
+    this.__ddcTextLockRAF = null;
+    this._applyTextResizeLock_(force);
+  });
+}
+
+_clearTextResizeLock_() {
+  if (this.__ddcTextLockObserver) {
+    try { this.__ddcTextLockObserver.disconnect(); } catch {}
+    this.__ddcTextLockObserver = null;
+  }
+  const touched = this.__ddcTextLockTouched;
+  if (touched) {
+    for (const el of Array.from(touched)) {
+      try { el?.style?.removeProperty?.('font-size'); } catch {}
+    }
+    touched.clear();
+  }
+  this.__ddcTextLockActive = false;
+  this.__ddcTextLockScale = 1;
+  this.__ddcTextLockDirty = false;
+}
+
+_ensureTextResizeObserver_() {
+  const container = this.cardContainer;
+  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+  const active = !!this.doNotResizeText || (mode === 'dynamic' && this._isMobileOptimizeActive_?.());
+  if (!container || !active) {
+    if (this.__ddcTextLockObserver) {
+      try { this.__ddcTextLockObserver.disconnect(); } catch {}
+      this.__ddcTextLockObserver = null;
+    }
+    return;
+  }
+
+  if (this.__ddcTextLockObserver) {
+    try { this.__ddcTextLockObserver.disconnect(); } catch {}
+  }
+
+  const observer = new MutationObserver(() => {
+    this.__ddcTextLockDirty = true;
+    this._scheduleTextResizeLockRefresh_?.();
+  });
+
+  const seen = new Set();
+  const observeRoot = (root) => {
+    if (!root || seen.has(root)) return;
+    seen.add(root);
+    try {
+      observer.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    } catch {}
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let node = root.nodeType === Node.ELEMENT_NODE ? root : walker.nextNode();
+    while (node) {
+      if (node.shadowRoot) observeRoot(node.shadowRoot);
+      node = walker.nextNode();
+    }
+  };
+
+  observeRoot(container);
+  Array.from(container.querySelectorAll('.card-wrapper > :first-child')).forEach((root) => observeRoot(root));
+  this.__ddcTextLockObserver = observer;
+}
+
+_isTextResizeTarget_(el) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  const tag = (el.tagName || '').toLowerCase();
+  if (!tag) return false;
+
+  const skip = new Set(['style', 'script', 'ha-icon', 'iron-icon', 'svg', 'path', 'img', 'picture', 'video', 'canvas', 'slot']);
+  if (skip.has(tag)) return false;
+
+  if ([
+    'button', 'input', 'textarea', 'select', 'option', 'label', 'legend',
+    'summary', 'a', 'small', 'strong', 'em', 'b', 'i'
+  ].includes(tag)) {
+    return true;
+  }
+
+  if (el.shadowRoot || tag.includes('-')) return true;
+
+  return Array.from(el.childNodes || []).some(
+    (node) => node.nodeType === Node.TEXT_NODE && String(node.textContent || '').trim()
+  );
+}
+
+_collectTextResizeTargets_(root, out = []) {
+  if (!root) return out;
+
+  const addIfTarget = (el) => {
+    if (!this._isTextResizeTarget_(el)) return;
+    if (!out.includes(el)) out.push(el);
+  };
+
+  if (root.nodeType === Node.ELEMENT_NODE) addIfTarget(root);
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node = walker.nextNode();
+  while (node) {
+    addIfTarget(node);
+    if (node.shadowRoot) this._collectTextResizeTargets_(node.shadowRoot, out);
+    node = walker.nextNode();
+  }
+
+  return out;
+}
+
+_applyTextResizeLock_(force = false) {
+  const container = this.cardContainer;
+  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
+  const supportedMode = (mode === 'dynamic' || mode === 'auto');
+  const mobileAssist = supportedMode && this._isMobileOptimizeActive_?.();
+  const enabled = supportedMode && (!!this.doNotResizeText || mobileAssist);
+  const scale = Math.max(0.0001, Number(this.__pointerScaleX || this.__pointerScaleY || 1) || 1);
+
+  if (!enabled) {
+    if (this.__ddcTextLockActive || this.__ddcTextLockDirty || force) this._clearTextResizeLock_();
+    return;
+  }
+
+  if (!container) return;
+
+  if (
+    !force &&
+    !this.__ddcTextLockDirty &&
+    this.__ddcTextLockActive &&
+    Math.abs((this.__ddcTextLockScale || 1) - scale) < 1e-3
+  ) {
+    return;
+  }
+
+  if (!this.__ddcTextLockBase) this.__ddcTextLockBase = new WeakMap();
+  if (!this.__ddcTextLockTouched) this.__ddcTextLockTouched = new Set();
+  this._ensureTextResizeObserver_?.();
+
+  const targetVisibleScale = this.doNotResizeText
+    ? 1
+    : Math.max(scale, Math.min(1, this._getMobileTextAssistScale_?.() || 1));
+  const compensation = this.doNotResizeText
+    ? (1 / scale)
+    : Math.max(1, Math.min(1 / scale, targetVisibleScale / scale));
+  const seen = new Set();
+  const cardRoots = Array.from(container.querySelectorAll('.card-wrapper > :first-child'));
+
+  for (const root of cardRoots) {
+    const targets = this._collectTextResizeTargets_(root, []);
+    for (const el of targets) {
+      if (!el || seen.has(el)) continue;
+      seen.add(el);
+
+      if (!this.__ddcTextLockBase.has(el)) {
+        const measured = parseFloat(getComputedStyle(el).fontSize || '0');
+        if (!Number.isFinite(measured) || measured <= 0) continue;
+        this.__ddcTextLockBase.set(el, measured);
+      }
+
+      const base = this.__ddcTextLockBase.get(el);
+      if (!Number.isFinite(base) || base <= 0) continue;
+
+      el.style.setProperty('font-size', `${Math.max(1, base * compensation).toFixed(3)}px`, 'important');
+      this.__ddcTextLockTouched.add(el);
+    }
+  }
+
+  for (const el of Array.from(this.__ddcTextLockTouched)) {
+    if (!el?.isConnected || !seen.has(el)) {
+      try { el?.style?.removeProperty?.('font-size'); } catch {}
+      this.__ddcTextLockTouched.delete(el);
+    }
+  }
+
+  this.__ddcTextLockActive = true;
+  this.__ddcTextLockScale = scale;
+  this.__ddcTextLockDirty = false;
+}
+
 _applyAutoScale() {
   // 1) Early path: "auto" mode (no proportional scaling)
   let mode = 'dynamic';
@@ -6604,7 +13076,7 @@ _applyAutoScale() {
 
   // 2) Only ensure scale wrapper when actually scaling
   try {
-    if (this.autoResizeCards || mode === 'auto') {
+    if (this.autoResizeCards || mode === 'auto' || this._getViewportPreviewPreset_?.()) {
       if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
     }
   } catch {}
@@ -6616,6 +13088,8 @@ _applyAutoScale() {
     const d = (typeof this._computeDesignSize === 'function')
       ? this._computeDesignSize()
       : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
+    const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
+    const previewActive = previewHeight > 0;
 
     if (mode === 'dynamic') {
       try { this._computeHaSidebarGutters_?.(); } catch {}
@@ -6654,15 +13128,23 @@ _applyAutoScale() {
           (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
           (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
           this.offsetWidth || d.w;
-
-        const wantOuterW = `${Math.max(1, pw)}px`;
-        const wantOuterH = `${Math.max(1, d.h)}px`;
+        const outerW = this._getEffectivePreviewWidth_?.(pw) || pw;
+        const wantOuterW = `${Math.max(1, outerW)}px`;
+        const wantOuterH = `${Math.max(1, previewActive ? previewHeight : d.h)}px`;
         if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
         if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
+        this.__scaleOuter.style.overflowX = d.w > outerW ? 'auto' : 'hidden';
+        this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
+        this.__scaleOuter.style.webkitOverflowScrolling = previewActive ? 'touch' : '';
+        this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+        this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
+        this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
+        this._applyPreviewDeviceFrame_?.(outerW, previewActive ? previewHeight : d.h);
       }
     }
 
     try { this._syncTabsWidth_?.(); } catch {}
+    try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
     return;
   }
 
@@ -6679,8 +13161,41 @@ _applyAutoScale() {
     (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
     (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
     this.offsetWidth || d.w;
+  const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
+  const previewActive = previewHeight > 0;
 
-  const availableW = Math.max(1, pw);
+  const availableW = Math.max(1, this._getEffectivePreviewWidth_?.(pw) || pw);
+  const unscaledPreview = this._shouldUseUnscaledPreviewCanvas_?.();
+  if (unscaledPreview) {
+    if (this.__scaleOuter) {
+      this.__scaleOuter.style.width = `${availableW}px`;
+      this.__scaleOuter.style.height = `${Math.max(1, previewActive ? previewHeight : d.h)}px`;
+      this.__scaleOuter.style.overflowX = 'auto';
+      this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
+      this.__scaleOuter.style.webkitOverflowScrolling = 'touch';
+      this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+      this.__scaleOuter.style.marginInline = 'auto';
+      this.__scaleOuter.style.maxWidth = '100%';
+      this._applyPreviewDeviceFrame_?.(availableW, previewActive ? previewHeight : d.h);
+    }
+
+    c.style.width = `${d.w}px`;
+    c.style.height = `${d.h}px`;
+    c.style.transform = 'scale(1)';
+    c.style.transformOrigin = 'top left';
+    c.style.position = 'absolute';
+    c.style.top = '0';
+    c.style.left = '0';
+
+    this.__pointerScaleX = 1;
+    this.__pointerScaleY = 1;
+
+    try { this._syncTabsWidth_?.(); } catch {}
+    try { this._layoutYtBackground_?.(); } catch {}
+    try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
+    try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+    return;
+  }
   // Compute the scale factor relative to the design width.  Previously the
   // factor was clamped to ≤1, meaning the layout would only shrink but
   // never grow.  This resulted in the “auto‑resize cards” option having
@@ -6688,11 +13203,22 @@ _applyAutoScale() {
   // the viewport.  Remove the clamp so that smaller layouts can grow to
   // fill the available space.  If desired a maximum cap could be
   // introduced here; for now allow the layout to scale up as needed.
-  const scale = availableW / Math.max(1, d.w);
+  const baseScale = availableW / Math.max(1, d.w);
+  const mobilePlan = this._isMobileOptimizeActive_?.()
+    ? this._getMobileScalePlan_?.(d.w, baseScale)
+    : null;
+  const scale = Math.max(0.0001, Number(mobilePlan?.scale || baseScale) || baseScale || 1);
 
   if (this.__scaleOuter) {
     this.__scaleOuter.style.width  = `${availableW}px`;
-    this.__scaleOuter.style.height = `${Math.max(1, d.h * scale)}px`;
+    this.__scaleOuter.style.height = `${Math.max(1, previewActive ? previewHeight : (d.h * scale))}px`;
+    this.__scaleOuter.style.overflowX = mobilePlan?.allowPanX ? 'auto' : 'hidden';
+    this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
+    this.__scaleOuter.style.webkitOverflowScrolling = (previewActive || mobilePlan?.allowPanX) ? 'touch' : '';
+    this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+    this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
+    this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
+    this._applyPreviewDeviceFrame_?.(availableW, previewActive ? previewHeight : (d.h * scale));
   }
 
   c.style.width = `${d.w}px`;
@@ -6709,6 +13235,7 @@ _applyAutoScale() {
 
   try { this._syncTabsWidth_?.(); } catch {}
   try { this._layoutYtBackground_?.(); } catch {}
+  try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
   // After applying a new scale, refresh the grid overlay dimensions so that
   // the selectable squares cover the scaled content area.  Without this
   // update the overlay may not extend across the resized canvas.
@@ -6731,6 +13258,8 @@ _applyAutoFillNoScale() {
     const outer = this.__scaleOuter || this.shadowRoot?.querySelector?.('.ddc-scale-outer') || this;
     const inner = this.cardContainer || this.shadowRoot?.querySelector?.('#cardContainer');
     if (!outer || !inner) return;
+    const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
+    const previewActive = previewHeight > 0;
 
     // Enable scrolling within the scale wrapper when the card
     // content exceeds the viewport.  We set overflow to "auto" to
@@ -6743,10 +13272,20 @@ _applyAutoFillNoScale() {
     // the wrapper).  Mimic dynamic mode by hiding vertical overflow and
     // enabling horizontal overflow.  Setting overflow to hidden first
     // establishes the default, then overflowX is overridden below.
+    const hostW =
+      (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+      (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+      (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+      this.offsetWidth ||
+      this.cardContainer?.offsetWidth ||
+      1;
+    const previewWidth = this._getEffectivePreviewWidth_?.(hostW) || hostW;
     outer.style.overflow = 'hidden';
     outer.style.overflowX = 'auto';
-    outer.style.overflowY = 'hidden';
-    outer.style.width = '100%';
+    outer.style.overflowY = previewActive ? 'auto' : 'hidden';
+    outer.style.width = previewActive ? `${Math.max(1, previewWidth)}px` : '100%';
+    outer.style.marginInline = previewActive ? 'auto' : '';
+    outer.style.maxWidth = previewActive ? '100%' : '';
 
     // If HA gives us a tiny height, expand to remaining viewport height (not to trigger loops).
     let vb = outer.getBoundingClientRect();
@@ -6769,11 +13308,13 @@ _applyAutoFillNoScale() {
     let maxX = 0, maxY = 0;
     const cards = Array.from(inner.querySelectorAll('.card-wrapper'));
     if (cards.length) {
-      const cr = inner.getBoundingClientRect();
       for (const w of cards) {
-        const r = w.getBoundingClientRect();
-        const right  = r.left - cr.left + r.width;
-        const bottom = r.top  - cr.top  + r.height;
+        const x = parseFloat(w.getAttribute('data-x-raw') || w.getAttribute('data-x') || '0') || 0;
+        const y = parseFloat(w.getAttribute('data-y-raw') || w.getAttribute('data-y') || '0') || 0;
+        const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width  || 0;
+        const height = parseFloat(w.style.height) || w.getBoundingClientRect().height || 0;
+        const right  = x + width;
+        const bottom = y + height;
         if (right  > maxX) maxX = right;
         if (bottom > maxY) maxY = bottom;
       }
@@ -6783,14 +13324,17 @@ _applyAutoFillNoScale() {
     }
 
     const gs = Number(this.gridSize || 1) || 1;
-    const natW = Math.max(1, Math.round(Math.ceil(maxX/gs) * gs));
-    const natH = Math.max(1, Math.round(Math.ceil(maxY/gs) * gs));
+    const outerBuffer = this._getOuterGridBufferPx_?.() || 0;
+    const natW = Math.max(1, Math.round(Math.ceil(maxX/gs) * gs) + outerBuffer);
+    const natH = Math.max(1, Math.round(Math.ceil(maxY/gs) * gs) + outerBuffer);
 
     // Strict rule:
     // - If viewport > natural size, expand inner to viewport (fills space).
     // - Else, inner stays at natural size (so user can scroll to reach overflow).
-    const targetW = (availW > natW) ? availW : natW;
-    const targetH = (availH > natH) ? availH : natH;
+    const screenAvailW = previewActive ? Math.max(1, previewWidth) : availW;
+    const screenAvailH = previewActive ? Math.max(1, previewHeight) : availH;
+    const targetW = (screenAvailW > natW) ? screenAvailW : natW;
+    const targetH = (screenAvailH > natH) ? screenAvailH : natH;
 
     // Apply: NO SCALE. Keep 1:1 pixels so positions are exact.
     inner.style.transform = 'none';
@@ -6807,23 +13351,20 @@ _applyAutoFillNoScale() {
     // scrollbar.  When the natural content height exceeds this height,
     // overflow:auto on the wrapper will provide scrollbars.
     if (outer) {
-      let topOffset = 0;
-      try {
-        const vb2 = outer.getBoundingClientRect();
-        topOffset = Math.max(0, Math.round(vb2.top || 0));
-      } catch {}
-      const vpH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 0);
-      // Reserve space for the bottom margin and ensure at least 1px height
-      const availViewH = Math.max(1, vpH - topOffset - 8);
-      // Set the wrapper height to the natural target height.  This allows
-      // the page to scroll vertically while the wrapper itself only
-      // scrolls horizontally.  Using the natural content height prevents
-      // clipping of cards and avoids nested vertical scrollbars.
-      outer.style.height = `${targetH}px`;
+      if (previewActive) {
+        outer.style.height = `${previewHeight}px`;
+        outer.style.webkitOverflowScrolling = 'touch';
+        outer.style.overscrollBehavior = 'contain';
+      } else {
+        outer.style.height = `${targetH}px`;
+        outer.style.webkitOverflowScrolling = '';
+        outer.style.overscrollBehavior = '';
+      }
+      this._applyPreviewDeviceFrame_?.(previewActive ? previewWidth : 0, previewActive ? previewHeight : 0);
     }
     inner.style.position = inner.style.position || 'absolute';
-    inner.style.top = inner.style.top || '0';
-    inner.style.left = inner.style.left || '0';
+    inner.style.top = '0';
+    inner.style.left = '0';
 
     // In auto mode, the tabs bar should span the viewport width (not the full card width).
     const tb = this.tabsBar;
@@ -6831,6 +13372,7 @@ _applyAutoFillNoScale() {
       tb.style.width = '100%';
       tb.style.maxWidth = '100%';
     }
+    try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
   } finally {
     // Recompute the background (e.g. YouTube video) sizing based on the
     // newly updated card dimensions.  Without this call the video
@@ -6855,22 +13397,26 @@ _applyAutoFillNoScale() {
   _resizeContainer() {
     const c = this.cardContainer; if (!c) return;
   
-    // In fixed modes, do NOT auto-grow/shrink — the box is hard-locked.
-    if (this._isContainerFixed()) return;
+  // In fixed modes, do NOT auto-grow/shrink — the box is hard-locked.
+  if (this._isContainerFixed()) return;
   
     // Dynamic mode: compute based on content
     const cards = Array.from(c.querySelectorAll('.card-wrapper'));
     let maxX = 0, maxY = 0;
     cards.forEach((card) => {
-      const r  = card.getBoundingClientRect();
-      const cr = c.getBoundingClientRect();
-      const right  = r.left - cr.left + r.width;
-      const bottom = r.top  - cr.top  + r.height;
+      const x = parseFloat(card.getAttribute('data-x-raw') || card.getAttribute('data-x') || '0') || 0;
+      const y = parseFloat(card.getAttribute('data-y-raw') || card.getAttribute('data-y') || '0') || 0;
+      const width  = parseFloat(card.style.width)  || card.getBoundingClientRect().width  || 0;
+      const height = parseFloat(card.style.height) || card.getBoundingClientRect().height || 0;
+      const right  = x + width;
+      const bottom = y + height;
       maxX = Math.max(maxX, right);
       maxY = Math.max(maxY, bottom);
     });
-    c.style.width  = `${Math.ceil(maxX/this.gridSize)*this.gridSize || 100}px`;
-    c.style.height = `${Math.ceil(maxY/this.gridSize)*this.gridSize || 100}px`;
+    const gs = Math.max(1, Number(this.gridSize || 1) || 1);
+    const outerBuffer = this._getOuterGridBufferPx_?.() || 0;
+    c.style.width  = `${Math.max(100, Math.ceil(maxX / gs) * gs + outerBuffer)}px`;
+    c.style.height = `${Math.max(100, Math.ceil(maxY / gs) * gs + outerBuffer)}px`;
 
     // Whenever the container size changes in dynamic mode, update the tabs bar
     // width so it remains aligned with the container. If the scale wrapper
@@ -6883,6 +13429,7 @@ _applyAutoFillNoScale() {
     // the overlay can remain clipped until the next edit toggle or page
     // refresh.
     try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+    try { this._renderConnectors_?.(); } catch {}
   }
   
   /**
@@ -7055,6 +13602,36 @@ _applyAutoFillNoScale() {
   }
   _extractCardConfig(cardEl){
     if (!cardEl) return {};
+    // Prefer the wrapper cache first. Runtime card instances, especially
+    // mod-card/card-mod combinations, may rewrite or expand their own config
+    // object internally after repeated rebuilds. If we serialize that mutated
+    // runtime object back into YAML, style snippets can get duplicated many
+    // times. The wrapper cache is the stable source-of-truth for what DDC
+    // intentionally saved.
+    try {
+      const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
+      const raw  = wrap?.dataset?.cfg;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      }
+    } catch {}
+    // Next prefer the original config snapshot captured when the card element
+    // was created. This protects against internal runtime mutation even when a
+    // wrapper cache is unavailable.
+    const sourceCfg = cardEl.__ddcSourceConfig;
+    if (sourceCfg && typeof sourceCfg === 'object' && Object.keys(sourceCfg).length) {
+      try {
+        if (typeof structuredClone === 'function') {
+          return structuredClone(sourceCfg);
+        }
+        return JSON.parse(JSON.stringify(sourceCfg));
+      } catch {
+        return { ...sourceCfg };
+      }
+    }
     // attempt to read the card's own config
     const cfg = cardEl._config || cardEl.config;
     if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
@@ -7071,19 +13648,6 @@ _applyAutoFillNoScale() {
         return { ...cfg };
       }
     }
-    // fallback: if the wrapper cached a config, use it
-    try {
-      // walk up to the wrapper; .closest may not exist on text nodes
-      const wrap = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
-      const raw  = wrap?.dataset?.cfg;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          // parsed is already a deep clone via JSON.parse
-          return parsed;
-        }
-      }
-    } catch {}
     return {};
   }
 
@@ -7093,6 +13657,12 @@ _applyAutoFillNoScale() {
   _catalog() {
     return [
       { id:'favorites', name:'Favorites', items:[] },
+      {
+        id:'ddc',
+        name:'Drag and drop cards',
+        hint:'Cards in this section are reserved for components that only make sense inside Drag & Drop Card. Connector lines are now drawn directly from the edit toolbar.',
+        items:this._dragAndDropCardsCatalog()
+      },
       { id:'recent',    name:'Recent',    items:[] },
       { id:'basics',    name:'Basics', items:[
         {type:'entities',          name:'Entities',          icon:'mdi:format-list-bulleted'},
@@ -7128,11 +13698,25 @@ _applyAutoFillNoScale() {
     ];
   }
 
+  _dragAndDropCardsCatalog() {
+    return [
+      {
+        type:'custom:ddc-html-card',
+        name:'HTML / Web card',
+        icon:'mdi:language-html5',
+        description:'Build a custom card with your own HTML, CSS and JavaScript inside Drag & Drop Card.'
+      }
+    ];
+  }
+
   /* ---- Find/create a config editor element for a given card type ---- */
   async _getEditorElementForType(type, cfg) {
     // Log the start of an editor lookup; this uses console.debug so it is visible
     try { console.info('[ddc:editor] Requesting editor element', { type, cfg }); } catch {}
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+
+    if (type === 'custom:ddc-html-card') return document.createElement('ddc-html-card-editor');
+    if (type === 'custom:ddc-line-card') return document.createElement('ddc-line-card-editor');
   
     // Warm the module before asking for the class only for built‑in HA cards.
     // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
@@ -8046,6 +14630,7 @@ _applyAutoFillNoScale() {
     const parse = (t) => (window.jsyaml ? window.jsyaml.load(t) : JSON.parse(t));
     hostEl.innerHTML = '';
     const initialText = dump(initialCfg);
+    let suppressProgrammaticText = null;
 
     if (customElements.get('ha-code-editor')) {
       const ed = document.createElement('ha-code-editor');
@@ -8060,13 +14645,22 @@ _applyAutoFillNoScale() {
       ed.addEventListener('value-changed', (e) => {
         if (programmatic) return;
         const txt = e.detail?.value ?? ed.value ?? '';
+        if (suppressProgrammaticText !== null && txt === suppressProgrammaticText) {
+          suppressProgrammaticText = null;
+          return;
+        }
         try { onValidChange(parse(txt)); }
         catch (err) { onInvalidChange?.(err); }
       });
       return {
         setValue: (cfg) => {
           const txt = dump(cfg);
-          if ((ed.value ?? '') !== txt) { programmatic = true; ed.value = txt; programmatic = false; }
+          if ((ed.value ?? '') !== txt) {
+            suppressProgrammaticText = txt;
+            programmatic = true;
+            ed.value = txt;
+            programmatic = false;
+          }
         }
       };
     }
@@ -8085,13 +14679,22 @@ _applyAutoFillNoScale() {
       cm.on('change', () => {
         if (programmatic) return;
         const text = cm.getValue();
+        if (suppressProgrammaticText !== null && text === suppressProgrammaticText) {
+          suppressProgrammaticText = null;
+          return;
+        }
         try { onValidChange(parse(text)); }
         catch (e) { onInvalidChange?.(e); }
       });
       return {
         setValue: (cfg) => {
           const txt = dump(cfg);
-          if (cm.getValue() !== txt) { programmatic = true; cm.setValue(txt); programmatic = false; }
+          if (cm.getValue() !== txt) {
+            suppressProgrammaticText = txt;
+            programmatic = true;
+            cm.setValue(txt);
+            programmatic = false;
+          }
         }
       };
     } catch {
@@ -8100,11 +14703,23 @@ _applyAutoFillNoScale() {
       ta.style.height = '260px';
       ta.value = initialText;
       ta.addEventListener('input', () => {
+        if (suppressProgrammaticText !== null && ta.value === suppressProgrammaticText) {
+          suppressProgrammaticText = null;
+          return;
+        }
         try { onValidChange(parse(ta.value)); }
         catch (e) { onInvalidChange?.(e); }
       });
       hostEl.appendChild(ta);
-      return { setValue: (cfg) => { const txt = dump(cfg); if (ta.value !== txt) ta.value = txt; } };
+      return {
+        setValue: (cfg) => {
+          const txt = dump(cfg);
+          if (ta.value !== txt) {
+            suppressProgrammaticText = txt;
+            ta.value = txt;
+          }
+        }
+      };
     }
   }
 
@@ -8163,19 +14778,21 @@ _applyAutoFillNoScale() {
 
     
     const close = () => modal.remove();
-    const modal = document.createElement('div'); modal.className='modal';
+    const modal = document.createElement('div'); modal.className='modal smart-picker-modal';
     modal.innerHTML = `
-      <div class="dialog" role="dialog" aria-modal="true">
+      <div class="dialog smart-picker-dialog" role="dialog" aria-modal="true">
         <div class="dlg-head">
           <h3>${mode==='edit'?'Edit card':'Add a card'}</h3>
-          <div style="display:flex;gap:10px;flex:1">
-            <input id="search" placeholder="Search cards (name or type)…" aria-label="search" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--divider-color);background:var(--primary-background-color);color:var(--primary-text-color)">
+          <div class="picker-search-wrap">
+            <input id="search" class="picker-search" placeholder="Search cards (name or type)…" aria-label="search">
           </div>
-          <button class="btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
-          <button class="btn" id="addBtn" disabled>${mode==='edit'
-            ? '<ha-icon icon="mdi:content-save"></ha-icon><span style="margin-left:6px">Update</span>'
-            : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
+          <div class="picker-actions">
+          <button class="picker-btn secondary" id="cancelBtn"><ha-icon icon="mdi:close"></ha-icon><span>Cancel</span></button>
+          <button class="picker-btn primary" id="addBtn" disabled>${mode==='edit'
+            ? '<ha-icon icon="mdi:content-save"></ha-icon><span>Update</span>'
+            : '<ha-icon icon="mdi:plus"></ha-icon><span>Add</span>'}
           </button>
+          </div>
         </div>
         <div id="layoutGrid" class="layout">
           <div class="pane" id="leftPane"></div>
@@ -8233,11 +14850,11 @@ _applyAutoFillNoScale() {
         </div>
 
         <div class="dlg-foot">
-          <span style="flex:1;opacity:.75;font-size:.85rem">Tip: use <ha-icon icon="mdi:star-outline"></ha-icon> to favorite cards you use often</span>
-          <button class="btn secondary" id="footCancel"><ha-icon icon="mdi:close"></ha-icon><span style="margin-left:6px">Cancel</span></button>
-          <button class="btn" id="footAdd" disabled>${mode==='edit'
-            ? '<ha-icon icon="mdi:content-save"></ha-icon><span style="margin-left:6px">Update</span>'
-            : '<ha-icon icon="mdi:plus"></ha-icon><span style="margin-left:6px">Add</span>'}
+          <span class="picker-footnote">Tip: use <ha-icon icon="mdi:star-outline"></ha-icon> to favorite cards you use often</span>
+          <button class="picker-btn secondary" id="footCancel"><ha-icon icon="mdi:close"></ha-icon><span>Cancel</span></button>
+          <button class="picker-btn primary" id="footAdd" disabled>${mode==='edit'
+            ? '<ha-icon icon="mdi:content-save"></ha-icon><span>Update</span>'
+            : '<ha-icon icon="mdi:plus"></ha-icon><span>Add</span>'}
           </button>
         </div>
       </div>`;
@@ -8272,6 +14889,15 @@ _applyAutoFillNoScale() {
     const catalog = this._catalog();
     const favSection = catalog.find(c=>c.id==='favorites');
     const recSection = catalog.find(c=>c.id==='recent');
+    const ddcSection = catalog.find(c=>c.id==='ddc');
+    if (ddcSection) {
+      const merged = new Map();
+      [...this._dragAndDropCardsCatalog(), ...(ddcSection.items || [])].forEach((item) => {
+        if (!item?.type) return;
+        merged.set(item.type, item);
+      });
+      ddcSection.items = Array.from(merged.values());
+    }
     const allItems = catalog.flatMap(c => c.items || []);
     favSection.items = allItems.filter(i => faves.has(i.type));
     recSection.items = recent.map(t => allItems.find(i => i.type===t)).filter(Boolean);
@@ -8431,34 +15057,56 @@ _applyAutoFillNoScale() {
     const filteredCatalog = () => {
       const q = search.value.trim().toLowerCase();
       return catalog
-        .map(section => ({
-          ...section,
-          items: (section.items || []).filter(
-            it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
-          )
-        }))
-        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent');
+        .map(section => {
+          const baseItems = section.id === 'ddc'
+            ? Array.from(new Map(
+                [...this._dragAndDropCardsCatalog(), ...(section.items || [])]
+                  .filter((it) => !!it?.type)
+                  .map((it) => [it.type, it])
+              ).values())
+            : (section.items || []);
+          return {
+            ...section,
+            items: baseItems.filter(
+              it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
+            )
+          };
+        })
+        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent' || (!q && sec.id === 'ddc'));
     };
 
     const renderLeft = () => {
       const view = filteredCatalog();
       left.innerHTML = '';
       view.forEach(cat => {
-        const div = document.createElement('div');
-        div.style.padding = '12px';
-        div.style.borderBottom = '1px solid var(--divider-color)';
-        const h = document.createElement('h4'); h.textContent = cat.name; h.style.margin='0 0 10px 0'; h.style.fontSize='.92rem'; h.style.opacity='.85';
+        const div = document.createElement('section');
+        div.className = 'picker-category';
+        const h = document.createElement('h4');
+        h.className = 'picker-category-title';
+        h.textContent = cat.name;
         div.appendChild(h);
 
-        if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent')) {
-          const p = document.createElement('div'); p.style.opacity='.6'; p.style.fontSize='.85rem'; p.textContent = cat.id==='favorites' ? 'No favorites yet.' : 'No recent items yet.'; div.appendChild(p);
+        if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent' || cat.id==='ddc')) {
+          const p = document.createElement('div');
+          p.className = 'picker-category-note';
+          if (cat.id === 'favorites') {
+            p.textContent = 'No favorites yet.';
+          } else if (cat.id === 'recent') {
+            p.textContent = 'No recent items yet.';
+          } else {
+            p.innerHTML = `<strong>Reserved for Drag & Drop Card</strong><span>${cat.hint || 'Cards that only work inside Drag & Drop Card will appear here.'}</span>`;
+          }
+          div.appendChild(p);
         } else {
           cat.items.forEach(item => {
             const b = document.createElement('button');
-            b.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px">
-              <ha-icon icon="${item.icon}"></ha-icon><span>${item.name}</span>
-            </span>`;
-            Object.assign(b.style,{display:'block',width:'100%',textAlign:'left',border:'none',background:'transparent',padding:'8px',borderRadius:'10px',cursor:'pointer'});
+            b.className = 'picker-item';
+            b.innerHTML = `
+              <ha-icon icon="${item.icon}"></ha-icon>
+              <span class="picker-item-meta">
+                <span class="picker-item-name">${item.name}</span>
+                <span class="picker-item-subtitle">${cat.name}</span>
+              </span>`;
             b.addEventListener('click', async () => { highlight(b); await selectType(item.type); });
             div.appendChild(b);
           });
@@ -8469,17 +15117,12 @@ _applyAutoFillNoScale() {
 
     const highlight = (btn) => {
       // Reset all buttons to default appearance
-      left.querySelectorAll('button').forEach(b => {
+      left.querySelectorAll('.picker-item').forEach(b => {
         b.classList.remove('active');
-        b.style.background = 'transparent';
-        b.style.color = '';
       });
       // Highlight the selected button so it is obvious which one is active.
       if (btn) {
         btn.classList.add('active');
-        // Soft highlight background and primary color text for contrast
-        btn.style.background = 'rgba(3,169,244,.12)';
-        btn.style.color = 'var(--primary-color)';
       }
     };
 
@@ -9827,9 +16470,23 @@ _applyAutoFillNoScale() {
         cardHost.innerHTML = '';
         await raf();
         try {
-          const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
           if (seq !== pickSeq) return;
-          const temp = helpers.createCardElement(cfg); temp.hass = this.hass;
+          let temp = null;
+          const type = String(cfg?.type || '');
+          if (type === 'custom:ddc-html-card') {
+            temp = document.createElement('ddc-html-card');
+            temp.setConfig?.(cfg);
+            temp.hass = this.hass;
+          } else if (type === 'custom:ddc-line-card') {
+            temp = document.createElement('ddc-line-card');
+            temp.setConfig?.(cfg);
+            temp.hass = this.hass;
+          } else {
+            const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+            if (seq !== pickSeq) return;
+            temp = helpers.createCardElement(cfg);
+            temp.hass = this.hass;
+          }
           if (seq !== pickSeq) return;
           cardHost.appendChild(temp);
         } catch {}
@@ -10098,6 +16755,103 @@ async _getStubConfigForType(type) {
     // Provide a blank stub when the user selects the "Custom Card" entry.
     // A blank type lets the YAML editor drive the configuration entirely.
     if (type === 'custom_card') return null;
+    if (type === 'custom:ddc-line-card') return {
+      type: 'custom:ddc-line-card',
+      title: '',
+      entity: '',
+      active_states: 'on,home,open,playing,charging,active,>0',
+      direction: 'horizontal',
+      arrows: 'end',
+      flow_direction: 'auto',
+      line_style: 'solid',
+      thickness: 10,
+      animate_mode: 'active',
+      animation_speed: 1.8,
+      active_color: 'var(--primary-color, #ff9800)',
+      inactive_color: 'rgba(148, 163, 184, 0.42)',
+      glow: true,
+      rounded: true
+    };
+    if (type === 'custom:ddc-html-card') return {
+      type: 'custom:ddc-html-card',
+      title: 'HTML / Web card',
+      html: `<div class="ddc-html-demo">
+  <div class="ddc-html-pill">Drag & Drop Card</div>
+  <h2>Custom HTML card</h2>
+  <p>Write your own HTML, CSS and JavaScript directly inside this card.</p>
+  <button id="ddc-html-demo-btn" type="button">Read live entity</button>
+  <div class="ddc-html-demo-state">Waiting for Home Assistant data…</div>
+</div>`,
+      css: `.ddc-html-demo {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.ddc-html-pill {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary-color, #ff9800) 14%, transparent);
+  color: var(--primary-color, #ff9800);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ddc-html-demo h2 {
+  margin: 0;
+  font-size: 1.18rem;
+}
+
+.ddc-html-demo p {
+  margin: 0;
+  color: var(--secondary-text-color, #94a3b8);
+  line-height: 1.5;
+}
+
+.ddc-html-demo button {
+  width: fit-content;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #ff9800) 82%, #fff 10%), color-mix(in oklab, var(--primary-color, #ff9800) 92%, #000 4%));
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ddc-html-demo-state {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  line-height: 1.45;
+}`,
+      js: `const stateEl = root.querySelector('.ddc-html-demo-state');
+const button = root.querySelector('#ddc-html-demo-btn');
+
+button?.addEventListener('click', async () => {
+  const entityId = Object.keys(states || {})[0];
+  if (!stateEl) return;
+  stateEl.textContent = entityId
+    ? \`Clicked: \${entityId} = \${states[entityId]?.state ?? 'unknown'}\`
+    : 'No entities are available right now.';
+});
+
+return {
+  update({ states }) {
+    if (!stateEl) return;
+    const entityId = Object.keys(states || {})[0];
+    stateEl.textContent = entityId
+      ? \`Live entity: \${entityId} = \${states[entityId]?.state ?? 'unknown'}\`
+      : 'No entities are available right now.';
+  }
+};`,
+      rerun_on_hass_update: false
+    };
 
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
@@ -10227,8 +16981,15 @@ async _getStubConfigForType(type) {
     const wrap = this._makeWrapper(cardEl);
     const next = this._getNextAvailablePosition();
     this._setCardPosition(wrap, next.x, next.y);
-    wrap.style.width  = `${14*this.gridSize}px`;
-    wrap.style.height = `${10*this.gridSize}px`;
+    const type = String(cardConfig?.type || '');
+    if (type === 'custom:ddc-line-card') {
+      const isVerticalish = ['vertical', 'diagonal-up', 'diagonal-down'].includes(String(cardConfig?.direction || '').toLowerCase());
+      wrap.style.width  = `${(isVerticalish ? 5 : 16) * this.gridSize}px`;
+      wrap.style.height = `${(isVerticalish ? 14 : 4) * this.gridSize}px`;
+    } else {
+      wrap.style.width  = `${14*this.gridSize}px`;
+      wrap.style.height = `${10*this.gridSize}px`;
+    }
     // Assign a z-index for the new card that is at least 6.  Without
     // clamping the first few cards could be placed behind the grid overlay.
     {
@@ -10518,22 +17279,15 @@ async _getStubConfigForType(type) {
     });
 
     modal.querySelector('#exportJson').addEventListener('click', () => {
-      const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
-      const saved = wraps.map((w)=>{
-        const x = parseFloat(w.getAttribute('data-x')) || 0;
-        const y = parseFloat(w.getAttribute('data-y')) || 0;
-        const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
-        const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
-        const z = parseInt(w.style.zIndex || '1', 10);
-        const cardCfg = this._extractCardConfig(w.firstElementChild);
-        const tabId = w.dataset.tabId || this.defaultTab;
-        return { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
-      });
-        const payload = {
-            version: 2,
-            options: this._exportableOptions(),
-            cards: saved
-        };
+      this._persistCurrentResponsiveProfileToMemory_();
+      const saved = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
+      const payload = {
+        version: 3,
+        options: this._exportableOptions(),
+        cards: saved,
+        responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, saved)),
+        packages: this._exportDashboardPackages_(),
+      };
       const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -10551,30 +17305,12 @@ async _getStubConfigForType(type) {
         try {
           const json = JSON.parse(txt);
           this._dbgPush('import', 'Loaded file', { bytes: txt.length });
-          this.cardContainer.innerHTML = '';
-          if (json.cards?.length) {
-            for (const conf of json.cards) {
-              if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-                const p = this._makePlaceholderAt(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
-                this.cardContainer.appendChild(p);
-              } else {
-                const el = await this._createCard(conf.card);
-                const wrap = this._makeWrapper(el);
-                this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-            wrap.dataset.tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
-            this._setCardPosition(wrap, conf.position?.x||0, conf.position?.y||0);
-                wrap.style.width = `${conf.size?.width||140}px`;
-                wrap.style.height= `${conf.size?.height||100}px`;
-                this.cardContainer.appendChild(wrap);
-                
-          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-          this._initCardInteract(wrap);
-              }
-            }
-          } else {
-            this._showEmptyPlaceholder();
-        this._applyAutoScale?.();
-          }
+          this._setDashboardPackages_(json.packages || []);
+          this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
+            json.options?.responsive_viewports || this.responsiveViewportProfiles
+          );
+          this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
+          await this._syncResponsiveProfileForViewport_({ force: true });
           this._resizeContainer();
           await this._saveLayout(false);
         } catch (e) {
@@ -10737,6 +17473,62 @@ modal.innerHTML = `
       <!-- SIZE EXTRAS (injected) -->
       <div id="ddc-setting-sizeExtras" class="setting" aria-live="polite"></div>
 
+      <div class="setting" role="group" aria-labelledby="lbl-mobile-optimize">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:cellphone-cog" aria-hidden="true"></ha-icon>
+            <label id="lbl-mobile-optimize" for="ddc-setting-optimizeForMobile">Optimize for mobile</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-optimizeForMobile"></ha-switch>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-optimizeForMobileHint">In Dynamic mode, keeps narrow screens more readable by avoiding extreme downscaling, softening text shrink, and allowing horizontal pan when needed.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-mobile-dynamic-behavior">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:cellphone-arrow-down" aria-hidden="true"></ha-icon>
+            <label id="lbl-mobile-dynamic-behavior" for="ddc-setting-mobileDynamicBehavior">Mobile dynamic behavior</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-mobileDynamicBehavior">
+              <option value="native">Native canvas (no scaling)</option>
+              <option value="scale">Scale to fit</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-mobileDynamicBehaviorHint">Choose how Dynamic mode behaves when the active responsive profile is Mobile. Native keeps scale at 1 and lets the canvas pan horizontally if needed.</div>
+      </div>
+
+      <!-- TEXT SCALE LOCK -->
+      <div class="setting" role="group" aria-labelledby="lbl-lock-text-scale">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:format-size" aria-hidden="true"></ha-icon>
+            <label id="lbl-lock-text-scale" for="ddc-setting-doNotResizeText">Do not Resize Text</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-doNotResizeText"></ha-switch>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-doNotResizeTextHint">Keeps text at its design size when the canvas scale changes. Best suited for Dynamic and Auto.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-outer-grid-buffer">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:grid-plus" aria-hidden="true"></ha-icon>
+            <label id="lbl-outer-grid-buffer" for="ddc-setting-outerGridBuffer">Outer grid buffer</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-outerGridBuffer"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Adds one extra grid cell after the furthest cards so they do not land flush against the canvas edge. Best suited for Dynamic and Auto.</div>
+      </div>
+
       <!-- ORIENTATION -->
       <div class="setting" role="group" aria-labelledby="lbl-orientation">
         <div class="row">
@@ -10807,6 +17599,52 @@ modal.innerHTML = `
         <h4 id="appearance-head">Appearance</h4>
       </div>
       <p class="caption">Choose backgrounds and colors. Use theme vars like <code>var(--ha-card-background)</code>.</p>
+      <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme-enabled">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:theme-light-dark" aria-hidden="true"></ha-icon>
+            <label id="lbl-dashboard-theme-enabled" for="ddc-setting-dashboardThemeEnabled">Enable dashboard theme styling</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-dashboardThemeEnabled"></ha-switch>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-dashboardThemeEnabledHint">Applies a Home Assistant theme to this dashboard so theme variables can style cards, text, buttons, and surfaces.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:format-paint" aria-hidden="true"></ha-icon>
+            <label id="lbl-dashboard-theme" for="ddc-setting-dashboardTheme">Dashboard theme</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-dashboardTheme">
+              <option value="">Select theme…</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-dashboardThemeHint">Choose which Home Assistant theme this dashboard should inherit variables from.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme-override">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:invert-colors" aria-hidden="true"></ha-icon>
+            <label id="lbl-dashboard-theme-override" for="ddc-setting-dashboardThemeOverrideAllDesign">Theme overrides all design</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-dashboardThemeOverrideAllDesign"></ha-switch>
+          </div>
+        </div>
+        <div class="hint" id="ddc-setting-dashboardThemeOverrideAllDesignHint">When enabled, the selected theme wins over dashboard surface colors, card shadows, and per-card design overrides.</div>
+      </div>
+      <div class="section-actions">
+        <button type="button" class="mini-action primary" id="ddc-randomize-allStyle">
+          <ha-icon icon="mdi:palette-outline"></ha-icon>
+          <span>Randomize all style</span>
+        </button>
+      </div>
 
       <!-- CONTAINER BG -->
       <div class="setting" role="group" aria-labelledby="lbl-container-bg">
@@ -10817,6 +17655,12 @@ modal.innerHTML = `
           </div>
             <div class="control">
               <div class="stack color-stack">
+                <div class="setting-actions">
+                  <button type="button" class="mini-action" id="ddc-randomize-containerBg">
+                    <ha-icon icon="mdi:shuffle-variant"></ha-icon>
+                    <span>Randomize</span>
+                  </button>
+                </div>
                 <div class="color-group">
                   <div class="color-group-title">
                     <span>Custom</span>
@@ -10846,6 +17690,19 @@ modal.innerHTML = `
         <div class="hint">Accepts plain colors or theme variables.</div>
       </div>
 
+      <div class="setting" role="group" aria-labelledby="lbl-apply-page-bg">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:application-braces-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-apply-page-bg" for="ddc-setting-applyPageBackground">Apply current background to whole page</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-applyPageBackground"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Applies the active background mode across the full Lovelace view, including image, particles, and video, not just the card canvas.</div>
+      </div>
+
       <!-- CARD BG -->
       <div class="setting" role="group" aria-labelledby="lbl-card-bg">
         <div class="row">
@@ -10855,6 +17712,12 @@ modal.innerHTML = `
           </div>
           <div class="control">
             <div class="stack color-stack">
+              <div class="setting-actions">
+                <button type="button" class="mini-action" id="ddc-randomize-cardBg">
+                  <ha-icon icon="mdi:shuffle-variant"></ha-icon>
+                  <span>Randomize</span>
+                </button>
+              </div>
               <div class="color-group">
                 <div class="color-group-title">
                   <span>Custom</span>
@@ -10929,6 +17792,7 @@ modal.innerHTML = `
               <div class="input-file">
                 <!-- Only a thumbnail + delete button, no upload -->
                 <div class="thumb" id="ddc-bg-thumb"></div>
+                <button type="button" class="btn secondary" id="ddc-browse-media-library">Browse Media</button>
                 <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
               </div>
 
@@ -10998,6 +17862,12 @@ modal.innerHTML = `
           </div>
           <div class="control">
             <div class="stack">
+              <div class="setting-actions">
+                <button type="button" class="mini-action" id="ddc-randomize-particles">
+                  <ha-icon icon="mdi:shuffle-variant"></ha-icon>
+                  <span>Randomize</span>
+                </button>
+              </div>
               <label for="ddc-particles-url">Config JSON URL (optional)</label>
               <input type="text" id="ddc-particles-url" placeholder="/local/particles.json or https://…" />
               <div class="hint">If empty, a sensible default is used. For HACS, prefer hosting the library + JSON under <code>/config/www</code> (served as <code>/local/…</code>).</div>
@@ -11255,6 +18125,23 @@ modal.innerHTML = `
       </div>
       <p class="caption">Create, rename, delete, and choose the default tab. Cards use <code>tabId</code> to decide where they appear.</p>
 
+      <div class="setting" role="group" aria-labelledby="lbl-tabs-placement">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:dock-window" aria-hidden="true"></ha-icon>
+            <label id="lbl-tabs-placement" for="ddc-setting-tabsPosition">Tabs placement</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-tabsPosition">
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left rail</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Dock the tabs at the top, bottom, or along the left side of the dashboard.</div>
+      </div>
+
       <!-- Current tabs list -->
       <div id="ddc-tabs-list" class="setting" aria-live="polite"></div>
 
@@ -11274,6 +18161,67 @@ modal.innerHTML = `
         </div>
         <div class="hint">Tab IDs must be unique. The label defaults to the ID if left empty.</div>
       </div>
+    </section>
+
+    <!-- Features -->
+    <section class="card packages-card" aria-labelledby="packages-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:puzzle-plus-outline" aria-hidden="true"></ha-icon>
+        <h4 id="packages-head">Add features</h4>
+      </div>
+      <p class="caption">Build Home Assistant features directly from the dashboard. Each feature is stored as package YAML in the dashboard JSON and synced by the backend into your HA <code>packages</code> folder.</p>
+
+      <div class="feature-quick-actions" aria-label="Add feature shortcuts">
+        <button type="button" class="mini-action primary ddc-feature-add-btn" data-feature-type="automation">
+          <ha-icon icon="mdi:robot-outline"></ha-icon>
+          <span>Add automation</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="script">
+          <ha-icon icon="mdi:script-text-outline"></ha-icon>
+          <span>Add script</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="input_boolean">
+          <ha-icon icon="mdi:toggle-switch-outline"></ha-icon>
+          <span>Add input boolean</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="input_select">
+          <ha-icon icon="mdi:format-list-bulleted-square"></ha-icon>
+          <span>Add input select</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="input_text">
+          <ha-icon icon="mdi:form-textbox"></ha-icon>
+          <span>Add input text</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="input_number">
+          <ha-icon icon="mdi:numeric"></ha-icon>
+          <span>Add input number</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="template_sensor">
+          <ha-icon icon="mdi:chart-bell-curve-cumulative"></ha-icon>
+          <span>Add template sensor</span>
+        </button>
+        <button type="button" class="mini-action ddc-feature-add-btn" data-feature-type="misc">
+          <ha-icon icon="mdi:code-tags"></ha-icon>
+          <span>Add misc</span>
+        </button>
+      </div>
+
+      <div class="package-tools">
+        <button type="button" class="mini-action" id="ddc-package-diagnostics-btn">
+          <ha-icon icon="mdi:stethoscope"></ha-icon>
+          <span>Check package sync</span>
+        </button>
+      </div>
+
+      <div class="package-reload-note">
+        <ha-icon icon="mdi:alert-outline" aria-hidden="true"></ha-icon>
+        <div>Make sure to reload your Home Assistant instance after editing this space so new helpers, scripts, automations, and other package-based features are picked up.</div>
+      </div>
+
+      <div id="ddc-package-diagnostics" class="package-sync-status">Run package sync diagnostics to verify backend support, package directory, and detected files.</div>
+
+      <div id="ddc-packages-list" class="packages-list" aria-live="polite"></div>
+      <div class="hint">Each feature becomes one package bundle behind the scenes. Use <code>Misc</code> whenever you need to add YAML that does not fit the guided shortcuts.</div>
     </section>
 
   </div>
@@ -11316,13 +18264,32 @@ modal.innerHTML = `
     const chkASave   = modal.querySelector('#ddc-setting-autoSave');
     const inpDeb     = modal.querySelector('#ddc-setting-autoSaveDebounce');
     const selSize    = modal.querySelector('#ddc-setting-sizeMode');
+    const chkOptimizeForMobile = modal.querySelector('#ddc-setting-optimizeForMobile');
+    const txtOptimizeForMobileHint = modal.querySelector('#ddc-setting-optimizeForMobileHint');
+    const selMobileDynamicBehavior = modal.querySelector('#ddc-setting-mobileDynamicBehavior');
+    const txtMobileDynamicBehaviorHint = modal.querySelector('#ddc-setting-mobileDynamicBehaviorHint');
+    const chkDoNotResizeText = modal.querySelector('#ddc-setting-doNotResizeText');
+    const txtDoNotResizeTextHint = modal.querySelector('#ddc-setting-doNotResizeTextHint');
+    const chkOuterGridBuffer = modal.querySelector('#ddc-setting-outerGridBuffer');
     const selOrient  = modal.querySelector('#ddc-setting-orient');
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
+    const chkDashboardThemeEnabled = modal.querySelector('#ddc-setting-dashboardThemeEnabled');
+    const txtDashboardThemeEnabledHint = modal.querySelector('#ddc-setting-dashboardThemeEnabledHint');
+    const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
+    const txtDashboardThemeHint = modal.querySelector('#ddc-setting-dashboardThemeHint');
+    const chkDashboardThemeOverrideAllDesign = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesign');
+    const txtDashboardThemeOverrideAllDesignHint = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesignHint');
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
+    const chkApplyPageBg = modal.querySelector('#ddc-setting-applyPageBackground');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
+    const btnRandomAllStyle     = modal.querySelector('#ddc-randomize-allStyle');
+    const btnRandomContainerBg = modal.querySelector('#ddc-randomize-containerBg');
+    const btnRandomCardBg      = modal.querySelector('#ddc-randomize-cardBg');
+    const btnRandomParticles   = modal.querySelector('#ddc-randomize-particles');
     const chkShadow  = modal.querySelector('#ddc-setting-cardShadow');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
+    const btnBrowseMediaLibrary = modal.querySelector('#ddc-browse-media-library');
     const selBgRepeat     = modal.querySelector('#ddc-bg-repeat');
     const selBgSize       = modal.querySelector('#ddc-bg-size');
     const selBgPosition   = modal.querySelector('#ddc-bg-position');
@@ -11352,8 +18319,13 @@ modal.innerHTML = `
     const selYtAttachment     = modal.querySelector('#ddc-youtube-attachment');
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
+    const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    const packagesListEl     = modal.querySelector('#ddc-packages-list');
+    const addFeatureBtns     = Array.from(modal.querySelectorAll('.ddc-feature-add-btn'));
+    const packageDiagnosticsBtn = modal.querySelector('#ddc-package-diagnostics-btn');
+    const packageDiagnosticsEl  = modal.querySelector('#ddc-package-diagnostics');
 
-    // hero image and tabs position are intentionally omitted from the settings UI
+    // hero image is intentionally omitted from the settings UI
 
     const bgCfg = (this._config?.background_image) || {};
 
@@ -11362,8 +18334,440 @@ modal.innerHTML = `
     if (selBgMode) selBgMode.value = String(bgMode);
 
     const pCfg = this._config?.background_particles || {};
+    const cloneData = (obj) => {
+      try { return JSON.parse(JSON.stringify(obj ?? null)); } catch { return null; }
+    };
+    const FEATURE_TYPES = {
+      automation: {
+        label: 'Automation',
+        icon: 'mdi:robot-outline',
+        description: 'Create one Home Assistant automation and keep the YAML bundled with this dashboard.',
+      },
+      script: {
+        label: 'Script',
+        icon: 'mdi:script-text-outline',
+        description: 'Add a reusable Home Assistant script to this dashboard package bundle.',
+      },
+      input_boolean: {
+        label: 'Input boolean',
+        icon: 'mdi:toggle-switch-outline',
+        description: 'Create a toggle helper that can be used across cards, automations, and scripts.',
+      },
+      input_select: {
+        label: 'Input select',
+        icon: 'mdi:format-list-bulleted-square',
+        description: 'Create a selectable helper with a list of options.',
+      },
+      input_text: {
+        label: 'Input text',
+        icon: 'mdi:form-textbox',
+        description: 'Create a text helper you can write to from cards, scripts, or automations.',
+      },
+      input_number: {
+        label: 'Input number',
+        icon: 'mdi:numeric',
+        description: 'Create a numeric helper for counters, setpoints, or quick controls.',
+      },
+      template_sensor: {
+        label: 'Template sensor',
+        icon: 'mdi:chart-bell-curve-cumulative',
+        description: 'Create a template sensor that derives values from other Home Assistant entities.',
+      },
+      misc: {
+        label: 'Misc',
+        icon: 'mdi:code-tags',
+        description: 'Use raw package YAML for anything that does not fit the guided feature shortcuts.',
+      },
+    };
+    const FEATURE_TYPE_ORDER = Object.keys(FEATURE_TYPES);
+    const featureTypeIsKnown = (type) => Object.prototype.hasOwnProperty.call(FEATURE_TYPES, type);
+    const featureTypeLabel = (type) => FEATURE_TYPES[type]?.label || FEATURE_TYPES.misc.label;
+    const featureTypeIcon = (type) => FEATURE_TYPES[type]?.icon || FEATURE_TYPES.misc.icon;
+    const featureTypeDescription = (type) => FEATURE_TYPES[type]?.description || FEATURE_TYPES.misc.description;
+    const formatFeatureError = (err) => {
+      if (!err) return 'Unknown error';
+      if (typeof err === 'string') return err;
+      if (err?.body?.message) return String(err.body.message);
+      if (err?.message) return String(err.message);
+      try { return JSON.stringify(err); } catch {}
+      return String(err);
+    };
+    const toFeatureKey = (value, fallback = 'feature') => this._slugifyPackageToken_(value, fallback).replace(/-/g, '_');
+    const inferFeatureTypeFromYaml = (yaml = '') => {
+      const text = String(yaml || '').trim();
+      if (!text) return 'misc';
+      const patterns = [
+        ['automation', /^\s*automation\s*:/m],
+        ['script', /^\s*script\s*:/m],
+        ['input_boolean', /^\s*input_boolean\s*:/m],
+        ['input_select', /^\s*input_select\s*:/m],
+        ['input_text', /^\s*input_text\s*:/m],
+        ['input_number', /^\s*input_number\s*:/m],
+        ['template_sensor', /^\s*template\s*:/m],
+      ];
+      const matches = patterns.filter(([, pattern]) => pattern.test(text)).map(([type]) => type);
+      return matches.length === 1 ? matches[0] : 'misc';
+    };
+    const buildFeatureYaml = (type, name) => {
+      const safeName = String(name || featureTypeLabel(type)).trim() || featureTypeLabel(type);
+      const key = toFeatureKey(safeName, type);
+      switch (type) {
+        case 'automation':
+          return `automation:\n  - alias: ${safeName}\n    id: ${key}\n    trigger: []\n    condition: []\n    action: []\n`;
+        case 'script':
+          return `script:\n  ${key}:\n    alias: ${safeName}\n    sequence: []\n`;
+        case 'input_boolean':
+          return `input_boolean:\n  ${key}:\n    name: ${safeName}\n    icon: mdi:toggle-switch\n`;
+        case 'input_select':
+          return `input_select:\n  ${key}:\n    name: ${safeName}\n    options:\n      - Option 1\n      - Option 2\n`;
+        case 'input_text':
+          return `input_text:\n  ${key}:\n    name: ${safeName}\n    max: 100\n`;
+        case 'input_number':
+          return `input_number:\n  ${key}:\n    name: ${safeName}\n    min: 0\n    max: 100\n    step: 1\n    mode: slider\n`;
+        case 'template_sensor':
+          return `template:\n  - sensor:\n      - name: ${safeName}\n        unique_id: ${key}\n        state: "ready"\n`;
+        case 'misc':
+        default:
+          return `# Add any Home Assistant package YAML here.\n`;
+      }
+    };
+    const suggestFeatureFilename = (name, type, fallbackIndex = 1) => {
+      const prefix = featureTypeIsKnown(type) ? type : 'feature';
+      const slug = this._slugifyPackageToken_(name || `${prefix}_${fallbackIndex}`, `${prefix}_${fallbackIndex}`);
+      return `${slug}.yaml`;
+    };
+    const nextFeatureName = (type) => {
+      const label = featureTypeLabel(type);
+      const count = packageDrafts.filter((pkg) => String(pkg.feature_type || 'misc') === type).length + 1;
+      return `${label} ${count}`;
+    };
+    const createFeatureDraft = (type = 'misc') => {
+      const featureType = featureTypeIsKnown(type) ? type : 'misc';
+      const nextIndex = packageDrafts.length + 1;
+      const name = nextFeatureName(featureType);
+      return {
+        id: `package_${Date.now()}_${nextIndex}`,
+        name,
+        filename: suggestFeatureFilename(name, featureType, nextIndex),
+        yaml: buildFeatureYaml(featureType, name),
+        enabled: true,
+        feature_type: featureType,
+        __filenameDirty: false,
+        __yamlDirty: false,
+      };
+    };
+    const clonePackageDraft = (pkg = {}, index = 0) => {
+      const inferredType = featureTypeIsKnown(pkg.feature_type) ? pkg.feature_type : inferFeatureTypeFromYaml(pkg.yaml ?? pkg.content ?? pkg.body ?? '');
+      return {
+        id: String(pkg.id || pkg.package_id || `package_${index + 1}`),
+        name: String(pkg.name || pkg.title || pkg.filename || `package_${index + 1}`),
+        filename: String(pkg.filename || ''),
+        yaml: String(pkg.yaml ?? pkg.content ?? pkg.body ?? '').replace(/\r\n/g, '\n'),
+        enabled: pkg.enabled !== false,
+        feature_type: inferredType,
+        __filenameDirty: !!String(pkg.filename || '').trim(),
+        __yamlDirty: !!String(pkg.yaml ?? pkg.content ?? pkg.body ?? '').trim(),
+      };
+    };
+    let packageDrafts = this._exportDashboardPackages_().map((pkg, index) => clonePackageDraft(pkg, index));
+    const featureSummaryFromYaml = (yaml = '') => {
+      const line = String(yaml || '')
+        .split('\n')
+        .map((entry) => entry.trim())
+        .find((entry) => entry && !entry.startsWith('#'));
+      return line || 'No YAML added yet.';
+    };
+    const renderPackageDiagnostics = (status, isError = false) => {
+      if (!packageDiagnosticsEl) return;
+      packageDiagnosticsEl.style.color = isError ? 'var(--error-color, #ef4444)' : 'var(--secondary-text-color)';
+      packageDiagnosticsEl.textContent = status || 'Run package sync diagnostics to verify backend support, package directory, and detected files.';
+    };
+    const renderDashboardThemeOptions = () => {
+      if (!selDashboardTheme) return;
+      const themeNames = this._getAvailableDashboardThemeNames_?.() || [];
+      const prevValue = String(selDashboardTheme.value || this.dashboardTheme || '').trim();
+      selDashboardTheme.innerHTML = '';
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = themeNames.length ? 'Select theme…' : 'No themes found';
+      selDashboardTheme.appendChild(emptyOpt);
+      themeNames.forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        selDashboardTheme.appendChild(opt);
+      });
+      if (prevValue && themeNames.includes(prevValue)) {
+        selDashboardTheme.value = prevValue;
+      } else {
+        selDashboardTheme.value = '';
+      }
+    };
+    const updateDashboardThemeState = () => {
+      const enabled = !!chkDashboardThemeEnabled?.checked;
+      const themeNames = this._getAvailableDashboardThemeNames_?.() || [];
+      const hasThemes = themeNames.length > 0;
+      if (selDashboardTheme) {
+        selDashboardTheme.disabled = !enabled || !hasThemes;
+      }
+      if (chkDashboardThemeOverrideAllDesign) {
+        chkDashboardThemeOverrideAllDesign.disabled = !enabled || !String(selDashboardTheme?.value || '').trim();
+      }
+      if (txtDashboardThemeEnabledHint) {
+        txtDashboardThemeEnabledHint.textContent = hasThemes
+          ? 'Applies a Home Assistant theme to this dashboard so theme variables can style cards, text, buttons, and surfaces.'
+          : 'No Home Assistant themes were detected yet. The toggle is stored, but you need available HA themes before you can pick one.';
+      }
+      if (txtDashboardThemeHint) {
+        txtDashboardThemeHint.textContent = !hasThemes
+          ? 'No themes were found from Home Assistant.'
+          : (!enabled
+              ? 'Turn on dashboard theme styling to choose a theme.'
+              : 'Choose which Home Assistant theme this dashboard should inherit variables from.');
+      }
+      if (txtDashboardThemeOverrideAllDesignHint) {
+        txtDashboardThemeOverrideAllDesignHint.textContent = (!enabled || !String(selDashboardTheme?.value || '').trim())
+          ? 'Select and enable a dashboard theme before theme override mode can take control.'
+          : 'When enabled, the selected theme wins over dashboard surface colors, card shadows, and per-card design overrides.';
+      }
+    };
+    const applyLiveDashboardThemePreview = () => {
+      try {
+        this.dashboardThemeEnabled = !!chkDashboardThemeEnabled?.checked;
+        this.dashboardTheme = String(selDashboardTheme?.value || '').trim();
+        this.dashboardThemeOverrideAllDesign = !!chkDashboardThemeOverrideAllDesign?.checked;
+        this._applyDashboardThemeStyling_?.();
+      } catch {}
+    };
+    const runPackageDiagnostics = async () => {
+      renderPackageDiagnostics('Checking backend package sync...');
+      try {
+        const res = await this.hass.callApi('get', 'dragdrop_storage_package_status');
+        if (!res || res.ok === false) {
+          renderPackageDiagnostics(`Package diagnostics failed.${res?.error ? ` ${res.error}` : ''}`, true);
+          return;
+        }
+        const lines = [
+          `Backend package sync: ${res.supports_package_sync ? 'supported' : 'unknown'}`,
+          `Packages directory: ${res.directory || '(missing)'}`,
+          `Directory exists: ${res.directory_exists ? 'yes' : 'no'}`,
+          `Looks writable: ${res.directory_writable ? 'yes' : 'no'}`,
+          `configuration.yaml found: ${res.configuration_exists ? 'yes' : 'no'}`,
+          `configuration has "packages:": ${res.configuration_mentions_packages ? 'yes' : 'no'}`,
+          `configuration includes packages dir: ${(res.configuration_includes_packages_dir_named || res.configuration_includes_packages_dir_merge_named) ? 'yes' : 'no'}`,
+          `Detected DDC package files: ${Array.isArray(res.files) && res.files.length ? res.files.join(', ') : 'none'}`,
+        ];
+        renderPackageDiagnostics(lines.join('\n'));
+      } catch (err) {
+        renderPackageDiagnostics(`Package diagnostics request failed: ${formatFeatureError(err)}`, true);
+      }
+    };
+    let featureEditorEl = null;
+    const closeFeatureEditor = () => {
+      try { featureEditorEl?.remove?.(); } catch {}
+      featureEditorEl = null;
+    };
+    const openFeatureEditor = (index) => {
+      const draft = packageDrafts[index];
+      if (!draft) return;
+
+      closeFeatureEditor();
+      const type = featureTypeIsKnown(draft.feature_type) ? draft.feature_type : 'misc';
+      const overlay = document.createElement('div');
+      overlay.className = 'feature-editor-shell';
+      overlay.innerHTML = `
+        <div class="feature-editor-backdrop"></div>
+        <div class="feature-editor-modal" role="dialog" aria-modal="true" aria-labelledby="ddc-feature-editor-title">
+          <div class="feature-editor-head">
+            <div>
+              <h5 id="ddc-feature-editor-title">Edit ${this._safe(featureTypeLabel(type))}</h5>
+              <p>${this._safe(featureTypeDescription(type))}</p>
+            </div>
+            <button type="button" class="icon-btn" id="ddc-feature-editor-close" title="Close editor">
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>
+          <div class="feature-editor-grid">
+            <div class="feature-editor-field">
+              <label for="ddc-feature-editor-name">Feature name</label>
+              <input id="ddc-feature-editor-name" type="text" value="${this._safe(draft.name || '')}" />
+            </div>
+            <div class="feature-editor-field">
+              <label for="ddc-feature-editor-type">Feature type</label>
+              <input id="ddc-feature-editor-type" type="text" value="${this._safe(featureTypeLabel(type))}" readonly />
+            </div>
+            <div class="feature-editor-field full">
+              <label for="ddc-feature-editor-file">Package file name</label>
+              <input id="ddc-feature-editor-file" type="text" value="${this._safe(draft.filename || '')}" placeholder="${this._safe(suggestFeatureFilename(draft.name, type, index + 1))}" />
+            </div>
+            <div class="feature-editor-field full">
+              <label for="ddc-feature-editor-yaml">YAML content</label>
+              <textarea id="ddc-feature-editor-yaml" spellcheck="false" placeholder="${this._safe(buildFeatureYaml(type, draft.name || featureTypeLabel(type)))}">${this._safe(draft.yaml || '')}</textarea>
+            </div>
+          </div>
+          <div class="feature-editor-footer">
+            <label class="feature-editor-toggle">
+              <span>Enable this feature</span>
+              <ha-switch id="ddc-feature-editor-enabled"></ha-switch>
+            </label>
+            <div class="feature-editor-actions">
+              <button type="button" class="btn secondary" id="ddc-feature-editor-cancel">Cancel</button>
+              <button type="button" class="btn primary" id="ddc-feature-editor-save">Save feature</button>
+            </div>
+          </div>
+        </div>
+      `;
+      modal.appendChild(overlay);
+      featureEditorEl = overlay;
+
+      const nameInput = overlay.querySelector('#ddc-feature-editor-name');
+      const fileInput = overlay.querySelector('#ddc-feature-editor-file');
+      const yamlInput = overlay.querySelector('#ddc-feature-editor-yaml');
+      const enabledToggle = overlay.querySelector('#ddc-feature-editor-enabled');
+      const closeBtn = overlay.querySelector('#ddc-feature-editor-close');
+      const cancelBtn = overlay.querySelector('#ddc-feature-editor-cancel');
+      const saveBtn = overlay.querySelector('#ddc-feature-editor-save');
+      const backdrop = overlay.querySelector('.feature-editor-backdrop');
+
+      let filenameDirty = !!draft.__filenameDirty;
+      let yamlDirty = !!draft.__yamlDirty;
+      if (enabledToggle) enabledToggle.checked = draft.enabled !== false;
+
+      const syncTemplateDefaults = () => {
+        const liveName = String(nameInput?.value || '').trim() || featureTypeLabel(type);
+        if (!filenameDirty || !String(fileInput?.value || '').trim()) {
+          const nextFile = suggestFeatureFilename(liveName, type, index + 1);
+          if (fileInput) fileInput.value = nextFile;
+        }
+        if (!yamlDirty) {
+          const nextYaml = buildFeatureYaml(type, liveName);
+          if (yamlInput) yamlInput.value = nextYaml;
+        }
+      };
+
+      nameInput?.addEventListener('input', syncTemplateDefaults);
+      fileInput?.addEventListener('input', () => { filenameDirty = true; });
+      yamlInput?.addEventListener('input', () => { yamlDirty = true; });
+
+      const closeEditor = () => {
+        closeFeatureEditor();
+        try {
+          packagesListEl?.querySelector?.(`[data-feature-index="${index}"] .feature-edit-btn`)?.focus?.();
+        } catch {}
+      };
+
+      const saveEditor = () => {
+        const nextName = String(nameInput?.value || '').trim() || featureTypeLabel(type);
+        const nextFilename = String(fileInput?.value || '').trim() || suggestFeatureFilename(nextName, type, index + 1);
+        const nextYaml = String(yamlInput?.value || '').replace(/\r\n/g, '\n');
+        if ((enabledToggle?.checked ?? true) && nextYaml.trim()) {
+          try {
+            window.jsyaml?.load?.(nextYaml);
+          } catch (yamlErr) {
+            this._toast?.(`Invalid YAML in ${featureTypeLabel(type).toLowerCase()} "${nextName}".`);
+            return;
+          }
+        }
+        packageDrafts[index] = {
+          ...packageDrafts[index],
+          name: nextName,
+          filename: nextFilename,
+          yaml: nextYaml,
+          enabled: !!enabledToggle?.checked,
+          feature_type: type,
+          __filenameDirty: filenameDirty || !!nextFilename.trim(),
+          __yamlDirty: yamlDirty || !!nextYaml.trim(),
+        };
+        closeFeatureEditor();
+        renderPackages();
+      };
+
+      closeBtn?.addEventListener('click', closeEditor);
+      cancelBtn?.addEventListener('click', closeEditor);
+      backdrop?.addEventListener('click', closeEditor);
+      saveBtn?.addEventListener('click', saveEditor);
+      overlay.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Escape') {
+          evt.preventDefault();
+          closeEditor();
+        }
+        if ((evt.metaKey || evt.ctrlKey) && evt.key.toLowerCase() === 's') {
+          evt.preventDefault();
+          saveEditor();
+        }
+      });
+
+      try { nameInput?.focus?.(); nameInput?.select?.(); } catch {}
+    };
+    const renderPackages = () => {
+      if (!packagesListEl) return;
+      packagesListEl.innerHTML = '';
+
+      if (!packageDrafts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'package-empty';
+        empty.textContent = 'No features added yet. Use the quick buttons above to create helpers, automations, scripts, template sensors, or a misc package block.';
+        packagesListEl.appendChild(empty);
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'feature-list';
+      packageDrafts.forEach((pkg, index) => {
+        const card = document.createElement('div');
+        const type = featureTypeIsKnown(pkg.feature_type) ? pkg.feature_type : inferFeatureTypeFromYaml(pkg.yaml || '');
+        const summary = featureSummaryFromYaml(pkg.yaml || '');
+        card.className = 'feature-card';
+        card.dataset.featureIndex = String(index);
+        card.innerHTML = `
+          <div class="feature-card-main">
+            <div class="feature-card-head">
+              <span class="feature-type-badge"><ha-icon icon="${this._safe(featureTypeIcon(type))}"></ha-icon>${this._safe(featureTypeLabel(type))}</span>
+              <span class="feature-card-title">${this._safe(pkg.name || featureTypeLabel(type))}</span>
+            </div>
+            <div class="feature-card-meta">
+              <code>${this._safe(pkg.filename || suggestFeatureFilename(pkg.name, type, index + 1))}</code>
+              <span>${pkg.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+            </div>
+            <div class="feature-card-summary">${this._safe(summary)}</div>
+          </div>
+          <div class="feature-card-actions">
+            <label class="package-toggle">
+              <span>Enabled</span>
+              <ha-switch class="feature-enabled"></ha-switch>
+            </label>
+            <button type="button" class="mini-action feature-edit-btn">
+              <ha-icon icon="mdi:pencil-outline"></ha-icon>
+              <span>Edit</span>
+            </button>
+            <button type="button" class="icon-btn danger feature-delete-btn" title="Delete feature">
+              <ha-icon icon="mdi:trash-can-outline"></ha-icon>
+            </button>
+          </div>
+        `;
+
+        const enabledToggle = card.querySelector('.feature-enabled');
+        const editBtn = card.querySelector('.feature-edit-btn');
+        const deleteBtn = card.querySelector('.feature-delete-btn');
+
+        if (enabledToggle) enabledToggle.checked = pkg.enabled !== false;
+        enabledToggle?.addEventListener('change', () => {
+          packageDrafts[index].enabled = !!enabledToggle.checked;
+        });
+        editBtn?.addEventListener('click', () => openFeatureEditor(index));
+        deleteBtn?.addEventListener('click', () => {
+          packageDrafts.splice(index, 1);
+          renderPackages();
+        });
+        list.appendChild(card);
+      });
+      packagesListEl.appendChild(list);
+    };
+    let particlesLiveConfig = cloneData(pCfg.config);
     if (inpParticlesUrl)     inpParticlesUrl.value = pCfg.config_url || '';
     if (chkParticlesPointer) chkParticlesPointer.checked = !!pCfg.pointer_events;
+    if (selTabsPosition) selTabsPosition.value = String(this.tabsPosition || 'top');
+    renderDashboardThemeOptions();
 
     const yCfg = this._config?.background_youtube || {};
     const ytStr = yCfg.url || yCfg.video_id || '';
@@ -11397,12 +18801,57 @@ modal.innerHTML = `
     showBgSections();
     // Hide auto-resize setting when the container size mode is not dynamic
     const secAutoResize = modal.querySelector('[aria-labelledby="lbl-auto-resize"]');
+    const secOptimizeForMobile = modal.querySelector('[aria-labelledby="lbl-mobile-optimize"]');
+    const secMobileDynamicBehavior = modal.querySelector('[aria-labelledby="lbl-mobile-dynamic-behavior"]');
     const updateAutoResizeVisibility = () => {
       const mode = selSize?.value || 'dynamic';
       if (secAutoResize) secAutoResize.style.display = (mode === 'dynamic') ? '' : 'none';
     };
+    const updateMobileDynamicBehaviorState = () => {
+      const mode = selSize?.value || 'dynamic';
+      const supported = mode === 'dynamic';
+      const behavior = String(selMobileDynamicBehavior?.value || this.mobileDynamicBehavior || 'native').toLowerCase();
+      if (secMobileDynamicBehavior) secMobileDynamicBehavior.style.display = supported ? '' : 'none';
+      if (txtMobileDynamicBehaviorHint) {
+        txtMobileDynamicBehaviorHint.textContent = supported
+          ? (behavior === 'scale'
+              ? 'Scale to fit keeps the current Dynamic behavior on mobile. Native canvas keeps scale at 1 and uses horizontal pan/scroll when needed.'
+              : 'Native canvas keeps the mobile layout at scale 1 in Dynamic mode, so you can treat mobile differently and pan horizontally if needed.')
+          : 'Stored, but only used while the container size mode is Dynamic.';
+      }
+    };
+    const updateOptimizeForMobileState = () => {
+      const mode = selSize?.value || 'dynamic';
+      const supported = mode === 'dynamic';
+      if (secOptimizeForMobile) secOptimizeForMobile.style.display = supported ? '' : 'none';
+      const behavior = String(selMobileDynamicBehavior?.value || this.mobileDynamicBehavior || 'native').toLowerCase();
+      if (txtOptimizeForMobileHint) {
+        txtOptimizeForMobileHint.textContent = !supported
+          ? 'Stored, but only used while the container size mode is Dynamic.'
+          : (behavior === 'scale'
+              ? 'In Dynamic mode, keeps narrow screens more readable by avoiding extreme downscaling, softening text shrink, and allowing horizontal pan when needed.'
+              : 'When Mobile dynamic behavior is set to Native canvas, this only still affects other narrow Dynamic cases that continue to use scaling.');
+      }
+    };
+    const updateDoNotResizeTextState = () => {
+      const mode = selSize?.value || 'dynamic';
+      const supported = (mode === 'dynamic' || mode === 'auto');
+      if (txtDoNotResizeTextHint) {
+        txtDoNotResizeTextHint.textContent = supported
+          ? 'Keeps text at its design size when the canvas scale changes. Best suited for Dynamic and Auto.'
+          : 'Stored, but only used while the container size mode is Dynamic or Auto.';
+      }
+    };
     updateAutoResizeVisibility();
+    updateMobileDynamicBehaviorState();
+    updateOptimizeForMobileState();
+    updateDoNotResizeTextState();
     selSize?.addEventListener('change', updateAutoResizeVisibility);
+    selSize?.addEventListener('change', updateMobileDynamicBehaviorState);
+    selSize?.addEventListener('change', updateOptimizeForMobileState);
+    selSize?.addEventListener('change', updateDoNotResizeTextState);
+    selMobileDynamicBehavior?.addEventListener('change', updateMobileDynamicBehaviorState);
+    selMobileDynamicBehavior?.addEventListener('change', updateOptimizeForMobileState);
 
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
@@ -11413,9 +18862,22 @@ modal.innerHTML = `
     if (chkASave)   chkASave.checked   = !!this.autoSave;
     if (inpDeb)     inpDeb.value       = String(this.autoSaveDebounce ?? 800);
     if (selSize)    selSize.value      = String(this.containerSizeMode || 'dynamic');
+    updateAutoResizeVisibility();
+    if (selMobileDynamicBehavior) selMobileDynamicBehavior.value = String(this.mobileDynamicBehavior || 'native');
+    updateMobileDynamicBehaviorState();
+    updateOptimizeForMobileState();
+    updateDoNotResizeTextState();
+    if (chkOptimizeForMobile) chkOptimizeForMobile.checked = !!this.optimizeForMobile;
+    if (chkDoNotResizeText) chkDoNotResizeText.checked = !!this.doNotResizeText;
+    if (chkOuterGridBuffer) chkOuterGridBuffer.checked = !!this.outerGridBuffer;
     if (selOrient)  selOrient.value    = String(this.containerPresetOrient || 'auto');
     if (chkOverlap) chkOverlap.checked = !!this.disableOverlap;
+    if (chkDashboardThemeEnabled) chkDashboardThemeEnabled.checked = !!this.dashboardThemeEnabled;
+    if (selDashboardTheme) selDashboardTheme.value = String(this.dashboardTheme || '');
+    if (chkDashboardThemeOverrideAllDesign) chkDashboardThemeOverrideAllDesign.checked = !!this.dashboardThemeOverrideAllDesign;
+    updateDashboardThemeState();
     if (inpCBg)     inpCBg.value       = String(this.containerBackground || '');
+    if (chkApplyPageBg) chkApplyPageBg.checked = !!this.applyBackgroundToPage;
     if (inpCardBg)  inpCardBg.value    = String(this.cardBackground || '');
     if (inpBgImg)   {
       const bgObj = (this._config?.background_image ?? this._config?.bg_image) || {};
@@ -11444,15 +18906,23 @@ modal.innerHTML = `
     if (chkShadow) {
       chkShadow.addEventListener('change', () => {
         try {
-          if (chkShadow.checked) {
-            // Use a more prominent drop shadow on toggle
-            this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
-          } else {
-            this.style.removeProperty('--ddc-card-shadow');
-          }
+          this.cardShadowEnabled = !!chkShadow.checked;
+          this._applyDashboardThemeStyling_?.();
         } catch {}
       });
     }
+    chkDashboardThemeEnabled?.addEventListener('change', () => {
+      updateDashboardThemeState();
+      applyLiveDashboardThemePreview();
+    });
+    selDashboardTheme?.addEventListener('change', () => {
+      updateDashboardThemeState();
+      applyLiveDashboardThemePreview();
+    });
+    chkDashboardThemeOverrideAllDesign?.addEventListener('change', () => {
+      updateDashboardThemeState();
+      applyLiveDashboardThemePreview();
+    });
 
     // ===== Screen saver UI =====
     // Prepopulate current value and bind live changes
@@ -11581,6 +19051,113 @@ modal.innerHTML = `
       'rgba(255,255,255,0.4)', 'rgba(0,0,0,0.3)', 'rgba(0,128,255,0.3)',
       'rgba(255,0,128,0.3)', 'rgba(255,255,0,0.3)', 'rgba(0,255,128,0.3)'
     ];
+    const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
+    const randBetween = (min, max, digits = 0) => {
+      const value = min + Math.random() * (max - min);
+      return Number(value.toFixed(digits));
+    };
+    const RANDOM_BG_SOLIDS = [
+      '#0f172a', '#1e293b', '#334155', '#0f766e', '#14532d', '#7c2d12',
+      '#7f1d1d', '#581c87', '#1d4ed8', '#065f46', '#111827', '#3f3f46',
+      'rgba(255,255,255,0.24)', 'rgba(15,23,42,0.56)', 'rgba(249,115,22,0.28)',
+      'rgba(20,184,166,0.28)', 'rgba(59,130,246,0.28)', 'rgba(244,63,94,0.24)'
+    ];
+    const RANDOM_CARD_SOLIDS = [
+      '#111827', '#1f2937', '#0f172a', '#172033', '#1a2332', '#202938',
+      'rgba(15,23,42,0.72)', 'rgba(30,41,59,0.78)', 'rgba(17,24,39,0.84)',
+      'rgba(8,47,73,0.72)', 'rgba(49,46,129,0.7)', 'rgba(69,10,10,0.7)'
+    ];
+    const makeRandomGradient = (palette) => {
+      const a = pickRandom(palette);
+      let b = pickRandom(palette);
+      if (a === b) b = pickRandom(palette.filter((c) => c !== a) || palette);
+      const angle = Math.round(randBetween(110, 320));
+      const mode = Math.random() > 0.45 ? 'linear' : 'radial';
+      return mode === 'linear'
+        ? `linear-gradient(${angle}deg, ${a}, ${b})`
+        : `radial-gradient(circle at ${Math.round(randBetween(20, 80))}% ${Math.round(randBetween(18, 82))}%, ${a}, ${b})`;
+    };
+    const randomBackgroundValue = (type = 'container') => {
+      const palette = type === 'card' ? RANDOM_CARD_SOLIDS : RANDOM_BG_SOLIDS;
+      return Math.random() > 0.45 ? makeRandomGradient(palette) : pickRandom(palette);
+    };
+    const syncChoiceGroup = (container, selector, value) => {
+      if (!container) return;
+      container.querySelectorAll(selector).forEach((el) => {
+        const matches = (el.title || '').trim() === String(value).trim();
+        el.setAttribute('aria-pressed', matches ? 'true' : 'false');
+      });
+    };
+    const applyBackgroundValue = ({ input, picker, value, kind }) => {
+      if (!input) return;
+      input.value = value;
+      if (picker) {
+        const hex = (String(value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
+        if (hex) picker.value = hex;
+      }
+      syncChoiceGroup(input.closest('.color-stack'), '.swatch', value);
+      syncChoiceGroup(input.closest('.color-stack'), '.gradient', value);
+      try { input.dispatchEvent(new Event('input', { bubbles: true, composed: true })); } catch {}
+      try {
+        if (kind === 'card') {
+          this.cardBackground = value;
+        } else {
+          this.containerBackground = value;
+        }
+        this._applyDashboardThemeStyling_?.();
+      } catch {}
+    };
+    const createRandomParticlesConfig = () => {
+      const colorPool = ['#ffffff', '#f8fafc', '#38bdf8', '#22d3ee', '#34d399', '#f59e0b', '#fb7185', '#c084fc', '#facc15'];
+      const directionPool = ['none', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left'];
+      return {
+        particles: {
+          number: { value: Math.round(randBetween(16, 72)), density: { enable: true, value_area: Math.round(randBetween(700, 1600)) } },
+          color: { value: pickRandom(colorPool) },
+          shape: { type: pickRandom(['circle', 'triangle', 'edge', 'star', 'polygon']) },
+          opacity: {
+            value: randBetween(0.14, 0.55, 2),
+            random: true,
+            anim: { enable: Math.random() > 0.6, speed: randBetween(0.2, 1.4, 2), opacity_min: randBetween(0.05, 0.2, 2), sync: false }
+          },
+          size: {
+            value: randBetween(1.6, 5.4, 1),
+            random: true,
+            anim: { enable: Math.random() > 0.72, speed: randBetween(1.5, 8.5, 1), size_min: randBetween(0.4, 1.5, 1), sync: false }
+          },
+          line_linked: {
+            enable: Math.random() > 0.45,
+            distance: Math.round(randBetween(90, 220)),
+            color: pickRandom(colorPool),
+            opacity: randBetween(0.08, 0.28, 2),
+            width: randBetween(0.6, 1.6, 1)
+          },
+          move: {
+            enable: true,
+            speed: randBetween(0.3, 2.4, 2),
+            direction: pickRandom(directionPool),
+            random: Math.random() > 0.55,
+            straight: Math.random() > 0.8,
+            out_mode: 'out'
+          }
+        },
+        interactivity: {
+          detect_on: 'canvas',
+          events: {
+            onhover: { enable: !!chkParticlesPointer?.checked, mode: pickRandom(['repulse', 'grab', 'bubble']) },
+            onclick: { enable: !!chkParticlesPointer?.checked, mode: pickRandom(['push', 'repulse']) },
+            resize: true
+          },
+          modes: {
+            repulse: { distance: Math.round(randBetween(70, 140)) },
+            push: { particles_nb: Math.round(randBetween(2, 6)) },
+            bubble: { distance: Math.round(randBetween(100, 180)), size: randBetween(3, 7, 1), duration: randBetween(1.2, 2.8, 1), opacity: randBetween(0.25, 0.6, 2) },
+            grab: { distance: Math.round(randBetween(110, 170)), line_linked: { opacity: randBetween(0.18, 0.45, 2) } }
+          }
+        },
+        retina_detect: false
+      };
+    };
     const buildSwatches = (containerSel, targetInputSel, targetPickerSel) => {
       const wrap = modal.querySelector(containerSel);
       const target = modal.querySelector(targetInputSel);
@@ -11629,6 +19206,47 @@ modal.innerHTML = `
     const updateThumb = (src) => {
       if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none';
     };
+    const applyLiveImageSettingsPreview = () => {
+      try {
+        const liveSrc = (urlInput?.value || '').trim();
+        const liveBg = liveSrc ? {
+          ...((this._config && this._config.background_image) || {}),
+          src: liveSrc,
+          repeat: selBgRepeat?.value || 'no-repeat',
+          size: selBgSize?.value || 'cover',
+          position: selBgPosition?.value || 'center center',
+          attachment: selBgAttachment?.value || 'scroll',
+          opacity: rngBgOpacity ? Math.max(0, Math.min(100, parseInt(rngBgOpacity.value || '100', 10))) / 100 : 1,
+        } : null;
+
+        if (liveBg) {
+          this._config = {
+            ...(this._config || {}),
+            background_mode: (selBgMode?.value || 'none') === 'image' ? 'image' : (this._config?.background_mode || 'image'),
+            background_image: liveBg,
+          };
+        } else if ((selBgMode?.value || 'none') === 'image') {
+          const { background_image, ...rest } = this._config || {};
+          this._config = rest;
+        }
+        this._applyBackgroundFromConfig?.();
+      } catch {}
+    };
+    if (btnBrowseMediaLibrary) {
+      btnBrowseMediaLibrary.disabled = !(this.hass && typeof this.hass.callWS === 'function');
+      btnBrowseMediaLibrary.addEventListener('click', async () => {
+        await this._openMediaLibraryBrowser_(async (selectedUrl) => {
+          if (!urlInput) return;
+          urlInput.value = selectedUrl;
+          updateThumb(selectedUrl);
+          applyLiveImageSettingsPreview();
+          try {
+            urlInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+            urlInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          } catch {}
+        });
+      });
+    }
 
     // Initialize thumbnail from existing value
     if (urlInput?.value) {
@@ -11639,7 +19257,14 @@ modal.innerHTML = `
     urlInput?.addEventListener('input', () => {
       const v = (urlInput.value || '').trim();
       updateThumb(v || '');
+      if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview();
     });
+    urlInput?.addEventListener('change', applyLiveImageSettingsPreview);
+    selBgRepeat?.addEventListener('change', () => { if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview(); });
+    selBgSize?.addEventListener('change', () => { if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview(); });
+    selBgPosition?.addEventListener('change', () => { if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview(); });
+    selBgAttachment?.addEventListener('change', () => { if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview(); });
+    rngBgOpacity?.addEventListener('input', () => { if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview(); });
 
 
     modal.querySelector('#ddc-clear-bg')?.addEventListener('click', () => {
@@ -11775,13 +19400,32 @@ modal.innerHTML = `
         icon: t.icon || '',
         label_mode: t.label_mode || 'both'
       }));
+      const nextDefault = defaultId ?? out[0]?.id ?? 'default';
 
       if (this._config?.options) {
-        this._config.options = { ...(this._config.options || {}), tabs: out, default_tab: defaultId ?? (this._config.options?.default_tab) };
+        this._config.options = { ...(this._config.options || {}), tabs: out, default_tab: nextDefault };
       } else {
         this._config.tabs = out;
-        if (defaultId) this._config.default_tab = defaultId;
       }
+      this._config.tabs = out;
+      this._config.default_tab = nextDefault;
+
+      this.tabs = out.map((t) => ({
+        ...t,
+        id: t.id ?? t.key ?? t.label ?? 'tab',
+        label: t.label ?? t.id ?? 'Tab',
+        icon: t.icon || '',
+        label_mode: t.label_mode || 'both',
+      }));
+      this.defaultTab = nextDefault;
+      if (!this.tabs.some((t) => t.id === this.activeTab)) {
+        this.activeTab = this.defaultTab;
+      }
+
+      try { this._renderTabs?.(); } catch {}
+      try { this._applyActiveTab?.(); } catch {}
+      try { this._applyVisibility_?.(); } catch {}
+
       try { await this._persistThisCardConfigToStorage_(); } catch (e) { console.warn('[drag-and-drop-card] Could not persist tabs', e); }
       this.requestUpdate?.();
     };
@@ -11905,6 +19549,9 @@ modal.innerHTML = `
       });
     };
     renderTabs();
+    renderPackages();
+    renderPackageDiagnostics('');
+    packageDiagnosticsBtn?.addEventListener('click', runPackageDiagnostics);
 
     // Add tab
     modal.querySelector('#ddc-add-tab-btn')?.addEventListener('click', async () => {
@@ -11922,6 +19569,15 @@ modal.innerHTML = `
       renderTabs();
     });
 
+    addFeatureBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const type = String(btn.dataset.featureType || 'misc');
+        packageDrafts.push(createFeatureDraft(type));
+        renderPackages();
+        openFeatureEditor(packageDrafts.length - 1);
+      });
+    });
+
 
     // ===== BACKGROUND IMAGE: DELETE BUTTON =====
     const clearBtn = modal.querySelector('#ddc-clear-bg');
@@ -11937,7 +19593,7 @@ modal.innerHTML = `
             const { background_image, ...rest } = this._config;
             this._config = rest;
           }
-          this._applyBackgroundImageFromConfig?.();
+          this._applyBackgroundFromConfig?.();
           this._persistThisCardConfigToStorage_?.();
         } catch (e) {
           console.warn('[drag-and-drop-card] Failed to clear background image', e);
@@ -11977,11 +19633,10 @@ modal.innerHTML = `
             const isCard = String(targetInputSel || '').toLowerCase().includes('cardbg');
             if (isCard) {
               this.cardBackground = g;
-              this.style.setProperty('--ddc-card-bg', g);
             } else {
               this.containerBackground = g;
-              this.style.setProperty('--ddc-bg', g);
             }
+            this._applyDashboardThemeStyling_?.();
           } catch {}
         });
         wrap.appendChild(b);
@@ -11990,6 +19645,71 @@ modal.innerHTML = `
     };
     buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
     buildGradients('#ddc-gradients-cardBg',      '#ddc-setting-cardBg');
+    const applyRandomParticlesPreview = () => {
+      particlesLiveConfig = createRandomParticlesConfig();
+      if (selBgMode) selBgMode.value = 'particles';
+      if (inpParticlesUrl) inpParticlesUrl.value = '';
+      showBgSections();
+      this._config = {
+        ...(this._config || {}),
+        background_mode: 'particles',
+        background_particles: {
+          ...(this._config?.background_particles || {}),
+          config_url: undefined,
+          config: cloneData(particlesLiveConfig),
+          pointer_events: !!chkParticlesPointer?.checked,
+        }
+      };
+      this._applyBackgroundFromConfig?.();
+    };
+    btnRandomContainerBg?.addEventListener('click', () => {
+      applyBackgroundValue({
+        input: inpCBg,
+        picker: modal.querySelector('#ddc-color-containerBg'),
+        value: randomBackgroundValue('container'),
+        kind: 'container'
+      });
+    });
+    btnRandomCardBg?.addEventListener('click', () => {
+      applyBackgroundValue({
+        input: inpCardBg,
+        picker: modal.querySelector('#ddc-color-cardBg'),
+        value: randomBackgroundValue('card'),
+        kind: 'card'
+      });
+    });
+    btnRandomAllStyle?.addEventListener('click', () => {
+      applyBackgroundValue({
+        input: inpCBg,
+        picker: modal.querySelector('#ddc-color-containerBg'),
+        value: randomBackgroundValue('container'),
+        kind: 'container'
+      });
+      applyBackgroundValue({
+        input: inpCardBg,
+        picker: modal.querySelector('#ddc-color-cardBg'),
+        value: randomBackgroundValue('card'),
+        kind: 'card'
+      });
+      applyRandomParticlesPreview();
+    });
+    btnRandomParticles?.addEventListener('click', () => {
+      applyRandomParticlesPreview();
+    });
+    chkParticlesPointer?.addEventListener('change', () => {
+      if ((selBgMode?.value || 'none') !== 'particles') return;
+      this._config = {
+        ...(this._config || {}),
+        background_mode: 'particles',
+        background_particles: {
+          ...(this._config?.background_particles || {}),
+          config_url: (inpParticlesUrl?.value || '').trim() || undefined,
+          config: cloneData(particlesLiveConfig) || undefined,
+          pointer_events: !!chkParticlesPointer.checked,
+        }
+      };
+      this._applyBackgroundFromConfig?.();
+    });
 
     // Live preview when manually editing background text inputs
     if (inpCBg) {
@@ -11997,7 +19717,15 @@ modal.innerHTML = `
         const val = (inpCBg.value || '').trim();
         try {
           this.containerBackground = val;
-          this.style.setProperty('--ddc-bg', val);
+          this._applyDashboardThemeStyling_?.();
+        } catch {}
+      });
+    }
+    if (chkApplyPageBg) {
+      chkApplyPageBg.addEventListener('change', () => {
+        try {
+          this.applyBackgroundToPage = !!chkApplyPageBg.checked;
+          this._applyBackgroundFromConfig?.();
         } catch {}
       });
     }
@@ -12006,7 +19734,7 @@ modal.innerHTML = `
         const val = (inpCardBg.value || '').trim();
         try {
           this.cardBackground = val;
-          this.style.setProperty('--ddc-card-bg', val);
+          this._applyDashboardThemeStyling_?.();
         } catch {}
       });
     }
@@ -12014,6 +19742,7 @@ modal.innerHTML = `
 
     // Remove modal helper
     const closeModal = () => {
+      try { closeFeatureEditor(); } catch {}
       try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
       try { modal.remove(); } catch {}
       if (this.__settingsModal === modal) this.__settingsModal = null;
@@ -12022,12 +19751,15 @@ modal.innerHTML = `
     modal.querySelector('#ddc-settings-close')?.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); });
     modal.querySelector('#ddc-settings-cancel')?.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); });
     // Save handler
-    modal.querySelector('#ddc-settings-save')?.addEventListener('click', (e) => {
+    modal.querySelector('#ddc-settings-save')?.addEventListener('click', async (e) => {
       e.stopPropagation();
       // Read values
       const newSize      = selSize?.value || 'dynamic';
-      // Auto-resize is only honored when the container size mode is dynamic
-      const newAuto      = (newSize === 'dynamic') && !!chkAuto?.checked;
+      // Dynamic mode always scales; if the explicit toggle is not present,
+      // keep the dynamic behavior instead of silently turning scaling off.
+      const newAuto      = (newSize === 'dynamic')
+        ? (chkAuto ? !!chkAuto.checked : true)
+        : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
       const newHideHdr   = !!chkHdr?.checked;
@@ -12036,8 +19768,18 @@ modal.innerHTML = `
       const newASave     = !!chkASave?.checked;
       const newDeb       = parseInt(inpDeb?.value || '0', 10);
       const newOrient    = selOrient?.value || 'auto';
+      const newOptimizeForMobile = !!chkOptimizeForMobile?.checked;
+      const newMobileDynamicBehavior = String(selMobileDynamicBehavior?.value || this.mobileDynamicBehavior || 'native').toLowerCase() === 'scale'
+        ? 'scale'
+        : 'native';
+      const newDoNotResizeText = !!chkDoNotResizeText?.checked;
+      const newOuterGridBuffer = !!chkOuterGridBuffer?.checked;
       const newOverlap   = !!chkOverlap?.checked;
+      const newDashboardThemeEnabled = !!chkDashboardThemeEnabled?.checked;
+      const newDashboardTheme = String(selDashboardTheme?.value || '').trim();
+      const newDashboardThemeOverrideAllDesign = !!chkDashboardThemeOverrideAllDesign?.checked;
       const newCBg       = (inpCBg?.value || '').trim();
+      const newApplyPageBg = !!chkApplyPageBg?.checked;
       const newCardBg    = (inpCardBg?.value || '').trim();
       const newBgImg     = (inpBgImg?.value || '').trim();
       const newDebug     = !!chkDebug?.checked;
@@ -12054,6 +19796,28 @@ modal.innerHTML = `
       const newYtPosition = (selYtPosition?.value || 'center');
       const newYtOpacity  = rngYtOpacity ? Math.max(0, Math.min(100, parseInt(rngYtOpacity.value || '100', 10))) / 100 : 1;
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
+      const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
+      const newTabsPosition = (newTabsPositionRaw === 'left' || newTabsPositionRaw === 'bottom') ? newTabsPositionRaw : 'top';
+      const normalizedPackages = this._normalizeDashboardPackages_(packageDrafts.map((pkg, index) => ({
+        id: String(pkg.id || `package_${index + 1}`).trim() || `package_${index + 1}`,
+        name: String(pkg.name || `Package ${index + 1}`).trim() || `Package ${index + 1}`,
+        filename: String(pkg.filename || '').trim(),
+        yaml: String(pkg.yaml || '').replace(/\r\n/g, '\n'),
+        enabled: pkg.enabled !== false,
+        feature_type: featureTypeIsKnown(pkg.feature_type) ? pkg.feature_type : 'misc',
+      })));
+
+      for (const pkg of normalizedPackages) {
+        const yamlText = String(pkg.yaml || '').trim();
+        if (!pkg.enabled || !yamlText) continue;
+        try {
+          window.jsyaml?.load?.(yamlText);
+        } catch (yamlErr) {
+          console.warn('[drag-and-drop-card] Invalid package YAML', pkg.name, yamlErr);
+          this._toast?.(`Invalid YAML in feature "${pkg.name || pkg.filename || pkg.id}".`);
+          return;
+        }
+      }
 
       // Card shadow toggle
       const newShadow = !!chkShadow?.checked;
@@ -12063,7 +19827,7 @@ modal.innerHTML = `
       const newScreenSaverDelayMin  = parseInt(rngScreenDelay?.value || '1', 10);
       const newScreenSaverDelayMs   = (Number.isFinite(newScreenSaverDelayMin) ? newScreenSaverDelayMin : 1) * 60000;
 
-      // hero and tabs position not exposed to user
+      // hero image not exposed to user
       try {
         // Auto resize cards
         this.autoResizeCards = newAuto;
@@ -12083,7 +19847,11 @@ modal.innerHTML = `
           this.__ddcResizeObs = new ResizeObserver(() => this._applyAutoScale?.());
           try { this.__ddcResizeObs.observe(this); } catch {}
           try { this.__ddcResizeObs.observe(this.cardContainer); } catch {}
-          window.addEventListener('resize', this.__ddcOnWinResize = () => this._applyAutoScale?.());
+          this.__ddcOnWinResize = this.__ddcOnWinResize || (() => {
+            this._syncResponsiveProfileForViewport_?.();
+            this._applyAutoScale?.();
+          });
+          window.addEventListener('resize', this.__ddcOnWinResize);
         }
 
         // Start/stop any rAF scale watcher depending on mode
@@ -12107,12 +19875,6 @@ modal.innerHTML = `
         }
         // Apply card drop shadow
         this.cardShadowEnabled = newShadow;
-        if (this.cardShadowEnabled) {
-          // Use a more prominent drop shadow when enabled
-          this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
-        } else {
-          this.style.removeProperty('--ddc-card-shadow');
-        }
         // Edit mode PIN
         this.editModePin = newEditPin;
         // make sure the persisted config also carries it
@@ -12130,14 +19892,23 @@ modal.innerHTML = `
         if (!isNaN(newDeb) && newDeb > 0) this.autoSaveDebounce = newDeb;
         // Container size mode
         const sizeChanged = newSize !== this.containerSizeMode;
+        const outerBufferChanged = newOuterGridBuffer !== !!this.outerGridBuffer;
         this.containerSizeMode = newSize;
+        this.optimizeForMobile = newOptimizeForMobile;
+        this.mobileDynamicBehavior = newMobileDynamicBehavior;
+        this.doNotResizeText = newDoNotResizeText;
+        this.outerGridBuffer = newOuterGridBuffer;
+        this.dashboardThemeEnabled = newDashboardThemeEnabled;
+        this.dashboardTheme = newDashboardTheme;
+        this.dashboardThemeOverrideAllDesign = newDashboardThemeOverrideAllDesign;
         // Container orientation
         const orientChanged = newOrient !== this.containerPresetOrient;
         this.containerPresetOrient = newOrient;
-        if (sizeChanged || orientChanged) {
+        if (sizeChanged || orientChanged || outerBufferChanged) {
           // When size or orientation changes, recalc container
           this._resizeContainer?.();
         }
+        this._syncViewportPreviewUI_?.();
 
         // Apply fixed custom or preset dimensions
         if (newSize === 'fixed_custom') {
@@ -12154,36 +19925,50 @@ modal.innerHTML = `
           // Recompute container size after updating preset
           this._resizeContainer?.();
         }
+        this._applyAutoScale?.();
+        this.tabsPosition = newTabsPosition;
+        this._config = this._config || {};
+        if (this._config.options) {
+          this._config.options = { ...(this._config.options || {}), tabs_position: this.tabsPosition };
+        }
+        this._config.tabs_position = this.tabsPosition;
+        this._syncTabsPlacement_?.();
+        this._renderTabs?.();
+        this._applyActiveTab?.();
+        this._syncTabsWidth_?.();
         // Disable overlap
         this.disableOverlap = newOverlap;
         // Container background
         // When the input has a value, apply it; otherwise reset to an empty string.
         if (newCBg) {
           this.containerBackground = newCBg;
-          this.style.setProperty('--ddc-bg', this.containerBackground);
           // reflect into config immediately so exportable options include it
           this._config = this._config || {};
           this._config.container_background = this.containerBackground;
         } else {
           // Reset: remove inline style and persist an empty string to override any YAML value
           this.containerBackground = '';
-          try { this.style.removeProperty('--ddc-bg'); } catch {}
           this._config = this._config || {};
           this._config.container_background = this.containerBackground;
         }
+        this.applyBackgroundToPage = newApplyPageBg;
+        this._config = this._config || {};
+        this._config.apply_background_to_page = !!this.applyBackgroundToPage;
         // Card background
         if (newCardBg) {
           this.cardBackground = newCardBg;
-          this.style.setProperty('--ddc-card-bg', this.cardBackground);
           this._config = this._config || {};
           this._config.card_background = this.cardBackground;
         } else {
           // Reset card background: remove inline style and store empty string
           this.cardBackground = '';
-          try { this.style.removeProperty('--ddc-card-bg'); } catch {}
           this._config = this._config || {};
           this._config.card_background = this.cardBackground;
         }
+        this._config.dashboard_theme_enabled = !!this.dashboardThemeEnabled;
+        this._config.dashboard_theme = this.dashboardTheme || '';
+        this._config.dashboard_theme_override_all_design = !!this.dashboardThemeOverrideAllDesign;
+        this._applyDashboardThemeStyling_?.();
         // Background image (only src)
         // Background image (only src) — immutable update (avoids "read-only" error)
         if (newBgImg) {
@@ -12225,6 +20010,7 @@ modal.innerHTML = `
         if (newBgMode === 'particles') {
           this._config.background_particles = {
             config_url: newParticlesUrl || undefined,
+            config: (!newParticlesUrl && particlesLiveConfig) ? cloneData(particlesLiveConfig) : undefined,
             pointer_events: newParticlesPtr || undefined,
           };
         } else {
@@ -12285,6 +20071,13 @@ modal.innerHTML = `
           this._config.auto_save_debounce      = this.autoSaveDebounce;
           this._config.container_size_mode     = this.containerSizeMode;
           this._config.container_preset_orientation = this.containerPresetOrient;
+          this._config.optimize_for_mobile     = !!this.optimizeForMobile;
+          this._config.mobile_dynamic_behavior = this.mobileDynamicBehavior || 'native';
+          this._config.do_not_resize_text      = !!this.doNotResizeText;
+          this._config.outer_grid_buffer       = !!this.outerGridBuffer;
+          this._config.dashboard_theme_enabled = !!this.dashboardThemeEnabled;
+          this._config.dashboard_theme = this.dashboardTheme || '';
+          this._config.dashboard_theme_override_all_design = !!this.dashboardThemeOverrideAllDesign;
           this._config.container_fixed_width   = this.containerFixedWidth;
           this._config.container_fixed_height  = this.containerFixedHeight;
           this._config.container_preset        = this.containerPreset;
@@ -12298,6 +20091,7 @@ modal.innerHTML = `
           } else if (this._config) {
             delete this._config.container_background;
           }
+          this._config.apply_background_to_page = !!this.applyBackgroundToPage;
           if (this.cardBackground !== undefined) {
             this._config.card_background = this.cardBackground;
           } else if (this._config) {
@@ -12316,6 +20110,8 @@ modal.innerHTML = `
         } catch (cfgErr) {
           console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
         }
+        this.__ddcTextLockDirty = true;
+        this._scheduleTextResizeLockRefresh_?.(true);
         // Persist changes
         // Persist changes both to the Lovelace storage (when available) and to the YAML config.
         // Calling both persistence helpers ensures that any changed settings override the
@@ -12340,6 +20136,13 @@ modal.innerHTML = `
           }
         } catch (persErr) {
           console.warn('[drag-and-drop-card] Unexpected error persisting settings', persErr);
+        }
+
+        try {
+          this._setDashboardPackages_(normalizedPackages);
+          await this._saveLayout(true);
+        } catch (packageSaveErr) {
+          console.warn('[drag-and-drop-card] Failed to persist package bundles', packageSaveErr);
         }
       } catch (err) {
         console.warn('[drag-and-drop-card] Failed to apply settings', err);
@@ -12389,11 +20192,22 @@ modal.innerHTML = `
       container_fixed_height: this.containerFixedHeight ?? undefined,
       container_preset: this.containerPreset,
       auto_resize_cards: !!this.autoResizeCards,
+      optimize_for_mobile: !!this.optimizeForMobile,
+      mobile_dynamic_behavior: this.mobileDynamicBehavior || 'native',
+      do_not_resize_text: !!this.doNotResizeText,
+      outer_grid_buffer: !!this.outerGridBuffer,
+      responsive_viewports: this._cloneJson_(this._serializeResponsiveViewportProfiles_(this.responsiveViewportProfiles)),
+      connectors: this._cloneJson_(this._responsiveConnectors?.[this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape'] || []),
+      responsive_connectors: this._cloneJson_(this._serializeResponsiveConnectorLayouts_(this._responsiveConnectors)),
 
       // Appearance
       container_background: this.containerBackground,
+      apply_background_to_page: !!this.applyBackgroundToPage,
       card_background: this.cardBackground,
       card_shadow: !!this.cardShadowEnabled,
+      dashboard_theme_enabled: !!this.dashboardThemeEnabled,
+      dashboard_theme: this.dashboardTheme || undefined,
+      dashboard_theme_override_all_design: !!this.dashboardThemeOverrideAllDesign,
       animate_cards: !!this.animateCards,
 
       // HA chrome visibility
@@ -12412,7 +20226,7 @@ modal.innerHTML = `
         ? pick(cfg.background_image, ['src','repeat','size','position','attachment','opacity'])
         : undefined,
       background_particles: cfg.background_particles
-        ? pick(cfg.background_particles, ['config_url','pointer_events'])
+        ? pick(cfg.background_particles, ['config_url','pointer_events','config'])
         : undefined,
       background_youtube: cfg.background_youtube
         ? pick(cfg.background_youtube, [
@@ -12456,9 +20270,36 @@ modal.innerHTML = `
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
     if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
+    if ('do_not_resize_text' in opts) this.doNotResizeText = !!opts.do_not_resize_text;
+    if ('optimize_for_mobile' in opts) this.optimizeForMobile = !!opts.optimize_for_mobile;
+    if ('mobile_dynamic_behavior' in opts) {
+      this.mobileDynamicBehavior = String(opts.mobile_dynamic_behavior || 'native').toLowerCase() === 'scale'
+        ? 'scale'
+        : 'native';
+    }
+    if ('outer_grid_buffer' in opts)  this.outerGridBuffer = !!opts.outer_grid_buffer;
+    if ('responsive_viewports' in opts) this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(opts.responsive_viewports);
+    if ('responsive_connectors' in opts || 'connectors' in opts) {
+      this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(
+        opts.connectors || [],
+        opts.responsive_connectors || null
+      );
+      this._connectorDraft = null;
+      this._selectedConnectorId = null;
+    }
     if ('container_background' in opts) this.containerBackground = opts.container_background ?? 'transparent';
+    if ('apply_background_to_page' in opts) this.applyBackgroundToPage = !!opts.apply_background_to_page;
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     if ('card_shadow' in opts)          this.cardShadowEnabled = !!opts.card_shadow;
+    if ('dashboard_theme_enabled' in opts || 'theme_enabled' in opts) {
+      this.dashboardThemeEnabled = !!(opts.dashboard_theme_enabled ?? opts.theme_enabled);
+    }
+    if ('dashboard_theme' in opts || 'theme_name' in opts) {
+      this.dashboardTheme = String(opts.dashboard_theme ?? opts.theme_name ?? '').trim();
+    }
+    if ('dashboard_theme_override_all_design' in opts || 'theme_override_all_design' in opts) {
+      this.dashboardThemeOverrideAllDesign = !!(opts.dashboard_theme_override_all_design ?? opts.theme_override_all_design);
+    }
     if ('debug' in opts)              this.debug = !!opts.debug;
     if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
 
@@ -12479,6 +20320,7 @@ modal.innerHTML = `
         this._stopScaleWatch?.();
       }
 
+      this._syncViewportPreviewUI_?.();
       this._applyAutoScale?.();
     }
 
@@ -12505,6 +20347,7 @@ modal.innerHTML = `
         this._stopScaleWatch?.();
       }
 
+      this._syncViewportPreviewUI_?.();
       this._applyAutoScale?.();
     }
 
@@ -12521,19 +20364,14 @@ modal.innerHTML = `
       if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
     }
 
-
-
-    // reflect to CSS
-    this.style.setProperty('--ddc-bg', this.containerBackground);
-    this.style.setProperty('--ddc-card-bg', this.cardBackground);
-
-    // Apply card shadow based on imported options
-    if (this.cardShadowEnabled) {
-      // Apply a stronger drop shadow when the option is enabled
-      this.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
-    } else {
-      this.style.removeProperty('--ddc-card-shadow');
+    if ('tabs_position' in opts) {
+      const tabsPosition = String(opts.tabs_position || 'top').toLowerCase();
+      this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
+      this._syncTabsPlacement_?.();
     }
+
+
+    this._applyDashboardThemeStyling_?.();
     this._applyGridVars();
 
     if (recalc) {
@@ -12542,41 +20380,27 @@ modal.innerHTML = `
       this._resizeContainer();
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
-
     }
+    if ('tabs_position' in opts) {
+      this._renderTabs?.();
+      this._applyActiveTab?.();
+      this._syncTabsWidth_?.();
+    }
+    this._renderConnectors?.();
+    this.__ddcTextLockDirty = true;
+    this._scheduleTextResizeLockRefresh_?.(true);
   }
 
   _exportDesign() {
-    const wraps = Array.from(
-      this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
-    );
-    const saved = wraps.map((w) => {
-      // Persist core card geometry and configuration. TabId defaults to the
-      // current active default tab when not explicitly set on the wrapper.
-      const x = parseFloat(w.getAttribute('data-x')) || 0;
-      const y = parseFloat(w.getAttribute('data-y')) || 0;
-      const width  = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
-      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
-      const z = parseInt(w.style.zIndex || '1', 10);
-      const cardCfg = this._extractCardConfig(w.firstElementChild);
-      const tabId = w.dataset.tabId || this.defaultTab;
-      const entry = { card: cardCfg, position:{x,y}, size:{width,height}, z, tabId };
-      // Persist explicit overflow setting on export. This mirrors the
-      // behaviour of _saveLayout which includes overflow when set on
-      // the wrapper style. Some cards require overflow visible or hidden
-      // to show dropdowns or tooltips correctly. Only include it when
-      // explicitly set to avoid writing default empty strings.
-      const ov = w.style.overflow;
-      if (ov && ov !== '') {
-        entry.overflow = ov;
-      }
-      return entry;
-    });
+    this._persistCurrentResponsiveProfileToMemory_();
+    const saved = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
 
     const payload = {
-      version: 2,
+      version: 3,
       options: this._exportableOptions(),
-      cards: saved
+      cards: saved,
+      responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, saved)),
+      packages: this._exportDashboardPackages_(),
     };
 
     // NEW: preserve card_mod (if present) as part of options so it exports with the design
@@ -12607,10 +20431,12 @@ _importDesign() {
     // Core + behavior
     'grid','drag_live_snap','auto_save','auto_save_debounce',
     'debug','disable_overlap','card_mod','storage_key',
-    'animate_cards','auto_resize_cards',
+    'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','responsive_viewports',
+    'connectors','responsive_connectors',
 
     // Visuals
-    'container_background','card_background',
+    'container_background','apply_background_to_page','card_background','card_shadow',
+    'dashboard_theme_enabled','dashboard_theme','dashboard_theme_override_all_design',
 
     // Size / layout
     'container_size_mode','container_fixed_width','container_fixed_height',
@@ -12637,6 +20463,7 @@ _importDesign() {
     try {
       const json = JSON.parse(txt);
       const prevStorageKey = this.storageKey || this._config?.storage_key || null;
+      this._setDashboardPackages_(json.packages || []);
 
       // -------- BACK-COMPAT: synthesize tabs if missing in older exports --------
       const hasOptionsTabs = !!(json.options && Array.isArray(json.options.tabs));
@@ -12656,9 +20483,10 @@ _importDesign() {
         compatTabs = [{ id: 'default', label: 'Layout' }];
       }
 
-      const compatTabsPosition = (json.options?.tabs_position === 'left')
-        ? 'left'
-        : (this.tabsPosition || 'top');
+      const compatTabsPositionRaw = String(json.options?.tabs_position || this.tabsPosition || 'top').toLowerCase();
+      const compatTabsPosition = (compatTabsPositionRaw === 'left' || compatTabsPositionRaw === 'bottom')
+        ? compatTabsPositionRaw
+        : 'top';
 
       const compatDefaultTab =
         json.options?.default_tab
@@ -12702,6 +20530,12 @@ _importDesign() {
           // Reflect a few toggles to instance fields used elsewhere
           if ('animate_cards' in imported) this.animateCards = !!imported.animate_cards;
           if ('auto_resize_cards' in imported) this.autoResizeCards = !!imported.auto_resize_cards;
+          if ('optimize_for_mobile' in imported) this.optimizeForMobile = !!imported.optimize_for_mobile;
+          if ('mobile_dynamic_behavior' in imported) {
+            this.mobileDynamicBehavior = String(imported.mobile_dynamic_behavior || 'native').toLowerCase() === 'scale'
+              ? 'scale'
+              : 'native';
+          }
 
           // Apply HA header/sidebar visibility immediately
           if ('hide_HA_Header' in imported || 'hide_HA_Sidebar' in imported) {
@@ -12754,7 +20588,7 @@ _importDesign() {
       if (!this.tabsPosition) this.tabsPosition = compatTabsPosition;
       if (!this.defaultTab) this.defaultTab = compatDefaultTab;
       if (this.hideTabsWhenSingle === undefined) this.hideTabsWhenSingle = compatHideSingle;
-      this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+      this._syncTabsPlacement_?.();
 
       // ---- PERSIST IMPORTED OPTIONS TO YAML (replace semantics) ----
       try {
@@ -12811,56 +20645,17 @@ _importDesign() {
       }
 
       // ---- BUILD CARDS ----
-      this.cardContainer.innerHTML = '';
-      if (Array.isArray(json.cards) && json.cards.length) {
-        for (const conf of json.cards) {
-          const x = conf.position?.x || 0;
-          const y = conf.position?.y || 0;
-          const w = conf.size?.width  || 140;
-          const h = conf.size?.height || 100;
-          const z = conf.z;
-          const tabId = this._normalizeTabId(conf.tabId || conf.tab_id || this.defaultTab);
-
-          if (!conf?.card || (typeof conf.card === 'object' && !Object.keys(conf.card).length)) {
-            // placeholder still respects tab
-            const p = this._makePlaceholderAt(x, y, w, h);
-            p.dataset.tabId = tabId;
-            this.cardContainer.appendChild(p);
-            continue;
-          }
-
-          const el = await this._createCard(conf.card);
-          const wrap = this._makeWrapper(el);
-          wrap.dataset.tabId = tabId;
-          this._setCardPosition(wrap, x, y);
-          wrap.style.width  = `${w}px`;
-          wrap.style.height = `${h}px`;
-          if (z != null) wrap.style.zIndex = String(z);
-          // Apply explicit overflow if provided in the import. Persist both
-          // on the wrapper style and dataset so the settings menu and save
-          // functions can detect and re-export the value. Absence of the
-          // property implies default overflow behaviour.
-          if (conf.overflow) {
-            wrap.style.overflow = conf.overflow;
-            wrap.dataset.overflow = conf.overflow;
-            const cardEl = wrap.firstElementChild;
-            if (cardEl) cardEl.style.overflow = conf.overflow;
-          }
-          this.cardContainer.appendChild(wrap);
-
-          try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-          this._initCardInteract(wrap);
-        }
-      } else {
-        this._showEmptyPlaceholder();
-        this._applyAutoScale?.();
-      }
+      this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
+        json.options?.responsive_viewports || this.responsiveViewportProfiles
+      );
+      this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
+      await this._syncResponsiveProfileForViewport_({ force: true });
 
       // apply container sizing/appearance and refresh tabs UI now that cards exist
       this._applyOptionsToDom?.(this._config);
       this._resizeContainer();
       try {
-        this.rootEl?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+        this._syncTabsPlacement_?.();
         this._renderTabs?.();
         this._applyActiveTab?.();
       } catch {}
@@ -13038,27 +20833,14 @@ _importDesign() {
   }
 
   async _saveLayout(silent = true) {
-    const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
-    const saved = wraps.map((w) => {
-      const x = parseFloat(w.getAttribute('data-x')) || 0;
-      const y = parseFloat(w.getAttribute('data-y')) || 0;
-      const width = parseFloat(w.style.width) || w.getBoundingClientRect().width;
-      const height = parseFloat(w.style.height) || w.getBoundingClientRect().height;
-      const z = parseInt(w.style.zIndex || '1', 10);
-      const cardCfg = this._extractCardConfig(w.firstElementChild);
-      const tabId = w.dataset.tabId || this.defaultTab;
-      // Persist custom overflow per-card so it can be restored on reload. If
-      // no explicit overflow is set on the wrapper we omit the field. Some
-      // cards require overflow visible to show dropdowns or tooltips.
-      const overflow = (w.style.overflow && w.style.overflow !== '') ? w.style.overflow : null;
-      const entry = { card: cardCfg, position: { x, y }, size: { width, height }, z, tabId };
-      if (overflow) entry.overflow = overflow;
-      return entry;
-    });
+    this._persistCurrentResponsiveProfileToMemory_();
+    const desktopCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
     const payload = {
-       version: 2,
+       version: 3,
        options: this._exportableOptions(),
-       cards: saved
+       cards: desktopCards,
+       responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, desktopCards)),
+       packages: this._exportDashboardPackages_(),
      };
 
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
@@ -13114,12 +20896,29 @@ _importDesign() {
   async _saveLayoutToBackend(key, data) {
     const url = `dragdrop_storage/${encodeURIComponent(key)}`;
     const size = JSON.stringify(data).length;
+    const hasPackagePayload = Array.isArray(data?.packages) && data.packages.some((pkg) => {
+      if (!pkg || typeof pkg !== 'object') return false;
+      if (pkg.enabled === false) return false;
+      return String(pkg.yaml || '').trim().length > 0;
+    });
     const t0 = performance.now();
     try {
       this._dbgPush('save', `POST /api/${url}`, { bytes: size });
       const res = await this.hass.callApi('post', url, data);
       const ms = Math.round(performance.now() - t0);
       this._dbgPush('save', `OK (${ms} ms)`, res);
+      if (hasPackagePayload && !('package_sync' in (res || {}))) {
+        this._dbgPush('packages', 'Package sync unsupported by backend', res);
+        console.warn('[ddc] backend save succeeded, but no package_sync info was returned. Backend may be outdated.');
+        this._toast?.('Features were saved in dashboard JSON, but this backend does not report package sync. Update the Drag And Drop Card backend in Home Assistant.');
+      } else if (res?.package_sync?.ok === false) {
+        this._dbgPush('packages', 'Package sync failed', res.package_sync);
+        console.warn('[ddc] package sync failed', res.package_sync);
+        this._toast?.(`Package sync failed: ${res?.package_sync?.error || 'unknown error'}`);
+      } else if (res?.package_sync?.count) {
+        this._dbgPush('packages', 'Package sync OK', res.package_sync);
+        this._toast?.(`Synced ${res.package_sync.count} feature package file${res.package_sync.count === 1 ? '' : 's'} to Home Assistant.`);
+      }
       return res;
     } catch (e) {
       const ms = Math.round(performance.now() - t0);
@@ -13131,7 +20930,7 @@ _importDesign() {
     try {
       const cur = await this._loadLayoutFromBackend(key);
       const merged = {
-        version: 2,
+        version: 3,
         ...(cur || {}),
         options: newOptions || this._exportableOptions?.() || {}
       };
@@ -13801,19 +21600,21 @@ if (!customElements.get('drag-and-drop-card')) {
 
     /* === GRID SELECT PATCH START (rendering) === */
     // Draw the full grid cell (no inner padding/gap) so visuals match actual grid cells
-    _buildGridTile_(gridSize, dpr) {
-
-      gridSize = gridSize / 2;
-      
+    _buildGridTile_(gridSize, _dpr) {
       const r = Math.min(10, gridSize * 0.25);
-      const tw = Math.max(1, Math.round(gridSize * dpr));
+      // Build the repeating tile in CSS-space units, not retina-scaled
+      // device pixels. The main grid canvas is already rendered on a
+      // dpr-scaled context in _renderGridCanvas_(). If we also scale the
+      // source tile here, the pattern cell ends up effectively doubled in
+      // width/height on high-DPI displays, which makes the painted grid look
+      // 4x larger in area than the actual snap/hover cell.
+      const tw = Math.max(1, Math.round(gridSize));
       const th = tw;
 
       const off = document.createElement('canvas');
       off.width = tw;
       off.height = th;
       const ctx = off.getContext('2d');
-      ctx.scale(dpr, dpr);
 
       const x = 0, y = 0, w = gridSize, h = gridSize;
       ctx.clearRect(0, 0, tw, th);
@@ -13849,7 +21650,6 @@ if (!customElements.get('drag-and-drop-card')) {
       const ctx = this._gridCtx;
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const grid = this._gridCellSize || 10;
-      const scale = this._canvasScale || 1;  
 
       ctx.clearRect(0, 0, c.width, c.height);
 
@@ -13904,10 +21704,10 @@ if (!customElements.get('drag-and-drop-card')) {
         const minRow = Math.min(this._gridStartRow, this._gridCurrRow);
         const maxRow = Math.max(this._gridStartRow, this._gridCurrRow);
 
-        const x = minCol * grid * scale;
-        const y = minRow * grid * scale;
-        const w = (maxCol - minCol + 1) * grid * scale;
-        const h = (maxRow - minRow + 1) * grid * scale;
+        const x = minCol * grid;
+        const y = minRow * grid;
+        const w = (maxCol - minCol + 1) * grid;
+        const h = (maxRow - minRow + 1) * grid;
 
         ctx.save();
         ctx.scale(dpr, dpr);
@@ -14049,17 +21849,11 @@ if (!customElements.get('drag-and-drop-card')) {
       // container’s padding, border and scroll offsets.  This differs
       // from the original implementation which divided by the scale to
       // compensate for a canvas sized to the scaled dimensions.
-      const cs = getComputedStyle(container);
-      const padL = parseFloat(cs.paddingLeft)  || 0;
-      const padT = parseFloat(cs.paddingTop)   || 0;
-      const bordL = parseFloat(cs.borderLeftWidth) || 0;
-      const bordT = parseFloat(cs.borderTopWidth)  || 0;
-
       const scrollX = container.scrollLeft || 0;
       const scrollY = container.scrollTop  || 0;
 
-      const cx = x + padL + bordL + scrollX;
-      const cy = y + padT + bordT + scrollY;
+      const cx = x + scrollX;
+      const cy = y + scrollY;
       const cw = w;
       const ch = h;
 
@@ -14093,8 +21887,6 @@ if (!customElements.get('drag-and-drop-card')) {
       if (!container || !canvas) return { x, y, w, h };
 
       const contCS = getComputedStyle(container);
-      const padL = parseFloat(contCS.paddingLeft)  || 0;
-      const padT = parseFloat(contCS.paddingTop)   || 0;
       const bL   = parseFloat(contCS.borderLeftWidth) || 0;
       const bT   = parseFloat(contCS.borderTopWidth)  || 0;
       const { sx, sy } = this._getContainerScale_();
@@ -14108,9 +21900,9 @@ if (!customElements.get('drag-and-drop-card')) {
       let dx = viewportX - contRect.left;
       let dy = viewportY - contRect.top;
 
-      // border-box → padding-box (also subtract borders)
-      dx -= (padL + bL);
-      dy -= (padT + bT);
+      // border-box → padding-box
+      dx -= bL;
+      dy -= bT;
 
 
 
@@ -14314,6 +22106,1328 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
   DragAndDropCard.prototype.__addPickedPatched = true;
 }
   // --- END: selection-rect placement shim ---
+
+  const DDC_HTML_CARD_TAG = 'ddc-html-card';
+  const DDC_HTML_CARD_EDITOR_TAG = 'ddc-html-card-editor';
+  const DDC_LINE_CARD_TAG = 'ddc-line-card';
+  const DDC_LINE_CARD_EDITOR_TAG = 'ddc-line-card-editor';
+  const __DDC_HTML_ASYNC_FUNCTION__ = Object.getPrototypeOf(async function () {}).constructor;
+  const __DDC_INTERNAL_CARD_TAGS__ = {
+    'custom:ddc-html-card': DDC_HTML_CARD_TAG,
+    'custom:ddc-line-card': DDC_LINE_CARD_TAG
+  };
+
+  function __createDdcInternalCardElement__(cfg, hass) {
+    const type = String(cfg?.type || '');
+    const tag = __DDC_INTERNAL_CARD_TAGS__[type];
+    if (!tag) return null;
+    const el = document.createElement(tag);
+    try { el.setConfig?.(cfg); } catch {}
+    try { el.hass = hass; } catch {}
+    return el;
+  }
+
+  function __ddcLineClamp__(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function __ddcLineNormalizeNumber__(value, fallback, min = -Infinity, max = Infinity) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    return __ddcLineClamp__(num, min, max);
+  }
+
+  function __ddcLineSplitTokens__(value) {
+    return String(value || '')
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean);
+  }
+
+  function __ddcLineEscapeHtml__(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function __ddcLineEscapeAttr__(value) {
+    return __ddcLineEscapeHtml__(value).replace(/"/g, '&quot;');
+  }
+
+  function __ddcLineIsTruthyState__(stateValue) {
+    const state = String(stateValue ?? '').trim().toLowerCase();
+    if (!state) return false;
+    return !['0', 'off', 'false', 'closed', 'idle', 'unavailable', 'unknown', 'none'].includes(state);
+  }
+
+  function __ddcLineMatchesStateRule__(stateValue, rule) {
+    const state = String(stateValue ?? '').trim();
+    const lowered = state.toLowerCase();
+    const token = String(rule ?? '').trim();
+    if (!token) return false;
+
+    const cmp = token.match(/^(>=|<=|>|<|==|=|!=)\s*(-?\d+(?:\.\d+)?)$/);
+    if (cmp) {
+      const current = Number(state);
+      const target = Number(cmp[2]);
+      if (!Number.isFinite(current) || !Number.isFinite(target)) return false;
+      switch (cmp[1]) {
+        case '>': return current > target;
+        case '<': return current < target;
+        case '>=': return current >= target;
+        case '<=': return current <= target;
+        case '=':
+        case '==': return current === target;
+        case '!=': return current !== target;
+        default: return false;
+      }
+    }
+
+    const loweredToken = token.toLowerCase();
+    if (loweredToken === 'truthy') return __ddcLineIsTruthyState__(stateValue);
+    if (loweredToken === 'falsy') return !__ddcLineIsTruthyState__(stateValue);
+    if (loweredToken === '!off') return lowered !== 'off';
+    return lowered === loweredToken;
+  }
+
+  function __ddcLineIsActive__(stateValue, activeStates) {
+    const tokens = __ddcLineSplitTokens__(activeStates);
+    if (!tokens.length) return __ddcLineIsTruthyState__(stateValue);
+    return tokens.some((rule) => __ddcLineMatchesStateRule__(stateValue, rule));
+  }
+
+  class DdcLineCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = null;
+      this._hass = null;
+      this._shellReady = false;
+    }
+
+    static getStubConfig() {
+      return {
+        type: 'custom:ddc-line-card',
+        title: '',
+        entity: '',
+        active_states: 'on,home,open,playing,charging,active,>0',
+        direction: 'horizontal',
+        arrows: 'end',
+        flow_direction: 'auto',
+        line_style: 'solid',
+        thickness: 10,
+        animate_mode: 'active',
+        animation_speed: 1.8,
+        active_color: 'var(--primary-color, #ff9800)',
+        inactive_color: 'rgba(148, 163, 184, 0.42)',
+        glow: true,
+        rounded: true
+      };
+    }
+
+    static async getConfigElement() {
+      return document.createElement(DDC_LINE_CARD_EDITOR_TAG);
+    }
+
+    async getConfigElement() {
+      return document.createElement(DDC_LINE_CARD_EDITOR_TAG);
+    }
+
+    setConfig(config) {
+      this._config = {
+        ...DdcLineCard.getStubConfig(),
+        ...(config || {})
+      };
+      this._renderCard_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      this._renderCard_();
+    }
+
+    get hass() {
+      return this._hass;
+    }
+
+    connectedCallback() {
+      if (this._config) this._renderCard_();
+    }
+
+    getCardSize() {
+      return 1;
+    }
+
+    _ensureShell_() {
+      if (this._shellReady || !this.shadowRoot) return;
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            color:var(--primary-text-color);
+          }
+          ha-card{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            background:transparent;
+            box-shadow:none;
+            border-radius:inherit;
+            overflow:visible;
+          }
+          .shell{
+            position:relative;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            padding:6px;
+            box-sizing:border-box;
+            --ddc-line-active: var(--primary-color, #ff9800);
+            --ddc-line-inactive: rgba(148, 163, 184, 0.42);
+            --ddc-line-thickness: 10;
+            --ddc-line-speed: 1.8s;
+          }
+          .line-title{
+            position:absolute;
+            top:8px;
+            left:10px;
+            z-index:2;
+            max-width:calc(100% - 20px);
+            padding:6px 10px;
+            border-radius:999px;
+            background:rgba(15, 23, 42, 0.58);
+            backdrop-filter:blur(8px);
+            border:1px solid rgba(255,255,255,.08);
+            color:rgba(248, 250, 252, 0.96);
+            font-size:.76rem;
+            font-weight:700;
+            letter-spacing:.04em;
+            text-transform:uppercase;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+          }
+          .canvas{
+            position:relative;
+            width:100%;
+            height:100%;
+            min-height:100%;
+          }
+          svg{
+            width:100%;
+            height:100%;
+            display:block;
+            overflow:visible;
+          }
+          .track,
+          .line,
+          .flow{
+            fill:none;
+            vector-effect:non-scaling-stroke;
+            stroke-width:var(--ddc-line-thickness);
+          }
+          .track{
+            stroke:var(--ddc-line-inactive);
+            opacity:.35;
+          }
+          .line{
+            stroke:var(--ddc-line-color, var(--ddc-line-inactive));
+            filter:none;
+          }
+          .shell.is-glow .line{
+            filter:drop-shadow(0 0 10px color-mix(in srgb, var(--ddc-line-color, var(--ddc-line-inactive)) 42%, transparent));
+          }
+          .flow{
+            stroke:rgba(255,255,255,.92);
+            stroke-linecap:round;
+            opacity:0;
+          }
+          .shell.is-animating .flow{
+            opacity:.86;
+            animation:ddc-line-flow var(--ddc-line-speed) linear infinite;
+          }
+          .shell.is-animating .flow.reverse{
+            animation-direction:reverse;
+          }
+          .endpoint{
+            fill:var(--ddc-line-color, var(--ddc-line-inactive));
+            opacity:.96;
+          }
+          .shell:not(.show-start-dot) .endpoint.start,
+          .shell:not(.show-end-dot) .endpoint.end{
+            display:none;
+          }
+          .shell.is-idle .endpoint{
+            opacity:.68;
+          }
+          @keyframes ddc-line-flow{
+            from { stroke-dashoffset: 54; }
+            to { stroke-dashoffset: 0; }
+          }
+        </style>
+        <ha-card>
+          <div class="shell">
+            <div class="line-title" hidden></div>
+            <div class="canvas"></div>
+          </div>
+        </ha-card>`;
+      this._shellEl = this.shadowRoot.querySelector('.shell');
+      this._titleEl = this.shadowRoot.querySelector('.line-title');
+      this._canvasEl = this.shadowRoot.querySelector('.canvas');
+      this._shellReady = true;
+    }
+
+    _resolveDirection_() {
+      const requested = String(this._config?.direction || 'horizontal').toLowerCase();
+      if (requested !== 'auto') return requested;
+      const rect = this.getBoundingClientRect();
+      return rect.width >= rect.height ? 'horizontal' : 'vertical';
+    }
+
+    _buildPath_(direction) {
+      const m = 10;
+      switch (direction) {
+        case 'vertical':
+          return { path: `M 50 ${m} L 50 ${100 - m}`, start: [50, m], end: [50, 100 - m] };
+        case 'diagonal-up':
+          return { path: `M ${m} ${100 - m} L ${100 - m} ${m}`, start: [m, 100 - m], end: [100 - m, m] };
+        case 'diagonal-down':
+          return { path: `M ${m} ${m} L ${100 - m} ${100 - m}`, start: [m, m], end: [100 - m, 100 - m] };
+        case 'elbow-right-down':
+          return { path: `M ${m} ${m + 2} L 68 ${m + 2} L 68 ${100 - m} L ${100 - m} ${100 - m}`, start: [m, m + 2], end: [100 - m, 100 - m] };
+        case 'elbow-right-up':
+          return { path: `M ${m} ${100 - m} L 68 ${100 - m} L 68 ${m} L ${100 - m} ${m}`, start: [m, 100 - m], end: [100 - m, m] };
+        case 'elbow-left-down':
+          return { path: `M ${100 - m} ${m} L 32 ${m} L 32 ${100 - m} L ${m} ${100 - m}`, start: [100 - m, m], end: [m, 100 - m] };
+        case 'elbow-left-up':
+          return { path: `M ${100 - m} ${100 - m} L 32 ${100 - m} L 32 ${m} L ${m} ${m}`, start: [100 - m, 100 - m], end: [m, m] };
+        case 'horizontal':
+        default:
+          return { path: `M ${m} 50 L ${100 - m} 50`, start: [m, 50], end: [100 - m, 50] };
+      }
+    }
+
+    _getLineStyle_(style, thickness, rounded) {
+      const normalized = String(style || 'solid').toLowerCase();
+      const cap = rounded || normalized === 'dotted' ? 'round' : 'square';
+      const join = rounded ? 'round' : 'miter';
+      let dasharray = '';
+      if (normalized === 'dashed') {
+        dasharray = `${Math.max(8, thickness * 1.65)} ${Math.max(6, thickness * 1.05)}`;
+      } else if (normalized === 'dotted') {
+        dasharray = `0 ${Math.max(8, thickness * 1.35)}`;
+      }
+      return { cap, join, dasharray };
+    }
+
+    _renderCard_() {
+      if (!this._config) return;
+      this._ensureShell_();
+      if (!this._shellEl || !this._canvasEl) return;
+
+      const cfg = this._config || {};
+      const entityId = String(cfg.entity || '').trim();
+      const entity = entityId ? this._hass?.states?.[entityId] : null;
+      const stateValue = entity?.state ?? '';
+      const active = entityId ? __ddcLineIsActive__(stateValue, cfg.active_states) : true;
+      const thickness = __ddcLineNormalizeNumber__(cfg.thickness, 10, 2, 28);
+      const activeColor = String(cfg.active_color || 'var(--primary-color, #ff9800)');
+      const inactiveColor = String(cfg.inactive_color || 'rgba(148, 163, 184, 0.42)');
+      const animateMode = String(cfg.animate_mode || 'active').toLowerCase();
+      const shouldAnimate = animateMode === 'always' || (animateMode === 'active' && active);
+      const speed = `${__ddcLineNormalizeNumber__(cfg.animation_speed, 1.8, 0.4, 8).toFixed(2)}s`;
+      const direction = this._resolveDirection_();
+      const arrows = String(cfg.arrows || 'end').toLowerCase();
+      const flowDirection = String(cfg.flow_direction || 'auto').toLowerCase();
+      const numericState = Number(stateValue);
+      const resolvedFlowDirection = flowDirection === 'auto'
+        ? ((Number.isFinite(numericState) && numericState < 0) ? 'reverse' : 'forward')
+        : (flowDirection === 'reverse' ? 'reverse' : 'forward');
+      const rounded = cfg.rounded !== false;
+      const showStartArrow = arrows === 'start' || arrows === 'both';
+      const showEndArrow = arrows === 'end' || arrows === 'both';
+      const currentColor = active ? activeColor : inactiveColor;
+      const { path, start, end } = this._buildPath_(direction);
+      const { cap, join, dasharray } = this._getLineStyle_(cfg.line_style, thickness, rounded);
+      const flowDash = `${Math.max(18, thickness * 2.4)} ${Math.max(10, thickness * 1.35)}`;
+      const title = String(cfg.title || '').trim();
+      const markerStart = showStartArrow ? 'url(#ddc-line-arrow-start)' : 'none';
+      const markerEnd = showEndArrow ? 'url(#ddc-line-arrow-end)' : 'none';
+
+      this._shellEl.style.setProperty('--ddc-line-active', activeColor);
+      this._shellEl.style.setProperty('--ddc-line-inactive', inactiveColor);
+      this._shellEl.style.setProperty('--ddc-line-color', currentColor);
+      this._shellEl.style.setProperty('--ddc-line-thickness', `${thickness}`);
+      this._shellEl.style.setProperty('--ddc-line-speed', speed);
+      this._shellEl.classList.toggle('is-active', active);
+      this._shellEl.classList.toggle('is-idle', !active);
+      this._shellEl.classList.toggle('is-animating', shouldAnimate);
+      this._shellEl.classList.toggle('is-glow', cfg.glow !== false);
+      this._shellEl.classList.toggle('show-start-dot', !showStartArrow);
+      this._shellEl.classList.toggle('show-end-dot', !showEndArrow);
+
+      this._titleEl.hidden = !title;
+      this._titleEl.textContent = title;
+
+      this._canvasEl.innerHTML = `
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="presentation" aria-hidden="true">
+          <defs>
+            <marker id="ddc-line-arrow-end" markerWidth="12" markerHeight="12" refX="10.4" refY="6" orient="auto" markerUnits="strokeWidth">
+              <path d="M 0 0 L 12 6 L 0 12 z" fill="${__ddcLineEscapeAttr__(currentColor)}"></path>
+            </marker>
+            <marker id="ddc-line-arrow-start" markerWidth="12" markerHeight="12" refX="1.6" refY="6" orient="auto-start-reverse" markerUnits="strokeWidth">
+              <path d="M 12 0 L 0 6 L 12 12 z" fill="${__ddcLineEscapeAttr__(currentColor)}"></path>
+            </marker>
+          </defs>
+          <path
+            class="track"
+            d="${path}"
+            stroke-linecap="${cap}"
+            stroke-linejoin="${join}"
+            ${dasharray ? `stroke-dasharray="${dasharray}"` : ''}
+          ></path>
+          <path
+            class="line"
+            d="${path}"
+            marker-start="${markerStart}"
+            marker-end="${markerEnd}"
+            stroke-linecap="${cap}"
+            stroke-linejoin="${join}"
+            ${dasharray ? `stroke-dasharray="${dasharray}"` : ''}
+          ></path>
+          <path
+            class="flow ${resolvedFlowDirection === 'reverse' ? 'reverse' : 'forward'}"
+            d="${path}"
+            marker-start="${showStartArrow && resolvedFlowDirection === 'reverse' ? markerStart : 'none'}"
+            marker-end="${showEndArrow && resolvedFlowDirection !== 'reverse' ? markerEnd : 'none'}"
+            stroke-dasharray="${flowDash}"
+            stroke-linecap="${cap}"
+            stroke-linejoin="${join}"
+          ></path>
+          <circle class="endpoint start" cx="${start[0]}" cy="${start[1]}" r="${Math.max(2.8, Math.min(7.5, thickness * 0.52))}"></circle>
+          <circle class="endpoint end" cx="${end[0]}" cy="${end[1]}" r="${Math.max(2.8, Math.min(7.5, thickness * 0.52))}"></circle>
+        </svg>`;
+    }
+  }
+
+  class DdcLineCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcLineCard.getStubConfig();
+      this._emitTimer = null;
+      this._configSig = '';
+    }
+
+    setConfig(config) {
+      const next = {
+        ...DdcLineCard.getStubConfig(),
+        ...(config || {})
+      };
+      const sig = JSON.stringify(next);
+      if (sig === this._configSig) return;
+      this._configSig = sig;
+      this._config = next;
+      this._renderEditor_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (!this.shadowRoot.childElementCount) this._renderEditor_();
+    }
+
+    _queueEmit_() {
+      clearTimeout(this._emitTimer);
+      this._emitTimer = setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail: { config: { ...this._config } }
+        }));
+      }, 120);
+    }
+
+    _bindText_(selector, key) {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('input', () => {
+        this._config[key] = input.value;
+        this._queueEmit_();
+      });
+    }
+
+    _bindSelect_(selector, key) {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('change', () => {
+        this._config[key] = input.value;
+        this._queueEmit_();
+      });
+    }
+
+    _bindNumber_(selector, key) {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      const commit = () => {
+        const val = input.value === '' ? '' : Number(input.value);
+        this._config[key] = Number.isFinite(val) ? val : this._config[key];
+        this._queueEmit_();
+      };
+      input.addEventListener('change', commit);
+      input.addEventListener('blur', commit);
+    }
+
+    _bindCheckbox_(selector, key) {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('change', () => {
+        this._config[key] = !!input.checked;
+        this._queueEmit_();
+      });
+    }
+
+    _renderEditor_() {
+      const cfg = this._config || DdcLineCard.getStubConfig();
+      const entityOptions = Object.keys(this._hass?.states || {})
+        .sort((a, b) => a.localeCompare(b))
+        .map((entityId) => `<option value="${__ddcLineEscapeAttr__(entityId)}"></option>`)
+        .join('');
+
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            color:var(--primary-text-color);
+          }
+          .editor{
+            display:grid;
+            gap:14px;
+          }
+          .intro{
+            display:grid;
+            gap:8px;
+            padding:14px 16px;
+            border-radius:16px;
+            background:rgba(255,255,255,.025);
+            border:1px solid rgba(255,255,255,.08);
+            line-height:1.5;
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .intro strong{
+            color:var(--primary-text-color);
+          }
+          .grid{
+            display:grid;
+            gap:14px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .field{
+            display:grid;
+            gap:8px;
+            min-width:0;
+          }
+          .field.full{
+            grid-column:1 / -1;
+          }
+          label{
+            display:grid;
+            gap:6px;
+            font-size:.9rem;
+            font-weight:650;
+          }
+          .hint{
+            font-size:.78rem;
+            color:var(--secondary-text-color, #94a3b8);
+            font-weight:500;
+            line-height:1.45;
+          }
+          input[type="text"], input[type="number"], select{
+            width:100%;
+            box-sizing:border-box;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            padding:12px 14px;
+            outline:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            font:inherit;
+          }
+          input[type="text"]:focus,
+          input[type="number"]:focus,
+          select:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          .toggles{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            flex-wrap:wrap;
+          }
+          .switch{
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            min-height:48px;
+            padding:0 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+          }
+          @media (max-width: 760px){
+            .grid{
+              grid-template-columns:1fr;
+            }
+            .field.full{
+              grid-column:auto;
+            }
+          }
+        </style>
+        <div class="editor">
+          <div class="intro">
+            <strong>Connect cards with a live line</strong>
+            <span>Use this as a transparent overlay card between other cards. You can animate the line, switch arrows, and tie the active style to a Home Assistant entity state.</span>
+          </div>
+
+          <datalist id="ddc-line-entities">${entityOptions}</datalist>
+
+          <div class="grid">
+            <label class="field">
+              <span>Title</span>
+              <input id="title" type="text" value="${__ddcLineEscapeAttr__(cfg.title || '')}" placeholder="Optional label">
+            </label>
+
+            <label class="field">
+              <span>Entity</span>
+              <input id="entity" type="text" list="ddc-line-entities" value="${__ddcLineEscapeAttr__(cfg.entity || '')}" placeholder="sensor.energy_flow">
+              <span class="hint">Used to decide active state and auto flow direction.</span>
+            </label>
+
+            <label class="field full">
+              <span>Active states</span>
+              <input id="active_states" type="text" value="${__ddcLineEscapeAttr__(cfg.active_states || '')}" placeholder="on,home,open,>0">
+              <span class="hint">Comma-separated. Supports exact states and numeric rules like <code>&gt;0</code>, <code>&lt;=10</code>.</span>
+            </label>
+
+            <label class="field">
+              <span>Direction</span>
+              <select id="direction">
+                ${this._option_('horizontal', 'Horizontal', cfg.direction)}
+                ${this._option_('vertical', 'Vertical', cfg.direction)}
+                ${this._option_('diagonal-down', 'Diagonal down', cfg.direction)}
+                ${this._option_('diagonal-up', 'Diagonal up', cfg.direction)}
+                ${this._option_('elbow-right-down', 'Elbow right down', cfg.direction)}
+                ${this._option_('elbow-right-up', 'Elbow right up', cfg.direction)}
+                ${this._option_('elbow-left-down', 'Elbow left down', cfg.direction)}
+                ${this._option_('elbow-left-up', 'Elbow left up', cfg.direction)}
+                ${this._option_('auto', 'Auto (width/height)', cfg.direction)}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Arrows</span>
+              <select id="arrows">
+                ${this._option_('none', 'No arrows', cfg.arrows)}
+                ${this._option_('start', 'Arrow at start', cfg.arrows)}
+                ${this._option_('end', 'Arrow at end', cfg.arrows)}
+                ${this._option_('both', 'Arrow at both ends', cfg.arrows)}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Flow direction</span>
+              <select id="flow_direction">
+                ${this._option_('auto', 'Auto from entity value', cfg.flow_direction)}
+                ${this._option_('forward', 'Forward', cfg.flow_direction)}
+                ${this._option_('reverse', 'Reverse', cfg.flow_direction)}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Line style</span>
+              <select id="line_style">
+                ${this._option_('solid', 'Solid', cfg.line_style)}
+                ${this._option_('dashed', 'Dashed', cfg.line_style)}
+                ${this._option_('dotted', 'Dotted', cfg.line_style)}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Animate</span>
+              <select id="animate_mode">
+                ${this._option_('active', 'Only when active', cfg.animate_mode)}
+                ${this._option_('always', 'Always', cfg.animate_mode)}
+                ${this._option_('never', 'Never', cfg.animate_mode)}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Thickness</span>
+              <input id="thickness" type="number" min="2" max="28" step="1" value="${__ddcLineEscapeAttr__(cfg.thickness ?? 10)}">
+            </label>
+
+            <label class="field">
+              <span>Animation speed (s)</span>
+              <input id="animation_speed" type="number" min="0.4" max="8" step="0.1" value="${__ddcLineEscapeAttr__(cfg.animation_speed ?? 1.8)}">
+            </label>
+
+            <label class="field">
+              <span>Active color</span>
+              <input id="active_color" type="text" value="${__ddcLineEscapeAttr__(cfg.active_color || '')}" placeholder="var(--primary-color)">
+            </label>
+
+            <label class="field">
+              <span>Inactive color</span>
+              <input id="inactive_color" type="text" value="${__ddcLineEscapeAttr__(cfg.inactive_color || '')}" placeholder="rgba(148,163,184,.42)">
+            </label>
+
+            <div class="field full">
+              <span>Toggles</span>
+              <div class="toggles">
+                <label class="switch">
+                  <input id="glow" type="checkbox" ${cfg.glow !== false ? 'checked' : ''}>
+                  <span>Glow</span>
+                </label>
+                <label class="switch">
+                  <input id="rounded" type="checkbox" ${cfg.rounded !== false ? 'checked' : ''}>
+                  <span>Rounded corners / caps</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      this._bindText_('#title', 'title');
+      this._bindText_('#entity', 'entity');
+      this._bindText_('#active_states', 'active_states');
+      this._bindText_('#active_color', 'active_color');
+      this._bindText_('#inactive_color', 'inactive_color');
+      this._bindSelect_('#direction', 'direction');
+      this._bindSelect_('#arrows', 'arrows');
+      this._bindSelect_('#flow_direction', 'flow_direction');
+      this._bindSelect_('#line_style', 'line_style');
+      this._bindSelect_('#animate_mode', 'animate_mode');
+      this._bindNumber_('#thickness', 'thickness');
+      this._bindNumber_('#animation_speed', 'animation_speed');
+      this._bindCheckbox_('#glow', 'glow');
+      this._bindCheckbox_('#rounded', 'rounded');
+    }
+
+    _option_(value, label, current) {
+      return `<option value="${__ddcLineEscapeAttr__(value)}" ${String(current || '') === value ? 'selected' : ''}>${__ddcLineEscapeHtml__(label)}</option>`;
+    }
+  }
+
+  class DdcHtmlCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = null;
+      this._hass = null;
+      this._styleSig = '';
+      this._jsSig = '';
+      this._scriptCleanup = null;
+      this._scriptUpdate = null;
+      this._scriptToken = 0;
+      this._rerunTimer = null;
+      this._shellReady = false;
+      this._liveStatesProxy = null;
+    }
+
+    static getStubConfig() {
+      return {
+        type: 'custom:ddc-html-card',
+        title: 'HTML / Web card',
+        html: '<div>Hello from Drag & Drop Card.</div>',
+        css: '',
+        js: '',
+        rerun_on_hass_update: false
+      };
+    }
+
+    static async getConfigElement() {
+      return document.createElement(DDC_HTML_CARD_EDITOR_TAG);
+    }
+
+    async getConfigElement() {
+      return document.createElement(DDC_HTML_CARD_EDITOR_TAG);
+    }
+
+    setConfig(config) {
+      this._config = {
+        type: 'custom:ddc-html-card',
+        title: '',
+        html: '',
+        css: '',
+        js: '',
+        rerun_on_hass_update: false,
+        ...(config || {})
+      };
+      this._renderCardShell_();
+      this._applyTemplate_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (!this._config) return;
+      this._dispatchRuntimeUpdate_('hass');
+      if (this._scriptUpdate) {
+        try {
+          this._scriptUpdate(this._buildRuntimeContext_('update'));
+        } catch (err) {
+          this._showRuntimeError_(err);
+        }
+        return;
+      }
+      if (this._config.rerun_on_hass_update && String(this._config.js || '').trim()) {
+        clearTimeout(this._rerunTimer);
+        this._rerunTimer = setTimeout(() => this._runUserScript_('hass-rerun'), 60);
+      }
+    }
+
+    get hass() {
+      return this._hass;
+    }
+
+    connectedCallback() {
+      if (this._config) this._renderCardShell_();
+    }
+
+    disconnectedCallback() {
+      clearTimeout(this._rerunTimer);
+      this._teardownUserScript_();
+    }
+
+    getCardSize() {
+      return 4;
+    }
+
+    _renderCardShell_() {
+      if (!this.shadowRoot) return;
+      if (!this._shellReady) {
+        this.shadowRoot.innerHTML = `
+          <style>
+            :host{
+              display:block;
+              width:100%;
+              height:100%;
+              min-height:100%;
+              color:var(--primary-text-color);
+            }
+            ha-card{
+              display:block;
+              height:100%;
+              min-height:100%;
+              background:transparent;
+              box-shadow:none;
+              border-radius:inherit;
+            }
+            .shell{
+              display:flex;
+              flex-direction:column;
+              gap:12px;
+              height:100%;
+              min-height:100%;
+              padding:16px;
+              box-sizing:border-box;
+            }
+            .title{
+              display:none;
+              margin:0;
+              font-size:1rem;
+              font-weight:700;
+              letter-spacing:.01em;
+            }
+            .title.show{
+              display:block;
+            }
+            .runtime{
+              position:relative;
+              flex:1 1 auto;
+              min-height:0;
+              overflow:auto;
+            }
+            .runtime-content{
+              min-height:100%;
+              box-sizing:border-box;
+            }
+            .runtime-style-anchor{
+              display:none;
+            }
+            .runtime-error{
+              display:none;
+              margin-top:12px;
+              padding:10px 12px;
+              border-radius:12px;
+              border:1px solid color-mix(in oklab, var(--error-color, #ef4444) 42%, transparent);
+              background:color-mix(in oklab, var(--error-color, #ef4444) 10%, transparent);
+              color:var(--error-color, #ef4444);
+              font-size:.82rem;
+              line-height:1.45;
+              white-space:pre-wrap;
+            }
+            .runtime-error.show{
+              display:block;
+            }
+            .empty{
+              display:grid;
+              gap:10px;
+              padding:14px;
+              border-radius:16px;
+              border:1px dashed rgba(255,255,255,.14);
+              background:rgba(255,255,255,.025);
+              color:var(--secondary-text-color, #94a3b8);
+              line-height:1.5;
+            }
+            .empty strong{
+              color:var(--primary-text-color);
+            }
+          </style>
+          <ha-card>
+            <div class="shell">
+              <div class="title"></div>
+              <div class="runtime">
+                <style class="runtime-style-anchor"></style>
+                <div class="runtime-content"></div>
+              </div>
+              <div class="runtime-error"></div>
+            </div>
+          </ha-card>`;
+        this._titleEl = this.shadowRoot.querySelector('.title');
+        this._runtimeEl = this.shadowRoot.querySelector('.runtime');
+        this._contentEl = this.shadowRoot.querySelector('.runtime-content');
+        this._styleEl = this.shadowRoot.querySelector('.runtime-style-anchor');
+        this._errorEl = this.shadowRoot.querySelector('.runtime-error');
+        this._shellReady = true;
+      }
+      const title = String(this._config?.title || '').trim();
+      this._titleEl.textContent = title;
+      this._titleEl.classList.toggle('show', !!title);
+    }
+
+    _applyTemplate_() {
+      this._renderCardShell_();
+      if (!this._contentEl) return;
+      const html = String(this._config?.html || '');
+      const css = String(this._config?.css || '');
+      const js = String(this._config?.js || '');
+      const styleSig = JSON.stringify({ title: this._config?.title || '', html, css });
+      const templateChanged = styleSig !== this._styleSig;
+
+      if (templateChanged) {
+        this._styleSig = styleSig;
+        this._styleEl.textContent = css;
+        this._contentEl.innerHTML = html.trim()
+          ? html
+          : `<div class="empty"><strong>HTML / Web card</strong><span>Add your own HTML, CSS and JavaScript in the visual editor to start building this card.</span></div>`;
+      }
+
+      if (js !== this._jsSig || templateChanged) {
+        this._jsSig = js;
+        this._runUserScript_('config');
+      } else {
+        this._dispatchRuntimeUpdate_('template');
+      }
+    }
+
+    _buildRuntimeContext_(reason = 'update') {
+      const hass = this._hass;
+      const states = this._getLiveStatesProxy_();
+      const root = this._contentEl;
+      const host = this;
+      const listeners = [];
+      const helpers = {
+        query(selector, scope = root) {
+          return scope?.querySelector?.(selector) || null;
+        },
+        queryAll(selector, scope = root) {
+          return Array.from(scope?.querySelectorAll?.(selector) || []);
+        },
+        entity(entityId) {
+          return host._hass?.states?.[entityId] || null;
+        },
+        state(entityId) {
+          return host._hass?.states?.[entityId]?.state;
+        },
+        attr(entityId, attr) {
+          return host._hass?.states?.[entityId]?.attributes?.[attr];
+        },
+        callService(domain, service, data = {}, target) {
+          return host._hass?.callService?.(domain, service, data, target);
+        },
+        fire(type, detail = {}) {
+          host.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+        },
+        listen(target, eventName, handler, options) {
+          if (!target?.addEventListener) return () => {};
+          target.addEventListener(eventName, handler, options);
+          const cleanup = () => target.removeEventListener(eventName, handler, options);
+          listeners.push(cleanup);
+          return cleanup;
+        },
+        requestRerun() {
+          host._runUserScript_('manual');
+        },
+        formatState(entityId) {
+          const entity = host._hass?.states?.[entityId];
+          if (!entity) return '';
+          const friendly = entity.attributes?.friendly_name || entityId;
+          return `${friendly}: ${entity.state}`;
+        }
+      };
+      return { hass, states, config: this._config, root, host, helpers, reason, listeners };
+    }
+
+    _getLiveStatesProxy_() {
+      if (this._liveStatesProxy) return this._liveStatesProxy;
+      const host = this;
+      this._liveStatesProxy = new Proxy({}, {
+        get(_target, prop) {
+          if (prop === Symbol.toStringTag) return 'Object';
+          const states = host._hass?.states || {};
+          return states[prop];
+        },
+        has(_target, prop) {
+          return prop in (host._hass?.states || {});
+        },
+        ownKeys() {
+          return Reflect.ownKeys(host._hass?.states || {});
+        },
+        getOwnPropertyDescriptor(_target, prop) {
+          const states = host._hass?.states || {};
+          if (!(prop in states)) return undefined;
+          return {
+            value: states[prop],
+            writable: false,
+            enumerable: true,
+            configurable: true
+          };
+        }
+      });
+      return this._liveStatesProxy;
+    }
+
+    _teardownUserScript_() {
+      try { this._scriptCleanup?.(); } catch {}
+      this._scriptCleanup = null;
+      this._scriptUpdate = null;
+    }
+
+    async _runUserScript_(reason = 'config') {
+      clearTimeout(this._rerunTimer);
+      this._teardownUserScript_();
+      this._showRuntimeError_('');
+      const source = String(this._config?.js || '').trim();
+      if (!source || !this._contentEl) {
+        this._dispatchRuntimeUpdate_(reason);
+        return;
+      }
+
+      const token = ++this._scriptToken;
+      const ctx = this._buildRuntimeContext_(reason);
+      try {
+        const runner = new __DDC_HTML_ASYNC_FUNCTION__(
+          'hass',
+          'states',
+          'config',
+          'root',
+          'host',
+          'helpers',
+          'reason',
+          `${source}`
+        );
+        const result = await runner(ctx.hass, ctx.states, ctx.config, ctx.root, ctx.host, ctx.helpers, ctx.reason);
+        if (token !== this._scriptToken) return;
+
+        if (Array.isArray(ctx.listeners) && ctx.listeners.length) {
+          const listenerCleanup = () => {
+            ctx.listeners.forEach((off) => {
+              try { off?.(); } catch {}
+            });
+          };
+          if (typeof result === 'function') {
+            const original = result;
+            this._scriptCleanup = () => {
+              listenerCleanup();
+              original();
+            };
+          } else if (result && typeof result.destroy === 'function') {
+            this._scriptCleanup = () => {
+              listenerCleanup();
+              result.destroy();
+            };
+          } else {
+            this._scriptCleanup = listenerCleanup;
+          }
+        } else if (typeof result === 'function') {
+          this._scriptCleanup = result;
+        } else if (result && typeof result.destroy === 'function') {
+          this._scriptCleanup = result.destroy.bind(result);
+        }
+
+        if (result && typeof result.update === 'function') {
+          this._scriptUpdate = result.update.bind(result);
+          try {
+            this._scriptUpdate(this._buildRuntimeContext_('after-init'));
+          } catch (err) {
+            this._showRuntimeError_(err);
+          }
+        } else {
+          this._dispatchRuntimeUpdate_('after-init');
+        }
+      } catch (err) {
+        if (token === this._scriptToken) this._showRuntimeError_(err);
+      }
+    }
+
+    _dispatchRuntimeUpdate_(reason = 'update') {
+      if (!this._contentEl) return;
+      try {
+        this._contentEl.dispatchEvent(new CustomEvent('ddc-hass-update', {
+          detail: this._buildRuntimeContext_(reason),
+          bubbles: false,
+          composed: false
+        }));
+      } catch {}
+    }
+
+    _showRuntimeError_(err) {
+      if (!this._errorEl) return;
+      const message = err ? String(err?.stack || err?.message || err) : '';
+      this._errorEl.textContent = message;
+      this._errorEl.classList.toggle('show', !!message);
+    }
+  }
+
+  class DdcHtmlCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = {
+        type: 'custom:ddc-html-card',
+        title: '',
+        html: '',
+        css: '',
+        js: '',
+        rerun_on_hass_update: false
+      };
+      this._emitTimer = null;
+      this._configSig = '';
+    }
+
+    setConfig(config) {
+      const next = {
+        type: 'custom:ddc-html-card',
+        title: '',
+        html: '',
+        css: '',
+        js: '',
+        rerun_on_hass_update: false,
+        ...(config || {})
+      };
+      const sig = JSON.stringify(next);
+      if (sig === this._configSig) return;
+      this._configSig = sig;
+      this._config = next;
+      this._renderEditor_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+    }
+
+    _queueEmit_() {
+      clearTimeout(this._emitTimer);
+      this._emitTimer = setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail: { config: { ...this._config } }
+        }));
+      }, 120);
+    }
+
+    _bindField_(selector, key) {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('input', () => {
+        this._config[key] = input.value;
+        this._queueEmit_();
+      });
+    }
+
+    _renderEditor_() {
+      const cfg = this._config || {};
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            color:var(--primary-text-color);
+          }
+          .editor{
+            display:grid;
+            gap:14px;
+          }
+          .intro{
+            display:grid;
+            gap:8px;
+            padding:14px 16px;
+            border-radius:16px;
+            background:rgba(255,255,255,.025);
+            border:1px solid rgba(255,255,255,.08);
+            line-height:1.5;
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .intro strong{
+            color:var(--primary-text-color);
+          }
+          .intro code{
+            font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size:.84rem;
+            color:var(--primary-text-color);
+          }
+          .grid{
+            display:grid;
+            gap:14px;
+          }
+          .field{
+            display:grid;
+            gap:8px;
+          }
+          .field.two{
+            grid-template-columns:minmax(0,1fr) auto;
+            align-items:end;
+            gap:14px;
+          }
+          label{
+            display:grid;
+            gap:6px;
+            font-size:.9rem;
+            font-weight:650;
+          }
+          .hint{
+            font-size:.78rem;
+            color:var(--secondary-text-color, #94a3b8);
+            font-weight:500;
+          }
+          input[type="text"], textarea{
+            width:100%;
+            box-sizing:border-box;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            padding:12px 14px;
+            outline:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            font:inherit;
+          }
+          input[type="text"]:focus, textarea:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          textarea{
+            min-height:180px;
+            resize:vertical;
+            font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size:.88rem;
+            line-height:1.55;
+          }
+          .switch{
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            min-height:48px;
+            padding:0 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+          }
+        </style>
+        <div class="editor">
+          <div class="intro">
+            <strong>Build a card with your own code</strong>
+            <span>Your JavaScript receives <code>hass</code>, <code>states</code>, <code>config</code>, <code>root</code>, <code>host</code> and <code>helpers</code>. Return <code>{ update, destroy }</code> if you want live updates without re-running the whole script.</span>
+          </div>
+
+          <div class="grid">
+            <div class="field two">
+              <label>
+                <span>Card title</span>
+                <input id="title" type="text" placeholder="Optional title shown above the custom content" value="${this._escapeHtmlAttr_(cfg.title || '')}">
+              </label>
+              <label class="switch">
+                <input id="rerun" type="checkbox" ${cfg.rerun_on_hass_update ? 'checked' : ''}>
+                <span>Re-run JS on state updates</span>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>HTML</span>
+              <span class="hint">Rendered inside the card body.</span>
+              <textarea id="html" spellcheck="false">${this._escapeTextarea_(cfg.html || '')}</textarea>
+            </label>
+
+            <label class="field">
+              <span>CSS</span>
+              <span class="hint">Scoped to this card.</span>
+              <textarea id="css" spellcheck="false">${this._escapeTextarea_(cfg.css || '')}</textarea>
+            </label>
+
+            <label class="field">
+              <span>JavaScript</span>
+              <span class="hint">Runs inside the card. Use <code>helpers.callService(...)</code> for HA actions.</span>
+              <textarea id="js" spellcheck="false">${this._escapeTextarea_(cfg.js || '')}</textarea>
+            </label>
+          </div>
+        </div>`;
+
+      this._bindField_('#title', 'title');
+      this._bindField_('#html', 'html');
+      this._bindField_('#css', 'css');
+      this._bindField_('#js', 'js');
+
+      const rerun = this.shadowRoot.querySelector('#rerun');
+      rerun?.addEventListener('change', () => {
+        this._config.rerun_on_hass_update = !!rerun.checked;
+        this._queueEmit_();
+      });
+    }
+
+    _escapeTextarea_(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    _escapeHtmlAttr_(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+  }
+
+  if (!customElements.get(DDC_LINE_CARD_TAG)) {
+    customElements.define(DDC_LINE_CARD_TAG, DdcLineCard);
+  }
+  if (!customElements.get(DDC_LINE_CARD_EDITOR_TAG)) {
+    customElements.define(DDC_LINE_CARD_EDITOR_TAG, DdcLineCardEditor);
+  }
+  if (!customElements.get(DDC_HTML_CARD_TAG)) {
+    customElements.define(DDC_HTML_CARD_TAG, DdcHtmlCard);
+  }
+  if (!customElements.get(DDC_HTML_CARD_EDITOR_TAG)) {
+    customElements.define(DDC_HTML_CARD_EDITOR_TAG, DdcHtmlCardEditor);
+  }
 
   customElements.define('drag-and-drop-card', DragAndDropCard);
 
@@ -14754,27 +23868,11 @@ async function _persistOptionsToYaml(opts, {
       await (this._persistOptionsToYaml?.call(this, { ...toPersist, storage_key: key }, { prevKey, noDownload: (source==='switcher') }));
     } catch(e) { console.warn('[ddc:apply] persist failed', e); }
     try {
-      this.cardContainer.innerHTML = '';
-      if (Array.isArray(json.cards) && json.cards.length) {
-        for (const conf of json.cards) {
-          if (!conf?.card || (typeof conf.card === 'object' && Object.keys(conf.card).length === 0)) {
-            const p = this._makePlaceholderAt?.(conf.position?.x||0, conf.position?.y||0, conf.size?.width||200, conf.size?.height||200);
-            if (p) this.cardContainer.appendChild(p);
-          } else {
-            const el = await this._createCard(conf.card);
-            const wrap = this._makeWrapper(el);
-            this._setCardPosition?.(wrap, conf.position?.x||0, conf.position?.y||0);
-            wrap.style.width  = `${conf.size?.width||140}px`;
-            wrap.style.height = `${conf.size?.height||100}px`;
-            if (conf.z != null) wrap.style.zIndex = String(conf.z);
-            this.cardContainer.appendChild(wrap);
-            try { this._rebuildOnce?.(wrap.firstElementChild); } catch {}
-            this._initCardInteract?.(wrap);
-          }
-        }
-      } else {
-        this._showEmptyPlaceholder?.();
-      }
+      this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
+        json.options?.responsive_viewports || this.responsiveViewportProfiles
+      );
+      this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
+      await this._syncResponsiveProfileForViewport_?.({ force: true });
       this._resizeContainer?.();
       this._markDirty?.('import');
       this._toast?.(source==='switcher' ? `Loaded layout "${key}"` : 'Design imported');
@@ -14788,13 +23886,16 @@ async function _persistOptionsToYaml(opts, {
       const host = this.shadowRoot || this.renderRoot || this;
       const el = host.querySelector('.ddc-switcher-inline');
       if (!el) return;
+      const sec = el.closest?.('.sec-layouts');
       const ll = this._getLovelace?.() || _getLovelace.call(this);
       let edit = false;
       try {
         const hui = (host.getRootNode && host.getRootNode())?.host;
-        edit = !!(ll && (ll.editMode === true || (hui && hui.editMode === true)));
+        edit = !!(this.editMode || (ll && (ll.editMode === true || (hui && hui.editMode === true))));
       } catch {}
       el.style.display = edit ? 'inline-flex' : 'none';
+      if (sec) sec.style.display = edit ? '' : 'none';
+      this._refreshToolbarOpenHeight_?.();
     } catch {}
   }
   function _ensureInlineSwitcher() {
@@ -14803,63 +23904,47 @@ async function _persistOptionsToYaml(opts, {
       const host = this.shadowRoot || this.renderRoot || this;
       const toolbar = host.querySelector('.toolbar');
       if (!toolbar) return;
+      let layoutHost = toolbar.querySelector('.sec-layouts .layout-host');
+      if (!layoutHost) {
+        const sec = document.createElement('section');
+        sec.className = 'ddc-sec sec-layouts';
+        sec.setAttribute('aria-label', 'Layouts');
+        sec.style.display = 'none';
+        sec.innerHTML = `
+          <header class="ddc-sec-head">
+            <span class="ddc-sec-dot" aria-hidden="true"></span>
+            <span class="ddc-sec-title">Layouts</span>
+          </header>
+          <div class="ddc-row center">
+            <div class="layout-host"></div>
+          </div>
+        `;
+        toolbar.appendChild(sec);
+        layoutHost = sec.querySelector('.layout-host');
+      }
       const wrap = document.createElement('div');
       wrap.className = 'ddc-switcher-inline';
-      Object.assign(wrap.style, { display: 'inline-flex', gap: '6px', alignItems: 'center', marginLeft: 'auto' });
       const label = document.createElement('span');
+      label.className = 'label';
       label.textContent = 'Layout:';
-      label.style.fontSize = '12px';
-      label.style.opacity = '0.8';
       const select = document.createElement('select');
-      Object.assign(select.style, {
-        fontSize: '12px', padding: '4px 6px', borderRadius: '8px',
-        border: '1px solid var(--divider-color, #999)',
-        background: 'var(--card-background-color, #fff)'
-      });
       select.title = 'Select stored layout (storage_key)';
       select.id = 'ddcKeySelect';
       const btn = document.createElement('button');
       btn.className = 'btn secondary';
       btn.type = 'button';
-      btn.style.padding = '6px 10px';
       btn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon><span style="margin-left:6px">Refresh</span>';
       // Create a delete button to remove the selected layout (except the current one)
       const deleteBtn = document.createElement('button');
-      // Style the delete button similar to other danger actions (red background, white text)
-      // Use the base 'btn secondary' class so disabled styles still apply
-      deleteBtn.className = 'btn secondary';
+      deleteBtn.className = 'btn danger';
       deleteBtn.type = 'button';
-      deleteBtn.style.padding = '6px 10px';
-      deleteBtn.style.display = 'inline-flex';
-      deleteBtn.style.alignItems = 'center';
-      deleteBtn.style.gap = '6px';
-      // Fixed red background rather than relying on CSS variables that may be undefined
-      deleteBtn.style.background = '#ef4444';
-      deleteBtn.style.color = '#fff';
-      deleteBtn.style.border = 'none';
-      deleteBtn.style.borderRadius = '8px';
-      deleteBtn.style.cursor = 'pointer';
-      deleteBtn.style.fontWeight = '600';
       // Set icon and text for delete
       deleteBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon><span style="margin-left:6px">Delete</span>';
       deleteBtn.title = 'Delete selected layout';
       // Create an undo button to restore the most recently deleted layouts
       const undoBtn = document.createElement('button');
-      // Style the restore button similar to resize handles (blue background, white text)
-      // Use the base 'btn secondary' class so disabled styles still apply
-      undoBtn.className = 'btn secondary';
+      undoBtn.className = 'btn info';
       undoBtn.type = 'button';
-      undoBtn.style.padding = '6px 10px';
-      undoBtn.style.display = 'inline-flex';
-      undoBtn.style.alignItems = 'center';
-      undoBtn.style.gap = '6px';
-      // Fixed blue background for restore
-      undoBtn.style.background = '#3b82f6';
-      undoBtn.style.color = '#fff';
-      undoBtn.style.border = 'none';
-      undoBtn.style.borderRadius = '8px';
-      undoBtn.style.cursor = 'pointer';
-      undoBtn.style.fontWeight = '600';
       undoBtn.innerHTML = '<ha-icon icon="mdi:undo"></ha-icon><span style="margin-left:6px">Restore</span>';
       undoBtn.title = 'Restore last deleted layout';
       wrap.appendChild(label);
@@ -14867,8 +23952,9 @@ async function _persistOptionsToYaml(opts, {
       wrap.appendChild(btn);
       wrap.appendChild(deleteBtn);
       wrap.appendChild(undoBtn);
-      toolbar.appendChild(wrap);
+      layoutHost.appendChild(wrap);
       this._ddcSwitcherInstalled = true;
+      this._refreshToolbarOpenHeight_?.();
       const fill = async () => {
         const current = this.storageKey || (this._config && this._config.storage_key) || '';
         const serverKeys = await _fetchBackendKeys.call(this);
@@ -14914,6 +24000,7 @@ async function _persistOptionsToYaml(opts, {
           select.appendChild(none);
         }
         _updateSwitcherVisibility.call(this);
+        this._refreshToolbarOpenHeight_?.();
         // Disable delete button when no layout is selected
         try {
           const selectedKey = select.value || '';
