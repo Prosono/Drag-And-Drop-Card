@@ -413,6 +413,63 @@ _ensureSettingsStyles_() {
     .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
     .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
     .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+    .layers-card .layer-toggle-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:8px 0 10px;
+    }
+    .layers-card .layer-row{
+      display:grid;
+      grid-template-columns:minmax(0, 1.35fr) minmax(110px, .7fr) 78px auto auto;
+      gap:10px;
+      align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid var(--divider-color, rgba(0,0,0,.08));
+    }
+    .layers-card .layer-row:last-child{ border-bottom:0; }
+    .layers-card .layer-row input[type="text"]{
+      width:100%;
+      min-width:0;
+    }
+    .layers-card .layer-row input[type="color"]{
+      width:48px;
+      min-width:48px;
+      height:40px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.2));
+      border-radius:12px;
+      padding:4px;
+      background:var(--ha-card-background, #fff);
+      cursor:pointer;
+    }
+    .layers-card .layer-empty{
+      padding:14px 16px;
+      border:1px dashed var(--divider-color, rgba(0,0,0,.14));
+      border-radius:14px;
+      background:color-mix(in oklab, var(--secondary-background-color, #111827) 20%, transparent);
+      color:var(--secondary-text-color);
+      font-size:.88rem;
+    }
+    .layers-card .layer-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:36px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid var(--divider-color, rgba(255,255,255,.14));
+      background:color-mix(in oklab, var(--primary-background-color, #0e1116) 18%, transparent);
+      font-size:.82rem;
+      font-weight:700;
+      color:var(--primary-text-color, #f5f5f5);
+    }
+    .layers-card .layer-chip ha-icon{ --mdc-icon-size:16px; }
+    .layers-card .layer-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
     .packages-list { display:flex; flex-direction:column; gap:14px; }
     .package-tools {
       display:flex;
@@ -1185,13 +1242,14 @@ _ensureSettingsStyles_() {
     }
     .card[aria-labelledby="behaviour-head"],
     .tabs-card,
+    .layers-card,
     .packages-card{
       grid-column:1 / -1;
     }
   }
 
   @media (min-width: 1280px) {
-    .tabs-card, .packages-card { grid-column: 1 / -1; }
+    .tabs-card, .layers-card, .packages-card { grid-column: 1 / -1; }
   }
 
   @media (max-width: 899px){
@@ -1214,6 +1272,8 @@ _ensureSettingsStyles_() {
     .media-browser-toolbar{ flex-wrap:wrap; }
     .package-file-row{ grid-template-columns:1fr; }
     .package-tools{ flex-direction:column; align-items:stretch; }
+    .layers-card .layer-row{ grid-template-columns:1fr; gap:8px; }
+    .layers-card .layer-actions{ flex-wrap:wrap; }
   }
   `;
   this.shadowRoot.appendChild(style);
@@ -2910,26 +2970,69 @@ _evaluateVisibility_(visList) {
 _applyVisibility_() {
   try {
     const wraps = this.cardContainer?.children || [];
-    // Determine the currently active tab; normalize to an integer
-    const currentTabId = this._normalizeTabId(this.activeTab);
     for (const wrap of wraps) {
       if (!wrap || !wrap.firstElementChild) continue;
-      // Only apply visibility rules to wrappers belonging to the active tab.
-      // Leave wrappers on other tabs untouched so that _applyActiveTab can
-      // control their display property.
-      const tabId = this._normalizeTabId(wrap.dataset.tabId);
-      const passesActiveTab = !this.tabs || !this.tabs.length || tabId === currentTabId;
-      const passesLayers = this._isWrapVisibleForActiveLayers_(wrap);
-      if (!passesActiveTab || !passesLayers) {
-        continue;
-      }
-      const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
-      const visList = cfg.visibility;
-      const shouldShow = this.editMode ? true : this._evaluateVisibility_(visList);
-      wrap.style.display = shouldShow ? '' : 'none';
+      this._applyWrapDisplayState_(wrap);
     }
   } catch (e) {
     console.warn('[ddc:visibility] apply error', e);
+  }
+}
+
+_shouldWrapDisplayForCurrentContext_(wrap) {
+  if (!wrap || !wrap.firstElementChild) return false;
+  const currentTabId = this._normalizeTabId(this.activeTab);
+  const tabId = wrap.dataset.tabId ? this._normalizeTabId(wrap.dataset.tabId) : this.defaultTab;
+  const passesActiveTab = !this.tabs || !this.tabs.length || tabId === currentTabId;
+  const passesLayers = this._isWrapVisibleForActiveLayers_(wrap);
+  if (!passesActiveTab || !passesLayers) return false;
+  if (this.editMode) return true;
+  const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+  const visList = cfg.visibility;
+  return this._evaluateVisibility_(visList);
+}
+
+_applyWrapDisplayState_(wrap, { clearSelectionOnHide = false } = {}) {
+  if (!wrap) return { changed: false, becameVisible: false, becameHidden: false, visible: false };
+  const shouldShow = !!this._shouldWrapDisplayForCurrentContext_(wrap);
+  const wasHidden = wrap.classList.contains('ddc-hidden') || wrap.style.display === 'none' || wrap.inert === true;
+
+  if (shouldShow) {
+    wrap.style.display = '';
+    wrap.inert = false;
+    wrap.classList.remove('ddc-hidden');
+  } else {
+    wrap.style.display = 'none';
+    wrap.inert = true;
+    wrap.classList.add('ddc-hidden');
+    wrap.classList.remove('ddc-selected');
+    if (clearSelectionOnHide && this._selectedWrap === wrap) {
+      try { this._clearSelection?.(); } catch {}
+    }
+  }
+
+  const isHidden = wrap.classList.contains('ddc-hidden') || wrap.style.display === 'none' || wrap.inert === true;
+  return {
+    changed: wasHidden !== isHidden,
+    becameVisible: wasHidden && !isHidden,
+    becameHidden: !wasHidden && isHidden,
+    visible: !isHidden,
+  };
+}
+
+_applyLayerVisibilityChange_() {
+  const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+  let changed = false;
+  const becameVisible = [];
+  wraps.forEach((wrap) => {
+    const result = this._applyWrapDisplayState_(wrap, { clearSelectionOnHide: true });
+    if (result.changed) changed = true;
+    if (result.becameVisible) becameVisible.push(wrap);
+  });
+  try { this._renderLayersBar_?.(); } catch {}
+  if (changed) {
+    try { this._animateCards_?.(becameVisible); } catch {}
+    try { this._renderConnectors_?.(); } catch {}
   }
 }
 
@@ -3516,6 +3619,7 @@ async _onToolbarAction_(action, ctx = {}) {
     this._dashboardPackages = [];
     this.layers = [];
     this.activeLayerIds = [];
+    this.layersEnabled = false;
     this.__dashboardThemeAppliedVars = [];
     this._responsivePreviewOrientations = {
       desktop: 'landscape',
@@ -3720,6 +3824,7 @@ async _onToolbarAction_(action, ctx = {}) {
         { id: 'home', label: 'Home', icon: 'mdi:home', label_mode: 'both' }
       ],
       default_tab: 'home',
+      layers_enabled: false,
       layers: [],
     };
   }
@@ -4339,7 +4444,9 @@ _normalizeSavedCardEntry_(entry = {}, fallback = null) {
   const defaultHeight = 10 * Math.max(1, Number(this.gridSize || 10) || 10);
   const id = normalized.id || fallbackEntry.id || this._genLayoutCardId_();
   const x = Number(normalized?.position?.x ?? fallbackEntry?.position?.x ?? 0) || 0;
-  const y = Number(normalized?.position?.y ?? fallbackEntry?.position?.y ?? 0) || 0;
+  const y = this._clampYToCanvasTop_(
+    Number(normalized?.position?.y ?? fallbackEntry?.position?.y ?? 0) || 0
+  );
   const width = Math.max(
     1,
     Number(normalized?.size?.width ?? fallbackEntry?.size?.width ?? defaultWidth) || defaultWidth
@@ -4485,6 +4592,16 @@ _normalizeLayerId_(value, fallback = 'layer') {
   return raw || fallback;
 }
 
+_defaultDashboardLayer_() {
+  return {
+    id: 'standard',
+    label: 'Standard',
+    icon: 'mdi:layers-outline',
+    color: '#60a5fa',
+    default_active: true,
+  };
+}
+
 _normalizeDashboardLayers_(layers = []) {
   const source = Array.isArray(layers) ? layers : [];
   const seen = new Set();
@@ -4541,6 +4658,7 @@ _getDefaultActiveLayerIds_() {
 }
 
 _getStoredActiveLayerIds_() {
+  if (!this.layersEnabled) return null;
   try {
     const raw = localStorage.getItem(`ddc_layers_${this.storageKey || 'default'}`);
     if (!raw) return null;
@@ -4563,7 +4681,10 @@ _persistActiveLayerIds_() {
 }
 
 _setDashboardLayers_(layers = [], { refresh = true, persist = true } = {}) {
-  const normalized = this._normalizeDashboardLayers_(layers);
+  let normalized = this._normalizeDashboardLayers_(layers);
+  if (this.layersEnabled && !normalized.length) {
+    normalized = this._normalizeDashboardLayers_([this._defaultDashboardLayer_()]);
+  }
   this.layers = normalized;
   const validIds = new Set(normalized.map((layer) => layer.id));
   const stored = this._getStoredActiveLayerIds_();
@@ -4583,14 +4704,21 @@ _setDashboardLayers_(layers = [], { refresh = true, persist = true } = {}) {
 }
 
 _setActiveLayerIds_(ids = [], { persist = true, refresh = true } = {}) {
+  if (!this.layersEnabled) {
+    this.activeLayerIds = [];
+    if (persist) this._persistActiveLayerIds_();
+    if (refresh) {
+      this._renderLayersBar_?.();
+      this._applyLayerVisibilityChange_?.();
+    }
+    return [];
+  }
   const validIds = new Set((Array.isArray(this.layers) ? this.layers : []).map((layer) => layer.id));
   const next = this._normalizeCardLayerIds_(ids).filter((id) => validIds.has(id));
   this.activeLayerIds = next;
   if (persist) this._persistActiveLayerIds_();
   if (refresh) {
-    this._renderLayersBar_?.();
-    this._applyActiveTab?.();
-    this._applyVisibility_?.();
+    this._applyLayerVisibilityChange_?.();
   }
   return next;
 }
@@ -4615,6 +4743,7 @@ _setWrapperLayerIds_(wrap, ids = []) {
 }
 
 _isWrapVisibleForActiveLayers_(wrap) {
+  if (!this.layersEnabled) return true;
   const layerIds = this._getWrapperLayerIds_(wrap);
   if (!layerIds.length) return true;
   const active = Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [];
@@ -4635,7 +4764,7 @@ _renderLayersBar_() {
   const bar = this.layersBar;
   if (!bar) return;
   const layers = Array.isArray(this.layers) ? this.layers : [];
-  if (!layers.length) {
+  if (!this.layersEnabled || !layers.length) {
     bar.style.display = 'none';
     bar.innerHTML = '';
     return;
@@ -5543,6 +5672,14 @@ _openConnectorSettings_(connectorId) {
           <label class="ddc-connector-field full">
             <span>Active states</span>
             <input id="connectorStates" class="input" type="text" list="connectorStateList" value="${this._safe(connector.active_states || '')}" placeholder="on,>0,charging" />
+            <div class="ddc-connector-inline-actions">
+              <select id="connectorStateQuickPick" class="input ddc-connector-state-picker">
+                <option value="">Choose state from selected entity…</option>
+              </select>
+              <button class="btn secondary compact" id="connectorStateClearBtn" type="button">
+                <ha-icon icon="mdi:close-circle-outline"></ha-icon><span>Clear</span>
+              </button>
+            </div>
             <div class="ddc-connector-state-meta" id="connectorStateMeta"></div>
             <div class="ddc-connector-state-suggestions" id="connectorStateSuggestions"></div>
           </label>
@@ -5645,6 +5782,7 @@ _openConnectorSettings_(connectorId) {
   const stateMeta = $('#connectorStateMeta');
   const stateSuggestions = $('#connectorStateSuggestions');
   const stateList = $('#connectorStateList');
+  const stateQuickPick = $('#connectorStateQuickPick');
   let entityInput = null;
   let currentConnector = this._getConnectorById_(connectorId) || connector;
   panel.dataset.connectorId = connectorId;
@@ -5672,6 +5810,14 @@ _openConnectorSettings_(connectorId) {
         .map((token) => `<option value="${this._safe(token)}"></option>`)
         .join('');
     }
+    if (stateQuickPick) {
+      stateQuickPick.innerHTML = [
+        '<option value="">Choose state from selected entity…</option>',
+        ...suggestions.map((token) => `<option value="${this._safe(token)}">${this._safe(token)}</option>`)
+      ].join('');
+      stateQuickPick.disabled = !suggestions.length;
+      stateQuickPick.value = '';
+    }
     if (!stateSuggestions || !statesInput) return;
     const activeTokens = (__ddcLineSplitTokens__(statesInput.value || '') || [])
       .map((entry) => String(entry || '').trim().toLowerCase())
@@ -5693,44 +5839,49 @@ _openConnectorSettings_(connectorId) {
     });
   };
 
-  if (entityHost) {
-    try {
-      if (customElements.get('ha-entity-picker')) {
-        const picker = document.createElement('ha-entity-picker');
-        picker.hass = this.hass;
-        picker.value = String(currentConnector.entity || '');
-        picker.setAttribute('label', 'Choose entity');
-        picker.removeAttribute('hide-clear-icon');
-        entityInput = picker;
-        entityHost.appendChild(picker);
-        picker.addEventListener('value-changed', (ev) => {
-          ev.stopPropagation();
-          const nextValue = String(ev.detail?.value || ev.detail || ev.target?.value || '').trim();
-          patchConnector({ entity: nextValue || '' });
-          renderConnectorStateHelpers(nextValue);
-        });
-      } else {
-        throw new Error('ha-entity-picker unavailable');
-      }
-    } catch (err) {
-      const input = document.createElement('input');
-      input.id = 'connectorEntity';
-      input.className = 'input';
-      input.type = 'text';
-      input.value = String(currentConnector.entity || '');
-      input.placeholder = 'sensor.example_power';
-      input.setAttribute('list', 'connectorEntityList');
-      entityInput = input;
-      entityHost.appendChild(input);
-      input.addEventListener('input', (ev) => {
-        const nextValue = String(ev.target?.value || '').trim();
+  const mountConnectorEntityInput = () => {
+    if (!entityHost) return;
+    entityHost.innerHTML = '';
+    if (customElements.get('ha-entity-picker')) {
+      const picker = document.createElement('ha-entity-picker');
+      picker.hass = this.hass;
+      picker.value = String(currentConnector.entity || '');
+      picker.setAttribute('label', 'Choose entity');
+      picker.removeAttribute('hide-clear-icon');
+      entityInput = picker;
+      entityHost.appendChild(picker);
+      picker.addEventListener('value-changed', (ev) => {
+        ev.stopPropagation();
+        const nextValue = String(ev.detail?.value || ev.detail || ev.target?.value || '').trim();
         patchConnector({ entity: nextValue || '' });
         renderConnectorStateHelpers(nextValue);
       });
-      if (err?.message && err.message !== 'ha-entity-picker unavailable') {
-        console.warn('[ddc] Falling back to text entity input in connector editor', err);
-      }
+      return;
     }
+
+    const input = document.createElement('input');
+    input.id = 'connectorEntity';
+    input.className = 'input';
+    input.type = 'text';
+    input.value = String(currentConnector.entity || '');
+    input.placeholder = 'sensor.example_power';
+    input.setAttribute('list', 'connectorEntityList');
+    entityInput = input;
+    entityHost.appendChild(input);
+    input.addEventListener('input', (ev) => {
+      const nextValue = String(ev.target?.value || '').trim();
+      patchConnector({ entity: nextValue || '' });
+      renderConnectorStateHelpers(nextValue);
+    });
+  };
+  mountConnectorEntityInput();
+  if (!customElements.get('ha-entity-picker')) {
+    customElements.whenDefined('ha-entity-picker').then(() => {
+      if (!panel.isConnected || panel.dataset.connectorId !== connectorId) return;
+      currentConnector = this._getConnectorById_(connectorId) || currentConnector;
+      mountConnectorEntityInput();
+      renderConnectorStateHelpers(String(currentConnector.entity || '').trim());
+    }).catch(() => {});
   }
   const applyConnectorFieldChange = (target, eventType = 'input') => {
     if (!target || !target.id) return false;
@@ -5762,6 +5913,17 @@ _openConnectorSettings_(connectorId) {
         return true;
       case 'connectorInactiveColor':
         patchConnector({ inactive_color: target.value || currentConnector.inactive_color });
+        return true;
+      case 'connectorStateQuickPick':
+        if (eventType !== 'change' || !target.value) return false;
+        {
+          const token = String(target.value || '').trim();
+          const nextValue = toggleConnectorStateToken(statesInput?.value || '', token);
+          if (statesInput) statesInput.value = nextValue;
+          target.value = '';
+          patchConnector({ active_states: nextValue || '' });
+          renderConnectorStateHelpers();
+        }
         return true;
       case 'connectorGlow':
         if (eventType !== 'change') return false;
@@ -5799,6 +5961,11 @@ _openConnectorSettings_(connectorId) {
   }
 
   $('#connectorCloseBtn')?.addEventListener('click', () => this._closeConnectorSettings_?.());
+  $('#connectorStateClearBtn')?.addEventListener('click', () => {
+    if (statesInput) statesInput.value = '';
+    patchConnector({ active_states: '' });
+    renderConnectorStateHelpers();
+  });
   $('#connectorDeleteBtn')?.addEventListener('click', () => {
     this._setCurrentConnectorEntries_(
       this._getCurrentConnectorEntries_().filter((entry) => entry.id !== connectorId),
@@ -7080,6 +7247,7 @@ _getMobileTextAssistScale_() {
       const tabsPosition = String(config.tabs_position || 'top').toLowerCase();
       this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
     }
+    this.layersEnabled = !!(config.layers_enabled ?? config.enable_layers ?? false);
     this._setDashboardLayers_(config.layers || [], { refresh: false });
     this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
     this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
@@ -8541,6 +8709,101 @@ _getMobileTextAssistScale_() {
           linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.012)),
           color-mix(in oklab, var(--primary-background-color, #0f172a) 94%, rgba(0,0,0,.08));
       }
+      .ddc-card-settings-backdrop{
+        position:fixed;
+        inset:0;
+        z-index:100000;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:18px;
+        background:rgba(4,8,16,.46);
+        backdrop-filter:blur(10px) saturate(1.04);
+        -webkit-backdrop-filter:blur(10px) saturate(1.04);
+      }
+      .ddc-card-settings{
+        width:min(760px, calc(100vw - 36px));
+        max-height:min(88vh, 860px);
+        display:flex;
+        flex-direction:column;
+        gap:14px;
+        overflow:auto;
+        padding:20px 22px 22px;
+        border-radius:24px;
+        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 76%, rgba(255,255,255,.12));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.01)),
+          color-mix(in oklab, var(--card-background-color, #111827) 92%, rgba(7,10,18,.9));
+        box-shadow:
+          0 28px 90px rgba(0,0,0,.44),
+          0 8px 24px rgba(0,0,0,.26),
+          inset 0 1px 0 rgba(255,255,255,.04);
+        color:var(--primary-text-color, #f5f5f5);
+      }
+      .ddc-card-settings-header{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:14px;
+        padding-bottom:8px;
+        border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, rgba(255,255,255,.08));
+      }
+      .ddc-card-settings-kicker{
+        font-size:.73rem;
+        letter-spacing:.18em;
+        text-transform:uppercase;
+        color:var(--secondary-text-color, #9ca3af);
+        font-weight:700;
+      }
+      .ddc-card-settings-title{
+        margin:4px 0 0;
+        font-size:1.32rem;
+        font-weight:760;
+        letter-spacing:-.02em;
+      }
+      .ddc-card-settings-subtitle{
+        margin:8px 0 0;
+        color:var(--secondary-text-color, #9ca3af);
+        line-height:1.55;
+      }
+      .ddc-card-settings-close{
+        flex:0 0 auto;
+        width:42px;
+        height:42px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.14);
+        background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+        color:var(--primary-text-color, #f5f5f5);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        cursor:pointer;
+        box-shadow:0 8px 20px rgba(0,0,0,.18);
+      }
+      .ddc-card-settings-close:hover{
+        transform:translateY(-1px);
+        background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      }
+      .ddc-card-settings .section-card{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        padding:16px;
+        border-radius:20px;
+        background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+        border:1px solid rgba(255,255,255,.08);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+      }
+      .ddc-card-settings .section-card h4{
+        margin:0;
+        font-size:1rem;
+        font-weight:700;
+      }
+      .ddc-card-settings .section-card p{
+        margin:0;
+        color:var(--secondary-text-color, #9ca3af);
+        line-height:1.55;
+      }
       .picker-search-wrap{
         display:flex;
         align-items:center;
@@ -9384,6 +9647,113 @@ _getMobileTextAssistScale_() {
 
 /* ===== DDC Tabs —END ==================== */
 
+/* ===== DDC Layers ==================== */
+.ddc-layers{
+  position: relative;
+  z-index: 4;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:8px;
+  width:fit-content;
+  max-width:min(100%, calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 28px));
+  margin:8px auto 10px;
+  padding:8px 10px;
+  border-radius:22px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--card-background-color, #16181c) 92%, rgba(255,255,255,.05)),
+      color-mix(in oklab, var(--primary-background-color, #0f1216) 90%, rgba(255,255,255,.02))
+    );
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
+  box-shadow:0 16px 30px rgba(16,18,23,.16);
+  backdrop-filter: blur(12px) saturate(1.01);
+  -webkit-backdrop-filter: blur(12px) saturate(1.01);
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+  scrollbar-color: color-mix(in oklab, var(--primary-text-color, #fff) 18%, transparent) transparent;
+}
+
+.ddc-layers::-webkit-scrollbar{ height:6px; }
+.ddc-layers::-webkit-scrollbar-thumb{
+  background: color-mix(in oklab, var(--primary-text-color, #fff) 18%, transparent);
+  border-radius:999px;
+}
+.ddc-layers::-webkit-scrollbar-track{ background:transparent; }
+
+.ddc-layer-btn{
+  --ddc-layer-accent: var(--primary-color, #60a5fa);
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:38px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
+  background:transparent;
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 92%, rgba(0,0,0,.16));
+  font:600 12px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:.03em;
+  cursor:pointer;
+  transition:
+    transform .16s ease,
+    color .16s ease,
+    background .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease;
+}
+
+.ddc-layer-btn ha-icon{
+  --mdc-icon-size:18px;
+  opacity:.94;
+}
+
+.ddc-layer-btn:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in oklab, var(--ddc-layer-accent) 44%, transparent);
+  background:color-mix(in oklab, var(--ddc-layer-accent) 10%, transparent);
+}
+
+.ddc-layer-btn.active{
+  color:#fff;
+  border-color:color-mix(in oklab, var(--ddc-layer-accent) 54%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ddc-layer-accent) 84%, rgba(255,255,255,.16)),
+      color-mix(in oklab, var(--ddc-layer-accent) 72%, rgba(0,0,0,.08))
+    );
+  box-shadow:
+    0 10px 22px color-mix(in oklab, var(--ddc-layer-accent) 24%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.16);
+}
+
+.ddc-layer-btn:focus-visible{
+  outline:none;
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--ddc-layer-accent) 58%, transparent),
+    0 0 0 5px color-mix(in oklab, var(--ddc-layer-accent) 16%, transparent);
+}
+
+@media (max-width: 768px){
+  .ddc-layers{
+    max-width:calc(100vw - 18px);
+    margin-inline:auto;
+    padding-inline:8px;
+  }
+  .ddc-layer-btn{
+    min-height:36px;
+    padding-inline:11px;
+    font-size:11px;
+  }
+}
+/* ===== DDC Layers —END ==================== */
+
 
         /* Fly‑in animation for card wrappers. When the animate_cards
            configuration option is enabled, card wrappers will animate
@@ -9488,13 +9858,10 @@ _getMobileTextAssistScale_() {
   display:grid;
   gap:16px;
   padding:18px;
-  border-radius:28px;
-  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 82%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-background-color, #151922) 92%, rgba(255,255,255,.08)) 0%, color-mix(in srgb, var(--card-background-color, #151922) 98%, rgba(0,0,0,.18)) 100%);
-  box-shadow:0 26px 72px rgba(0,0,0,.34);
-  backdrop-filter:blur(22px) saturate(1.08);
-  -webkit-backdrop-filter:blur(22px) saturate(1.08);
+  border-radius:24px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 76%, transparent);
+  background:var(--ha-card-background, var(--card-background-color, #1f2329));
+  box-shadow:0 22px 52px rgba(0,0,0,.34);
   overflow:auto;
   max-height:inherit;
 }
@@ -9508,10 +9875,9 @@ _getMobileTextAssistScale_() {
 .ddc-connector-close{
   width:48px;
   height:48px;
-  border-radius:16px;
-  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.025) 100%);
+  border-radius:14px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.16)) 78%, transparent);
+  background:var(--secondary-background-color, rgba(255,255,255,.04));
   color:var(--primary-text-color, #fff);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.05),
@@ -9521,8 +9887,7 @@ _getMobileTextAssistScale_() {
 .ddc-connector-close:hover{
   transform:translateY(-1px);
   border-color:color-mix(in srgb, var(--primary-color, #ff9800) 26%, rgba(255,255,255,.18));
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.04) 100%);
+  background:color-mix(in srgb, var(--secondary-background-color, rgba(255,255,255,.04)) 82%, var(--primary-color, #ff9800) 18%);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.06),
     0 12px 24px rgba(0,0,0,.24);
@@ -9553,10 +9918,9 @@ _getMobileTextAssistScale_() {
   display:grid;
   gap:12px;
   padding:14px;
-  border-radius:22px;
+  border-radius:18px;
   border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 72%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-background-color, #151922) 88%, rgba(255,255,255,.06)) 0%, color-mix(in srgb, var(--card-background-color, #151922) 95%, rgba(0,0,0,.12)) 100%);
+  background:color-mix(in srgb, var(--secondary-background-color, rgba(255,255,255,.04)) 88%, transparent);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
 }
 .ddc-connector-preview{
@@ -9568,8 +9932,7 @@ _getMobileTextAssistScale_() {
   min-height:58px;
   padding:0 12px;
   border-radius:18px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.02) 100%);
+  background:rgba(255,255,255,.025);
   overflow:hidden;
 }
 .ddc-connector-preview-stroke{
@@ -9640,10 +10003,9 @@ _getMobileTextAssistScale_() {
   min-height:48px;
   box-sizing:border-box;
   padding:12px 14px;
-  border-radius:16px;
-  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 72%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.025) 100%);
+  border-radius:12px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.16)) 80%, transparent);
+  background:var(--secondary-background-color, rgba(255,255,255,.03));
   color:var(--primary-text-color, #fff);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.04),
@@ -9660,8 +10022,7 @@ _getMobileTextAssistScale_() {
     inset 0 1px 0 rgba(255,255,255,.05),
     0 0 0 3px color-mix(in srgb, var(--primary-color, #ff9800) 18%, transparent),
     0 14px 28px rgba(0,0,0,.18);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.03) 100%);
+  background:color-mix(in srgb, var(--secondary-background-color, rgba(255,255,255,.03)) 84%, rgba(255,255,255,.06));
 }
 .ddc-connector-entity-host{
   display:grid;
@@ -9686,11 +10047,19 @@ _getMobileTextAssistScale_() {
   flex-wrap:wrap;
   gap:8px;
 }
+.ddc-connector-inline-actions{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  gap:8px;
+  align-items:center;
+}
+.ddc-connector-state-picker{
+  min-width:0;
+}
 .ddc-connector-state-chip{
   appearance:none;
   border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.02) 100%);
+  background:var(--secondary-background-color, rgba(255,255,255,.03));
   color:var(--primary-text-color, #fff);
   min-height:34px;
   padding:0 12px;
@@ -9732,9 +10101,9 @@ _getMobileTextAssistScale_() {
   gap:10px;
   min-height:44px;
   padding:10px 12px;
-  border-radius:16px;
+  border-radius:14px;
   border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 68%, transparent);
-  background:rgba(255,255,255,.03);
+  background:var(--secondary-background-color, rgba(255,255,255,.03));
   font-size:.9rem;
   font-weight:600;
 }
@@ -9751,19 +10120,24 @@ _getMobileTextAssistScale_() {
   min-height:48px;
   width:100%;
   padding:0 16px;
-  border-radius:16px;
+  border-radius:12px;
   font-size:.92rem;
   font-weight:700;
   letter-spacing:.01em;
   transition:transform .16s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease, filter .18s ease;
 }
+.ddc-connector-inspector .btn.compact{
+  min-height:44px;
+  width:auto;
+  padding:0 14px;
+  white-space:nowrap;
+}
 .ddc-connector-inspector .btn:hover{
   transform:translateY(-1px);
 }
 .ddc-connector-inspector .btn.secondary{
-  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.025) 100%);
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(255,255,255,.16)) 80%, transparent);
+  background:var(--secondary-background-color, rgba(255,255,255,.03));
   color:var(--primary-text-color, #fff);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.05),
@@ -9806,6 +10180,9 @@ _getMobileTextAssistScale_() {
     width:auto;
   }
   .ddc-connector-inspector-grid{
+    grid-template-columns:1fr;
+  }
+  .ddc-connector-inline-actions{
     grid-template-columns:1fr;
   }
 }
@@ -9950,6 +10327,7 @@ _getMobileTextAssistScale_() {
 
           <!-- Tabs & card container -->
           <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
+          <div class="ddc-layers" id="layersBar" style="display:none"></div>
           <div class="card-container" id="cardContainer">
             <!-- host for particles.js / YouTube backgrounds -->
             <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
@@ -9981,6 +10359,7 @@ _getMobileTextAssistScale_() {
       this.lineModeBtn  = this.shadowRoot.querySelector('#lineModeBtn');
       this.settingsBtn  = this.shadowRoot.querySelector('#settingsBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
+      this.layersBar    = this.shadowRoot.querySelector('#layersBar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
       this.previewModeControls = this.shadowRoot.querySelector('#previewModeControls');
       this.previewModeButtons = Array.from(this.shadowRoot.querySelectorAll('[data-preview-mode]'));
@@ -10031,7 +10410,7 @@ _getMobileTextAssistScale_() {
       }, { passive: false });
       this.previewSwapButton?.addEventListener('click', () => this._swapResponsiveViewportOrientation_?.());
       try { this._syncViewportPreviewUI_?.(); } catch {}
-      try { this._renderTabs(); this._applyActiveTab(); } catch {}
+      try { this._renderTabs(); this._renderLayersBar(); this._applyActiveTab(); } catch {}
       try { this._syncConnectorUiState_?.(); } catch {}
      
 
@@ -10491,7 +10870,7 @@ connectedCallback() {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','card_shadow','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
         // Ensure screen saver settings from YAML override persisted options on reload. Without
         // including these keys, the screensaver delay can become stuck because the overlay
         // of YAML values never occurs. Adding them keeps behaviour consistent with other
@@ -10552,7 +10931,7 @@ connectedCallback() {
       this.__booting = false;
       this.__dirty = false;
       this._updateApplyBtn?.();
-      try { this._renderTabs(); this._applyActiveTab(); } catch {}
+      try { this._renderTabs(); this._renderLayersBar_?.(); this._applyActiveTab(); } catch {}
       // Reevaluate visibility after the layout has been built. Cards with
       // visibility conditions will hide themselves when not in edit mode.
       try { this._applyVisibility_(); } catch {}
@@ -10653,22 +11032,9 @@ connectedCallback() {
     try { this._refreshTabsAlignment_?.(); } catch {}
   }
   _applyActiveTab() {
-    const current = this._normalizeTabId(this.activeTab);
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
     wraps.forEach(w => {
-      const tabId = w.dataset.tabId ? this._normalizeTabId(w.dataset.tabId) : this.defaultTab;
-      const passesActiveTab = !this.tabs || !this.tabs.length || tabId === current;
-      const passesLayers = this._isWrapVisibleForActiveLayers_(w);
-      if (passesActiveTab && passesLayers) {
-        w.style.display = '';
-        w.inert = false;
-        w.classList.remove('ddc-hidden');
-      } else {
-        w.style.display = 'none';
-        w.inert = true;
-        w.classList.add('ddc-hidden');
-        w.classList.remove('ddc-selected');
-      }
+      this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
     });
 
     // After switching tabs, reapply sizing based on the current container mode.
@@ -10695,9 +11061,11 @@ connectedCallback() {
    * removed once the animation completes so subsequent tab switches can
    * retrigger the animation. Hidden wrappers (display: none) are skipped.
    */
-_animateCards() {
+_animateCards(targetWraps = null) {
   try {
-    const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+    const wraps = Array.isArray(targetWraps)
+      ? targetWraps
+      : Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper') || []);
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
     // 🎚️ Master controls
@@ -10710,6 +11078,7 @@ _animateCards() {
     const maxDelay = totalAnimationTime - duration;
 
     wraps.forEach((w) => {
+      if (!w) return;
       // Skip hidden cards
       const cs = window.getComputedStyle?.(w);
       const isHidden =
@@ -10925,7 +11294,8 @@ _animateCards() {
     const state = this.__cardSettingsMenu;
     if (!state) return;
     try { state.cleanup?.(); } catch {}
-    try { state.menu?.remove?.(); } catch {}
+    try { state.root?.remove?.(); } catch {}
+    try { if (!state.root) state.menu?.remove?.(); } catch {}
     this.__cardSettingsMenu = null;
   }
 
@@ -10975,7 +11345,8 @@ _animateCards() {
       return;
     }
     this._closeCardSettingsMenu_();
-    // Create the menu container
+    const backdrop = document.createElement('div');
+    backdrop.className = 'ddc-card-settings-backdrop';
     const menu = document.createElement('div');
     menu.className = 'ddc-card-settings';
     const themeVars = getComputedStyle(this);
@@ -10988,81 +11359,32 @@ _animateCards() {
       }
       return '#1f2329';
     };
-    const popupSurface = resolveSolidSurface('--ha-card-background', '--card-background-color', '--primary-background-color');
     const popupFieldSurface = resolveSolidSurface('--secondary-background-color', '--card-background-color', '--primary-background-color');
-    // Note: do not reset all styles here. The menu relies on the surrounding card theme
-    // variables (like colors) for its look. Inheriting them is intentional.
-    // Position and style the menu. Inline styles allow it to work without
-    // relying on external CSS. The design aims to match the settings modal:
-    // solid background, drop shadow and clean spacing. Render it as a fixed
-    // overlay so it can escape the card bounds and stay fully visible.
     Object.assign(menu.style, {
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      transform: 'none',
-      zIndex: '100000',
-      // Use a non-transparent background. Fall back to a dark colour if theme
-      // variables are unset. This makes the popup look like a standalone card.
-      background: popupSurface,
-      border: '1px solid var(--divider-color, rgba(0,0,0,.3))',
-      borderRadius: '12px',
-      padding: '14px',
-      boxShadow: '0 10px 24px rgba(0,0,0,.4)',
-      color: 'var(--primary-text-color, #f5f5f5)',
-      minWidth: '220px',
-      maxWidth: 'min(340px, calc(100vw - 24px))',
-      maxHeight: 'min(560px, calc(100vh - 24px))',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      fontSize: '.875rem',
-      opacity: '1',
-      mixBlendMode: 'normal',
-      overflow: 'auto',
       pointerEvents: 'auto',
-      overscrollBehavior: 'contain',
-      backdropFilter: 'none',
-      WebkitBackdropFilter: 'none'
+      fontSize: '.92rem'
     });
-    // Intercept pointer events in the menu to prevent card drag when
-    // interacting with dropdowns or other controls. Without stopping
-    // propagation, Interact’s draggable handler would treat pointer
-    // presses inside the menu as the start of a drag.
     const stopEvt = (ev) => ev.stopPropagation();
     menu.addEventListener('pointerdown', stopEvt, true);
     menu.addEventListener('mousedown', stopEvt, true);
     menu.addEventListener('touchstart', stopEvt, true);
 
-    // Add a title for the settings popup
+    const header = document.createElement('div');
+    header.className = 'ddc-card-settings-header';
+    const headCopy = document.createElement('div');
+    const kicker = document.createElement('div');
+    kicker.className = 'ddc-card-settings-kicker';
+    kicker.textContent = 'Card Settings';
     const titleEl = document.createElement('div');
+    titleEl.className = 'ddc-card-settings-title';
     titleEl.textContent = 'Card Settings';
-    Object.assign(titleEl.style, {
-      fontWeight: '600',
-      fontSize: '1rem',
-      marginBottom: '4px',
-      color: 'var(--primary-text-color, #f5f5f5)'
-    });
-    menu.appendChild(titleEl);
-
-    // Add a close button in the top-right corner of the menu. Use
-    // absolute positioning so it doesn’t affect layout of other rows.
+    const subtitle = document.createElement('p');
+    subtitle.className = 'ddc-card-settings-subtitle';
+    subtitle.textContent = 'Fine-tune visibility, layers and per-card styling for this card without leaving edit mode.';
+    headCopy.append(kicker, titleEl, subtitle);
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'mini';
-    Object.assign(closeBtn.style, {
-      position: 'absolute',
-      top: '4px',
-      right: '4px',
-      border: 'none',
-      background: 'transparent',
-      color: 'var(--secondary-text-color, #9ca3af)',
-      cursor: 'pointer',
-      width: '24px',
-      height: '24px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    });
+    closeBtn.className = 'ddc-card-settings-close';
+    closeBtn.type = 'button';
     closeBtn.setAttribute('title', 'Close');
     closeBtn.setAttribute('aria-label', 'Close settings');
     closeBtn.innerHTML = '<ha-icon icon="mdi:close"></ha-icon>';
@@ -11070,10 +11392,9 @@ _animateCards() {
       ev.stopPropagation();
       this._closeCardSettingsMenu_();
     });
-    menu.appendChild(closeBtn);
+    header.append(headCopy, closeBtn);
+    menu.appendChild(header);
 
-    // Build a row factory for label + select combos. Rows are laid
-    // horizontally with a fixed gap between label and control.
     const makeRow = (labelText, selectElement) => {
       const row = document.createElement('div');
       row.style.display = 'flex';
@@ -11092,19 +11413,31 @@ _animateCards() {
       row.appendChild(selectElement);
       return row;
     };
+    const makeSection = (title, description) => {
+      const section = document.createElement('section');
+      section.className = 'section-card';
+      if (title) {
+        const h4 = document.createElement('h4');
+        h4.textContent = title;
+        section.appendChild(h4);
+      }
+      if (description) {
+        const p = document.createElement('p');
+        p.textContent = description;
+        section.appendChild(p);
+      }
+      return section;
+    };
 
-    // Predefine a common select style for all dropdowns. This closely
-    // matches the styling used in the main settings modal: subtle border,
-    // rounded corners and consistent padding/background. The `appearance`
-    // property removes native OS styling for a cleaner look.
     const applySelectStyle = (sel) => {
       Object.assign(sel.style, {
         appearance: 'none',
-        padding: '6px 8px',
-        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
-        borderRadius: '8px',
+        padding: '10px 12px',
+        minHeight: '44px',
+        border: '1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.08))',
+        borderRadius: '12px',
         background: popupFieldSurface,
-        color: 'var(--primary-text-color, #000)',
+        color: 'var(--primary-text-color, #f5f5f5)',
         font: 'inherit',
         lineHeight: '1.4',
         width: '100%'
@@ -11229,10 +11562,10 @@ _animateCards() {
       resetBtn.type = 'button';
       resetBtn.textContent = 'Reset';
       Object.assign(resetBtn.style, {
-        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
+        border: '1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.08))',
         borderRadius: '999px',
-        padding: '4px 10px',
-        background: 'transparent',
+        padding: '6px 12px',
+        background: 'rgba(255,255,255,.03)',
         color: 'var(--primary-text-color, #f5f5f5)',
         cursor: 'pointer',
         font: 'inherit'
@@ -11266,9 +11599,10 @@ _animateCards() {
       input.placeholder = placeholder;
       Object.assign(input.style, {
         flex: '1 1 auto',
-        padding: '8px 10px',
-        border: '1px solid var(--divider-color, rgba(0,0,0,.25))',
-        borderRadius: '10px',
+        minHeight: '44px',
+        padding: '10px 12px',
+        border: '1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.08))',
+        borderRadius: '12px',
         background: 'var(--ha-card-background, var(--card-background-color, #111827))',
         color: 'var(--primary-text-color, #f5f5f5)',
         font: 'inherit'
@@ -11365,7 +11699,10 @@ _animateCards() {
       return field;
     };
 
-    // Build Tab selector row if multiple tabs exist
+    const visibilitySection = makeSection('Visibility & placement', 'Control where this card appears and how it behaves inside the dashboard.');
+    const styleSection = makeSection('Per-card style', 'Overrides Dashboard Settings for this card only.');
+    const actionsSection = makeSection('Actions', 'Quick actions for this individual card.');
+
     if (Array.isArray(this.tabs) && this.tabs.length > 1) {
       const tabSelect = document.createElement('select');
       applySelectStyle(tabSelect);
@@ -11390,22 +11727,72 @@ _animateCards() {
       tabSelect.addEventListener('mousedown', stopEvt);
       tabSelect.addEventListener('touchstart', stopEvt);
       const row = makeRow('Tab', tabSelect);
-      menu.appendChild(row);
-      // Hint for Tab selector
+      visibilitySection.appendChild(row);
       const tabHint = document.createElement('div');
       tabHint.textContent = 'Choose which tab this card appears on.';
       Object.assign(tabHint.style, {
         fontSize: '.75rem',
-        color: 'var(--secondary-text-color, #9ca3af)',
-        marginTop: '2px'
+        color: 'var(--secondary-text-color, #9ca3af)'
       });
-      menu.appendChild(tabHint);
+      visibilitySection.appendChild(tabHint);
     }
 
-    // Build Overflow selector row with additional options (e.g. Scroll)
+    if (this.layersEnabled && Array.isArray(this.layers) && this.layers.length) {
+      const layerHint = document.createElement('div');
+      layerHint.textContent = 'Pick the layers this card should belong to. If none are selected, the card stays visible on every layer.';
+      Object.assign(layerHint.style, {
+        fontSize: '.75rem',
+        color: 'var(--secondary-text-color, #9ca3af)'
+      });
+      visibilitySection.appendChild(layerHint);
+
+      const layerGrid = document.createElement('div');
+      Object.assign(layerGrid.style, {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px'
+      });
+      const selectedLayers = new Set(this._getWrapperLayerIds_(wrap));
+      const syncLayerChips = () => {
+        layerGrid.querySelectorAll('[data-layer-id]').forEach((btn) => {
+          const id = btn.getAttribute('data-layer-id');
+          const active = !!id && selectedLayers.has(id);
+          btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+          btn.style.outline = active ? '2px solid var(--primary-color, #03a9f4)' : 'none';
+          btn.style.borderColor = active
+            ? 'color-mix(in oklab, var(--primary-color, #03a9f4) 48%, transparent)'
+            : 'var(--divider-color, rgba(255,255,255,.14))';
+        });
+      };
+
+      (this.layers || []).forEach((layer) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'layer-chip';
+        chip.setAttribute('data-layer-id', layer.id);
+        chip.setAttribute('aria-pressed', selectedLayers.has(layer.id) ? 'true' : 'false');
+        chip.style.borderColor = `color-mix(in oklab, ${layer.color || '#60a5fa'} 40%, transparent)`;
+        chip.style.background = `color-mix(in oklab, ${layer.color || '#60a5fa'} 12%, transparent)`;
+        chip.innerHTML = `${layer.icon ? `<ha-icon icon="${layer.icon}"></ha-icon>` : ''}<span>${layer.label || layer.id}</span>`;
+        stopInteractive(chip);
+        chip.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (selectedLayers.has(layer.id)) selectedLayers.delete(layer.id);
+          else selectedLayers.add(layer.id);
+          this._setWrapperLayerIds_(wrap, Array.from(selectedLayers));
+          syncLayerChips();
+          try { this._applyActiveTab?.(); } catch {}
+          try { this._applyVisibility_?.(); } catch {}
+          try { this._queueSave?.('layer-change'); } catch {}
+        });
+        layerGrid.appendChild(chip);
+      });
+      syncLayerChips();
+      visibilitySection.appendChild(layerGrid);
+    }
+
     const overflowSelect = document.createElement('select');
     applySelectStyle(overflowSelect);
-    // Define overflow modes: default (inherit), visible, hidden, scroll/auto
     const modes = [
       { value: '', label: 'Default' },
       { value: 'visible', label: 'Visible' },
@@ -11439,95 +11826,85 @@ _animateCards() {
     overflowSelect.addEventListener('mousedown', stopEvt);
     overflowSelect.addEventListener('touchstart', stopEvt);
     const rowOv = makeRow('Overflow', overflowSelect);
-    menu.appendChild(rowOv);
-    // Hint for Overflow selector
+    visibilitySection.appendChild(rowOv);
     const ovHint = document.createElement('div');
     ovHint.textContent = 'Control how card content behaves when it exceeds its bounds.';
     Object.assign(ovHint.style, {
       fontSize: '.75rem',
-      color: 'var(--secondary-text-color, #9ca3af)',
-      marginTop: '2px'
+      color: 'var(--secondary-text-color, #9ca3af)'
     });
-    menu.appendChild(ovHint);
+    visibilitySection.appendChild(ovHint);
 
-    const styleDivider = document.createElement('div');
-    Object.assign(styleDivider.style, {
-      height: '1px',
-      background: 'var(--divider-color, rgba(255,255,255,.12))',
-      margin: '2px 0'
-    });
-    menu.appendChild(styleDivider);
-
-    const styleTitle = document.createElement('div');
-    styleTitle.textContent = 'Per-card style';
-    Object.assign(styleTitle.style, {
-      fontWeight: '600',
-      color: 'var(--primary-text-color, #f5f5f5)'
-    });
-    menu.appendChild(styleTitle);
-
-    const styleHint = document.createElement('div');
-    styleHint.textContent = 'Overrides Dashboard Settings for this card only.';
-    Object.assign(styleHint.style, {
-      fontSize: '.75rem',
-      color: 'var(--secondary-text-color, #9ca3af)',
-      marginTop: '-6px'
-    });
-    menu.appendChild(styleHint);
-
-    menu.appendChild(makeStyleField(
+    styleSection.appendChild(makeStyleField(
       'Container background',
       'container_background',
       'transparent · #123456 · var(--ha-card-background)',
       'Sets the inner card surface for this card only.',
       { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
     ));
-    menu.appendChild(makeStyleField(
+    styleSection.appendChild(makeStyleField(
       'Card background',
       'background',
       'transparent · #123456 · linear-gradient(...)',
       'Sets the outer wrapper/background around this card.',
       { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
     ));
-    menu.appendChild(makeStyleField('Text color', 'text_color', '#f8fafc · var(--primary-text-color)', 'Applies to text and icons when the card supports inherited theme vars.'));
-    menu.appendChild(makeStyleField('Border color', 'border_color', '#38bdf8', 'Adds an optional border color around this card.'));
-    menu.appendChild(makeOverrideRow('Animate cards', 'animate_cards', 'Overrides the dashboard animation setting for this card.'));
-    menu.appendChild(makeOverrideRow('Drop shadow', 'card_shadow', 'Overrides the dashboard shadow setting for this card.'));
+    styleSection.appendChild(makeStyleField('Text color', 'text_color', '#f8fafc · var(--primary-text-color)', 'Applies to text and icons when the card supports inherited theme vars.'));
+    styleSection.appendChild(makeStyleField('Border color', 'border_color', '#38bdf8', 'Adds an optional border color around this card.'));
+    styleSection.appendChild(makeOverrideRow('Animate cards', 'animate_cards', 'Overrides the dashboard animation setting for this card.'));
+    styleSection.appendChild(makeOverrideRow('Drop shadow', 'card_shadow', 'Overrides the dashboard shadow setting for this card.'));
+
+    const actionsRow = document.createElement('div');
+    Object.assign(actionsRow.style, {
+      display: 'grid',
+      gridTemplateColumns: '1fr',
+      gap: '8px'
+    });
+
+    const exportCardBtn = document.createElement('button');
+    exportCardBtn.type = 'button';
+    exportCardBtn.className = 'btn secondary';
+    exportCardBtn.innerHTML = '<ha-icon icon="mdi:download-box-outline"></ha-icon><span style="margin-left:6px">Export card</span>';
+    stopInteractive(exportCardBtn);
+    exportCardBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._exportSingleCard_?.(wrap);
+    });
+    actionsRow.appendChild(exportCardBtn);
+    actionsSection.appendChild(actionsRow);
+
+    menu.append(visibilitySection, styleSection, actionsSection);
 
     const overlayRoot = this.shadowRoot || this;
-    overlayRoot.appendChild(menu);
+    backdrop.appendChild(menu);
+    overlayRoot.appendChild(backdrop);
 
-    const reposition = () => this._positionCardSettingsMenu_?.();
     const closeOnOutside = (ev) => {
+      if (ev.target === backdrop) this._closeCardSettingsMenu_();
+    };
+    const closeOnPointer = (ev) => {
       const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
-      if (path.includes(menu) || path.includes(wrap)) return;
+      if (path.includes(menu)) return;
       this._closeCardSettingsMenu_();
     };
     const closeOnEscape = (ev) => {
       if (ev.key === 'Escape') this._closeCardSettingsMenu_();
     };
 
-    window.addEventListener('resize', reposition);
-    window.addEventListener('scroll', reposition, true);
-    this.__scaleOuter?.addEventListener?.('scroll', reposition, { passive: true });
-    this.cardContainer?.addEventListener?.('scroll', reposition, { passive: true });
-    document.addEventListener('pointerdown', closeOnOutside, true);
+    backdrop.addEventListener('pointerdown', closeOnOutside, true);
+    document.addEventListener('pointerdown', closeOnPointer, true);
     document.addEventListener('keydown', closeOnEscape, true);
 
     this.__cardSettingsMenu = {
+      root: backdrop,
       menu,
       wrap,
       cleanup: () => {
-        window.removeEventListener('resize', reposition);
-        window.removeEventListener('scroll', reposition, true);
-        this.__scaleOuter?.removeEventListener?.('scroll', reposition, { passive: true });
-        this.cardContainer?.removeEventListener?.('scroll', reposition, { passive: true });
-        document.removeEventListener('pointerdown', closeOnOutside, true);
+        backdrop.removeEventListener('pointerdown', closeOnOutside, true);
+        document.removeEventListener('pointerdown', closeOnPointer, true);
         document.removeEventListener('keydown', closeOnEscape, true);
       }
     };
-
-    requestAnimationFrame(() => this._positionCardSettingsMenu_?.());
   }
   
 /* ------------------------------ Edit mode ------------------------------ */
@@ -12058,6 +12435,7 @@ _syncEmptyStateUI() {
             const snapY = live ? Math.round(rawY / gs) * gs : rawY;
             return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
           });
+          this._shiftProposedCardsIntoCanvasTop_?.(proposed, live, gs);
 
           // If overlap protection is on, restore other cards and push them out of the way
           if (this.disableOverlap) {
@@ -12089,6 +12467,7 @@ _syncEmptyStateUI() {
             const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
             return { el: m, rawX, rawY, snapX, snapY, w, h };
           });
+          this._shiftProposedCardsIntoCanvasTop_?.(endRects, true, gs);
 
           // On end, do a final restore/push to prevent leftover overlaps
           if (this.disableOverlap) {
@@ -12231,6 +12610,27 @@ _syncEmptyStateUI() {
       el.hass = this.hass;
       return el;
     }
+    if (type === 'custom:ddc-table-card') {
+      const el = document.createElement('ddc-table-card');
+      el.__ddcSourceConfig = sourceCfg;
+      el.setConfig?.(cfg);
+      el.hass = this.hass;
+      return el;
+    }
+    if (type === 'custom:ddc-icon-card') {
+      const el = document.createElement('ddc-icon-card');
+      el.__ddcSourceConfig = sourceCfg;
+      el.setConfig?.(cfg);
+      el.hass = this.hass;
+      return el;
+    }
+    if (type === 'custom:ddc-text-card') {
+      const el = document.createElement('ddc-text-card');
+      el.__ddcSourceConfig = sourceCfg;
+      el.setConfig?.(cfg);
+      el.hass = this.hass;
+      return el;
+    }
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
     const el = helpers.createCardElement(cfg);
     el.__ddcSourceConfig = sourceCfg;
@@ -12276,6 +12676,9 @@ _syncEmptyStateUI() {
       </button>
       <button class="mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
         <ha-icon icon="mdi:content-copy"></ha-icon><span>Duplicate</span>
+      </button>
+      <button class="mini" data-act="export-card" title="Export card" aria-label="Export card">
+        <ha-icon icon="mdi:download-box-outline"></ha-icon><span>Export card</span>
       </button>
       <button class="mini pill" data-act="front" title="Bring forward" aria-label="Bring forward">
         <ha-icon icon="mdi:arrange-bring-forward"></ha-icon>
@@ -12345,6 +12748,8 @@ _syncEmptyStateUI() {
         } else {
           wrap.remove(); this._resizeContainer(); this._queueSave('delete'); this._ensurePlaceholderIfEmpty();
         }
+      } else if (act === 'export-card') {
+        this._exportSingleCard_?.(wrap);
       } else if (act === 'duplicate' || act === 'copy') {
         const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
         for (const t of targets) {
@@ -12710,11 +13115,31 @@ _syncEmptyStateUI() {
 
   _setCardPosition(el, x, y) {
     const nx = Math.round(x);
-    const ny = Math.round(y);
+    const ny = Math.max(0, Math.round(y));
     el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
     el.setAttribute('data-x', String(nx));
     el.setAttribute('data-y', String(ny));
     // Do NOT touch data-*-raw here; drag/resize 
+  }
+
+  _clampYToCanvasTop_(value = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  }
+
+  _shiftProposedCardsIntoCanvasTop_(proposed = [], liveSnap = false, gridSize = this.gridSize) {
+    const items = Array.isArray(proposed) ? proposed : [];
+    if (!items.length) return items;
+    const minY = items.reduce((min, item) => Math.min(min, Number(item?.rawY ?? item?.snapY ?? 0) || 0), Infinity);
+    if (!Number.isFinite(minY) || minY >= 0) return items;
+    const offset = Math.abs(minY);
+    const gs = Math.max(1, Number(gridSize || this.gridSize || 1) || 1);
+    items.forEach((item) => {
+      if (!item) return;
+      item.rawY = this._clampYToCanvasTop_((Number(item.rawY) || 0) + offset);
+      item.snapY = liveSnap ? Math.round(item.rawY / gs) * gs : item.rawY;
+    });
+    return items;
   }
   
 
@@ -13562,6 +13987,8 @@ _applyAutoFillNoScale() {
         if (isFixed) {
           candidateX = Math.max(0, Math.min(candidateX, Math.max(0, cw - ow)));
           candidateY = Math.max(0, Math.min(candidateY, Math.max(0, ch - oh)));
+        } else {
+          candidateY = this._clampYToCanvasTop_(candidateY);
         }
       }
 
@@ -13571,6 +13998,7 @@ _applyAutoFillNoScale() {
 
     // Apply final positions to non-selected cards
     for (const [card, pos] of finalPos) {
+      pos.y = this._clampYToCanvasTop_(pos.y);
       card.setAttribute('data-x-raw', String(pos.x));
       card.setAttribute('data-y-raw', String(pos.y));
       const snX = liveSnap ? Math.round(pos.x / gridSize) * gridSize : pos.x;
@@ -13705,6 +14133,24 @@ _applyAutoFillNoScale() {
         name:'HTML / Web card',
         icon:'mdi:language-html5',
         description:'Build a custom card with your own HTML, CSS and JavaScript inside Drag & Drop Card.'
+      },
+      {
+        type:'custom:ddc-table-card',
+        name:'Table card',
+        icon:'mdi:table-large',
+        description:'Build a visual table with text, icons, entity states, badges and buttons directly inside Drag & Drop Card.'
+      },
+      {
+        type:'custom:ddc-icon-card',
+        name:'Icon card',
+        icon:'mdi:star-four-points-circle',
+        description:'Place a pure icon design object with state-based color, glow, pulse and optional click action.'
+      },
+      {
+        type:'custom:ddc-text-card',
+        name:'Text card',
+        icon:'mdi:format-text',
+        description:'Create a pure typography object with font controls, semantic text styles and editorial layout options.'
       }
     ];
   }
@@ -13717,6 +14163,9 @@ _applyAutoFillNoScale() {
 
     if (type === 'custom:ddc-html-card') return document.createElement('ddc-html-card-editor');
     if (type === 'custom:ddc-line-card') return document.createElement('ddc-line-card-editor');
+    if (type === 'custom:ddc-table-card') return document.createElement('ddc-table-card-editor');
+    if (type === 'custom:ddc-icon-card') return document.createElement('ddc-icon-card-editor');
+    if (type === 'custom:ddc-text-card') return document.createElement('ddc-text-card-editor');
   
     // Warm the module before asking for the class only for built‑in HA cards.
     // Skip preloading for custom cards (including the "custom_card" placeholder) since they have no core modules.
@@ -16481,6 +16930,18 @@ _applyAutoFillNoScale() {
             temp = document.createElement('ddc-line-card');
             temp.setConfig?.(cfg);
             temp.hass = this.hass;
+          } else if (type === 'custom:ddc-table-card') {
+            temp = document.createElement('ddc-table-card');
+            temp.setConfig?.(cfg);
+            temp.hass = this.hass;
+          } else if (type === 'custom:ddc-icon-card') {
+            temp = document.createElement('ddc-icon-card');
+            temp.setConfig?.(cfg);
+            temp.hass = this.hass;
+          } else if (type === 'custom:ddc-text-card') {
+            temp = document.createElement('ddc-text-card');
+            temp.setConfig?.(cfg);
+            temp.hass = this.hass;
           } else {
             const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
             if (seq !== pickSeq) return;
@@ -16852,6 +17313,71 @@ return {
 };`,
       rerun_on_hass_update: false
     };
+    if (type === 'custom:ddc-table-card') {
+      const entityIds = Object.keys(this.hass?.states || {});
+      const first = entityIds[0] || '';
+      const second = entityIds[1] || first;
+      return {
+        type: 'custom:ddc-table-card',
+        title: 'Energy overview',
+        rows: 3,
+        columns: 3,
+        header_row: true,
+        border: true,
+        radius: 16,
+        spacing: 8,
+        cells: [
+          { type: 'text', text: 'Area', align: 'left' },
+          { type: 'text', text: 'Live state', align: 'center' },
+          { type: 'text', text: 'Action', align: 'center' },
+          { type: 'text', text: 'Primary', align: 'left' },
+          { type: 'entity', entity: first, text: 'Primary sensor', align: 'center', active_states: 'on,home,open,playing,charging,active,>0', active_color: 'var(--primary-color, #ff9800)', inactive_color: 'rgba(148, 163, 184, 0.18)' },
+          { type: 'button', entity: first, text: 'Inspect', button_action: 'more-info', align: 'center', active_states: 'on,home,open,playing,charging,active,>0', active_color: 'var(--primary-color, #ff9800)', inactive_color: 'rgba(148, 163, 184, 0.18)' },
+          { type: 'icon', icon: 'mdi:flash', text: 'Secondary', align: 'left' },
+          { type: 'badge', entity: second, text: 'Secondary sensor', align: 'center', active_states: 'on,home,open,playing,charging,active,>0', active_color: 'var(--primary-color, #ff9800)', inactive_color: 'rgba(148, 163, 184, 0.18)' },
+          { type: 'text', text: 'Editable cells', align: 'center' },
+        ]
+      };
+    }
+    if (type === 'custom:ddc-icon-card') {
+      const entityIds = Object.keys(this.hass?.states || {});
+      const first = entityIds[0] || '';
+      const iconFallback = first ? String(this.hass?.states?.[first]?.attributes?.icon || 'mdi:flash') : 'mdi:flash';
+      return {
+        type: 'custom:ddc-icon-card',
+        icon: iconFallback,
+        entity: first,
+        size: 96,
+        color: 'var(--primary-color, #ff9800)',
+        active_color: '#22c55e',
+        state_based_color: true,
+        glow: true,
+        rotate: 0,
+        pulse_when_active: true,
+        opacity_based_on_state: false,
+        active_opacity: 1,
+        inactive_opacity: 0.28,
+        active_states: 'on,home,open,playing,charging,active,>0',
+        click_action: 'more-info'
+      };
+    }
+    if (type === 'custom:ddc-text-card') {
+      return {
+        type: 'custom:ddc-text-card',
+        text: 'Energy overview',
+        rich_text: false,
+        rich_html: '',
+        variant: 'title',
+        font_family: '',
+        font_size: 42,
+        color: 'var(--primary-text-color, #f8fafc)',
+        align: 'left',
+        bold: true,
+        italic: false,
+        letter_spacing: -0.03,
+        line_height: 1.05
+      };
+    }
 
     try { if (helpers.getCardElementClass) CardClass = await helpers.getCardElementClass(type); } catch {}
     const all = Object.keys(this.hass?.states || {});
@@ -16986,6 +17512,17 @@ return {
       const isVerticalish = ['vertical', 'diagonal-up', 'diagonal-down'].includes(String(cardConfig?.direction || '').toLowerCase());
       wrap.style.width  = `${(isVerticalish ? 5 : 16) * this.gridSize}px`;
       wrap.style.height = `${(isVerticalish ? 14 : 4) * this.gridSize}px`;
+    } else if (type === 'custom:ddc-table-card') {
+      const cols = Math.max(1, Number(cardConfig?.columns || 3) || 3);
+      const rows = Math.max(1, Number(cardConfig?.rows || 3) || 3);
+      wrap.style.width  = `${Math.max(12, Math.min(24, cols * 5)) * this.gridSize}px`;
+      wrap.style.height = `${Math.max(7, Math.min(18, rows * 3 + (cardConfig?.title ? 2 : 1))) * this.gridSize}px`;
+    } else if (type === 'custom:ddc-icon-card') {
+      wrap.style.width  = `${6 * this.gridSize}px`;
+      wrap.style.height = `${6 * this.gridSize}px`;
+    } else if (type === 'custom:ddc-text-card') {
+      wrap.style.width  = `${14 * this.gridSize}px`;
+      wrap.style.height = `${5 * this.gridSize}px`;
     } else {
       wrap.style.width  = `${14*this.gridSize}px`;
       wrap.style.height = `${10*this.gridSize}px`;
@@ -17305,6 +17842,11 @@ return {
         try {
           const json = JSON.parse(txt);
           this._dbgPush('import', 'Loaded file', { bytes: txt.length });
+          if (this._isSingleCardImportPayload_(json)) {
+            await this._importSingleCardPayload_(json);
+            const ev = new Event('ddc-logrefresh'); window.dispatchEvent(ev);
+            return;
+          }
           this._setDashboardPackages_(json.packages || []);
           this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
             json.options?.responsive_viewports || this.responsiveViewportProfiles
@@ -18163,6 +18705,46 @@ modal.innerHTML = `
       </div>
     </section>
 
+    <!-- Layers -->
+    <section class="card layers-card" aria-labelledby="layers-head">
+      <div class="section-head">
+        <ha-icon icon="mdi:layers-triple-outline" aria-hidden="true"></ha-icon>
+        <h4 id="layers-head">Layers</h4>
+      </div>
+      <p class="caption">Create optional visibility layers on top of tabs. Cards without assigned layers remain visible everywhere for backward compatibility.</p>
+
+      <div class="setting" role="group" aria-labelledby="lbl-layers-enabled">
+        <div class="layer-toggle-row">
+          <div class="title">
+            <ha-icon icon="mdi:layers-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-layers-enabled" for="ddc-setting-layersEnabled">Enable Layers</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-layersEnabled"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">When enabled, you can assign cards to one or more layers and show or hide them from a compact layer bar in the dashboard.</div>
+      </div>
+
+      <div id="ddc-layers-list" class="setting" aria-live="polite"></div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-add-layer">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:layer-plus" aria-hidden="true"></ha-icon>
+            <label id="lbl-add-layer" for="ddc-new-layer-name">Add layer</label>
+          </div>
+          <div class="control">
+            <div class="row">
+              <input type="text" id="ddc-new-layer-name" placeholder="e.g. Night mode" class="grow" />
+              <button class="btn primary" id="ddc-add-layer-btn">Add</button>
+            </div>
+          </div>
+        </div>
+        <div class="hint">The first layer defaults to <code>standard</code>. You can rename labels later without breaking older cards.</div>
+      </div>
+    </section>
+
     <!-- Features -->
     <section class="card packages-card" aria-labelledby="packages-head">
       <div class="section-head">
@@ -18320,6 +18902,10 @@ modal.innerHTML = `
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    const chkLayersEnabled   = modal.querySelector('#ddc-setting-layersEnabled');
+    const layersListEl       = modal.querySelector('#ddc-layers-list');
+    const newLayerNameInput  = modal.querySelector('#ddc-new-layer-name');
+    const addLayerBtn        = modal.querySelector('#ddc-add-layer-btn');
     const packagesListEl     = modal.querySelector('#ddc-packages-list');
     const addFeatureBtns     = Array.from(modal.querySelectorAll('.ddc-feature-add-btn'));
     const packageDiagnosticsBtn = modal.querySelector('#ddc-package-diagnostics-btn');
@@ -18469,6 +19055,27 @@ modal.innerHTML = `
         __yamlDirty: !!String(pkg.yaml ?? pkg.content ?? pkg.body ?? '').trim(),
       };
     };
+    const cloneLayerDraft = (layer = {}, index = 0) => ({
+      id: String(layer.id || `layer-${index + 1}`),
+      label: String(layer.label || layer.name || `Layer ${index + 1}`),
+      icon: String(layer.icon || 'mdi:layers-outline'),
+      color: String(layer.color || '#60a5fa'),
+      default_active: layer.default_active !== false,
+    });
+    const normalizeLayerDrafts = (drafts = []) => this._normalizeDashboardLayers_(
+      (Array.isArray(drafts) ? drafts : []).map((layer, index) => ({
+        id: String(layer?.id || `layer-${index + 1}`),
+        label: String(layer?.label || layer?.name || `Layer ${index + 1}`),
+        icon: String(layer?.icon || 'mdi:layers-outline'),
+        color: String(layer?.color || '#60a5fa'),
+        default_active: layer?.default_active !== false,
+      }))
+    );
+    let layersEnabledDraft = !!this.layersEnabled;
+    let layerDrafts = (this.layers || []).map((layer, index) => cloneLayerDraft(layer, index));
+    if (layersEnabledDraft && !layerDrafts.length) {
+      layerDrafts = [cloneLayerDraft(this._defaultDashboardLayer_(), 0)];
+    }
     let packageDrafts = this._exportDashboardPackages_().map((pkg, index) => clonePackageDraft(pkg, index));
     const featureSummaryFromYaml = (yaml = '') => {
       const line = String(yaml || '')
@@ -18502,6 +19109,121 @@ modal.innerHTML = `
       } else {
         selDashboardTheme.value = '';
       }
+    };
+    const syncLayerDraftState = () => {
+      const enabled = !!layersEnabledDraft;
+      if (chkLayersEnabled) chkLayersEnabled.checked = enabled;
+      if (layersListEl) {
+        layersListEl.style.opacity = enabled ? '1' : '.6';
+      }
+      if (newLayerNameInput) newLayerNameInput.disabled = !enabled;
+      if (addLayerBtn) addLayerBtn.disabled = !enabled;
+    };
+    const renderLayers = () => {
+      if (!layersListEl) return;
+      syncLayerDraftState();
+      layersListEl.innerHTML = '';
+      if (!layersEnabledDraft) {
+        const hint = document.createElement('div');
+        hint.className = 'layer-empty';
+        hint.textContent = 'Layers are currently off. Turn them on to create smaller visibility groups beneath the tabs area.';
+        layersListEl.appendChild(hint);
+        return;
+      }
+
+      if (!layerDrafts.length) {
+        const hint = document.createElement('div');
+        hint.className = 'layer-empty';
+        hint.textContent = 'No layers yet. Add your first one below. Cards without assigned layers stay visible on every layer.';
+        layersListEl.appendChild(hint);
+        return;
+      }
+
+      layerDrafts.forEach((layer, index) => {
+        const row = document.createElement('div');
+        row.className = 'layer-row';
+        row.dataset.layerId = layer.id;
+
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.value = layer.label || '';
+        labelInput.placeholder = 'Layer label';
+        labelInput.title = 'Layer label';
+        labelInput.addEventListener('input', () => {
+          layerDrafts[index] = {
+            ...layerDrafts[index],
+            label: labelInput.value,
+          };
+        });
+
+        const iconInput = document.createElement('input');
+        iconInput.type = 'text';
+        iconInput.value = layer.icon || '';
+        iconInput.placeholder = 'mdi:layers-outline';
+        iconInput.title = 'Layer icon';
+        iconInput.addEventListener('input', () => {
+          layerDrafts[index] = {
+            ...layerDrafts[index],
+            icon: iconInput.value.trim() || 'mdi:layers-outline',
+          };
+        });
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(layer.color || '').trim())
+          ? String(layer.color).trim()
+          : '#60a5fa';
+        colorInput.title = 'Layer accent color';
+        colorInput.addEventListener('input', () => {
+          layerDrafts[index] = {
+            ...layerDrafts[index],
+            color: colorInput.value,
+          };
+        });
+
+        const activeWrap = document.createElement('div');
+        activeWrap.className = 'layer-actions';
+        const activeToggle = document.createElement('ha-switch');
+        activeToggle.checked = layer.default_active !== false;
+        activeToggle.title = 'Enabled by default';
+        activeToggle.addEventListener('change', () => {
+          layerDrafts[index] = {
+            ...layerDrafts[index],
+            default_active: !!activeToggle.checked,
+          };
+        });
+        activeWrap.appendChild(activeToggle);
+
+        const actions = document.createElement('div');
+        actions.className = 'layer-actions';
+
+        const previewChip = document.createElement('span');
+        previewChip.className = 'layer-chip';
+        previewChip.style.setProperty('--ddc-layer-accent', layer.color || '#60a5fa');
+        previewChip.style.borderColor = `color-mix(in oklab, ${layer.color || '#60a5fa'} 48%, transparent)`;
+        previewChip.style.background = `color-mix(in oklab, ${layer.color || '#60a5fa'} 12%, transparent)`;
+        previewChip.innerHTML = `<ha-icon icon="${layer.icon || 'mdi:layers-outline'}"></ha-icon><span>${layer.label || layer.id}</span>`;
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'icon-btn danger';
+        delBtn.title = 'Delete layer';
+        delBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
+        delBtn.addEventListener('click', () => {
+          layerDrafts.splice(index, 1);
+          renderLayers();
+        });
+
+        actions.appendChild(previewChip);
+        actions.appendChild(delBtn);
+
+        row.appendChild(labelInput);
+        row.appendChild(iconInput);
+        row.appendChild(colorInput);
+        row.appendChild(activeWrap);
+        row.appendChild(actions);
+        layersListEl.appendChild(row);
+      });
     };
     const updateDashboardThemeState = () => {
       const enabled = !!chkDashboardThemeEnabled?.checked;
@@ -19549,6 +20271,7 @@ modal.innerHTML = `
       });
     };
     renderTabs();
+    renderLayers();
     renderPackages();
     renderPackageDiagnostics('');
     packageDiagnosticsBtn?.addEventListener('click', runPackageDiagnostics);
@@ -19567,6 +20290,42 @@ modal.innerHTML = `
       await writeTabs(tabs, defaultTabId());
       inp.value = '';
       renderTabs();
+    });
+
+    chkLayersEnabled?.addEventListener('change', () => {
+      layersEnabledDraft = !!chkLayersEnabled.checked;
+      if (layersEnabledDraft && !layerDrafts.length) {
+        layerDrafts = [cloneLayerDraft(this._defaultDashboardLayer_(), 0)];
+      }
+      renderLayers();
+    });
+
+    const addLayerFromInput = () => {
+      if (!layersEnabledDraft) return;
+      const raw = String(newLayerNameInput?.value || '').trim();
+      if (!raw) return;
+      const nextIdBase = this._normalizeLayerId_(raw, `layer-${layerDrafts.length + 1}`);
+      let nextId = nextIdBase;
+      let suffix = 2;
+      const ids = new Set(layerDrafts.map((layer) => String(layer.id || '')));
+      while (ids.has(nextId)) nextId = `${nextIdBase}-${suffix++}`;
+      layerDrafts.push({
+        id: nextId,
+        label: raw,
+        icon: 'mdi:layers-outline',
+        color: '#60a5fa',
+        default_active: true,
+      });
+      if (newLayerNameInput) newLayerNameInput.value = '';
+      renderLayers();
+    };
+
+    addLayerBtn?.addEventListener('click', addLayerFromInput);
+    newLayerNameInput?.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        addLayerFromInput();
+      }
     });
 
     addFeatureBtns.forEach((btn) => {
@@ -19798,6 +20557,12 @@ modal.innerHTML = `
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = (newTabsPositionRaw === 'left' || newTabsPositionRaw === 'bottom') ? newTabsPositionRaw : 'top';
+      const newLayersEnabled = !!chkLayersEnabled?.checked;
+      const normalizedLayers = normalizeLayerDrafts(
+        newLayersEnabled
+          ? (layerDrafts.length ? layerDrafts : [cloneLayerDraft(this._defaultDashboardLayer_(), 0)])
+          : layerDrafts
+      );
       const normalizedPackages = this._normalizeDashboardPackages_(packageDrafts.map((pkg, index) => ({
         id: String(pkg.id || `package_${index + 1}`).trim() || `package_${index + 1}`,
         name: String(pkg.name || `Package ${index + 1}`).trim() || `Package ${index + 1}`,
@@ -19898,6 +20663,7 @@ modal.innerHTML = `
         this.mobileDynamicBehavior = newMobileDynamicBehavior;
         this.doNotResizeText = newDoNotResizeText;
         this.outerGridBuffer = newOuterGridBuffer;
+        this.layersEnabled = newLayersEnabled;
         this.dashboardThemeEnabled = newDashboardThemeEnabled;
         this.dashboardTheme = newDashboardTheme;
         this.dashboardThemeOverrideAllDesign = newDashboardThemeOverrideAllDesign;
@@ -19929,9 +20695,17 @@ modal.innerHTML = `
         this.tabsPosition = newTabsPosition;
         this._config = this._config || {};
         if (this._config.options) {
-          this._config.options = { ...(this._config.options || {}), tabs_position: this.tabsPosition };
+          this._config.options = {
+            ...(this._config.options || {}),
+            tabs_position: this.tabsPosition,
+            layers_enabled: !!this.layersEnabled,
+            layers: this._cloneJson_(normalizedLayers),
+          };
         }
         this._config.tabs_position = this.tabsPosition;
+        this._config.layers_enabled = !!this.layersEnabled;
+        this._config.layers = this._cloneJson_(normalizedLayers);
+        this._setDashboardLayers_(normalizedLayers, { refresh: true, persist: true });
         this._syncTabsPlacement_?.();
         this._renderTabs?.();
         this._applyActiveTab?.();
@@ -20219,6 +20993,8 @@ modal.innerHTML = `
       tabs_position: this.tabsPosition,
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
+      layers_enabled: !!this.layersEnabled,
+      layers: this._cloneJson_(this.layers || []),
 
       // Background (image | particles | youtube | none)
       background_mode: bgMode,
@@ -20299,6 +21075,14 @@ modal.innerHTML = `
     }
     if ('dashboard_theme_override_all_design' in opts || 'theme_override_all_design' in opts) {
       this.dashboardThemeOverrideAllDesign = !!(opts.dashboard_theme_override_all_design ?? opts.theme_override_all_design);
+    }
+    if ('layers_enabled' in opts || 'enable_layers' in opts) {
+      this.layersEnabled = !!(opts.layers_enabled ?? opts.enable_layers);
+    }
+    if ('layers' in opts) {
+      this._setDashboardLayers_(opts.layers || [], { refresh: false, persist: true });
+    } else if ('layers_enabled' in opts || 'enable_layers' in opts) {
+      this._setDashboardLayers_(this.layers || [], { refresh: false, persist: true });
     }
     if ('debug' in opts)              this.debug = !!opts.debug;
     if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
@@ -20386,9 +21170,240 @@ modal.innerHTML = `
       this._applyActiveTab?.();
       this._syncTabsWidth_?.();
     }
+    if ('layers' in opts || 'layers_enabled' in opts || 'enable_layers' in opts) {
+      this._renderLayersBar_?.();
+      this._applyActiveTab?.();
+    }
     this._renderConnectors?.();
     this.__ddcTextLockDirty = true;
     this._scheduleTextResizeLockRefresh_?.(true);
+  }
+
+  _downloadJsonFile_(name, payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  _getHighestZForEntries_(entries = []) {
+    return (Array.isArray(entries) ? entries : []).reduce((max, entry) => {
+      const z = Number(entry?.z);
+      return Number.isFinite(z) ? Math.max(max, Math.round(z)) : max;
+    }, 5);
+  }
+
+  _getImportViewportBoundsForLayoutVariant_(variantKey = '') {
+    const layoutKey = String(variantKey || this._getActiveResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
+    const { profile, orientation } = this._splitResponsiveLayoutKey_(layoutKey);
+    const viewport = this._getResponsiveViewportProfile_?.(profile, orientation);
+    const width = Math.max(1, Number(viewport?.width || 0) || 0);
+    const height = Math.max(1, Number(viewport?.height || 0) || 0);
+    if (width > 0 && height > 0) return { width, height };
+    const fallback = this._getContainerSize?.() || {};
+    return {
+      width: Math.max(1, Number(fallback?.w || fallback?.width || 0) || 1),
+      height: Math.max(1, Number(fallback?.h || fallback?.height || 0) || 1),
+    };
+  }
+
+  _findNextAvailablePositionForEntries_(entries = [], size = {}, bounds = null) {
+    const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+    const width = Math.max(1, Number(size?.width) || (14 * gs));
+    const height = Math.max(1, Number(size?.height) || (10 * gs));
+    const boundWidth = Number(bounds?.width);
+    const boundHeight = Number(bounds?.height);
+    const hasBounds = Number.isFinite(boundWidth) && boundWidth > 0 && Number.isFinite(boundHeight) && boundHeight > 0;
+    const existingRects = (Array.isArray(entries) ? entries : []).map((entry) => ({
+      x: Number(entry?.position?.x) || 0,
+      y: this._clampYToCanvasTop_(Number(entry?.position?.y) || 0),
+      w: Math.max(1, Number(entry?.size?.width) || (14 * gs)),
+      h: Math.max(1, Number(entry?.size?.height) || (10 * gs)),
+    }));
+    const maxX = existingRects.reduce((max, rect) => Math.max(max, rect.x + rect.w), 0);
+    const searchCols = hasBounds
+      ? Math.max(1, Math.floor(Math.max(0, boundWidth - width) / gs) + 1)
+      : Math.max(24, Math.ceil((maxX + width + gs * 12) / gs));
+    const searchRows = hasBounds
+      ? Math.max(1, Math.floor(Math.max(0, boundHeight - height) / gs) + 1)
+      : 400;
+    const candidateRect = { x: 0, y: 0, w: width, h: height };
+
+    for (let yi = 0; yi < searchRows; yi += 1) {
+      for (let xi = 0; xi < searchCols; xi += 1) {
+        candidateRect.x = xi * gs;
+        candidateRect.y = this._clampYToCanvasTop_(yi * gs);
+        if (hasBounds) {
+          if ((candidateRect.x + candidateRect.w) > boundWidth) continue;
+          if ((candidateRect.y + candidateRect.h) > boundHeight) continue;
+        }
+        const collision = existingRects.some((rect) => this._rectsOverlap(candidateRect, rect));
+        if (!collision) {
+          return { x: candidateRect.x, y: candidateRect.y };
+        }
+      }
+    }
+    return { x: 0, y: 0 };
+  }
+
+  _captureSingleCardExportPayload_(wrap) {
+    if (!wrap) return null;
+    this._persistCurrentResponsiveProfileToMemory_?.();
+    const layoutCardId = wrap.dataset.layoutCardId || this._genLayoutCardId_();
+    const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const currentEntries = this._captureCurrentLayoutEntries_();
+    const activeEntry = currentEntries.find((entry) => entry.id === layoutCardId)
+      || this._responsiveLayouts?.[activeLayoutKey]?.find?.((entry) => entry?.id === layoutCardId)
+      || null;
+    if (!activeEntry?.card) return null;
+
+    const responsiveEntries = {};
+    (this._responsiveLayoutVariantKeys_?.() || []).forEach((variantKey) => {
+      const found = this._responsiveLayouts?.[variantKey]?.find?.((entry) => entry?.id === layoutCardId);
+      if (found?.card) responsiveEntries[variantKey] = this._normalizeSavedCardEntry_(found, found);
+    });
+    if (!responsiveEntries[activeLayoutKey]) {
+      responsiveEntries[activeLayoutKey] = this._normalizeSavedCardEntry_(activeEntry, activeEntry);
+    }
+
+    return {
+      kind: 'ddc-card',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      source_storage_key: this.storageKey || null,
+      entry: this._normalizeSavedCardEntry_(activeEntry, activeEntry),
+      responsive_entries: this._cloneJson_(responsiveEntries),
+    };
+  }
+
+  _exportSingleCard_(wrap) {
+    const payload = this._captureSingleCardExportPayload_(wrap);
+    if (!payload?.entry?.card) {
+      this._toast?.('Could not export this card.');
+      return;
+    }
+    const typeToken = String(payload.entry?.card?.type || 'card')
+      .replace(/^custom:/i, '')
+      .replace(/[^a-z0-9]+/gi, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase() || 'card';
+    const fileName = `ddc_card_${typeToken}_${payload.entry.id || Date.now()}.json`;
+    this._downloadJsonFile_(fileName, payload);
+    this._toast?.('Card exported.');
+  }
+
+  _isSingleCardImportPayload_(json = null) {
+    if (!json || typeof json !== 'object') return false;
+    if (json.kind === 'ddc-card') return true;
+    if (json.entry?.card) return true;
+    if (json.card?.card) return true;
+    if (json.responsive_entries && typeof json.responsive_entries === 'object') return true;
+    return false;
+  }
+
+  async _createWrapperFromSavedEntry_(entry = {}) {
+    const normalized = this._normalizeSavedCardEntry_(entry, entry);
+    if (!normalized?.card || (typeof normalized.card === 'object' && Object.keys(normalized.card).length === 0)) {
+      const wrap = this._makePlaceholderAt(
+        normalized.position?.x || 0,
+        normalized.position?.y || 0,
+        normalized.size?.width || 200,
+        normalized.size?.height || 200
+      );
+      wrap.dataset.layoutCardId = normalized.id;
+      wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+      this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+      return wrap;
+    }
+    const cardEl = await this._createCard(normalized.card);
+    const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
+    if (this.editMode) wrap.classList.add('editing');
+    wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+    this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+    this._setCardPosition(wrap, normalized.position?.x || 0, normalized.position?.y || 0);
+    wrap.style.width = `${normalized.size?.width ?? 14 * this.gridSize}px`;
+    wrap.style.height = `${normalized.size?.height ?? 10 * this.gridSize}px`;
+    if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
+    if (normalized.overflow) {
+      try {
+        wrap.style.overflow = normalized.overflow;
+        wrap.dataset.overflow = normalized.overflow;
+        const inner = wrap.firstElementChild;
+        if (inner) inner.style.overflow = normalized.overflow;
+      } catch {}
+    }
+    try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
+    return wrap;
+  }
+
+  async _importSingleCardPayload_(payload = {}) {
+    const baseEntryRaw = payload?.entry?.card ? payload.entry : (payload?.card?.card ? payload.card : payload);
+    if (!baseEntryRaw?.card) {
+      this._toast?.('Import failed — invalid card file.');
+      return false;
+    }
+
+    this._persistCurrentResponsiveProfileToMemory_?.();
+    if (!this._responsiveLayouts) {
+      this._responsiveLayouts = this._normalizeResponsiveLayouts_(this._captureCurrentLayoutEntries_(), null);
+    }
+
+    const responsiveEntriesRaw = payload?.responsive_entries || payload?.responsiveEntries || {};
+    const variantKeys = this._responsiveLayoutVariantKeys_?.() || [this._activeResponsiveLayoutKey || 'desktop_landscape'];
+    const newLayoutCardId = this._genLayoutCardId_();
+    const targetTabId = this._normalizeTabId(this.activeTab || this.defaultTab);
+    const importedByVariant = {};
+
+    variantKeys.forEach((variantKey) => {
+      const sourceEntryRaw = responsiveEntriesRaw?.[variantKey]?.card
+        ? responsiveEntriesRaw[variantKey]
+        : baseEntryRaw;
+      const sourceEntry = this._normalizeSavedCardEntry_(sourceEntryRaw, baseEntryRaw);
+      const currentEntries = Array.isArray(this._responsiveLayouts?.[variantKey])
+        ? this._responsiveLayouts[variantKey].map((entry) => this._normalizeSavedCardEntry_(entry, entry))
+        : [];
+      const importedEntry = this._normalizeSavedCardEntry_({
+        ...this._cloneJson_(sourceEntry),
+        id: newLayoutCardId,
+        tabId: targetTabId,
+      }, sourceEntry);
+      importedEntry.id = newLayoutCardId;
+      importedEntry.tabId = targetTabId;
+      importedEntry.position = this._findNextAvailablePositionForEntries_(
+        currentEntries,
+        importedEntry.size,
+        this._getImportViewportBoundsForLayoutVariant_(variantKey)
+      );
+      importedEntry.z = Math.max(6, this._getHighestZForEntries_(currentEntries) + 1);
+      currentEntries.push(importedEntry);
+      this._responsiveLayouts[variantKey] = currentEntries;
+      importedByVariant[variantKey] = importedEntry;
+    });
+
+    const activeLayoutKey = this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const activeEntry = importedByVariant[activeLayoutKey] || importedByVariant[this._getPrimaryResponsiveLayoutKey_?.()] || Object.values(importedByVariant)[0];
+    if (activeEntry) {
+      this._hideEmptyPlaceholder?.();
+      const wrap = await this._createWrapperFromSavedEntry_(activeEntry);
+      if (wrap) {
+        this.cardContainer.appendChild(wrap);
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+        if (!wrap.classList.contains('ddc-placeholder')) {
+          this._initCardInteract?.(wrap);
+        }
+      }
+    }
+
+    this._resizeContainer?.();
+    this._syncEmptyStateUI?.();
+    try { this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); } catch {}
+    try { this._applyVisibility_?.(); } catch {}
+    try { this._renderConnectors_?.(); } catch {}
+    try { await this._saveLayout(false); } catch { this._queueSave?.('import-card'); }
+    this._toast?.('Card imported.');
+    return true;
   }
 
   _exportDesign() {
@@ -20410,12 +21425,7 @@ modal.innerHTML = `
     }
 
     const name = `DragAndDrop_Design_${this.storageKey || 'layout'}.json`;
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    this._downloadJsonFile_(name, payload);
     this._toast('Design exported.');
   }  
   
@@ -20443,7 +21453,8 @@ _importDesign() {
     'container_preset','container_preset_orientation',
 
     // Tabs
-    'tabs','tabs_position','default_tab','hide_tabs_when_single',
+    'tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled',
+    'layers',
 
     // HA chrome
     'hide_HA_Header','hide_HA_Sidebar',
@@ -20462,6 +21473,10 @@ _importDesign() {
 
     try {
       const json = JSON.parse(txt);
+      if (this._isSingleCardImportPayload_(json)) {
+        await this._importSingleCardPayload_(json);
+        return;
+      }
       const prevStorageKey = this.storageKey || this._config?.storage_key || null;
       this._setDashboardPackages_(json.packages || []);
 
@@ -22111,10 +23126,19 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
   const DDC_HTML_CARD_EDITOR_TAG = 'ddc-html-card-editor';
   const DDC_LINE_CARD_TAG = 'ddc-line-card';
   const DDC_LINE_CARD_EDITOR_TAG = 'ddc-line-card-editor';
+  const DDC_TABLE_CARD_TAG = 'ddc-table-card';
+  const DDC_TABLE_CARD_EDITOR_TAG = 'ddc-table-card-editor';
+  const DDC_ICON_CARD_TAG = 'ddc-icon-card';
+  const DDC_ICON_CARD_EDITOR_TAG = 'ddc-icon-card-editor';
+  const DDC_TEXT_CARD_TAG = 'ddc-text-card';
+  const DDC_TEXT_CARD_EDITOR_TAG = 'ddc-text-card-editor';
   const __DDC_HTML_ASYNC_FUNCTION__ = Object.getPrototypeOf(async function () {}).constructor;
   const __DDC_INTERNAL_CARD_TAGS__ = {
     'custom:ddc-html-card': DDC_HTML_CARD_TAG,
-    'custom:ddc-line-card': DDC_LINE_CARD_TAG
+    'custom:ddc-line-card': DDC_LINE_CARD_TAG,
+    'custom:ddc-table-card': DDC_TABLE_CARD_TAG,
+    'custom:ddc-icon-card': DDC_ICON_CARD_TAG,
+    'custom:ddc-text-card': DDC_TEXT_CARD_TAG
   };
 
   function __createDdcInternalCardElement__(cfg, hass) {
@@ -22195,6 +23219,193 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
     const tokens = __ddcLineSplitTokens__(activeStates);
     if (!tokens.length) return __ddcLineIsTruthyState__(stateValue);
     return tokens.some((rule) => __ddcLineMatchesStateRule__(stateValue, rule));
+  }
+
+  function __ddcTableDefaultCell__(index = 0, columns = 3) {
+    const row = Math.floor(index / Math.max(1, columns));
+    const col = index % Math.max(1, columns);
+    if (row === 0) {
+      const headerLabels = ['Label', 'State', 'Action'];
+      return {
+        type: 'text',
+        text: headerLabels[col] || `Column ${col + 1}`,
+        icon: '',
+        entity: '',
+        align: col === 0 ? 'left' : 'center',
+        active_states: 'on,home,open,playing,charging,active,>0',
+        active_color: 'var(--primary-color, #ff9800)',
+        inactive_color: 'rgba(148, 163, 184, 0.18)',
+        button_action: 'more-info'
+      };
+    }
+    return {
+      type: row === 1 && col === 2 ? 'button' : (row === 1 && col === 1 ? 'entity' : (col === 1 ? 'badge' : 'text')),
+      text: row === 1 && col === 0 ? 'Primary' : '',
+      icon: row === 2 && col === 0 ? 'mdi:flash' : '',
+      entity: '',
+      align: col === 0 ? 'left' : 'center',
+      active_states: 'on,home,open,playing,charging,active,>0',
+      active_color: 'var(--primary-color, #ff9800)',
+      inactive_color: 'rgba(148, 163, 184, 0.18)',
+      button_action: 'more-info'
+    };
+  }
+
+  function __ddcTableNormalizeCell__(cell = {}, index = 0, columns = 3) {
+    const fallback = __ddcTableDefaultCell__(index, columns);
+    return {
+      ...fallback,
+      ...(cell || {}),
+      type: String(cell?.type || fallback.type || 'text').toLowerCase(),
+      text: String(cell?.text ?? fallback.text ?? ''),
+      icon: String(cell?.icon ?? fallback.icon ?? ''),
+      entity: String(cell?.entity ?? fallback.entity ?? ''),
+      align: String(cell?.align || fallback.align || 'left').toLowerCase(),
+      active_states: String(cell?.active_states ?? fallback.active_states ?? 'on,home,open,playing,charging,active,>0'),
+      active_color: String(cell?.active_color ?? fallback.active_color ?? 'var(--primary-color, #ff9800)'),
+      inactive_color: String(cell?.inactive_color ?? fallback.inactive_color ?? 'rgba(148, 163, 184, 0.18)'),
+      button_action: String(cell?.button_action || fallback.button_action || 'more-info').toLowerCase()
+    };
+  }
+
+  function __ddcTableEnsureCells__(rows = 3, columns = 3, cells = []) {
+    const total = Math.max(1, Math.min(144, Number(rows || 3) * Number(columns || 3)));
+    const source = Array.isArray(cells) ? cells : [];
+    return Array.from({ length: total }, (_, index) => {
+      return __ddcTableNormalizeCell__(source[index], index, columns);
+    });
+  }
+
+  function __ddcTableEscapeAttr__(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function __ddcTableEscapeHtml__(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function __ddcTextVariantPreset__(variant) {
+    switch (String(variant || '').toLowerCase()) {
+      case 'header':
+        return { font_size: 14, bold: true, letter_spacing: 0.16, line_height: 1.1 };
+      case 'h1':
+        return { font_size: 56, bold: true, letter_spacing: -0.06, line_height: 0.96 };
+      case 'h2':
+        return { font_size: 44, bold: true, letter_spacing: -0.045, line_height: 1.02 };
+      case 'h3':
+        return { font_size: 34, bold: true, letter_spacing: -0.03, line_height: 1.08 };
+      case 'h4':
+        return { font_size: 26, bold: true, letter_spacing: -0.018, line_height: 1.14 };
+      case 'paragraph':
+      case 'p':
+        return { font_size: 18, bold: false, letter_spacing: 0, line_height: 1.58 };
+      case 'small':
+        return { font_size: 13, bold: false, letter_spacing: 0.02, line_height: 1.42 };
+      case 'title':
+      default:
+        return { font_size: 42, bold: true, letter_spacing: -0.03, line_height: 1.05 };
+    }
+  }
+
+  function __ddcTextInlineMarkup__(value) {
+    let html = __ddcTableEscapeHtml__(String(value ?? ''));
+    html = html.replace(/\*\*\*([\s\S]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    return html;
+  }
+
+  function __ddcTextRichMarkup__(value) {
+    const lines = String(value ?? '').replace(/\r\n?/g, '\n').split('\n');
+    const blocks = [];
+    lines.forEach((raw) => {
+      const line = String(raw ?? '').trimEnd();
+      const trimmed = line.trim();
+      if (!trimmed) {
+        blocks.push('<div class="ddc-rich-break" aria-hidden="true"></div>');
+        return;
+      }
+      if (trimmed.startsWith('###### ')) {
+        blocks.push(`<div class="ddc-rich-line ddc-rich-small">${__ddcTextInlineMarkup__(trimmed.slice(7))}</div>`);
+        return;
+      }
+      if (trimmed.startsWith('##### ')) {
+        blocks.push(`<div class="ddc-rich-line ddc-rich-header">${__ddcTextInlineMarkup__(trimmed.slice(6))}</div>`);
+        return;
+      }
+      if (trimmed.startsWith('#### ')) {
+        blocks.push(`<h4 class="ddc-rich-line">${__ddcTextInlineMarkup__(trimmed.slice(5))}</h4>`);
+        return;
+      }
+      if (trimmed.startsWith('### ')) {
+        blocks.push(`<h3 class="ddc-rich-line">${__ddcTextInlineMarkup__(trimmed.slice(4))}</h3>`);
+        return;
+      }
+      if (trimmed.startsWith('## ')) {
+        blocks.push(`<h2 class="ddc-rich-line">${__ddcTextInlineMarkup__(trimmed.slice(3))}</h2>`);
+        return;
+      }
+      if (trimmed.startsWith('# ')) {
+        blocks.push(`<h1 class="ddc-rich-line">${__ddcTextInlineMarkup__(trimmed.slice(2))}</h1>`);
+        return;
+      }
+      blocks.push(`<p class="ddc-rich-line">${__ddcTextInlineMarkup__(trimmed)}</p>`);
+    });
+    return blocks.join('');
+  }
+
+  function __ddcTextSanitizeRichHtml__(value) {
+    const html = String(value ?? '');
+    if (!html.trim()) return '';
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const allowedTags = new Set([
+      'p', 'div', 'br',
+      'h1', 'h2', 'h3', 'h4',
+      'blockquote', 'pre', 'code',
+      'ul', 'ol', 'li',
+      'strong', 'b', 'em', 'i', 'u', 's', 'small',
+      'span', 'a'
+    ]);
+
+    const sanitizeNode = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return document.createTextNode(node.textContent || '');
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return document.createDocumentFragment();
+      }
+      const tag = String(node.tagName || '').toLowerCase();
+      const safeTag = tag === 'b' ? 'strong' : tag === 'i' ? 'em' : tag;
+      const children = Array.from(node.childNodes).map((child) => sanitizeNode(child));
+      if (!allowedTags.has(tag)) {
+        const fragment = document.createDocumentFragment();
+        children.forEach((child) => fragment.appendChild(child));
+        return fragment;
+      }
+      const el = document.createElement(safeTag);
+      if (safeTag === 'a') {
+        const href = String(node.getAttribute('href') || '').trim();
+        if (/^(https?:|mailto:|tel:|\/)/i.test(href)) {
+          el.setAttribute('href', href);
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noreferrer noopener');
+        }
+      }
+      children.forEach((child) => el.appendChild(child));
+      return el;
+    };
+
+    const out = document.createElement('div');
+    Array.from(tpl.content.childNodes).forEach((node) => out.appendChild(sanitizeNode(node)));
+    return out.innerHTML;
   }
 
   class DdcLineCard extends HTMLElement {
@@ -22824,6 +24035,2280 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
     }
   }
 
+  class DdcTableCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcTableCard.getStubConfig();
+      this._hass = null;
+      this._shellReady = false;
+      this._boundCellClick = this._handleCellClick_.bind(this);
+    }
+
+    static getStubConfig() {
+      return {
+        type: 'custom:ddc-table-card',
+        title: '',
+        rows: 3,
+        columns: 3,
+        header_row: true,
+        border: true,
+        radius: 16,
+        spacing: 8,
+        cells: __ddcTableEnsureCells__(3, 3, [])
+      };
+    }
+
+    static async getConfigElement() {
+      return document.createElement(DDC_TABLE_CARD_EDITOR_TAG);
+    }
+
+    async getConfigElement() {
+      return document.createElement(DDC_TABLE_CARD_EDITOR_TAG);
+    }
+
+    setConfig(config) {
+      const rows = __ddcLineNormalizeNumber__(config?.rows, 3, 1, 18);
+      const columns = __ddcLineNormalizeNumber__(config?.columns, 3, 1, 12);
+      this._config = {
+        ...DdcTableCard.getStubConfig(),
+        ...(config || {}),
+        rows,
+        columns,
+        header_row: config?.header_row !== false,
+        border: config?.border !== false,
+        radius: __ddcLineNormalizeNumber__(config?.radius, 16, 0, 40),
+        spacing: __ddcLineNormalizeNumber__(config?.spacing, 8, 0, 32),
+        cells: __ddcTableEnsureCells__(rows, columns, config?.cells || [])
+      };
+      this._renderCard_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      this._renderCard_();
+    }
+
+    get hass() {
+      return this._hass;
+    }
+
+    connectedCallback() {
+      if (this._config) this._renderCard_();
+    }
+
+    getCardSize() {
+      const rows = Number(this._config?.rows || 3) || 3;
+      return Math.max(1, Math.ceil((rows + (this._config?.title ? 1 : 0)) / 2));
+    }
+
+    _ensureShell_() {
+      if (this._shellReady || !this.shadowRoot) return;
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            color:var(--primary-text-color);
+          }
+          ha-card{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            background:transparent;
+            box-shadow:none;
+            border-radius:inherit;
+            overflow:visible;
+          }
+          .shell{
+            display:grid;
+            gap:12px;
+            height:100%;
+            min-height:100%;
+            padding:8px;
+            box-sizing:border-box;
+          }
+          .title{
+            display:none;
+            margin:0;
+            font-size:1rem;
+            font-weight:800;
+            letter-spacing:-0.03em;
+            line-height:1.1;
+          }
+          .title.show{
+            display:block;
+          }
+          .table-grid{
+            display:grid;
+            grid-template-columns:repeat(var(--ddc-table-columns, 3), minmax(0, 1fr));
+            gap:var(--ddc-table-gap, 8px);
+            align-content:start;
+            min-height:0;
+          }
+          .table-cell{
+            min-height:70px;
+            display:grid;
+            gap:8px;
+            align-content:center;
+            justify-items:start;
+            padding:14px;
+            box-sizing:border-box;
+            border-radius:var(--ddc-table-radius, 16px);
+            background:var(--ddc-table-cell-fill, rgba(255,255,255,.035));
+            border:1px solid var(--ddc-table-cell-border, rgba(255,255,255,.08));
+            text-align:left;
+            overflow:hidden;
+            position:relative;
+          }
+          .table-cell.align-center{
+            justify-items:center;
+            text-align:center;
+          }
+          .table-cell.align-right{
+            justify-items:end;
+            text-align:right;
+          }
+          .table-cell.no-border{
+            border-color:transparent;
+          }
+          .table-cell.is-header{
+            min-height:56px;
+            align-content:center;
+            background:rgba(255,255,255,.055);
+            border-color:rgba(255,255,255,.1);
+          }
+          .table-cell.is-header .cell-text,
+          .table-cell.is-header .cell-label{
+            font-size:.76rem;
+            font-weight:800;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            color:rgba(241,245,249,.96);
+          }
+          .cell-stack{
+            display:grid;
+            gap:6px;
+            min-width:0;
+            width:100%;
+          }
+          .cell-label{
+            font-size:.78rem;
+            font-weight:700;
+            color:rgba(203,213,225,.88);
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+          }
+          .cell-value,
+          .cell-text{
+            font-size:1rem;
+            font-weight:800;
+            line-height:1.15;
+            overflow:hidden;
+            text-overflow:ellipsis;
+          }
+          .cell-value{
+            font-size:1.1rem;
+          }
+          .cell-meta{
+            font-size:.8rem;
+            color:rgba(203,213,225,.76);
+          }
+          .cell-icon-chip{
+            width:42px;
+            height:42px;
+            display:grid;
+            place-items:center;
+            border-radius:14px;
+            background:color-mix(in srgb, var(--ddc-table-cell-tone, rgba(148,163,184,.35)) 22%, rgba(255,255,255,.04));
+            color:var(--ddc-table-cell-tone, var(--primary-color, #ff9800));
+            flex-shrink:0;
+          }
+          .cell-icon-chip ha-icon{
+            width:24px;
+            height:24px;
+          }
+          .cell-inline{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            min-width:0;
+            width:100%;
+          }
+          .cell-badge{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            width:fit-content;
+            max-width:100%;
+            padding:8px 12px;
+            border-radius:999px;
+            background:color-mix(in srgb, var(--ddc-table-cell-tone, rgba(148,163,184,.4)) 18%, rgba(255,255,255,.04));
+            color:var(--ddc-table-cell-tone, var(--primary-color, #ff9800));
+            font-size:.82rem;
+            font-weight:800;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+          }
+          .cell-button{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-height:42px;
+            width:100%;
+            max-width:100%;
+            padding:11px 14px;
+            border:0;
+            border-radius:14px;
+            background:linear-gradient(180deg, color-mix(in srgb, var(--ddc-table-cell-tone, var(--primary-color, #ff9800)) 82%, #fff 10%), color-mix(in srgb, var(--ddc-table-cell-tone, var(--primary-color, #ff9800)) 92%, #000 4%));
+            color:#fff;
+            font:inherit;
+            font-weight:800;
+            cursor:pointer;
+            box-shadow:0 8px 20px color-mix(in srgb, var(--ddc-table-cell-tone, var(--primary-color, #ff9800)) 20%, transparent);
+          }
+          .cell-button:disabled{
+            opacity:.52;
+            cursor:default;
+          }
+          .cell-button ha-icon{
+            width:18px;
+            height:18px;
+          }
+        </style>
+        <ha-card>
+          <div class="shell">
+            <h3 class="title"></h3>
+            <div class="table-grid"></div>
+          </div>
+        </ha-card>`;
+      this._titleEl = this.shadowRoot.querySelector('.title');
+      this._gridEl = this.shadowRoot.querySelector('.table-grid');
+      this._gridEl?.addEventListener('click', this._boundCellClick);
+      this._shellReady = true;
+    }
+
+    _handleCellClick_(ev) {
+      const button = ev.target?.closest?.('[data-table-button-index]');
+      if (!button) return;
+      ev.stopPropagation();
+      const index = Number(button.dataset.tableButtonIndex);
+      if (!Number.isFinite(index)) return;
+      const cell = this._config?.cells?.[index];
+      if (!cell) return;
+      this._runButtonAction_(cell);
+    }
+
+    _fireMoreInfo_(entityId) {
+      if (!entityId) return;
+      try {
+        this.dispatchEvent(new CustomEvent('hass-more-info', {
+          detail: { entityId },
+          bubbles: true,
+          composed: true
+        }));
+      } catch {}
+    }
+
+    _runButtonAction_(cell) {
+      const entityId = String(cell?.entity || '').trim();
+      const action = String(cell?.button_action || 'more-info').toLowerCase();
+      if (!entityId || action === 'none') return;
+      if (action === 'toggle') {
+        try { this._hass?.callService?.('homeassistant', 'toggle', { entity_id: entityId }); } catch {}
+        return;
+      }
+      this._fireMoreInfo_(entityId);
+    }
+
+    _formatEntityState_(entity) {
+      if (!entity) return '--';
+      const stateValue = String(entity.state ?? '').trim() || '--';
+      const unit = String(entity.attributes?.unit_of_measurement || '').trim();
+      if (!unit) return stateValue;
+      return stateValue.includes(unit) ? stateValue : `${stateValue} ${unit}`;
+    }
+
+    _resolveCellContext_(cell) {
+      const entityId = String(cell?.entity || '').trim();
+      const entity = entityId ? this._hass?.states?.[entityId] : null;
+      const stateValue = entity?.state ?? '';
+      const active = entityId ? __ddcLineIsActive__(stateValue, cell.active_states) : false;
+      const activeColor = String(cell?.active_color || 'var(--primary-color, #ff9800)');
+      const inactiveColor = String(cell?.inactive_color || 'rgba(148, 163, 184, 0.18)');
+      const tone = active ? activeColor : inactiveColor;
+      const fill = entityId
+        ? `color-mix(in srgb, ${tone} ${active ? 18 : 12}%, rgba(8, 15, 27, 0.94))`
+        : 'rgba(255,255,255,.035)';
+      const border = entityId
+        ? `color-mix(in srgb, ${tone} ${active ? 52 : 26}%, rgba(255,255,255,.08))`
+        : 'rgba(255,255,255,.08)';
+      const friendly = String(entity?.attributes?.friendly_name || entityId || '').trim();
+      return {
+        entity,
+        entityId,
+        stateValue,
+        active,
+        tone,
+        fill,
+        border,
+        friendly,
+        stateLabel: this._formatEntityState_(entity)
+      };
+    }
+
+    _renderCellMarkup_(cell, index, columns) {
+      const context = this._resolveCellContext_(cell);
+      const align = ['left', 'center', 'right'].includes(String(cell.align || '').toLowerCase())
+        ? String(cell.align).toLowerCase()
+        : 'left';
+      const row = Math.floor(index / Math.max(1, columns));
+      const isHeader = !!this._config?.header_row && row === 0;
+      const text = String(cell.text || '').trim();
+      const icon = String(cell.icon || context.entity?.attributes?.icon || '').trim();
+      const cellType = String(cell.type || 'text').toLowerCase();
+      const label = text || context.friendly || `Cell ${index + 1}`;
+      const stateLabel = context.stateLabel || '--';
+      const classes = [
+        'table-cell',
+        `align-${align}`,
+        isHeader ? 'is-header' : '',
+        this._config?.border === false ? 'no-border' : ''
+      ].filter(Boolean).join(' ');
+      const style = `--ddc-table-cell-tone:${__ddcTableEscapeAttr__(context.tone)};--ddc-table-cell-fill:${__ddcTableEscapeAttr__(context.fill)};--ddc-table-cell-border:${__ddcTableEscapeAttr__(context.border)};`;
+      if (cellType === 'icon') {
+        return `
+          <article class="${classes}" style="${style}">
+            <div class="cell-inline">
+              <div class="cell-icon-chip">${icon ? `<ha-icon icon="${__ddcTableEscapeAttr__(icon)}"></ha-icon>` : ''}</div>
+              <div class="cell-stack">
+                <span class="cell-label">${__ddcTableEscapeHtml__(label)}</span>
+                ${context.entityId ? `<span class="cell-meta">${__ddcTableEscapeHtml__(stateLabel)}</span>` : ''}
+              </div>
+            </div>
+          </article>`;
+      }
+      if (cellType === 'entity') {
+        return `
+          <article class="${classes}" style="${style}">
+            <div class="cell-stack">
+              <span class="cell-label">${__ddcTableEscapeHtml__(label)}</span>
+              <strong class="cell-value">${__ddcTableEscapeHtml__(stateLabel)}</strong>
+            </div>
+          </article>`;
+      }
+      if (cellType === 'badge') {
+        return `
+          <article class="${classes}" style="${style}">
+            <div class="cell-stack">
+              ${text ? `<span class="cell-label">${__ddcTableEscapeHtml__(text)}</span>` : ''}
+              <span class="cell-badge">${icon ? `<ha-icon icon="${__ddcTableEscapeAttr__(icon)}"></ha-icon>` : ''}${__ddcTableEscapeHtml__(stateLabel)}</span>
+            </div>
+          </article>`;
+      }
+      if (cellType === 'button') {
+        const buttonLabel = text || context.friendly || 'Open';
+        const iconMarkup = icon ? `<ha-icon icon="${__ddcTableEscapeAttr__(icon)}"></ha-icon>` : '';
+        return `
+          <article class="${classes}" style="${style}">
+            <div class="cell-stack">
+              <button class="cell-button" type="button" data-table-button-index="${index}" ${context.entityId ? '' : 'disabled'}>
+                ${iconMarkup}<span>${__ddcTableEscapeHtml__(buttonLabel)}</span>
+              </button>
+              ${context.entityId ? `<span class="cell-meta">${__ddcTableEscapeHtml__(stateLabel)}</span>` : `<span class="cell-meta">Assign an entity to enable this button.</span>`}
+            </div>
+          </article>`;
+      }
+      return `
+        <article class="${classes}" style="${style}">
+          <div class="cell-stack">
+            <span class="cell-text">${__ddcTableEscapeHtml__(label)}</span>
+            ${context.entityId ? `<span class="cell-meta">${__ddcTableEscapeHtml__(stateLabel)}</span>` : ''}
+          </div>
+        </article>`;
+    }
+
+    _renderCard_() {
+      this._ensureShell_();
+      if (!this._gridEl || !this._titleEl || !this._config) return;
+      const cfg = this._config;
+      this._titleEl.textContent = String(cfg.title || '').trim();
+      this._titleEl.classList.toggle('show', !!String(cfg.title || '').trim());
+      this._gridEl.style.setProperty('--ddc-table-columns', `${Math.max(1, Number(cfg.columns || 3) || 3)}`);
+      this._gridEl.style.setProperty('--ddc-table-gap', `${Math.max(0, Number(cfg.spacing || 8) || 0)}px`);
+      this._gridEl.style.setProperty('--ddc-table-radius', `${Math.max(0, Number(cfg.radius || 16) || 0)}px`);
+      const cells = __ddcTableEnsureCells__(cfg.rows || 3, cfg.columns || 3, cfg.cells || []);
+      this._gridEl.innerHTML = cells.map((cell, index) => this._renderCellMarkup_(cell, index, cfg.columns || 3)).join('');
+    }
+  }
+
+  class DdcTableCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcTableCard.getStubConfig();
+      this._configSig = '';
+      this._emitTimer = null;
+      this._eventsBound = false;
+      this._onInput = this._handleEditorInput_.bind(this);
+      this._onChange = this._handleEditorChange_.bind(this);
+      this._onBlur = this._handleEditorBlur_.bind(this);
+    }
+
+    setConfig(config) {
+      const next = this._normalizeConfig_(config || {});
+      const sig = JSON.stringify(next);
+      if (sig === this._configSig) return;
+      this._configSig = sig;
+      this._config = next;
+      this._renderEditor_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (!this.shadowRoot.childElementCount) this._renderEditor_();
+    }
+
+    _normalizeConfig_(config) {
+      const rows = __ddcLineNormalizeNumber__(config?.rows, 3, 1, 18);
+      const columns = __ddcLineNormalizeNumber__(config?.columns, 3, 1, 12);
+      return {
+        ...DdcTableCard.getStubConfig(),
+        ...(config || {}),
+        rows,
+        columns,
+        header_row: config?.header_row !== false,
+        border: config?.border !== false,
+        radius: __ddcLineNormalizeNumber__(config?.radius, 16, 0, 40),
+        spacing: __ddcLineNormalizeNumber__(config?.spacing, 8, 0, 32),
+        cells: __ddcTableEnsureCells__(rows, columns, config?.cells || [])
+      };
+    }
+
+    _queueEmit_() {
+      clearTimeout(this._emitTimer);
+      this._emitTimer = setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail: { config: { ...this._config, cells: this._config.cells.map((cell) => ({ ...cell })) } }
+        }));
+      }, 120);
+    }
+
+    _ensureListeners_() {
+      if (this._eventsBound || !this.shadowRoot) return;
+      this.shadowRoot.addEventListener('input', this._onInput);
+      this.shadowRoot.addEventListener('change', this._onChange);
+      this.shadowRoot.addEventListener('blur', this._onBlur, true);
+      this._eventsBound = true;
+    }
+
+    _handleEditorInput_(ev) {
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.id === 'tableTitle') {
+        this._config.title = target.value || '';
+        this._queueEmit_();
+        return;
+      }
+      if (!target.dataset.cellIndex) return;
+      this._updateCellField_(target);
+    }
+
+    _handleEditorChange_(ev) {
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.id === 'tableRows' || target.id === 'tableColumns') {
+        this._applyDimensionsFromInputs_();
+        return;
+      }
+      if (target.id === 'tableHeaderRow') {
+        this._config.header_row = !!target.checked;
+        this._queueEmit_();
+        return;
+      }
+      if (target.id === 'tableBorder') {
+        this._config.border = !!target.checked;
+        this._queueEmit_();
+        return;
+      }
+      if (target.id === 'tableRadius') {
+        this._config.radius = __ddcLineNormalizeNumber__(target.value, this._config.radius || 16, 0, 40);
+        this._queueEmit_();
+        return;
+      }
+      if (target.id === 'tableSpacing') {
+        this._config.spacing = __ddcLineNormalizeNumber__(target.value, this._config.spacing || 8, 0, 32);
+        this._queueEmit_();
+        return;
+      }
+      if (!target.dataset.cellIndex) return;
+      this._updateCellField_(target);
+    }
+
+    _handleEditorBlur_(ev) {
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.id === 'tableRows' || target.id === 'tableColumns') {
+        this._applyDimensionsFromInputs_();
+      }
+    }
+
+    _applyDimensionsFromInputs_() {
+      const rowsInput = this.shadowRoot.querySelector('#tableRows');
+      const columnsInput = this.shadowRoot.querySelector('#tableColumns');
+      const rows = __ddcLineNormalizeNumber__(rowsInput?.value, this._config.rows || 3, 1, 18);
+      const columns = __ddcLineNormalizeNumber__(columnsInput?.value, this._config.columns || 3, 1, 12);
+      if (rows === this._config.rows && columns === this._config.columns) return;
+      this._config.rows = rows;
+      this._config.columns = columns;
+      this._config.cells = __ddcTableEnsureCells__(rows, columns, this._config.cells || []);
+      this._renderEditor_();
+      this._queueEmit_();
+    }
+
+    _updateCellField_(target) {
+      const index = Number(target.dataset.cellIndex);
+      const key = String(target.dataset.key || '').trim();
+      if (!Number.isFinite(index) || !key || !this._config?.cells?.[index]) return;
+      const cell = { ...this._config.cells[index] };
+      let value = target.type === 'checkbox' ? !!target.checked : target.value;
+      if (['type', 'align', 'button_action'].includes(key)) value = String(value || '').toLowerCase();
+      if (['text', 'icon', 'entity', 'active_states', 'active_color', 'inactive_color'].includes(key)) value = String(value || '');
+      cell[key] = value;
+      this._config.cells[index] = __ddcTableNormalizeCell__(cell, index, this._config.columns || 3);
+      const badge = target.closest('.cell-card')?.querySelector('.cell-card-type');
+      if (badge && key === 'type') {
+        badge.textContent = this._labelForType_(value);
+      }
+      this._queueEmit_();
+    }
+
+    _labelForType_(type) {
+      const map = {
+        text: 'Text',
+        icon: 'Icon',
+        entity: 'Entity state',
+        badge: 'Badge',
+        button: 'Button'
+      };
+      return map[String(type || 'text').toLowerCase()] || 'Text';
+    }
+
+    _renderEditor_() {
+      const cfg = this._config || DdcTableCard.getStubConfig();
+      const entityOptions = Object.keys(this._hass?.states || {})
+        .sort((a, b) => a.localeCompare(b))
+        .map((entityId) => `<option value="${__ddcTableEscapeAttr__(entityId)}"></option>`)
+        .join('');
+      const cellsMarkup = (cfg.cells || []).map((cell, index) => {
+        const row = Math.floor(index / Math.max(1, cfg.columns)) + 1;
+        const col = (index % Math.max(1, cfg.columns)) + 1;
+        return `
+          <section class="cell-card">
+            <div class="cell-card-head">
+              <div>
+                <strong>Row ${row} · Column ${col}</strong>
+                <span>Cell ${index + 1}</span>
+              </div>
+              <span class="cell-card-type">${this._labelForType_(cell.type)}</span>
+            </div>
+            <div class="cell-grid">
+              <label class="field">
+                <span>Content type</span>
+                <select data-cell-index="${index}" data-key="type">
+                  <option value="text" ${cell.type === 'text' ? 'selected' : ''}>Text</option>
+                  <option value="icon" ${cell.type === 'icon' ? 'selected' : ''}>Icon</option>
+                  <option value="entity" ${cell.type === 'entity' ? 'selected' : ''}>Entity state</option>
+                  <option value="badge" ${cell.type === 'badge' ? 'selected' : ''}>Badge</option>
+                  <option value="button" ${cell.type === 'button' ? 'selected' : ''}>Button</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Alignment</span>
+                <select data-cell-index="${index}" data-key="align">
+                  <option value="left" ${cell.align === 'left' ? 'selected' : ''}>Left</option>
+                  <option value="center" ${cell.align === 'center' ? 'selected' : ''}>Center</option>
+                  <option value="right" ${cell.align === 'right' ? 'selected' : ''}>Right</option>
+                </select>
+              </label>
+              <label class="field full">
+                <span>Text / label</span>
+                <input data-cell-index="${index}" data-key="text" type="text" value="${__ddcTableEscapeAttr__(cell.text || '')}" placeholder="Title, label or button text" />
+              </label>
+              <label class="field">
+                <span>Icon</span>
+                <input data-cell-index="${index}" data-key="icon" type="text" value="${__ddcTableEscapeAttr__(cell.icon || '')}" placeholder="mdi:flash" />
+              </label>
+              <label class="field">
+                <span>Entity</span>
+                <input data-cell-index="${index}" data-key="entity" type="text" list="ddcTableEntityList" value="${__ddcTableEscapeAttr__(cell.entity || '')}" placeholder="sensor.example_power" />
+              </label>
+              <label class="field full">
+                <span>State match</span>
+                <input data-cell-index="${index}" data-key="active_states" type="text" value="${__ddcTableEscapeAttr__(cell.active_states || '')}" placeholder="on,home,open,playing,charging,active,>0" />
+              </label>
+              <label class="field">
+                <span>Active color</span>
+                <input data-cell-index="${index}" data-key="active_color" type="text" value="${__ddcTableEscapeAttr__(cell.active_color || '')}" />
+              </label>
+              <label class="field">
+                <span>Inactive color</span>
+                <input data-cell-index="${index}" data-key="inactive_color" type="text" value="${__ddcTableEscapeAttr__(cell.inactive_color || '')}" />
+              </label>
+              <label class="field">
+                <span>Button action</span>
+                <select data-cell-index="${index}" data-key="button_action">
+                  <option value="none" ${cell.button_action === 'none' ? 'selected' : ''}>None</option>
+                  <option value="more-info" ${cell.button_action === 'more-info' ? 'selected' : ''}>More info</option>
+                  <option value="toggle" ${cell.button_action === 'toggle' ? 'selected' : ''}>Toggle entity</option>
+                </select>
+              </label>
+            </div>
+          </section>`;
+      }).join('');
+
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            color:var(--primary-text-color);
+          }
+          .editor{
+            display:grid;
+            gap:14px;
+          }
+          .intro,
+          .section{
+            display:grid;
+            gap:10px;
+            padding:14px 16px;
+            border-radius:16px;
+            background:rgba(255,255,255,.025);
+            border:1px solid rgba(255,255,255,.08);
+          }
+          .intro{
+            line-height:1.5;
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .intro strong,
+          .section-head strong,
+          .cell-card-head strong{
+            color:var(--primary-text-color);
+          }
+          .section-head{
+            display:grid;
+            gap:4px;
+          }
+          .section-head span,
+          .cell-card-head span,
+          .hint{
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .grid{
+            display:grid;
+            gap:14px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .field{
+            display:grid;
+            gap:8px;
+            min-width:0;
+          }
+          .field.full{
+            grid-column:1 / -1;
+          }
+          label{
+            display:grid;
+            gap:6px;
+            font-size:.9rem;
+            font-weight:650;
+          }
+          input[type="text"],
+          input[type="number"],
+          select{
+            width:100%;
+            box-sizing:border-box;
+            min-height:46px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            padding:11px 14px;
+            outline:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            font:inherit;
+          }
+          input[type="text"]:focus,
+          input[type="number"]:focus,
+          select:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          .toggles{
+            display:flex;
+            flex-wrap:wrap;
+            gap:12px;
+          }
+          .toggle{
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            min-height:46px;
+            padding:0 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+            font-weight:650;
+          }
+          .cells{
+            display:grid;
+            gap:14px;
+          }
+          .cell-card{
+            display:grid;
+            gap:14px;
+            padding:14px;
+            border-radius:18px;
+            background:rgba(255,255,255,.03);
+            border:1px solid rgba(255,255,255,.08);
+          }
+          .cell-card-head{
+            display:flex;
+            align-items:start;
+            justify-content:space-between;
+            gap:12px;
+          }
+          .cell-card-head > div{
+            display:grid;
+            gap:4px;
+          }
+          .cell-card-type{
+            display:inline-flex;
+            align-items:center;
+            padding:6px 10px;
+            border-radius:999px;
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 12%, transparent);
+            color:var(--primary-color, #ff9800);
+            font-size:.76rem;
+            font-weight:800;
+            letter-spacing:.04em;
+            text-transform:uppercase;
+          }
+          .cell-grid{
+            display:grid;
+            gap:14px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          @media (max-width: 760px){
+            .grid,
+            .cell-grid{
+              grid-template-columns:1fr;
+            }
+            .field.full{
+              grid-column:auto;
+            }
+          }
+        </style>
+        <div class="editor">
+          <div class="intro">
+            <strong>Build a visual table inside Drag & Drop Card</strong>
+            <span>Choose rows and columns, then fine-tune each cell. Every cell can show plain text, an icon, a Home Assistant entity state, a badge or a button.</span>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Table settings</strong>
+              <span>These options control the overall structure and spacing.</span>
+            </div>
+            <datalist id="ddcTableEntityList">${entityOptions}</datalist>
+            <div class="grid">
+              <label class="field full">
+                <span>Title</span>
+                <input id="tableTitle" type="text" value="${__ddcTableEscapeAttr__(cfg.title || '')}" placeholder="Optional title shown above the table" />
+              </label>
+              <label class="field">
+                <span>Rows</span>
+                <input id="tableRows" type="number" min="1" max="18" step="1" value="${Number(cfg.rows || 3)}" />
+              </label>
+              <label class="field">
+                <span>Columns</span>
+                <input id="tableColumns" type="number" min="1" max="12" step="1" value="${Number(cfg.columns || 3)}" />
+              </label>
+              <label class="field">
+                <span>Corner radius</span>
+                <input id="tableRadius" type="number" min="0" max="40" step="1" value="${Number(cfg.radius || 16)}" />
+              </label>
+              <label class="field">
+                <span>Cell spacing</span>
+                <input id="tableSpacing" type="number" min="0" max="32" step="1" value="${Number(cfg.spacing || 8)}" />
+              </label>
+            </div>
+            <div class="toggles">
+              <label class="toggle">
+                <input id="tableHeaderRow" type="checkbox" ${cfg.header_row !== false ? 'checked' : ''} />
+                <span>Header row</span>
+              </label>
+              <label class="toggle">
+                <input id="tableBorder" type="checkbox" ${cfg.border !== false ? 'checked' : ''} />
+                <span>Cell borders</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Cells</strong>
+              <span>The first row can act as a header, but every cell is still fully editable.</span>
+            </div>
+            <div class="cells">${cellsMarkup}</div>
+          </div>
+        </div>`;
+
+      this._ensureListeners_();
+    }
+  }
+
+  class DdcIconCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcIconCard.getStubConfig();
+      this._hass = null;
+      this._shellReady = false;
+      this._boundActivate = this._handleActivate_.bind(this);
+      this._boundKeydown = this._handleKeydown_.bind(this);
+    }
+
+    static getStubConfig() {
+      return {
+        type: 'custom:ddc-icon-card',
+        icon: 'mdi:flash',
+        entity: '',
+        size: 96,
+        color: 'var(--primary-color, #ff9800)',
+        active_color: '#22c55e',
+        state_based_color: true,
+        glow: true,
+        rotate: 0,
+        pulse_when_active: true,
+        opacity_based_on_state: false,
+        active_opacity: 1,
+        inactive_opacity: 0.28,
+        active_states: 'on,home,open,playing,charging,active,>0',
+        click_action: 'none'
+      };
+    }
+
+    static async getConfigElement() {
+      return document.createElement(DDC_ICON_CARD_EDITOR_TAG);
+    }
+
+    async getConfigElement() {
+      return document.createElement(DDC_ICON_CARD_EDITOR_TAG);
+    }
+
+    setConfig(config) {
+      this._config = {
+        ...DdcIconCard.getStubConfig(),
+        ...(config || {}),
+        icon: String(config?.icon || DdcIconCard.getStubConfig().icon),
+        entity: String(config?.entity || ''),
+        size: __ddcLineNormalizeNumber__(config?.size, 96, 20, 320),
+        color: String(config?.color || 'var(--primary-color, #ff9800)'),
+        active_color: String(config?.active_color || '#22c55e'),
+        state_based_color: config?.state_based_color !== false,
+        glow: config?.glow !== false,
+        rotate: __ddcLineNormalizeNumber__(config?.rotate, 0, -3600, 3600),
+        pulse_when_active: config?.pulse_when_active !== false,
+        opacity_based_on_state: !!config?.opacity_based_on_state,
+        active_opacity: __ddcLineNormalizeNumber__(config?.active_opacity, 1, 0, 1),
+        inactive_opacity: __ddcLineNormalizeNumber__(config?.inactive_opacity, 0.28, 0, 1),
+        active_states: String(config?.active_states || 'on,home,open,playing,charging,active,>0'),
+        click_action: String(config?.click_action || 'none').toLowerCase()
+      };
+      this._renderCard_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      this._renderCard_();
+    }
+
+    get hass() {
+      return this._hass;
+    }
+
+    connectedCallback() {
+      if (this._config) this._renderCard_();
+    }
+
+    disconnectedCallback() {
+      this._hitAreaEl?.removeEventListener?.('click', this._boundActivate);
+      this._hitAreaEl?.removeEventListener?.('keydown', this._boundKeydown);
+    }
+
+    getCardSize() {
+      return 2;
+    }
+
+    _ensureShell_() {
+      if (this._shellReady || !this.shadowRoot) return;
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            color:var(--primary-text-color);
+          }
+          ha-card{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            background:transparent;
+            box-shadow:none;
+            border-radius:inherit;
+            overflow:visible;
+          }
+          .shell{
+            position:relative;
+            display:grid;
+            place-items:center;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            padding:10px;
+            box-sizing:border-box;
+            --ddc-icon-size:96px;
+            --ddc-icon-color:var(--primary-color, #ff9800);
+            --ddc-icon-opacity:1;
+            --ddc-icon-rotate:0deg;
+          }
+          .hit-area{
+            display:grid;
+            place-items:center;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            border-radius:inherit;
+            outline:none;
+            cursor:default;
+          }
+          .hit-area.is-clickable{
+            cursor:pointer;
+          }
+          .icon-wrap{
+            position:relative;
+            width:var(--ddc-icon-size);
+            height:var(--ddc-icon-size);
+            display:grid;
+            place-items:center;
+          }
+          .icon-wrap ha-icon{
+            width:100%;
+            height:100%;
+            color:var(--ddc-icon-color);
+            opacity:var(--ddc-icon-opacity);
+            transform:rotate(var(--ddc-icon-rotate));
+            transform-origin:center;
+            filter:drop-shadow(0 0 0 transparent);
+            transition:
+              color .18s ease,
+              opacity .18s ease,
+              transform .18s ease,
+              filter .18s ease;
+          }
+          .shell.is-glow .icon-wrap ha-icon{
+            filter:drop-shadow(0 0 12px color-mix(in srgb, var(--ddc-icon-color) 38%, transparent));
+          }
+          .shell.is-pulsing .icon-wrap ha-icon{
+            animation:ddc-icon-pulse 1.65s ease-in-out infinite;
+          }
+          .shell.is-clickable .hit-area:hover ha-icon,
+          .shell.is-clickable .hit-area:focus-visible ha-icon{
+            opacity:min(1, calc(var(--ddc-icon-opacity) + 0.08));
+          }
+          @keyframes ddc-icon-pulse{
+            0%, 100%{
+              transform:rotate(var(--ddc-icon-rotate)) scale(1);
+            }
+            45%{
+              transform:rotate(var(--ddc-icon-rotate)) scale(1.08);
+            }
+            60%{
+              transform:rotate(var(--ddc-icon-rotate)) scale(1.03);
+            }
+          }
+        </style>
+        <ha-card>
+          <div class="shell">
+            <div class="hit-area" tabindex="-1" aria-label="Icon card">
+              <div class="icon-wrap">
+                <ha-icon icon="mdi:flash"></ha-icon>
+              </div>
+            </div>
+          </div>
+        </ha-card>`;
+      this._shellEl = this.shadowRoot.querySelector('.shell');
+      this._hitAreaEl = this.shadowRoot.querySelector('.hit-area');
+      this._iconEl = this.shadowRoot.querySelector('ha-icon');
+      this._hitAreaEl?.addEventListener('click', this._boundActivate);
+      this._hitAreaEl?.addEventListener('keydown', this._boundKeydown);
+      this._shellReady = true;
+    }
+
+    _fireMoreInfo_(entityId) {
+      if (!entityId) return;
+      try {
+        this.dispatchEvent(new CustomEvent('hass-more-info', {
+          detail: { entityId },
+          bubbles: true,
+          composed: true
+        }));
+      } catch {}
+    }
+
+    _handleKeydown_(ev) {
+      if (!ev) return;
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        this._handleActivate_();
+      }
+    }
+
+    _handleActivate_() {
+      const entityId = String(this._config?.entity || '').trim();
+      const action = String(this._config?.click_action || 'none').toLowerCase();
+      if (!entityId || action === 'none') return;
+      if (action === 'toggle') {
+        try { this._hass?.callService?.('homeassistant', 'toggle', { entity_id: entityId }); } catch {}
+        return;
+      }
+      this._fireMoreInfo_(entityId);
+    }
+
+    _renderCard_() {
+      this._ensureShell_();
+      if (!this._shellEl || !this._iconEl || !this._hitAreaEl || !this._config) return;
+      const cfg = this._config;
+      const entityId = String(cfg.entity || '').trim();
+      const entity = entityId ? this._hass?.states?.[entityId] : null;
+      const entityIcon = String(entity?.attributes?.icon || '').trim();
+      const icon = String(cfg.icon || entityIcon || 'mdi:flash').trim() || 'mdi:flash';
+      const hasEntity = !!entityId;
+      const isActive = hasEntity ? __ddcLineIsActive__(entity?.state ?? '', cfg.active_states) : false;
+      const useStateColor = cfg.state_based_color !== false && hasEntity;
+      const currentColor = useStateColor ? (isActive ? cfg.active_color : cfg.color) : cfg.color;
+      const opacity = cfg.opacity_based_on_state && hasEntity
+        ? (isActive ? cfg.active_opacity : cfg.inactive_opacity)
+        : cfg.active_opacity;
+      const clickable = hasEntity && String(cfg.click_action || 'none').toLowerCase() !== 'none';
+      const shouldPulse = !!cfg.pulse_when_active && hasEntity && isActive;
+
+      this._iconEl.setAttribute('icon', icon);
+      this._shellEl.style.setProperty('--ddc-icon-size', `${Math.round(__ddcLineNormalizeNumber__(cfg.size, 96, 20, 320))}px`);
+      this._shellEl.style.setProperty('--ddc-icon-color', String(currentColor || cfg.color || 'var(--primary-color, #ff9800)'));
+      this._shellEl.style.setProperty('--ddc-icon-opacity', `${__ddcLineNormalizeNumber__(opacity, 1, 0, 1)}`);
+      this._shellEl.style.setProperty('--ddc-icon-rotate', `${__ddcLineNormalizeNumber__(cfg.rotate, 0, -3600, 3600)}deg`);
+      this._shellEl.classList.toggle('is-glow', cfg.glow !== false);
+      this._shellEl.classList.toggle('is-pulsing', shouldPulse);
+      this._shellEl.classList.toggle('is-clickable', clickable);
+      this._hitAreaEl.classList.toggle('is-clickable', clickable);
+      this._hitAreaEl.tabIndex = clickable ? 0 : -1;
+      this._hitAreaEl.setAttribute('aria-label', clickable && entityId ? `Icon card for ${entityId}` : 'Icon card');
+    }
+  }
+
+  class DdcIconCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcIconCard.getStubConfig();
+      this._configSig = '';
+      this._emitTimer = null;
+    }
+
+    setConfig(config) {
+      const next = {
+        ...DdcIconCard.getStubConfig(),
+        ...(config || {}),
+        icon: String(config?.icon || DdcIconCard.getStubConfig().icon),
+        entity: String(config?.entity || ''),
+        size: __ddcLineNormalizeNumber__(config?.size, 96, 20, 320),
+        color: String(config?.color || 'var(--primary-color, #ff9800)'),
+        active_color: String(config?.active_color || '#22c55e'),
+        state_based_color: config?.state_based_color !== false,
+        glow: config?.glow !== false,
+        rotate: __ddcLineNormalizeNumber__(config?.rotate, 0, -3600, 3600),
+        pulse_when_active: config?.pulse_when_active !== false,
+        opacity_based_on_state: !!config?.opacity_based_on_state,
+        active_opacity: __ddcLineNormalizeNumber__(config?.active_opacity, 1, 0, 1),
+        inactive_opacity: __ddcLineNormalizeNumber__(config?.inactive_opacity, 0.28, 0, 1),
+        active_states: String(config?.active_states || 'on,home,open,playing,charging,active,>0'),
+        click_action: String(config?.click_action || 'none').toLowerCase()
+      };
+      const sig = JSON.stringify(next);
+      if (sig === this._configSig) return;
+      this._configSig = sig;
+      this._config = next;
+      this._renderEditor_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (!this.shadowRoot.childElementCount) this._renderEditor_();
+    }
+
+    _queueEmit_() {
+      clearTimeout(this._emitTimer);
+      this._emitTimer = setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail: { config: { ...this._config } }
+        }));
+      }, 120);
+    }
+
+    _bindField_(selector, key, type = 'text') {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      const eventName = type === 'select' || type === 'checkbox' ? 'change' : 'input';
+      input.addEventListener(eventName, () => {
+        if (type === 'checkbox') {
+          this._config[key] = !!input.checked;
+        } else if (type === 'number') {
+          const defaults = {
+            size: [96, 20, 320],
+            rotate: [0, -3600, 3600],
+            active_opacity: [1, 0, 1],
+            inactive_opacity: [0.28, 0, 1]
+          };
+          const [fallback, min, max] = defaults[key] || [0, -Infinity, Infinity];
+          this._config[key] = __ddcLineNormalizeNumber__(input.value, fallback, min, max);
+        } else {
+          this._config[key] = input.value;
+        }
+        this._queueEmit_();
+      });
+    }
+
+    _renderEditor_() {
+      const cfg = this._config || DdcIconCard.getStubConfig();
+      const entityOptions = Object.keys(this._hass?.states || {})
+        .sort((a, b) => a.localeCompare(b))
+        .map((entityId) => `<option value="${__ddcTableEscapeAttr__(entityId)}"></option>`)
+        .join('');
+
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            color:var(--primary-text-color);
+          }
+          .editor{
+            display:grid;
+            gap:14px;
+          }
+          .intro,
+          .section{
+            display:grid;
+            gap:10px;
+            padding:14px 16px;
+            border-radius:16px;
+            background:rgba(255,255,255,.025);
+            border:1px solid rgba(255,255,255,.08);
+          }
+          .intro{
+            line-height:1.5;
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .intro strong,
+          .section-head strong{
+            color:var(--primary-text-color);
+          }
+          .section-head{
+            display:grid;
+            gap:4px;
+          }
+          .section-head span{
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .grid{
+            display:grid;
+            gap:14px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .field{
+            display:grid;
+            gap:8px;
+            min-width:0;
+          }
+          .field.full{
+            grid-column:1 / -1;
+          }
+          label{
+            display:grid;
+            gap:6px;
+            font-size:.9rem;
+            font-weight:650;
+          }
+          input[type="text"],
+          input[type="number"],
+          select{
+            width:100%;
+            box-sizing:border-box;
+            min-height:46px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            padding:11px 14px;
+            outline:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            font:inherit;
+          }
+          input[type="text"]:focus,
+          input[type="number"]:focus,
+          select:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          .toggles{
+            display:grid;
+            gap:12px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .toggle{
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            min-height:46px;
+            padding:0 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+            font-weight:650;
+          }
+          @media (max-width: 760px){
+            .grid,
+            .toggles{
+              grid-template-columns:1fr;
+            }
+            .field.full{
+              grid-column:auto;
+            }
+          }
+        </style>
+        <div class="editor">
+          <div class="intro">
+            <strong>Build a pure icon object</strong>
+            <span>Use this for atmosphere, energy flows, status accents or subtle reactive decoration without wrapping it in a normal button card.</span>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Icon settings</strong>
+              <span>Choose the icon itself, what entity should drive it, and how it should react.</span>
+            </div>
+            <datalist id="ddcIconEntityList">${entityOptions}</datalist>
+            <div class="grid">
+              <label class="field">
+                <span>Icon</span>
+                <input id="icon" type="text" value="${__ddcTableEscapeAttr__(cfg.icon || '')}" placeholder="mdi:flash" />
+              </label>
+              <label class="field">
+                <span>Entity</span>
+                <input id="entity" type="text" list="ddcIconEntityList" value="${__ddcTableEscapeAttr__(cfg.entity || '')}" placeholder="sensor.example_power" />
+              </label>
+              <label class="field full">
+                <span>Active states</span>
+                <input id="activeStates" type="text" value="${__ddcTableEscapeAttr__(cfg.active_states || '')}" placeholder="on,home,open,playing,charging,active,>0" />
+              </label>
+              <label class="field">
+                <span>Size</span>
+                <input id="size" type="number" min="20" max="320" step="1" value="${Number(cfg.size || 96)}" />
+              </label>
+              <label class="field">
+                <span>Rotate</span>
+                <input id="rotate" type="number" min="-3600" max="3600" step="1" value="${Number(cfg.rotate || 0)}" />
+              </label>
+              <label class="field">
+                <span>Base color</span>
+                <input id="color" type="text" value="${__ddcTableEscapeAttr__(cfg.color || '')}" placeholder="var(--primary-color)" />
+              </label>
+              <label class="field">
+                <span>Active color</span>
+                <input id="activeColor" type="text" value="${__ddcTableEscapeAttr__(cfg.active_color || '')}" placeholder="#22c55e" />
+              </label>
+              <label class="field">
+                <span>Active opacity</span>
+                <input id="activeOpacity" type="number" min="0" max="1" step="0.05" value="${Number(cfg.active_opacity ?? 1)}" />
+              </label>
+              <label class="field">
+                <span>Inactive opacity</span>
+                <input id="inactiveOpacity" type="number" min="0" max="1" step="0.05" value="${Number(cfg.inactive_opacity ?? 0.28)}" />
+              </label>
+              <label class="field full">
+                <span>Click action</span>
+                <select id="clickAction">
+                  <option value="none" ${cfg.click_action === 'none' ? 'selected' : ''}>None</option>
+                  <option value="more-info" ${cfg.click_action === 'more-info' ? 'selected' : ''}>More info</option>
+                  <option value="toggle" ${cfg.click_action === 'toggle' ? 'selected' : ''}>Toggle entity</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Reactive styling</strong>
+              <span>Let entity state drive the visual treatment, or keep it as a fixed design element.</span>
+            </div>
+            <div class="toggles">
+              <label class="toggle">
+                <input id="stateBasedColor" type="checkbox" ${cfg.state_based_color ? 'checked' : ''}>
+                <span>State-based color</span>
+              </label>
+              <label class="toggle">
+                <input id="glow" type="checkbox" ${cfg.glow ? 'checked' : ''}>
+                <span>Glow</span>
+              </label>
+              <label class="toggle">
+                <input id="pulseWhenActive" type="checkbox" ${cfg.pulse_when_active ? 'checked' : ''}>
+                <span>Pulse when active</span>
+              </label>
+              <label class="toggle">
+                <input id="opacityBasedOnState" type="checkbox" ${cfg.opacity_based_on_state ? 'checked' : ''}>
+                <span>Opacity based on state</span>
+              </label>
+            </div>
+          </div>
+        </div>`;
+
+      this._bindField_('#icon', 'icon');
+      this._bindField_('#entity', 'entity');
+      this._bindField_('#activeStates', 'active_states');
+      this._bindField_('#size', 'size', 'number');
+      this._bindField_('#rotate', 'rotate', 'number');
+      this._bindField_('#color', 'color');
+      this._bindField_('#activeColor', 'active_color');
+      this._bindField_('#activeOpacity', 'active_opacity', 'number');
+      this._bindField_('#inactiveOpacity', 'inactive_opacity', 'number');
+      this._bindField_('#clickAction', 'click_action', 'select');
+      this._bindField_('#stateBasedColor', 'state_based_color', 'checkbox');
+      this._bindField_('#glow', 'glow', 'checkbox');
+      this._bindField_('#pulseWhenActive', 'pulse_when_active', 'checkbox');
+      this._bindField_('#opacityBasedOnState', 'opacity_based_on_state', 'checkbox');
+    }
+  }
+
+  class DdcTextCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcTextCard.getStubConfig();
+      this._hass = null;
+      this._shellReady = false;
+    }
+
+    static getStubConfig() {
+      return {
+        type: 'custom:ddc-text-card',
+        text: 'Energy overview',
+        rich_text: false,
+        rich_html: '',
+        variant: 'title',
+        font_family: '',
+        font_size: 42,
+        color: 'var(--primary-text-color, #f8fafc)',
+        align: 'left',
+        bold: true,
+        italic: false,
+        letter_spacing: -0.03,
+        line_height: 1.05
+      };
+    }
+
+    static async getConfigElement() {
+      return document.createElement(DDC_TEXT_CARD_EDITOR_TAG);
+    }
+
+    async getConfigElement() {
+      return document.createElement(DDC_TEXT_CARD_EDITOR_TAG);
+    }
+
+    setConfig(config) {
+      const variant = String(config?.variant || 'title').toLowerCase();
+      const preset = __ddcTextVariantPreset__(variant);
+      this._config = {
+        ...DdcTextCard.getStubConfig(),
+        ...(config || {}),
+        text: String(config?.text || 'Energy overview'),
+        rich_text: !!config?.rich_text,
+        rich_html: String(config?.rich_html || ''),
+        variant,
+        font_family: String(config?.font_family || ''),
+        font_size: __ddcLineNormalizeNumber__(config?.font_size, preset.font_size, 8, 200),
+        color: String(config?.color || 'var(--primary-text-color, #f8fafc)'),
+        align: String(config?.align || 'left').toLowerCase(),
+        bold: typeof config?.bold === 'boolean' ? config.bold : preset.bold,
+        italic: !!config?.italic,
+        letter_spacing: __ddcLineNormalizeNumber__(config?.letter_spacing, preset.letter_spacing, -1, 2),
+        line_height: __ddcLineNormalizeNumber__(config?.line_height, preset.line_height, 0.7, 3)
+      };
+      this._renderCard_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      this._renderCard_();
+    }
+
+    get hass() {
+      return this._hass;
+    }
+
+    connectedCallback() {
+      if (this._config) this._renderCard_();
+    }
+
+    getCardSize() {
+      return 2;
+    }
+
+    _ensureShell_() {
+      if (this._shellReady || !this.shadowRoot) return;
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            color:var(--primary-text-color);
+          }
+          ha-card{
+            display:block;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            background:transparent;
+            box-shadow:none;
+            border-radius:inherit;
+            overflow:visible;
+          }
+          .shell{
+            display:grid;
+            align-items:center;
+            width:100%;
+            height:100%;
+            min-height:100%;
+            padding:10px 12px;
+            box-sizing:border-box;
+          }
+          .copy{
+            margin:0;
+            width:100%;
+            color:var(--ddc-text-color, var(--primary-text-color, #f8fafc));
+            font-family:var(--ddc-text-font-family, inherit);
+            font-size:var(--ddc-text-size, 42px);
+            font-weight:var(--ddc-text-weight, 700);
+            font-style:var(--ddc-text-style, normal);
+            line-height:var(--ddc-text-line-height, 1.05);
+            letter-spacing:var(--ddc-text-letter-spacing, 0em);
+            text-align:var(--ddc-text-align, left);
+            text-wrap:balance;
+            overflow-wrap:anywhere;
+          }
+          .copy.is-rich{
+            display:grid;
+            gap:calc(var(--ddc-text-size, 42px) * 0.22);
+            text-wrap:pretty;
+          }
+          .copy.is-rich > *{
+            margin:0;
+            color:inherit;
+            font-family:inherit;
+            text-align:inherit;
+            line-height:inherit;
+            letter-spacing:inherit;
+          }
+          .copy.is-rich p + p,
+          .copy.is-rich p + ul,
+          .copy.is-rich p + ol,
+          .copy.is-rich ul + p,
+          .copy.is-rich ol + p,
+          .copy.is-rich blockquote + p,
+          .copy.is-rich pre + p{
+            margin-top:calc(var(--ddc-text-size, 42px) * 0.18);
+          }
+          .copy.is-rich h1{
+            font-size:calc(var(--ddc-text-size, 42px) * 1.56);
+            font-weight:800;
+            line-height:0.96;
+            letter-spacing:calc(var(--ddc-text-letter-spacing, -0.03em) - 0.025em);
+          }
+          .copy.is-rich h2{
+            font-size:calc(var(--ddc-text-size, 42px) * 1.28);
+            font-weight:780;
+            line-height:1.02;
+            letter-spacing:calc(var(--ddc-text-letter-spacing, -0.03em) - 0.015em);
+          }
+          .copy.is-rich h3{
+            font-size:calc(var(--ddc-text-size, 42px) * 1.08);
+            font-weight:760;
+            line-height:1.08;
+          }
+          .copy.is-rich h4{
+            font-size:calc(var(--ddc-text-size, 42px) * 0.92);
+            font-weight:720;
+            line-height:1.14;
+          }
+          .copy.is-rich p{
+            font-size:var(--ddc-text-size, 42px);
+          }
+          .copy.is-rich small{
+            font-size:calc(var(--ddc-text-size, 42px) * 0.74);
+            opacity:.82;
+            line-height:1.35;
+          }
+          .copy.is-rich ul,
+          .copy.is-rich ol{
+            padding-inline-start:1.2em;
+            display:grid;
+            gap:0.3em;
+          }
+          .copy.is-rich li{
+            margin:0;
+          }
+          .copy.is-rich blockquote{
+            padding:0.22em 0 0.22em 1em;
+            border-left:3px solid color-mix(in oklab, var(--primary-color, #ff9800) 52%, rgba(255,255,255,.16));
+            color:color-mix(in oklab, var(--ddc-text-color, #f8fafc) 82%, rgba(255,255,255,.36));
+          }
+          .copy.is-rich pre{
+            padding:0.8em 0.95em;
+            border-radius:16px;
+            background:rgba(255,255,255,.06);
+            border:1px solid rgba(255,255,255,.08);
+            overflow:auto;
+            white-space:pre-wrap;
+          }
+          .copy.is-rich code{
+            font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size:0.92em;
+          }
+          .copy.is-rich a{
+            color:color-mix(in oklab, var(--primary-color, #ff9800) 78%, white 12%);
+            text-decoration:underline;
+            text-decoration-thickness:0.08em;
+          }
+          .copy.is-rich strong{
+            font-weight:800;
+          }
+          .copy.is-rich em{
+            font-style:italic;
+          }
+          .copy.variant-header{
+            text-transform:uppercase;
+          }
+          .copy.variant-small{
+            opacity:.86;
+          }
+        </style>
+        <ha-card>
+          <div class="shell">
+            <div class="copy"></div>
+          </div>
+        </ha-card>`;
+      this._shellEl = this.shadowRoot.querySelector('.shell');
+      this._copyEl = this.shadowRoot.querySelector('.copy');
+      this._shellReady = true;
+    }
+
+    _resolveTag_(variant) {
+      switch (String(variant || '').toLowerCase()) {
+        case 'h1': return 'h1';
+        case 'h2': return 'h2';
+        case 'h3': return 'h3';
+        case 'h4': return 'h4';
+        case 'header': return 'div';
+        case 'small': return 'small';
+        case 'paragraph':
+        case 'p': return 'p';
+        case 'title':
+        default: return 'div';
+      }
+    }
+
+    _renderCard_() {
+      this._ensureShell_();
+      if (!this._shellEl || !this._copyEl || !this._config) return;
+      const cfg = this._config;
+      const tag = this._resolveTag_(cfg.variant);
+      const wantsRich = !!cfg.rich_text;
+      const align = ['left', 'center', 'right'].includes(String(cfg.align || '').toLowerCase())
+        ? String(cfg.align).toLowerCase()
+        : 'left';
+      const rawText = String(cfg.text || '');
+      const text = rawText.trim() || 'Text';
+      this._shellEl.style.setProperty('--ddc-text-font-family', String(cfg.font_family || '').trim() || 'inherit');
+      this._shellEl.style.setProperty('--ddc-text-size', `${__ddcLineNormalizeNumber__(cfg.font_size, 42, 8, 200)}px`);
+      this._shellEl.style.setProperty('--ddc-text-color', String(cfg.color || 'var(--primary-text-color, #f8fafc)'));
+      this._shellEl.style.setProperty('--ddc-text-weight', cfg.bold ? '800' : '500');
+      this._shellEl.style.setProperty('--ddc-text-style', cfg.italic ? 'italic' : 'normal');
+      this._shellEl.style.setProperty('--ddc-text-line-height', `${__ddcLineNormalizeNumber__(cfg.line_height, 1.05, 0.7, 3)}`);
+      this._shellEl.style.setProperty('--ddc-text-letter-spacing', `${__ddcLineNormalizeNumber__(cfg.letter_spacing, -0.03, -1, 2)}em`);
+      this._shellEl.style.setProperty('--ddc-text-align', align);
+      if (wantsRich) {
+        if (this._copyEl.tagName.toLowerCase() !== 'div') {
+          const replacement = document.createElement('div');
+          replacement.className = 'copy';
+          this._copyEl.replaceWith(replacement);
+          this._copyEl = replacement;
+        }
+        this._copyEl.className = 'copy is-rich';
+        const richHtml = __ddcTextSanitizeRichHtml__(cfg.rich_html || '') || __ddcTextSanitizeRichHtml__(__ddcTextRichMarkup__(rawText));
+        this._copyEl.innerHTML = richHtml || '<p>Text</p>';
+        return;
+      }
+      if (this._copyEl.tagName.toLowerCase() !== tag) {
+        const replacement = document.createElement(tag);
+        replacement.className = 'copy';
+        this._copyEl.replaceWith(replacement);
+        this._copyEl = replacement;
+      }
+      this._copyEl.className = `copy variant-${__ddcTableEscapeAttr__(cfg.variant || 'title')}`;
+      this._copyEl.textContent = text;
+    }
+  }
+
+  class DdcTextCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this._config = DdcTextCard.getStubConfig();
+      this._configSig = '';
+      this._emitTimer = null;
+      this._richSelectionRange = null;
+      this._globalRichShortcutGuards = null;
+    }
+
+    setConfig(config) {
+      const variant = String(config?.variant || 'title').toLowerCase();
+      const preset = __ddcTextVariantPreset__(variant);
+      const next = {
+        ...DdcTextCard.getStubConfig(),
+        ...(config || {}),
+        text: String(config?.text || 'Energy overview'),
+        rich_text: !!config?.rich_text,
+        rich_html: String(config?.rich_html || ''),
+        variant,
+        font_family: String(config?.font_family || ''),
+        font_size: __ddcLineNormalizeNumber__(config?.font_size, preset.font_size, 8, 200),
+        color: String(config?.color || 'var(--primary-text-color, #f8fafc)'),
+        align: String(config?.align || 'left').toLowerCase(),
+        bold: typeof config?.bold === 'boolean' ? config.bold : preset.bold,
+        italic: !!config?.italic,
+        letter_spacing: __ddcLineNormalizeNumber__(config?.letter_spacing, preset.letter_spacing, -1, 2),
+        line_height: __ddcLineNormalizeNumber__(config?.line_height, preset.line_height, 0.7, 3)
+      };
+      const sig = JSON.stringify(next);
+      if (sig === this._configSig) return;
+      this._configSig = sig;
+      this._config = next;
+      this._renderEditor_();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (!this.shadowRoot.childElementCount) this._renderEditor_();
+    }
+
+    _markLocalConfigUpdated_() {
+      this._configSig = JSON.stringify(this._config || {});
+    }
+
+    _queueEmit_() {
+      this._markLocalConfigUpdated_();
+      clearTimeout(this._emitTimer);
+      this._emitTimer = setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail: { config: { ...this._config } }
+        }));
+      }, 120);
+    }
+
+    _bindField_(selector, key, type = 'text') {
+      const input = this.shadowRoot.querySelector(selector);
+      if (!input) return;
+      const eventName = type === 'select' || type === 'checkbox' ? 'change' : 'input';
+      input.addEventListener(eventName, () => {
+        if (key === 'variant' && type === 'select') {
+          this._applyVariantPreset_(input.value);
+          return;
+        }
+        if (type === 'checkbox') {
+          this._config[key] = !!input.checked;
+        } else if (type === 'number') {
+          const defaults = {
+            font_size: [42, 8, 200],
+            letter_spacing: [-0.03, -1, 2],
+            line_height: [1.05, 0.7, 3]
+          };
+          const [fallback, min, max] = defaults[key] || [0, -Infinity, Infinity];
+          this._config[key] = __ddcLineNormalizeNumber__(input.value, fallback, min, max);
+        } else {
+          this._config[key] = input.value;
+        }
+        this._queueEmit_();
+      });
+    }
+
+    _seedRichHtml_() {
+      const seeded = __ddcTextSanitizeRichHtml__(this._config?.rich_html || '') || __ddcTextSanitizeRichHtml__(__ddcTextRichMarkup__(this._config?.text || ''));
+      this._config.rich_html = seeded;
+      this._markLocalConfigUpdated_();
+      return seeded;
+    }
+
+    _captureRichSelection_() {
+      const editor = this.shadowRoot?.querySelector('#richEditor');
+      const selection = this.ownerDocument?.getSelection?.();
+      if (!editor || !selection || selection.rangeCount < 1) return;
+      const range = selection.getRangeAt(0);
+      const anchorNode = range.commonAncestorContainer;
+      if (editor.contains(anchorNode) || anchorNode === editor) {
+        this._richSelectionRange = range.cloneRange();
+      }
+    }
+
+    _restoreRichSelection_() {
+      if (!this._richSelectionRange) return;
+      const selection = this.ownerDocument?.getSelection?.();
+      if (!selection) return;
+      selection.removeAllRanges();
+      selection.addRange(this._richSelectionRange);
+    }
+
+    _syncRichEditorFromDom_(rewrite = false) {
+      const editor = this.shadowRoot?.querySelector('#richEditor');
+      if (!editor) return;
+      let html = editor.innerHTML || '';
+      if (rewrite) {
+        html = __ddcTextSanitizeRichHtml__(html);
+        if (editor.innerHTML !== html) editor.innerHTML = html;
+      }
+      this._config.rich_html = html;
+      const textContent = String(editor.textContent || '').replace(/\u00a0/g, ' ').trim();
+      if (textContent) this._config.text = textContent;
+      this._queueEmit_();
+    }
+
+    _execRichCommand_(command, value = null) {
+      const editor = this.shadowRoot?.querySelector('#richEditor');
+      if (!editor) return;
+      editor.focus();
+      this._restoreRichSelection_();
+      try {
+        if (command === 'createLink') {
+          if (!value) return;
+          this.ownerDocument.execCommand('createLink', false, value);
+        } else if (command === 'formatBlock') {
+          this.ownerDocument.execCommand('formatBlock', false, value);
+        } else {
+          this.ownerDocument.execCommand(command, false, value);
+        }
+      } catch {}
+      this._captureRichSelection_();
+      this._syncRichEditorFromDom_(true);
+    }
+
+    _bindRichEditor_() {
+      const editor = this.shadowRoot?.querySelector('#richEditor');
+      if (!editor) return;
+      const stopShortcutBubble = (event) => {
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      };
+      ['keydown', 'keypress', 'keyup', 'beforeinput', 'input', 'paste'].forEach((eventName) => {
+        editor.addEventListener(eventName, stopShortcutBubble);
+      });
+      const installGlobalShortcutGuards = () => {
+        if (this._globalRichShortcutGuards) return;
+        const shouldTrap = () => {
+          const selection = this.ownerDocument?.getSelection?.();
+          const active = this.shadowRoot?.activeElement || this.ownerDocument?.activeElement;
+          const inEditor =
+            active === editor ||
+            editor.contains(active) ||
+            (selection?.anchorNode && editor.contains(selection.anchorNode));
+          return !!inEditor;
+        };
+        const guard = (event) => {
+          if (!shouldTrap()) return;
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        };
+        this._globalRichShortcutGuards = { guard };
+        ['keydown', 'keypress', 'keyup', 'beforeinput'].forEach((eventName) => {
+          window.addEventListener(eventName, guard, true);
+          document.addEventListener(eventName, guard, true);
+        });
+      };
+      const removeGlobalShortcutGuards = () => {
+        if (!this._globalRichShortcutGuards?.guard) return;
+        const { guard } = this._globalRichShortcutGuards;
+        ['keydown', 'keypress', 'keyup', 'beforeinput'].forEach((eventName) => {
+          window.removeEventListener(eventName, guard, true);
+          document.removeEventListener(eventName, guard, true);
+        });
+        this._globalRichShortcutGuards = null;
+      };
+      editor.addEventListener('input', () => this._syncRichEditorFromDom_(false));
+      editor.addEventListener('keyup', () => this._captureRichSelection_());
+      editor.addEventListener('mouseup', () => this._captureRichSelection_());
+      editor.addEventListener('focus', () => {
+        installGlobalShortcutGuards();
+        this._captureRichSelection_();
+      });
+      editor.addEventListener('blur', () => {
+        this._syncRichEditorFromDom_(true);
+        setTimeout(() => {
+          const active = this.shadowRoot?.activeElement || this.ownerDocument?.activeElement;
+          if (!active || !editor.contains(active)) removeGlobalShortcutGuards();
+        }, 0);
+      }, true);
+
+      this.shadowRoot.querySelectorAll('[data-rich-cmd]').forEach((btn) => {
+        btn.addEventListener('mousedown', (event) => event.preventDefault());
+        btn.addEventListener('click', () => {
+          const cmd = btn.getAttribute('data-rich-cmd');
+          if (!cmd) return;
+          if (cmd === 'createLink') {
+            const url = window.prompt('Link URL', 'https://');
+            if (!url) return;
+            this._execRichCommand_(cmd, url);
+            return;
+          }
+          this._execRichCommand_(cmd);
+        });
+      });
+
+      const blockSelect = this.shadowRoot.querySelector('#richBlock');
+      if (blockSelect) {
+        blockSelect.addEventListener('change', () => {
+          const value = String(blockSelect.value || 'P').toUpperCase();
+          this._execRichCommand_('formatBlock', value);
+        });
+      }
+    }
+
+    _applyVariantPreset_(variant) {
+      const nextVariant = String(variant || 'title').toLowerCase();
+      const preset = __ddcTextVariantPreset__(nextVariant);
+      this._config.variant = nextVariant;
+      this._config.font_size = preset.font_size;
+      this._config.bold = preset.bold;
+      this._config.letter_spacing = preset.letter_spacing;
+      this._config.line_height = preset.line_height;
+      this._renderEditor_();
+      this._queueEmit_();
+    }
+
+    _renderEditor_() {
+      const cfg = this._config || DdcTextCard.getStubConfig();
+      const richHtml = cfg.rich_text ? this._seedRichHtml_() : '';
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{
+            display:block;
+            color:var(--primary-text-color);
+          }
+          .editor{
+            display:grid;
+            gap:14px;
+          }
+          .intro,
+          .section{
+            display:grid;
+            gap:10px;
+            padding:14px 16px;
+            border-radius:16px;
+            background:rgba(255,255,255,.025);
+            border:1px solid rgba(255,255,255,.08);
+          }
+          .intro{
+            line-height:1.5;
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .intro strong,
+          .section-head strong{
+            color:var(--primary-text-color);
+          }
+          .section-head{
+            display:grid;
+            gap:4px;
+          }
+          .section-head span{
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .grid{
+            display:grid;
+            gap:14px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .field{
+            display:grid;
+            gap:8px;
+            min-width:0;
+          }
+          .field.full{
+            grid-column:1 / -1;
+          }
+          label{
+            display:grid;
+            gap:6px;
+            font-size:.9rem;
+            font-weight:650;
+          }
+          input[type="text"],
+          input[type="number"],
+          textarea,
+          select{
+            width:100%;
+            box-sizing:border-box;
+            min-height:46px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            padding:11px 14px;
+            outline:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            font:inherit;
+          }
+          textarea{
+            min-height:120px;
+            resize:vertical;
+            line-height:1.55;
+          }
+          input[type="text"]:focus,
+          input[type="number"]:focus,
+          textarea:focus,
+          select:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          .toggles{
+            display:grid;
+            gap:12px;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+          }
+          .toggle{
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            min-height:46px;
+            padding:0 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+            font-weight:650;
+          }
+          .toggle.is-disabled{
+            opacity:.5;
+          }
+          .toggle.is-disabled input{
+            pointer-events:none;
+          }
+          .field.is-disabled{
+            opacity:.58;
+          }
+          .field.is-disabled select,
+          .field.is-disabled input{
+            pointer-events:none;
+          }
+          .rich-shell{
+            display:grid;
+            gap:12px;
+          }
+          .rich-toolbar{
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:8px;
+            padding:10px 12px;
+            border-radius:16px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.03);
+          }
+          .rich-toolbar select{
+            width:auto;
+            min-width:148px;
+            min-height:42px;
+            padding:8px 12px;
+            border-radius:12px;
+          }
+          .rich-divider{
+            width:1px;
+            align-self:stretch;
+            background:rgba(255,255,255,.08);
+            margin:0 4px;
+          }
+          .rich-btn{
+            display:grid;
+            place-items:center;
+            width:42px;
+            height:42px;
+            padding:0;
+            border-radius:12px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(4,9,18,.82);
+            color:var(--primary-text-color);
+            cursor:pointer;
+            transition:transform .18s ease, border-color .18s ease, background .18s ease;
+          }
+          .rich-btn:hover{
+            transform:translateY(-1px);
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 48%, rgba(255,255,255,.12));
+            background:rgba(255,255,255,.06);
+          }
+          .rich-btn ha-icon{
+            --mdc-icon-size:20px;
+          }
+          .rich-surface{
+            min-height:180px;
+            padding:16px 18px;
+            border-radius:18px;
+            border:1px solid rgba(255,255,255,.1);
+            background:rgba(4,9,18,.82);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+            outline:none;
+            color:var(--primary-text-color);
+            line-height:1.55;
+            overflow:auto;
+          }
+          .rich-surface:focus{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.12));
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.04);
+          }
+          .rich-surface:empty::before{
+            content:attr(data-placeholder);
+            color:rgba(148,163,184,.7);
+            pointer-events:none;
+          }
+          .rich-surface > *{
+            margin:0;
+          }
+          .rich-surface > * + *{
+            margin-top:.5em;
+          }
+          .rich-surface h1,
+          .rich-surface h2,
+          .rich-surface h3,
+          .rich-surface h4{
+            font-weight:800;
+            letter-spacing:-0.03em;
+          }
+          .rich-surface h1{ font-size:2rem; line-height:1; }
+          .rich-surface h2{ font-size:1.65rem; line-height:1.06; }
+          .rich-surface h3{ font-size:1.35rem; line-height:1.12; }
+          .rich-surface h4{ font-size:1.12rem; line-height:1.18; }
+          .rich-surface blockquote{
+            padding-left:.9em;
+            border-left:3px solid color-mix(in oklab, var(--primary-color, #ff9800) 54%, rgba(255,255,255,.16));
+            color:var(--secondary-text-color, #94a3b8);
+          }
+          .rich-surface pre{
+            padding:.8em .9em;
+            border-radius:14px;
+            background:rgba(255,255,255,.05);
+            border:1px solid rgba(255,255,255,.08);
+            white-space:pre-wrap;
+          }
+          .rich-surface code{
+            font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          }
+          .rich-surface ul,
+          .rich-surface ol{
+            padding-inline-start:1.3em;
+          }
+          .rich-note{
+            color:var(--secondary-text-color, #94a3b8);
+            line-height:1.5;
+          }
+          @media (max-width: 760px){
+            .grid,
+            .toggles{
+              grid-template-columns:1fr;
+            }
+            .field.full{
+              grid-column:auto;
+            }
+          }
+        </style>
+        <div class="editor">
+          <div class="intro">
+            <strong>Build a pure typography object</strong>
+            <span>Use this for hero titles, subtle labels, paragraphs or editorial headers directly inside Drag & Drop Card.</span>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Copy</strong>
+              <span>Choose the content and what kind of text object it should behave like.</span>
+            </div>
+            <div class="toggles">
+              <label class="toggle">
+                <input id="richText" type="checkbox" ${cfg.rich_text ? 'checked' : ''}>
+                <span>Enable rich text mode</span>
+              </label>
+            </div>
+            <div class="grid">
+              ${cfg.rich_text ? `
+                <div class="field full">
+                  <span>Rich text</span>
+                  <div class="rich-shell">
+                    <div class="rich-toolbar">
+                      <select id="richBlock">
+                        <option value="P">Normal</option>
+                        <option value="H1">Title / H1</option>
+                        <option value="H2">H2</option>
+                        <option value="H3">H3</option>
+                        <option value="H4">H4</option>
+                        <option value="BLOCKQUOTE">Quote</option>
+                        <option value="PRE">Code</option>
+                      </select>
+                      <button class="rich-btn" type="button" data-rich-cmd="bold" title="Bold"><ha-icon icon="mdi:format-bold"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="italic" title="Italic"><ha-icon icon="mdi:format-italic"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="underline" title="Underline"><ha-icon icon="mdi:format-underline"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="strikeThrough" title="Strike"><ha-icon icon="mdi:format-strikethrough-variant"></ha-icon></button>
+                      <div class="rich-divider"></div>
+                      <button class="rich-btn" type="button" data-rich-cmd="insertUnorderedList" title="Bullet list"><ha-icon icon="mdi:format-list-bulleted"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="insertOrderedList" title="Numbered list"><ha-icon icon="mdi:format-list-numbered"></ha-icon></button>
+                      <div class="rich-divider"></div>
+                      <button class="rich-btn" type="button" data-rich-cmd="createLink" title="Link"><ha-icon icon="mdi:link-variant"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="unlink" title="Unlink"><ha-icon icon="mdi:link-variant-off"></ha-icon></button>
+                      <button class="rich-btn" type="button" data-rich-cmd="removeFormat" title="Clear formatting"><ha-icon icon="mdi:format-clear"></ha-icon></button>
+                    </div>
+                    <div id="richEditor" class="rich-surface" contenteditable="true" data-placeholder="Write your text here...">${richHtml}</div>
+                    <div class="rich-note">Use the toolbar to mix headings, paragraphs, bold, italic, lists, quotes and links in the same text card.</div>
+                  </div>
+                </div>
+              ` : `
+                <label class="field full">
+                  <span>Text</span>
+                  <textarea id="text">${__ddcTableEscapeHtml__(cfg.text || '')}</textarea>
+                </label>
+              `}
+              <label class="field ${cfg.rich_text ? 'is-disabled' : ''}">
+                <span>Variant</span>
+                <select id="variant" ${cfg.rich_text ? 'disabled' : ''}>
+                  <option value="title" ${cfg.variant === 'title' ? 'selected' : ''}>Title</option>
+                  <option value="header" ${cfg.variant === 'header' ? 'selected' : ''}>Header</option>
+                  <option value="h1" ${cfg.variant === 'h1' ? 'selected' : ''}>H1</option>
+                  <option value="h2" ${cfg.variant === 'h2' ? 'selected' : ''}>H2</option>
+                  <option value="h3" ${cfg.variant === 'h3' ? 'selected' : ''}>H3</option>
+                  <option value="h4" ${cfg.variant === 'h4' ? 'selected' : ''}>H4</option>
+                  <option value="paragraph" ${cfg.variant === 'paragraph' ? 'selected' : ''}>Paragraph</option>
+                  <option value="small" ${cfg.variant === 'small' ? 'selected' : ''}>Small</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Alignment</span>
+                <select id="align">
+                  <option value="left" ${cfg.align === 'left' ? 'selected' : ''}>Left</option>
+                  <option value="center" ${cfg.align === 'center' ? 'selected' : ''}>Center</option>
+                  <option value="right" ${cfg.align === 'right' ? 'selected' : ''}>Right</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <strong>Typography</strong>
+              <span>Fine-tune the editorial expression of the text object.</span>
+            </div>
+            <div class="grid">
+              <label class="field full">
+                <span>Font family</span>
+                <input id="fontFamily" type="text" value="${__ddcTableEscapeAttr__(cfg.font_family || '')}" placeholder="e.g. Georgia, 'Avenir Next', var(--paper-font-common-base_-_font-family)" />
+              </label>
+              <label class="field">
+                <span>Font size</span>
+                <input id="fontSize" type="number" min="8" max="200" step="1" value="${Number(cfg.font_size || 42)}" />
+              </label>
+              <label class="field">
+                <span>Color</span>
+                <input id="color" type="text" value="${__ddcTableEscapeAttr__(cfg.color || '')}" placeholder="var(--primary-text-color)" />
+              </label>
+              <label class="field">
+                <span>Letter spacing</span>
+                <input id="letterSpacing" type="number" min="-1" max="2" step="0.01" value="${Number(cfg.letter_spacing ?? -0.03)}" />
+              </label>
+              <label class="field">
+                <span>Line height</span>
+                <input id="lineHeight" type="number" min="0.7" max="3" step="0.05" value="${Number(cfg.line_height ?? 1.05)}" />
+              </label>
+            </div>
+            <div class="toggles">
+              <label class="toggle ${cfg.rich_text ? 'is-disabled' : ''}">
+                <input id="bold" type="checkbox" ${cfg.bold ? 'checked' : ''} ${cfg.rich_text ? 'disabled' : ''}>
+                <span>Bold</span>
+              </label>
+              <label class="toggle ${cfg.rich_text ? 'is-disabled' : ''}">
+                <input id="italic" type="checkbox" ${cfg.italic ? 'checked' : ''} ${cfg.rich_text ? 'disabled' : ''}>
+                <span>Italic</span>
+              </label>
+            </div>
+          </div>
+        </div>`;
+
+      this._bindField_('#richText', 'rich_text', 'checkbox');
+      if (cfg.rich_text) this._bindRichEditor_();
+      else this._bindField_('#text', 'text');
+      this._bindField_('#variant', 'variant', 'select');
+      this._bindField_('#align', 'align', 'select');
+      this._bindField_('#fontFamily', 'font_family');
+      this._bindField_('#fontSize', 'font_size', 'number');
+      this._bindField_('#color', 'color');
+      this._bindField_('#letterSpacing', 'letter_spacing', 'number');
+      this._bindField_('#lineHeight', 'line_height', 'number');
+      this._bindField_('#bold', 'bold', 'checkbox');
+      this._bindField_('#italic', 'italic', 'checkbox');
+
+      const richToggle = this.shadowRoot.querySelector('#richText');
+      if (richToggle) {
+        richToggle.addEventListener('change', () => {
+          if (richToggle.checked) {
+            this._config.bold = false;
+            this._config.italic = false;
+            this._seedRichHtml_();
+          }
+          this._renderEditor_();
+          this._queueEmit_();
+        });
+      }
+    }
+  }
+
   class DdcHtmlCard extends HTMLElement {
     constructor() {
       super();
@@ -23421,6 +26906,24 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
   }
   if (!customElements.get(DDC_LINE_CARD_EDITOR_TAG)) {
     customElements.define(DDC_LINE_CARD_EDITOR_TAG, DdcLineCardEditor);
+  }
+  if (!customElements.get(DDC_TABLE_CARD_TAG)) {
+    customElements.define(DDC_TABLE_CARD_TAG, DdcTableCard);
+  }
+  if (!customElements.get(DDC_TABLE_CARD_EDITOR_TAG)) {
+    customElements.define(DDC_TABLE_CARD_EDITOR_TAG, DdcTableCardEditor);
+  }
+  if (!customElements.get(DDC_ICON_CARD_TAG)) {
+    customElements.define(DDC_ICON_CARD_TAG, DdcIconCard);
+  }
+  if (!customElements.get(DDC_ICON_CARD_EDITOR_TAG)) {
+    customElements.define(DDC_ICON_CARD_EDITOR_TAG, DdcIconCardEditor);
+  }
+  if (!customElements.get(DDC_TEXT_CARD_TAG)) {
+    customElements.define(DDC_TEXT_CARD_TAG, DdcTextCard);
+  }
+  if (!customElements.get(DDC_TEXT_CARD_EDITOR_TAG)) {
+    customElements.define(DDC_TEXT_CARD_EDITOR_TAG, DdcTextCardEditor);
   }
   if (!customElements.get(DDC_HTML_CARD_TAG)) {
     customElements.define(DDC_HTML_CARD_TAG, DdcHtmlCard);
