@@ -1,0 +1,2093 @@
+{
+  "version": 3,
+  "options": {
+    "storage_key": "ddc_test_dashboard_showcase",
+    "grid": 20,
+    "drag_live_snap": true,
+    "auto_save": true,
+    "auto_save_debounce": 700,
+    "disable_overlap": false,
+    "debug": false,
+    "container_size_mode": "fixed_custom",
+    "container_fixed_width": 1440,
+    "container_fixed_height": 900,
+    "container_preset": "fhd",
+    "container_preset_orientation": "landscape",
+    "auto_resize_cards": true,
+    "optimize_for_mobile": true,
+    "mobile_dynamic_behavior": "scale",
+    "do_not_resize_text": false,
+    "outer_grid_buffer": true,
+    "responsive_viewports": {
+      "desktop": {
+        "landscape": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "tablet": {
+        "landscape": {
+          "width": 1180,
+          "height": 820
+        },
+        "portrait": {
+          "width": 820,
+          "height": 1180
+        }
+      },
+      "mobile": {
+        "landscape": {
+          "width": 932,
+          "height": 430
+        },
+        "portrait": {
+          "width": 430,
+          "height": 932
+        }
+      }
+    },
+    "connectors": [
+      {
+        "id": "conn_overview_story",
+        "tabId": "overview",
+        "points": [
+          {
+            "x": 640,
+            "y": 170
+          },
+          {
+            "x": 700,
+            "y": 130
+          }
+        ],
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 7,
+        "animate_mode": "always",
+        "animation_speed": 1.4,
+        "active_color": "#38bdf8",
+        "inactive_color": "rgba(148,163,184,.35)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "conn_motion_route",
+        "tabId": "motion",
+        "points": [
+          {
+            "x": 600,
+            "y": 390
+          },
+          {
+            "x": 720,
+            "y": 140
+          },
+          {
+            "x": 1050,
+            "y": 140
+          },
+          {
+            "x": 1180,
+            "y": 330
+          }
+        ],
+        "arrows": "both",
+        "flow_direction": "forward",
+        "line_style": "dashed",
+        "thickness": 9,
+        "animate_mode": "always",
+        "animation_speed": 1.1,
+        "active_color": "#f59e0b",
+        "inactive_color": "rgba(148,163,184,.35)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "conn_layers_path",
+        "tabId": "layers",
+        "points": [
+          {
+            "x": 420,
+            "y": 315
+          },
+          {
+            "x": 520,
+            "y": 245
+          },
+          {
+            "x": 880,
+            "y": 245
+          }
+        ],
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "dotted",
+        "thickness": 8,
+        "animate_mode": "always",
+        "animation_speed": 1.8,
+        "active_color": "#fb7185",
+        "inactive_color": "rgba(148,163,184,.35)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "conn_responsive_bridge",
+        "tabId": "responsive",
+        "points": [
+          {
+            "x": 650,
+            "y": 340
+          },
+          {
+            "x": 700,
+            "y": 340
+          }
+        ],
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 7,
+        "animate_mode": "always",
+        "animation_speed": 1.25,
+        "active_color": "#22c55e",
+        "inactive_color": "rgba(148,163,184,.35)",
+        "glow": true,
+        "rounded": true
+      }
+    ],
+    "responsive_connectors": {
+      "mobile_portrait": [
+        {
+          "id": "conn_overview_story",
+          "tabId": "overview",
+          "points": [
+            {
+              "x": 210,
+              "y": 260
+            },
+            {
+              "x": 210,
+              "y": 330
+            }
+          ],
+          "arrows": "end",
+          "flow_direction": "forward",
+          "line_style": "solid",
+          "thickness": 7,
+          "animate_mode": "always",
+          "animation_speed": 1.4,
+          "active_color": "#38bdf8",
+          "inactive_color": "rgba(148,163,184,.35)",
+          "glow": true,
+          "rounded": true
+        },
+        {
+          "id": "conn_motion_route",
+          "tabId": "motion",
+          "points": [
+            {
+              "x": 215,
+              "y": 235
+            },
+            {
+              "x": 215,
+              "y": 520
+            },
+            {
+              "x": 215,
+              "y": 740
+            }
+          ],
+          "arrows": "both",
+          "flow_direction": "forward",
+          "line_style": "dashed",
+          "thickness": 8,
+          "animate_mode": "always",
+          "animation_speed": 1.2,
+          "active_color": "#f59e0b",
+          "inactive_color": "rgba(148,163,184,.35)",
+          "glow": true,
+          "rounded": true
+        },
+        {
+          "id": "conn_layers_path",
+          "tabId": "layers",
+          "points": [
+            {
+              "x": 215,
+              "y": 300
+            },
+            {
+              "x": 215,
+              "y": 500
+            },
+            {
+              "x": 215,
+              "y": 700
+            }
+          ],
+          "arrows": "end",
+          "flow_direction": "forward",
+          "line_style": "dotted",
+          "thickness": 8,
+          "animate_mode": "always",
+          "animation_speed": 1.8,
+          "active_color": "#fb7185",
+          "inactive_color": "rgba(148,163,184,.35)",
+          "glow": true,
+          "rounded": true
+        },
+        {
+          "id": "conn_responsive_bridge",
+          "tabId": "responsive",
+          "points": [
+            {
+              "x": 215,
+              "y": 390
+            },
+            {
+              "x": 215,
+              "y": 470
+            }
+          ],
+          "arrows": "end",
+          "flow_direction": "forward",
+          "line_style": "solid",
+          "thickness": 7,
+          "animate_mode": "always",
+          "animation_speed": 1.25,
+          "active_color": "#22c55e",
+          "inactive_color": "rgba(148,163,184,.35)",
+          "glow": true,
+          "rounded": true
+        }
+      ]
+    },
+    "container_background": "radial-gradient(circle at 12% 18%, rgba(56,189,248,.22), transparent 30%), radial-gradient(circle at 82% 16%, rgba(251,113,133,.24), transparent 28%), radial-gradient(circle at 72% 86%, rgba(34,197,94,.18), transparent 34%), linear-gradient(135deg, #101318 0%, #18201b 48%, #241b23 100%)",
+    "apply_background_to_page": false,
+    "card_background": "rgba(10, 16, 23, 0.72)",
+    "card_shadow": true,
+    "dashboard_theme_enabled": false,
+    "dashboard_theme_override_all_design": false,
+    "animate_cards": true,
+    "hide_HA_Header": false,
+    "hide_HA_Sidebar": false,
+    "tabs": [
+      {
+        "id": "overview",
+        "label": "Overview",
+        "icon": "mdi:view-dashboard-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "motion",
+        "label": "Motion",
+        "icon": "mdi:animation-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "layers",
+        "label": "Layers",
+        "icon": "mdi:layers-triple-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "responsive",
+        "label": "Views",
+        "icon": "mdi:cellphone-link",
+        "label_mode": "both"
+      }
+    ],
+    "tabs_position": "left",
+    "default_tab": "overview",
+    "hide_tabs_when_single": false,
+    "layers_enabled": true,
+    "layers": [
+      {
+        "id": "content",
+        "label": "Content",
+        "icon": "mdi:view-dashboard-outline",
+        "color": "#38bdf8",
+        "default_active": true
+      },
+      {
+        "id": "annotations",
+        "label": "Annotations",
+        "icon": "mdi:arrow-decision-outline",
+        "color": "#f59e0b",
+        "default_active": true
+      },
+      {
+        "id": "actions",
+        "label": "Actions",
+        "icon": "mdi:gesture-tap-button",
+        "color": "#22c55e",
+        "default_active": true
+      },
+      {
+        "id": "decor",
+        "label": "Decor",
+        "icon": "mdi:creation-outline",
+        "color": "#fb7185",
+        "default_active": true
+      }
+    ],
+    "background_mode": "particles",
+    "background_particles": {
+      "pointer_events": false,
+      "config": {
+        "particles": {
+          "number": {
+            "value": 44,
+            "density": {
+              "enable": true,
+              "value_area": 1300
+            }
+          },
+          "color": {
+            "value": "#f8fafc"
+          },
+          "shape": {
+            "type": "circle"
+          },
+          "opacity": {
+            "value": 0.24,
+            "random": true
+          },
+          "size": {
+            "value": 2.4,
+            "random": true
+          },
+          "line_linked": {
+            "enable": true,
+            "distance": 145,
+            "color": "#38bdf8",
+            "opacity": 0.12,
+            "width": 1
+          },
+          "move": {
+            "enable": true,
+            "speed": 0.8,
+            "direction": "none",
+            "random": true,
+            "straight": false,
+            "out_mode": "out"
+          }
+        },
+        "interactivity": {
+          "detect_on": "canvas",
+          "events": {
+            "onhover": {
+              "enable": false
+            },
+            "onclick": {
+              "enable": false
+            },
+            "resize": true
+          }
+        },
+        "retina_detect": false
+      }
+    },
+    "screen_saver_enabled": true,
+    "screen_saver_delay": 600000
+  },
+  "cards": [
+    {
+      "id": "ov_hero",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "",
+        "html": "<section class='lab-hero'><div class='eyebrow'>Import-ready design JSON</div><h1>Drag & Drop Test Lab</h1><p>Et demonstrasjonsdashboard for frie kort, snap-grid, z-index, tabs, layers, HTML, klikk, animasjoner og responsive visninger.</p><div class='actions'><button data-click>Click test <strong data-count>0</strong></button><button data-pulse>Toggle pulse</button></div><div class='status' data-status>Buttons are live. Long-press or double-click empty canvas to edit.</div></section>",
+        "css": ".lab-hero{position:relative;min-height:100%;display:grid;align-content:center;gap:18px;padding:26px;border-radius:22px;overflow:hidden;background:linear-gradient(135deg,rgba(56,189,248,.22),rgba(34,197,94,.12) 48%,rgba(251,113,133,.18));border:1px solid rgba(255,255,255,.16)}.lab-hero:before{content:'';position:absolute;inset:auto -80px -120px auto;width:280px;height:280px;border-radius:50%;background:conic-gradient(from 45deg,#38bdf8,#22c55e,#f59e0b,#fb7185,#38bdf8);filter:blur(18px);opacity:.34;animation:spin 10s linear infinite}.lab-hero>*{position:relative}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#a7f3d0;font-weight:800}.lab-hero h1{margin:0;font-size:54px;line-height:.94;color:#fff}.lab-hero p{max-width:48ch;margin:0;color:rgba(226,232,240,.9);font-size:17px;line-height:1.5}.actions{display:flex;gap:12px;flex-wrap:wrap}.actions button{border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:12px 16px;background:rgba(255,255,255,.1);color:#fff;font-weight:800;cursor:pointer}.actions button:hover{transform:translateY(-1px);background:rgba(255,255,255,.16)}.status{font-size:13px;color:rgba(226,232,240,.82)}.lab-hero.is-pulse{animation:heroPulse .8s ease}@keyframes spin{to{transform:rotate(360deg)}}@keyframes heroPulse{50%{box-shadow:0 0 0 8px rgba(34,197,94,.22),0 0 50px rgba(56,189,248,.34)}}",
+        "js": "const count=root.querySelector('[data-count]');const status=root.querySelector('[data-status]');const hero=root.querySelector('.lab-hero');let n=0;helpers.listen(root.querySelector('[data-click]'),'click',()=>{n+=1;count.textContent=String(n);status.textContent='Click event registered: '+n;});helpers.listen(root.querySelector('[data-pulse]'),'click',()=>{hero.classList.toggle('is-pulse');status.textContent=hero.classList.contains('is-pulse')?'Pulse animation is on':'Pulse animation is off';});return {update(){}};",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 620,
+        "height": 270
+      },
+      "z": 10,
+      "tabId": "overview",
+      "layerIds": [
+        "content",
+        "actions"
+      ],
+      "card_style": {
+        "background": "rgba(7, 12, 18, .42)",
+        "border_color": "rgba(255,255,255,.18)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "ov_quickstart",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "##### QUICKSTART\n### 1. Enter edit mode\nDouble-click empty space or long-press.\n\n### 2. Drag, resize, snap\nUse the 20 px grid, selection marquee and card toolbar.\n\n###### Import keeps your current storage_key by default.",
+        "rich_text": true,
+        "variant": "paragraph",
+        "font_size": 17,
+        "color": "#e2e8f0",
+        "align": "left",
+        "bold": false,
+        "letter_spacing": 0,
+        "line_height": 1.35
+      },
+      "position": {
+        "x": 720,
+        "y": 44
+      },
+      "size": {
+        "width": 360,
+        "height": 220
+      },
+      "z": 12,
+      "tabId": "overview",
+      "layerIds": [
+        "content",
+        "annotations"
+      ],
+      "card_style": {
+        "background": "rgba(15,23,42,.72)",
+        "border_color": "rgba(56,189,248,.3)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "ov_snap_arrow",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "animated connector",
+        "direction": "horizontal",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 8,
+        "animate_mode": "always",
+        "animation_speed": 1.2,
+        "active_color": "#38bdf8",
+        "inactive_color": "rgba(148,163,184,.36)",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 640,
+        "y": 116
+      },
+      "size": {
+        "width": 90,
+        "height": 82
+      },
+      "z": 14,
+      "tabId": "overview",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "ov_icon_move",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:cursor-move",
+        "size": 92,
+        "color": "#38bdf8",
+        "active_color": "#22c55e",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": -8,
+        "pulse_when_active": true,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 1120,
+        "y": 52
+      },
+      "size": {
+        "width": 130,
+        "height": 130
+      },
+      "z": 9,
+      "tabId": "overview",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(56,189,248,.12)",
+        "border_color": "rgba(56,189,248,.28)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "ov_icon_resize",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:resize",
+        "size": 92,
+        "color": "#fb7185",
+        "active_color": "#f59e0b",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": 8,
+        "pulse_when_active": true,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 1264,
+        "y": 52
+      },
+      "size": {
+        "width": 130,
+        "height": 130
+      },
+      "z": 9,
+      "tabId": "overview",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(251,113,133,.12)",
+        "border_color": "rgba(251,113,133,.28)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "ov_click_button",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Interactive HTML card",
+        "html": "<div class='click-card'><div><span class='pill'>HTML + JS</span><h2>Trykkbare knapper uten egne entities</h2><p>Dette kortet endrer lokal UI-state direkte i dashboardet.</p></div><button data-main>Arm demo</button><button data-alt>Toast style</button><output data-out>Ready</output></div>",
+        "css": ".click-card{height:100%;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px}.pill{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(34,197,94,.16);color:#86efac;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}.click-card h2{margin:10px 0 6px;color:#fff;font-size:24px}.click-card p{margin:0;color:rgba(226,232,240,.78)}button{border:0;border-radius:16px;padding:16px 18px;color:#07131b;background:#22c55e;font-weight:900;cursor:pointer}button+button{background:#f59e0b}button:hover{filter:brightness(1.08);transform:translateY(-1px)}output{grid-column:1/-1;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.07);color:#dbeafe}.is-armed{animation:armed .7s ease}@keyframes armed{50%{transform:scale(1.015);box-shadow:0 0 0 8px rgba(34,197,94,.2)}}",
+        "js": "const box=root.querySelector('.click-card');const out=root.querySelector('[data-out]');let armed=false;helpers.listen(root.querySelector('[data-main]'),'click',()=>{armed=!armed;box.classList.toggle('is-armed',armed);out.textContent=armed?'Demo armed: animation class applied':'Demo disarmed: state reset';});helpers.listen(root.querySelector('[data-alt]'),'click',()=>{out.textContent='Secondary button clicked at '+new Date().toLocaleTimeString();});return {update(){}};",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 720,
+        "y": 292
+      },
+      "size": {
+        "width": 680,
+        "height": 190
+      },
+      "z": 11,
+      "tabId": "overview",
+      "layerIds": [
+        "actions",
+        "content"
+      ],
+      "card_style": {
+        "background": "linear-gradient(135deg, rgba(34,197,94,.18), rgba(245,158,11,.13))",
+        "border_color": "rgba(34,197,94,.3)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "ov_layer_badge",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "",
+        "html": "<div class='badge'><strong>Z 18</strong><span>Overlapping card with visible overflow</span></div>",
+        "css": ".badge{height:100%;display:grid;place-items:center;text-align:center;gap:6px;border-radius:18px;background:linear-gradient(135deg,#f59e0b,#fb7185);color:#fff;box-shadow:0 18px 45px rgba(251,113,133,.32);transform:rotate(-3deg)}strong{font-size:30px;line-height:1}span{font-size:13px;font-weight:800;max-width:16ch}",
+        "js": "",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 520,
+        "y": 246
+      },
+      "size": {
+        "width": 210,
+        "height": 108
+      },
+      "z": 18,
+      "tabId": "overview",
+      "layerIds": [
+        "annotations",
+        "decor"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "ov_feature_table",
+      "card": {
+        "type": "custom:ddc-table-card",
+        "title": "Feature sampler",
+        "rows": 4,
+        "columns": 4,
+        "header_row": true,
+        "border": true,
+        "radius": 14,
+        "spacing": 10,
+        "cells": [
+          {
+            "type": "text",
+            "text": "Capability",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Demo",
+            "align": "center"
+          },
+          {
+            "type": "text",
+            "text": "Layer",
+            "align": "center"
+          },
+          {
+            "type": "text",
+            "text": "Status",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Drag / resize",
+            "icon": "mdi:cursor-move",
+            "align": "left",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "badge",
+            "text": "Grid 20 px",
+            "icon": "mdi:grid",
+            "align": "center",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "badge",
+            "text": "Content",
+            "icon": "mdi:layers-outline",
+            "align": "center",
+            "active_color": "#22c55e"
+          },
+          {
+            "type": "text",
+            "text": "Ready",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Tabs",
+            "icon": "mdi:tab",
+            "align": "left",
+            "active_color": "#f59e0b"
+          },
+          {
+            "type": "badge",
+            "text": "4 views",
+            "icon": "mdi:view-carousel",
+            "align": "center",
+            "active_color": "#f59e0b"
+          },
+          {
+            "type": "badge",
+            "text": "Annotations",
+            "icon": "mdi:arrow-decision",
+            "align": "center",
+            "active_color": "#fb7185"
+          },
+          {
+            "type": "text",
+            "text": "Live",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "HTML",
+            "icon": "mdi:language-html5",
+            "align": "left",
+            "active_color": "#22c55e"
+          },
+          {
+            "type": "badge",
+            "text": "Buttons",
+            "icon": "mdi:gesture-tap-button",
+            "align": "center",
+            "active_color": "#22c55e"
+          },
+          {
+            "type": "badge",
+            "text": "Actions",
+            "icon": "mdi:flash",
+            "align": "center",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "text",
+            "text": "Clickable",
+            "align": "center"
+          }
+        ]
+      },
+      "position": {
+        "x": 40,
+        "y": 390
+      },
+      "size": {
+        "width": 640,
+        "height": 360
+      },
+      "z": 8,
+      "tabId": "overview",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(255,255,255,.14)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "ov_footer",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "This import file intentionally includes overlapping cards, active layer memberships, animated line cards, SVG connector paths, left tabs, particle background settings, fixed viewport sizing and mobile responsive geometry.",
+        "variant": "paragraph",
+        "font_size": 18,
+        "color": "#cbd5e1",
+        "align": "center",
+        "bold": false,
+        "letter_spacing": 0,
+        "line_height": 1.45
+      },
+      "position": {
+        "x": 720,
+        "y": 520
+      },
+      "size": {
+        "width": 680,
+        "height": 160
+      },
+      "z": 8,
+      "tabId": "overview",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(255,255,255,.06)",
+        "border_color": "rgba(255,255,255,.12)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "motion_heading",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Motion, arrows and snap behavior",
+        "variant": "h2",
+        "font_size": 44,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true,
+        "letter_spacing": -0.02,
+        "line_height": 1.02
+      },
+      "position": {
+        "x": 40,
+        "y": 42
+      },
+      "size": {
+        "width": 560,
+        "height": 110
+      },
+      "z": 10,
+      "tabId": "motion",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(255,255,255,.05)",
+        "border_color": "rgba(255,255,255,.1)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "motion_grid",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Mini drag lab",
+        "html": "<div class='motion-lab'><div class='mini-grid'><span class='tile a'>drag</span><span class='tile b'>resize</span><span class='tile c'>snap</span></div><div class='toolbar'><button data-shuffle>Animate layout</button><button data-grid>Toggle grid glow</button></div><p data-copy>Cards here are HTML, but the imported dashboard itself is ready for native drag and resize in edit mode.</p></div>",
+        "css": ".motion-lab{height:100%;display:grid;grid-template-rows:1fr auto auto;gap:14px}.mini-grid{position:relative;min-height:270px;border-radius:20px;overflow:hidden;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:20px 20px;background-color:rgba(2,6,23,.35);border:1px solid rgba(255,255,255,.12)}.mini-grid.glow{box-shadow:inset 0 0 0 2px rgba(56,189,248,.28),0 0 34px rgba(56,189,248,.2)}.tile{position:absolute;display:grid;place-items:center;border-radius:16px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.08em}.a{left:34px;top:38px;width:180px;height:90px;background:#38bdf8}.b{left:250px;top:130px;width:220px;height:112px;background:#22c55e}.c{left:150px;top:210px;width:150px;height:78px;background:#fb7185}.motion-lab.play .a{animation:moveA 1s ease both}.motion-lab.play .b{animation:moveB 1s ease both}.motion-lab.play .c{animation:moveC 1s ease both}.toolbar{display:flex;gap:10px;flex-wrap:wrap}button{border:0;border-radius:14px;padding:12px 14px;background:#f59e0b;color:#111827;font-weight:900;cursor:pointer}button+button{background:#38bdf8}.motion-lab p{margin:0;color:rgba(226,232,240,.82);line-height:1.45}@keyframes moveA{50%{transform:translate(120px,70px)}}@keyframes moveB{50%{transform:translate(-120px,-70px) scale(1.08)}}@keyframes moveC{50%{transform:translate(150px,-145px)}}",
+        "js": "const lab=root.querySelector('.motion-lab');const grid=root.querySelector('.mini-grid');const copy=root.querySelector('[data-copy]');helpers.listen(root.querySelector('[data-shuffle]'),'click',()=>{lab.classList.remove('play');void lab.offsetWidth;lab.classList.add('play');copy.textContent='Animation replayed. In edit mode, the real cards snap to the same 20 px rhythm.';});helpers.listen(root.querySelector('[data-grid]'),'click',()=>{grid.classList.toggle('glow');copy.textContent=grid.classList.contains('glow')?'Grid glow is on':'Grid glow is off';});return {update(){}};",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 560,
+        "height": 470
+      },
+      "z": 10,
+      "tabId": "motion",
+      "layerIds": [
+        "content",
+        "actions"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.7)",
+        "border_color": "rgba(56,189,248,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "motion_line_horizontal",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "horizontal",
+        "direction": "horizontal",
+        "arrows": "both",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 10,
+        "animate_mode": "always",
+        "animation_speed": 1.3,
+        "active_color": "#38bdf8",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 660,
+        "y": 78
+      },
+      "size": {
+        "width": 320,
+        "height": 90
+      },
+      "z": 12,
+      "tabId": "motion",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_line_vertical",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "vertical",
+        "direction": "vertical",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "dashed",
+        "thickness": 9,
+        "animate_mode": "always",
+        "animation_speed": 1.65,
+        "active_color": "#22c55e",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 80
+      },
+      "size": {
+        "width": 120,
+        "height": 270
+      },
+      "z": 12,
+      "tabId": "motion",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_line_elbow",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "elbow route",
+        "direction": "elbow-right-down",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 11,
+        "animate_mode": "always",
+        "animation_speed": 1.45,
+        "active_color": "#f59e0b",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 660,
+        "y": 250
+      },
+      "size": {
+        "width": 330,
+        "height": 220
+      },
+      "z": 11,
+      "tabId": "motion",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_line_diag",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "diagonal",
+        "direction": "diagonal-up",
+        "arrows": "both",
+        "flow_direction": "reverse",
+        "line_style": "dotted",
+        "thickness": 10,
+        "animate_mode": "always",
+        "animation_speed": 1,
+        "active_color": "#fb7185",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 1080,
+        "y": 265
+      },
+      "size": {
+        "width": 280,
+        "height": 150
+      },
+      "z": 11,
+      "tabId": "motion",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_flow_note",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "",
+        "html": "<div class='flow-note'><span>Connector overlay</span><strong>SVG paths can sit above cards</strong><p>The orange dashed route is not a normal card. It is imported through options.connectors and follows the active tab.</p></div>",
+        "css": ".flow-note{height:100%;display:grid;align-content:center;gap:10px;padding:20px;border-radius:18px;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.28)}span{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fcd34d;font-weight:900}strong{font-size:26px;line-height:1.05;color:#fff}p{margin:0;color:rgba(226,232,240,.82);line-height:1.45}",
+        "js": "",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 1010,
+        "y": 470
+      },
+      "size": {
+        "width": 350,
+        "height": 170
+      },
+      "z": 10,
+      "tabId": "motion",
+      "layerIds": [
+        "content",
+        "annotations"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(245,158,11,.24)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "motion_icon_pulse",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:gesture-tap-hold",
+        "size": 110,
+        "color": "#f59e0b",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": -12,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 675,
+        "y": 520
+      },
+      "size": {
+        "width": 150,
+        "height": 150
+      },
+      "z": 8,
+      "tabId": "motion",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(245,158,11,.12)",
+        "border_color": "rgba(245,158,11,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_icon_layer",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:layers-search-outline",
+        "size": 110,
+        "color": "#22c55e",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": 9,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 845,
+        "y": 520
+      },
+      "size": {
+        "width": 150,
+        "height": 150
+      },
+      "z": 8,
+      "tabId": "motion",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(34,197,94,.12)",
+        "border_color": "rgba(34,197,94,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "motion_footer",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Tip: switch to edit mode and drag a selection marquee across several cards. The layout supports multi-select, group movement, resize handles, card duplication, z-order controls and per-card settings.",
+        "variant": "paragraph",
+        "font_size": 18,
+        "color": "#cbd5e1",
+        "align": "left",
+        "bold": false,
+        "letter_spacing": 0,
+        "line_height": 1.45
+      },
+      "position": {
+        "x": 40,
+        "y": 690
+      },
+      "size": {
+        "width": 1320,
+        "height": 120
+      },
+      "z": 8,
+      "tabId": "motion",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(255,255,255,.06)",
+        "border_color": "rgba(255,255,255,.12)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "layer_heading",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Layers: turn groups on and off",
+        "variant": "h2",
+        "font_size": 44,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true,
+        "letter_spacing": -0.02,
+        "line_height": 1.02
+      },
+      "position": {
+        "x": 40,
+        "y": 42
+      },
+      "size": {
+        "width": 620,
+        "height": 110
+      },
+      "z": 10,
+      "tabId": "layers",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(255,255,255,.05)",
+        "border_color": "rgba(255,255,255,.1)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "layer_base_panel",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Content layer",
+        "html": "<div class='layer-panel content'><span>Content</span><strong>Primary dashboard objects</strong><p>Cards with no layer always remain visible, while assigned cards can be filtered from the layer bar.</p></div>",
+        "css": ".layer-panel{height:100%;display:grid;align-content:center;gap:12px;padding:22px;border-radius:20px;border:1px solid rgba(255,255,255,.14)}.content{background:linear-gradient(135deg,rgba(56,189,248,.22),rgba(56,189,248,.06))}span{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:#bae6fd;font-weight:900}strong{font-size:30px;line-height:1.05;color:#fff}p{margin:0;color:rgba(226,232,240,.82);line-height:1.45}",
+        "js": "",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 40,
+        "y": 185
+      },
+      "size": {
+        "width": 380,
+        "height": 270
+      },
+      "z": 9,
+      "tabId": "layers",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(56,189,248,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "layer_annotation_panel",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "### Annotation layer\nPiler, forklaringer og hjelpetekster kan toggles separat fra hovedinnholdet. Slukk `Annotations` i layerbaren og se pilene forsvinne.",
+        "rich_text": true,
+        "variant": "paragraph",
+        "font_size": 18,
+        "color": "#fef3c7",
+        "align": "left",
+        "bold": false,
+        "letter_spacing": 0,
+        "line_height": 1.4
+      },
+      "position": {
+        "x": 500,
+        "y": 165
+      },
+      "size": {
+        "width": 360,
+        "height": 180
+      },
+      "z": 12,
+      "tabId": "layers",
+      "layerIds": [
+        "annotations"
+      ],
+      "card_style": {
+        "background": "rgba(245,158,11,.16)",
+        "border_color": "rgba(245,158,11,.34)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "layer_action_panel",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Action layer",
+        "html": "<div class='action-layer'><span>Actions</span><h2>Interactive layer</h2><div class='buttons'><button data-up>Increment</button><button data-down>Reset</button></div><strong data-num>0</strong></div>",
+        "css": ".action-layer{height:100%;display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;padding:22px;border-radius:20px;background:linear-gradient(135deg,rgba(34,197,94,.2),rgba(20,184,166,.08));border:1px solid rgba(34,197,94,.26)}span{grid-column:1/-1;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#bbf7d0;font-weight:900}h2{margin:0;color:#fff}.buttons{display:flex;gap:10px;flex-wrap:wrap}button{border:0;border-radius:14px;padding:12px 14px;background:#22c55e;color:#052e16;font-weight:900;cursor:pointer}button+button{background:#94a3b8;color:#111827}strong{font-size:64px;color:#fff;line-height:1}.pop{animation:pop .25s ease}@keyframes pop{50%{transform:scale(1.18)}}",
+        "js": "const num=root.querySelector('[data-num]');let value=0;function paint(){num.textContent=String(value);num.classList.remove('pop');void num.offsetWidth;num.classList.add('pop');}helpers.listen(root.querySelector('[data-up]'),'click',()=>{value+=1;paint();});helpers.listen(root.querySelector('[data-down]'),'click',()=>{value=0;paint();});return {update(){}};",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 905,
+        "y": 165
+      },
+      "size": {
+        "width": 455,
+        "height": 230
+      },
+      "z": 11,
+      "tabId": "layers",
+      "layerIds": [
+        "actions"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(34,197,94,.3)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "layer_arrow",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "layer route",
+        "direction": "horizontal",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "dashed",
+        "thickness": 9,
+        "animate_mode": "always",
+        "animation_speed": 1.4,
+        "active_color": "#f59e0b",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 420,
+        "y": 285
+      },
+      "size": {
+        "width": 475,
+        "height": 100
+      },
+      "z": 8,
+      "tabId": "layers",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "layer_decor_icon1",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:star-four-points-outline",
+        "size": 100,
+        "color": "#fb7185",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": 24,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 515,
+        "y": 385
+      },
+      "size": {
+        "width": 160,
+        "height": 160
+      },
+      "z": 13,
+      "tabId": "layers",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(251,113,133,.12)",
+        "border_color": "rgba(251,113,133,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "layer_decor_icon2",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:blur",
+        "size": 110,
+        "color": "#38bdf8",
+        "state_based_color": false,
+        "glow": true,
+        "rotate": -18,
+        "click_action": "none"
+      },
+      "position": {
+        "x": 705,
+        "y": 385
+      },
+      "size": {
+        "width": 160,
+        "height": 160
+      },
+      "z": 13,
+      "tabId": "layers",
+      "layerIds": [
+        "decor"
+      ],
+      "card_style": {
+        "background": "rgba(56,189,248,.12)",
+        "border_color": "rgba(56,189,248,.26)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "layer_table",
+      "card": {
+        "type": "custom:ddc-table-card",
+        "title": "Layer membership",
+        "rows": 3,
+        "columns": 4,
+        "header_row": true,
+        "border": true,
+        "radius": 14,
+        "spacing": 10,
+        "cells": [
+          {
+            "type": "text",
+            "text": "Layer",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Purpose",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Toggle",
+            "align": "center"
+          },
+          {
+            "type": "text",
+            "text": "Example",
+            "align": "center"
+          },
+          {
+            "type": "badge",
+            "text": "Content",
+            "icon": "mdi:view-dashboard",
+            "align": "left",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "text",
+            "text": "Main cards and text",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Layer bar",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Panels",
+            "icon": "mdi:card-text-outline",
+            "align": "center"
+          },
+          {
+            "type": "badge",
+            "text": "Decor + Actions",
+            "icon": "mdi:creation",
+            "align": "left",
+            "active_color": "#fb7185"
+          },
+          {
+            "type": "text",
+            "text": "Extras and controls",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Layer bar",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Icons",
+            "icon": "mdi:star-four-points",
+            "align": "center"
+          }
+        ]
+      },
+      "position": {
+        "x": 40,
+        "y": 585
+      },
+      "size": {
+        "width": 1320,
+        "height": 250
+      },
+      "z": 8,
+      "tabId": "layers",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(255,255,255,.14)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "resp_heading",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Responsive views and device presets",
+        "variant": "h2",
+        "font_size": 44,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true,
+        "letter_spacing": -0.02,
+        "line_height": 1.02
+      },
+      "position": {
+        "x": 40,
+        "y": 42
+      },
+      "size": {
+        "width": 700,
+        "height": 110
+      },
+      "z": 10,
+      "tabId": "responsive",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(255,255,255,.05)",
+        "border_color": "rgba(255,255,255,.1)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "resp_device_lab",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Viewport cards",
+        "html": "<div class='devices'><article><span>Desktop</span><strong>1440 x 900</strong><em>Wide freeform canvas</em></article><article><span>Tablet</span><strong>820 x 1180</strong><em>Portrait profile included</em></article><article><span>Mobile</span><strong>430 x 932</strong><em>Stacked geometry included</em></article></div>",
+        "css": ".devices{height:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.devices article{display:grid;align-content:center;gap:10px;min-width:0;padding:18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);position:relative;overflow:hidden}.devices article:before{content:'';position:absolute;inset:auto -30px -50px auto;width:130px;height:130px;border-radius:50%;background:var(--accent,#38bdf8);filter:blur(30px);opacity:.28}.devices article:nth-child(2){--accent:#f59e0b}.devices article:nth-child(3){--accent:#22c55e}span{font-size:12px;letter-spacing:.13em;text-transform:uppercase;font-weight:900;color:#bae6fd}strong{font-size:26px;color:#fff}em{font-style:normal;color:rgba(226,232,240,.78);line-height:1.35}@media(max-width:700px){.devices{grid-template-columns:1fr}}",
+        "js": "",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 620,
+        "height": 330
+      },
+      "z": 9,
+      "tabId": "responsive",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(56,189,248,.22)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "resp_matrix",
+      "card": {
+        "type": "custom:ddc-table-card",
+        "title": "Imported responsive layouts",
+        "rows": 4,
+        "columns": 3,
+        "header_row": true,
+        "border": true,
+        "radius": 14,
+        "spacing": 10,
+        "cells": [
+          {
+            "type": "text",
+            "text": "Variant",
+            "align": "left"
+          },
+          {
+            "type": "text",
+            "text": "Geometry",
+            "align": "center"
+          },
+          {
+            "type": "text",
+            "text": "Use",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Desktop landscape",
+            "icon": "mdi:monitor",
+            "align": "left",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "badge",
+            "text": "Base cards",
+            "icon": "mdi:card-multiple-outline",
+            "align": "center",
+            "active_color": "#38bdf8"
+          },
+          {
+            "type": "text",
+            "text": "Default",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Tablet portrait",
+            "icon": "mdi:tablet",
+            "align": "left",
+            "active_color": "#f59e0b"
+          },
+          {
+            "type": "badge",
+            "text": "Compact",
+            "icon": "mdi:arrow-collapse",
+            "align": "center",
+            "active_color": "#f59e0b"
+          },
+          {
+            "type": "text",
+            "text": "Preview",
+            "align": "center"
+          },
+          {
+            "type": "icon",
+            "text": "Mobile portrait",
+            "icon": "mdi:cellphone",
+            "align": "left",
+            "active_color": "#22c55e"
+          },
+          {
+            "type": "badge",
+            "text": "Stacked",
+            "icon": "mdi:format-align-justify",
+            "align": "center",
+            "active_color": "#22c55e"
+          },
+          {
+            "type": "text",
+            "text": "Included",
+            "align": "center"
+          }
+        ]
+      },
+      "position": {
+        "x": 720,
+        "y": 180
+      },
+      "size": {
+        "width": 640,
+        "height": 330
+      },
+      "z": 9,
+      "tabId": "responsive",
+      "layerIds": [
+        "content"
+      ],
+      "card_style": {
+        "background": "rgba(8,13,20,.68)",
+        "border_color": "rgba(34,197,94,.22)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    },
+    {
+      "id": "resp_line",
+      "card": {
+        "type": "custom:ddc-line-card",
+        "title": "view switch",
+        "direction": "horizontal",
+        "arrows": "both",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 9,
+        "animate_mode": "always",
+        "animation_speed": 1.2,
+        "active_color": "#22c55e",
+        "glow": true,
+        "rounded": true
+      },
+      "position": {
+        "x": 655,
+        "y": 302
+      },
+      "size": {
+        "width": 70,
+        "height": 90
+      },
+      "z": 12,
+      "tabId": "responsive",
+      "layerIds": [
+        "annotations"
+      ],
+      "overflow": "visible"
+    },
+    {
+      "id": "resp_footer",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "The JSON contains a fixed desktop canvas plus tablet and mobile portrait coordinates. Import it, then use the viewport/device controls in the card settings to inspect how the same card IDs move between layouts.",
+        "variant": "paragraph",
+        "font_size": 20,
+        "color": "#d1fae5",
+        "align": "center",
+        "bold": false,
+        "letter_spacing": 0,
+        "line_height": 1.45
+      },
+      "position": {
+        "x": 40,
+        "y": 560
+      },
+      "size": {
+        "width": 1320,
+        "height": 150
+      },
+      "z": 8,
+      "tabId": "responsive",
+      "layerIds": [
+        "content",
+        "annotations"
+      ],
+      "card_style": {
+        "background": "rgba(34,197,94,.12)",
+        "border_color": "rgba(34,197,94,.24)",
+        "card_shadow": "on",
+        "animate_cards": "on"
+      }
+    }
+  ],
+  "responsive_layouts": {
+    "tablet_portrait": [
+      {
+        "id": "ov_hero",
+        "position": {
+          "x": 30,
+          "y": 30
+        },
+        "size": {
+          "width": 760,
+          "height": 300
+        },
+        "z": 10,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_quickstart",
+        "position": {
+          "x": 30,
+          "y": 360
+        },
+        "size": {
+          "width": 360,
+          "height": 240
+        },
+        "z": 12,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_click_button",
+        "position": {
+          "x": 410,
+          "y": 360
+        },
+        "size": {
+          "width": 380,
+          "height": 240
+        },
+        "z": 11,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_feature_table",
+        "position": {
+          "x": 30,
+          "y": 630
+        },
+        "size": {
+          "width": 760,
+          "height": 380
+        },
+        "z": 8,
+        "tabId": "overview"
+      },
+      {
+        "id": "motion_grid",
+        "position": {
+          "x": 30,
+          "y": 180
+        },
+        "size": {
+          "width": 520,
+          "height": 460
+        },
+        "z": 10,
+        "tabId": "motion"
+      },
+      {
+        "id": "motion_line_horizontal",
+        "position": {
+          "x": 570,
+          "y": 190
+        },
+        "size": {
+          "width": 210,
+          "height": 90
+        },
+        "z": 12,
+        "tabId": "motion"
+      },
+      {
+        "id": "motion_flow_note",
+        "position": {
+          "x": 570,
+          "y": 310
+        },
+        "size": {
+          "width": 210,
+          "height": 240
+        },
+        "z": 10,
+        "tabId": "motion"
+      },
+      {
+        "id": "layer_base_panel",
+        "position": {
+          "x": 30,
+          "y": 175
+        },
+        "size": {
+          "width": 360,
+          "height": 270
+        },
+        "z": 9,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_annotation_panel",
+        "position": {
+          "x": 420,
+          "y": 175
+        },
+        "size": {
+          "width": 370,
+          "height": 180
+        },
+        "z": 12,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_action_panel",
+        "position": {
+          "x": 420,
+          "y": 380
+        },
+        "size": {
+          "width": 370,
+          "height": 230
+        },
+        "z": 11,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_table",
+        "position": {
+          "x": 30,
+          "y": 650
+        },
+        "size": {
+          "width": 760,
+          "height": 290
+        },
+        "z": 8,
+        "tabId": "layers"
+      },
+      {
+        "id": "resp_device_lab",
+        "position": {
+          "x": 30,
+          "y": 170
+        },
+        "size": {
+          "width": 760,
+          "height": 280
+        },
+        "z": 9,
+        "tabId": "responsive"
+      },
+      {
+        "id": "resp_matrix",
+        "position": {
+          "x": 30,
+          "y": 480
+        },
+        "size": {
+          "width": 760,
+          "height": 340
+        },
+        "z": 9,
+        "tabId": "responsive"
+      },
+      {
+        "id": "resp_footer",
+        "position": {
+          "x": 30,
+          "y": 850
+        },
+        "size": {
+          "width": 760,
+          "height": 150
+        },
+        "z": 8,
+        "tabId": "responsive"
+      }
+    ],
+    "mobile_portrait": [
+      {
+        "id": "ov_hero",
+        "position": {
+          "x": 16,
+          "y": 20
+        },
+        "size": {
+          "width": 398,
+          "height": 260
+        },
+        "z": 10,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_layer_badge",
+        "position": {
+          "x": 212,
+          "y": 232
+        },
+        "size": {
+          "width": 190,
+          "height": 94
+        },
+        "z": 18,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_quickstart",
+        "position": {
+          "x": 16,
+          "y": 330
+        },
+        "size": {
+          "width": 398,
+          "height": 240
+        },
+        "z": 12,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_click_button",
+        "position": {
+          "x": 16,
+          "y": 595
+        },
+        "size": {
+          "width": 398,
+          "height": 190
+        },
+        "z": 11,
+        "tabId": "overview"
+      },
+      {
+        "id": "ov_feature_table",
+        "position": {
+          "x": 16,
+          "y": 815
+        },
+        "size": {
+          "width": 398,
+          "height": 420
+        },
+        "z": 8,
+        "tabId": "overview"
+      },
+      {
+        "id": "motion_heading",
+        "position": {
+          "x": 16,
+          "y": 20
+        },
+        "size": {
+          "width": 398,
+          "height": 130
+        },
+        "z": 10,
+        "tabId": "motion"
+      },
+      {
+        "id": "motion_grid",
+        "position": {
+          "x": 16,
+          "y": 170
+        },
+        "size": {
+          "width": 398,
+          "height": 440
+        },
+        "z": 10,
+        "tabId": "motion"
+      },
+      {
+        "id": "motion_flow_note",
+        "position": {
+          "x": 16,
+          "y": 635
+        },
+        "size": {
+          "width": 398,
+          "height": 190
+        },
+        "z": 10,
+        "tabId": "motion"
+      },
+      {
+        "id": "motion_footer",
+        "position": {
+          "x": 16,
+          "y": 850
+        },
+        "size": {
+          "width": 398,
+          "height": 170
+        },
+        "z": 8,
+        "tabId": "motion"
+      },
+      {
+        "id": "layer_heading",
+        "position": {
+          "x": 16,
+          "y": 20
+        },
+        "size": {
+          "width": 398,
+          "height": 130
+        },
+        "z": 10,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_base_panel",
+        "position": {
+          "x": 16,
+          "y": 170
+        },
+        "size": {
+          "width": 398,
+          "height": 230
+        },
+        "z": 9,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_annotation_panel",
+        "position": {
+          "x": 16,
+          "y": 425
+        },
+        "size": {
+          "width": 398,
+          "height": 190
+        },
+        "z": 12,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_action_panel",
+        "position": {
+          "x": 16,
+          "y": 640
+        },
+        "size": {
+          "width": 398,
+          "height": 220
+        },
+        "z": 11,
+        "tabId": "layers"
+      },
+      {
+        "id": "layer_table",
+        "position": {
+          "x": 16,
+          "y": 885
+        },
+        "size": {
+          "width": 398,
+          "height": 340
+        },
+        "z": 8,
+        "tabId": "layers"
+      },
+      {
+        "id": "resp_heading",
+        "position": {
+          "x": 16,
+          "y": 20
+        },
+        "size": {
+          "width": 398,
+          "height": 130
+        },
+        "z": 10,
+        "tabId": "responsive"
+      },
+      {
+        "id": "resp_device_lab",
+        "position": {
+          "x": 16,
+          "y": 170
+        },
+        "size": {
+          "width": 398,
+          "height": 320
+        },
+        "z": 9,
+        "tabId": "responsive"
+      },
+      {
+        "id": "resp_matrix",
+        "position": {
+          "x": 16,
+          "y": 520
+        },
+        "size": {
+          "width": 398,
+          "height": 410
+        },
+        "z": 9,
+        "tabId": "responsive"
+      },
+      {
+        "id": "resp_footer",
+        "position": {
+          "x": 16,
+          "y": 960
+        },
+        "size": {
+          "width": 398,
+          "height": 180
+        },
+        "z": 8,
+        "tabId": "responsive"
+      }
+    ]
+  },
+  "packages": []
+}

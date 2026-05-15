@@ -272,6 +272,515 @@ Each added card is wrapped in a draggable/resizable container that participates 
 
 ---
 
+## 🤖 LLM Dashboard Authoring Reference
+
+This section is written to make it easy for an LLM, agent, or automation tool to generate valid **importable Drag & Drop Card dashboards** without reverse-engineering the source code.
+
+### Purpose
+
+When generating a dashboard JSON for Drag & Drop Card, the model should think in five layers:
+
+1. **`options`**: dashboard-level behavior and styling
+2. **`cards`**: the desktop/base layout entries
+3. **`responsive_layouts`**: per-device or per-orientation variants
+4. **`responsive_connectors`** inside `options`: animated line overlays between items
+5. **`packages`**: optional Home Assistant YAML bundles synced by the backend
+
+### Top-level JSON shape
+
+An importable dashboard JSON should follow this structure:
+
+```json
+{
+  "version": 3,
+  "options": {},
+  "cards": [],
+  "responsive_layouts": {},
+  "packages": []
+}
+```
+
+### Minimal working example
+
+```json
+{
+  "version": 3,
+  "options": {
+    "grid": 20,
+    "auto_save": true,
+    "container_size_mode": "dynamic",
+    "tabs": [
+      { "id": "overview", "label": "Overview", "icon": "mdi:view-dashboard" }
+    ],
+    "default_tab": "overview",
+    "hide_tabs_when_single": true
+  },
+  "cards": [
+    {
+      "id": "layout_card_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Hello dashboard",
+        "variant": "title"
+      },
+      "position": { "x": 40, "y": 40 },
+      "size": { "width": 420, "height": 120 },
+      "z": 6,
+      "tabId": "overview"
+    }
+  ],
+  "responsive_layouts": {
+    "desktop": {
+      "cards": [],
+      "landscape": { "cards": [] }
+    },
+    "tablet": {
+      "cards": [],
+      "landscape": { "cards": [] },
+      "portrait": { "cards": [] }
+    },
+    "mobile": {
+      "cards": [],
+      "landscape": { "cards": [] },
+      "portrait": { "cards": [] }
+    }
+  },
+  "packages": []
+}
+```
+
+### Card entry format
+
+Each dashboard item is stored as a layout entry:
+
+```json
+{
+  "id": "layout_card_1",
+  "card": {
+    "type": "entities",
+    "title": "Example"
+  },
+  "position": { "x": 0, "y": 0 },
+  "size": { "width": 280, "height": 180 },
+  "z": 6,
+  "tabId": "overview",
+  "layerIds": ["standard"],
+  "card_style": {},
+  "overflow": "visible"
+}
+```
+
+#### Important notes
+
+- `id` should be unique within the dashboard.
+- `position` and `size` are in **canvas pixels**.
+- `z` should usually start at `6` or higher.
+- `tabId` controls which tab the card belongs to.
+- `layerIds` is optional. If omitted, the card remains visible for backward compatibility.
+- `card_style` is optional and contains per-card design overrides.
+
+### Responsive layouts
+
+`cards` at the top level acts as the **desktop/base layout**.
+
+`responsive_layouts` allows separate variants for:
+
+- `desktop.landscape`
+- `tablet.landscape`
+- `tablet.portrait`
+- `mobile.landscape`
+- `mobile.portrait`
+
+Recommended shape:
+
+```json
+{
+  "responsive_layouts": {
+    "desktop": {
+      "cards": [/* desktop landscape cards */],
+      "landscape": { "cards": [/* desktop landscape cards */] }
+    },
+    "tablet": {
+      "cards": [/* tablet landscape fallback */],
+      "landscape": { "cards": [/* tablet landscape cards */] },
+      "portrait": { "cards": [/* tablet portrait cards */] }
+    },
+    "mobile": {
+      "cards": [/* mobile landscape fallback */],
+      "landscape": { "cards": [/* mobile landscape cards */] },
+      "portrait": { "cards": [/* mobile portrait cards */] }
+    }
+  }
+}
+```
+
+#### Best practice for LLMs
+
+- Treat **portrait** and **landscape** as separate layouts for `tablet` and `mobile`.
+- If the same card exists in multiple profiles, keep the same `id` but allow different `position` and `size`.
+- New dashboards should usually define at least:
+  - one desktop layout
+  - one mobile portrait layout
+  - one tablet landscape layout
+
+### Dashboard options most relevant to generation
+
+These are the most important option keys for an LLM to know:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `grid` | number | Snap size in px |
+| `drag_live_snap` | boolean | Snap during drag/resize |
+| `auto_save` | boolean | Save automatically |
+| `auto_save_debounce` | number | Auto-save delay in ms |
+| `container_size_mode` | string | `dynamic`, `auto`, `fixed_custom`, `preset` |
+| `container_background` | string | Dashboard background color or gradient |
+| `card_background` | string | Default wrapped card background |
+| `card_shadow` | boolean | Enable default card shadows |
+| `animate_cards` | boolean | Animate cards on tab/layer entry |
+| `tabs` | array | Tab definitions |
+| `tabs_position` | string | `top`, `bottom`, `left` |
+| `default_tab` | string | Default active tab id |
+| `hide_tabs_when_single` | boolean | Hide tabs if only one exists |
+| `layers_enabled` | boolean | Enable layer-based visibility |
+| `layers` | array | Layer definitions |
+| `background_mode` | string | `none`, `image`, `particles`, `youtube` |
+| `background_image` | object | Image background settings |
+| `background_particles` | object | Particle background settings |
+| `background_youtube` | object | YouTube background settings |
+| `dashboard_theme_enabled` | boolean | Enable Home Assistant theme styling |
+| `dashboard_theme` | string | Theme name |
+| `dashboard_theme_override_all_design` | boolean | Force theme to win over custom design choices |
+| `responsive_viewports` | object | Editor preview sizes for desktop/tablet/mobile |
+| `responsive_connectors` | object | Animated connector overlay layouts |
+
+### Tabs
+
+Tabs are configured in `options.tabs`:
+
+```json
+{
+  "tabs": [
+    { "id": "overview", "label": "Overview", "icon": "mdi:view-dashboard" },
+    { "id": "energy", "label": "Energy", "icon": "mdi:flash" },
+    { "id": "automation", "label": "Automation", "icon": "mdi:robot" }
+  ],
+  "default_tab": "overview",
+  "tabs_position": "top"
+}
+```
+
+Every card entry should then include a matching `tabId`.
+
+### Layers
+
+Layers are independent of tabs and are used for toggling sets of cards inside the same tab:
+
+```json
+{
+  "layers_enabled": true,
+  "layers": [
+    { "id": "standard", "label": "Standard", "icon": "mdi:layers" },
+    { "id": "energy", "label": "Energy", "icon": "mdi:flash" },
+    { "id": "explainers", "label": "Explainers", "icon": "mdi:help-circle-outline" }
+  ]
+}
+```
+
+Cards can then opt into one or more layers:
+
+```json
+{
+  "layerIds": ["energy"]
+}
+```
+
+#### Backward compatibility rule
+
+If a card has **no `layerIds`**, it should still remain visible. This is intentional and should be preserved when generating new dashboards that mix old and new content.
+
+### Connectors / animated lines
+
+Lines are **not** authored as normal cards anymore. They are stored in `options.responsive_connectors`.
+
+Recommended shape:
+
+```json
+{
+  "responsive_connectors": {
+    "desktop": {
+      "connectors": [],
+      "landscape": { "connectors": [] }
+    },
+    "tablet": {
+      "connectors": [],
+      "landscape": { "connectors": [] },
+      "portrait": { "connectors": [] }
+    },
+    "mobile": {
+      "connectors": [],
+      "landscape": { "connectors": [] },
+      "portrait": { "connectors": [] }
+    }
+  }
+}
+```
+
+Each connector entry looks like this:
+
+```json
+{
+  "id": "connector_power_1",
+  "tabId": "overview",
+  "points": [
+    { "x": 120, "y": 200 },
+    { "x": 420, "y": 200 },
+    { "x": 420, "y": 360 }
+  ],
+  "entity": "input_boolean.ddc_demo_flow",
+  "active_states": "on,home,open,playing,charging,active,>0",
+  "arrows": "end",
+  "flow_direction": "auto",
+  "line_style": "dashed",
+  "thickness": 10,
+  "animate_mode": "active",
+  "animation_speed": 1.8,
+  "active_color": "var(--primary-color, #ff9800)",
+  "inactive_color": "rgba(148, 163, 184, 0.42)",
+  "glow": true,
+  "rounded": true
+}
+```
+
+#### Connector authoring rules
+
+- `points` must contain at least **two** points.
+- Points should snap to the same grid as the dashboard.
+- `tabId` should match the tab where the line is visible.
+- Use `entity` + `active_states` when the line should animate or change color based on Home Assistant state.
+
+### Supported built-in DDC custom cards
+
+These are the custom cards an LLM can safely generate today.
+
+#### 1. `custom:ddc-html-card`
+
+Use this when the dashboard needs freeform HTML, CSS, and JavaScript inside a card.
+
+```json
+{
+  "type": "custom:ddc-html-card",
+  "title": "Custom widget",
+  "html": "<div class='demo'>Hello</div>",
+  "css": ".demo { color: white; }",
+  "js": "return { update(){ /* read hass/states here */ } };",
+  "rerun_on_hass_update": false
+}
+```
+
+Runtime JavaScript receives access to:
+
+- `hass`
+- `states`
+- `config`
+- `root`
+- `host`
+- `helpers`
+
+#### 2. `custom:ddc-text-card`
+
+Use this for titles, headings, paragraphs, small labels, and rich text.
+
+```json
+{
+  "type": "custom:ddc-text-card",
+  "text": "Energy overview",
+  "rich_text": false,
+  "rich_html": "",
+  "variant": "title",
+  "font_family": "",
+  "font_size": 42,
+  "color": "var(--primary-text-color, #f8fafc)",
+  "align": "left",
+  "bold": true,
+  "italic": false,
+  "letter_spacing": -0.03,
+  "line_height": 1.05
+}
+```
+
+When `rich_text` is enabled, use `rich_html` as the canonical content.
+
+#### 3. `custom:ddc-icon-card`
+
+Use this for pure design icons or state-driven status icons.
+
+```json
+{
+  "type": "custom:ddc-icon-card",
+  "icon": "mdi:flash",
+  "entity": "input_boolean.ddc_demo_flow",
+  "size": 96,
+  "color": "var(--primary-color, #ff9800)",
+  "active_color": "#22c55e",
+  "state_based_color": true,
+  "glow": true,
+  "rotate": 0,
+  "pulse_when_active": true,
+  "opacity_based_on_state": false,
+  "active_opacity": 1,
+  "inactive_opacity": 0.28,
+  "active_states": "on,home,open,playing,charging,active,>0",
+  "click_action": "none"
+}
+```
+
+This card is intended to be visually transparent around the icon itself.
+
+#### 4. `custom:ddc-table-card`
+
+Use this for visual comparison tables, badges, and entity state summaries.
+
+```json
+{
+  "type": "custom:ddc-table-card",
+  "title": "System matrix",
+  "rows": 3,
+  "columns": 3,
+  "header_row": true,
+  "border": true,
+  "radius": 16,
+  "spacing": 8,
+  "cells": [
+    { "type": "text", "text": "Area", "align": "left" },
+    { "type": "text", "text": "State", "align": "center" },
+    { "type": "text", "text": "Action", "align": "center" },
+    { "type": "icon", "icon": "mdi:flash", "text": "Power", "align": "left" },
+    {
+      "type": "entity",
+      "entity": "sensor.ddc_demo_status",
+      "text": "Live",
+      "align": "center",
+      "active_states": "on,active,>0",
+      "active_color": "var(--primary-color, #ff9800)",
+      "inactive_color": "rgba(148, 163, 184, 0.18)"
+    },
+    {
+      "type": "button",
+      "entity": "input_boolean.ddc_demo_flow",
+      "text": "Inspect",
+      "button_action": "more-info",
+      "align": "center"
+    }
+  ]
+}
+```
+
+Supported cell types:
+
+- `text`
+- `icon`
+- `entity`
+- `badge`
+- `button`
+
+### Standard Home Assistant cards
+
+The dashboard can also contain normal Lovelace cards such as:
+
+- `entities`
+- `button`
+- `tile`
+- `gauge`
+- `markdown`
+- `glance`
+- `sensor`
+- `statistics-graph`
+- `history-graph`
+- `picture-entity`
+- `picture-glance`
+
+These should be placed in `entry.card` exactly as a normal Lovelace card config.
+
+### Packages
+
+Packages are exported together with the dashboard and require the backend integration to sync into `/config/packages`.
+
+Each package entry looks like this:
+
+```json
+{
+  "id": "package_1",
+  "name": "Demo helpers",
+  "filename": "demo_helpers.yaml",
+  "enabled": true,
+  "yaml": "input_boolean:\\n  ddc_demo_flow:\\n    name: DDC Demo Flow\\n"
+}
+```
+
+#### Package authoring rules
+
+- Only enabled packages with non-empty `yaml` are written by the backend.
+- Package filenames are backend-normalized to a Home Assistant-safe slug.
+- Home Assistant must have packages enabled in `configuration.yaml`, for example:
+
+```yaml
+homeassistant:
+  packages: !include_dir_named packages
+```
+
+### Single-card export / import
+
+The editor supports exporting a single card and importing it into an existing dashboard.
+
+When importing a single card:
+
+- it is inserted into the **current tab**
+- it is placed inside the **active viewport**
+- it receives a new internal id
+- it does **not** replace the whole dashboard
+
+### Recommended authoring strategy for LLMs
+
+When generating a full demo dashboard, use this checklist:
+
+1. Define at least **2–3 tabs**.
+2. If using layers, always include:
+   - `layers_enabled: true`
+   - a `standard` layer
+   - at least one extra layer such as `energy` or `explainers`
+3. Place a mix of:
+   - standard HA cards
+   - `custom:ddc-text-card`
+   - `custom:ddc-icon-card`
+   - `custom:ddc-table-card`
+   - `custom:ddc-html-card`
+4. Add at least one connector in `responsive_connectors`.
+5. Keep card `tabId` and connector `tabId` aligned.
+6. If the dashboard should work on fresh installs, include demo `packages`.
+7. Prefer `mobile.portrait` and `tablet.landscape` variants instead of relying on desktop-only layout.
+8. Keep `z` values consistent and start at `6`.
+
+### Recommended demo dashboard ingredients
+
+For a strong showcase dashboard, include:
+
+- one **hero title** using `custom:ddc-text-card`
+- one **live KPI icon** using `custom:ddc-icon-card`
+- one **table summary** using `custom:ddc-table-card`
+- one **interactive HTML widget** using `custom:ddc-html-card`
+- one **Entities** or **Button** card for controls
+- one or more **animated connectors**
+- at least one **background mode**
+- one **layers** example and one **tabs** example
+- one **package** that creates the helper entities used by the demo
+
+### Important limitation
+
+Do **not** model connectors as normal cards in new dashboards. Use `responsive_connectors` instead. Legacy `custom:ddc-line-card` data may exist in older exports, but new dashboards should rely on the connector overlay system.
+
+---
+
 ## 🧑‍🏫 Editor UX & Shortcuts
 
 - **Enter Edit**: Long-press on blank canvas (~1s) or **double-click** an empty area.
