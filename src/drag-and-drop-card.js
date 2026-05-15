@@ -5274,11 +5274,60 @@ _buildConnectorPathData_(points = []) {
     .join(' ');
 }
 
+_splitConnectorStateRules_(value) {
+  return String(value || '')
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+_isTruthyConnectorState_(stateValue) {
+  const state = String(stateValue ?? '').trim().toLowerCase();
+  if (!state) return false;
+  return !['0', 'off', 'false', 'closed', 'idle', 'unavailable', 'unknown', 'none'].includes(state);
+}
+
+_matchesConnectorStateRule_(stateValue, rule) {
+  const state = String(stateValue ?? '').trim();
+  const lowered = state.toLowerCase();
+  const token = String(rule ?? '').trim();
+  if (!token) return false;
+
+  const cmp = token.match(/^(>=|<=|>|<|==|=|!=)\s*(-?\d+(?:\.\d+)?)$/);
+  if (cmp) {
+    const current = Number(state);
+    const target = Number(cmp[2]);
+    if (!Number.isFinite(current) || !Number.isFinite(target)) return false;
+    switch (cmp[1]) {
+      case '>': return current > target;
+      case '<': return current < target;
+      case '>=': return current >= target;
+      case '<=': return current <= target;
+      case '=':
+      case '==': return current === target;
+      case '!=': return current !== target;
+      default: return false;
+    }
+  }
+
+  const loweredToken = token.toLowerCase();
+  if (loweredToken === 'truthy') return this._isTruthyConnectorState_(stateValue);
+  if (loweredToken === 'falsy') return !this._isTruthyConnectorState_(stateValue);
+  if (loweredToken === '!off') return lowered !== 'off';
+  return lowered === loweredToken;
+}
+
+_isConnectorStateActive_(stateValue, activeStates) {
+  const tokens = this._splitConnectorStateRules_(activeStates);
+  if (!tokens.length) return this._isTruthyConnectorState_(stateValue);
+  return tokens.some((rule) => this._matchesConnectorStateRule_(stateValue, rule));
+}
+
 _getConnectorResolvedState_(connector = {}) {
   const entityId = String(connector.entity || '').trim();
   const entity = entityId ? this.hass?.states?.[entityId] : null;
   const stateValue = entity?.state ?? '';
-  const active = entityId ? __ddcLineIsActive__(stateValue, connector.active_states) : true;
+  const active = entityId ? this._isConnectorStateActive_(stateValue, connector.active_states) : true;
   const numericState = Number(stateValue);
   const flowDirection = String(connector.flow_direction || 'auto').toLowerCase();
   const reverse = flowDirection === 'reverse'
