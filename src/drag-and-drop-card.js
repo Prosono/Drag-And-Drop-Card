@@ -30133,6 +30133,8 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       this._rerunTimer = null;
       this._shellReady = false;
       this._liveStatesProxy = null;
+      this._pendingScriptReason = '';
+      this._scriptHasRun = false;
     }
 
     static getStubConfig() {
@@ -30192,10 +30194,21 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
 
     connectedCallback() {
       if (this._config) this._renderCardShell_();
+      const pendingReason = this._pendingScriptReason;
+      const hasRunnableScript = String(this._config?.js || '').trim();
+      if (pendingReason || (hasRunnableScript && !this._scriptHasRun)) {
+        this._pendingScriptReason = '';
+        queueMicrotask(() => {
+          if (!this.isConnected) return;
+          this._runUserScript_(pendingReason || 'connected');
+        });
+      }
     }
 
     disconnectedCallback() {
       clearTimeout(this._rerunTimer);
+      this._pendingScriptReason = '';
+      this._scriptHasRun = false;
       this._teardownUserScript_();
     }
 
@@ -30325,7 +30338,13 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
 
       if (js !== this._jsSig || templateChanged) {
         this._jsSig = js;
-        this._runUserScript_('config');
+        this._scriptHasRun = false;
+        if (this.isConnected) {
+          this._runUserScript_('config');
+        } else {
+          this._pendingScriptReason = 'config';
+          this._showRuntimeError_('');
+        }
       } else {
         this._dispatchRuntimeUpdate_('template');
       }
@@ -30445,6 +30464,7 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       }
 
       const token = ++this._scriptToken;
+      this._scriptHasRun = true;
       const ctx = this._buildRuntimeContext_(reason);
       try {
         const runner = new __DDC_HTML_ASYNC_FUNCTION__(
