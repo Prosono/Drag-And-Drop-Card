@@ -32,8 +32,9 @@ const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleC
 class DragAndDropCard extends HTMLElement {
   _updateTabsA11y_() {
   const bar = this.tabsBar; if (!bar) return;
-  bar.setAttribute('role', 'tablist');
   const btns = bar.querySelectorAll('.ddc-tab');
+  if (btns.length) bar.setAttribute('role', 'tablist');
+  else bar.removeAttribute('role');
   btns.forEach((btn, idx) => {
     const selected = btn.classList.contains('active');
     btn.setAttribute('role', 'tab');
@@ -43,6 +44,7 @@ class DragAndDropCard extends HTMLElement {
   });
   if (!this.__tabsKeyHandler) {
     this.__tabsKeyHandler = (e) => {
+      if (e.target?.closest?.('.ddc-layer-menu')) return;
       const valid = ['ArrowLeft','ArrowRight','Home','End'];
       if (!valid.includes(e.key)) return;
       const list = Array.from(bar.querySelectorAll('.ddc-tab'));
@@ -279,6 +281,157 @@ _ensureToolbarStyles_() {
 
   /* -------------------- Settings Dashboard styling -------------------- */
 
+_getScreenSaverPresets_() {
+  return [
+    { id: 'visionos_glass', name: 'VisionOS Glass', note: 'Layered glass, date card and calm Home status.' },
+    { id: 'minimal_scandi', name: 'Minimal Scandi', note: 'Quiet horizon, large clock and a slim status rail.' },
+    { id: 'cinematic_dashboard', name: 'Cinematic Dashboard', note: 'Warm scene, greeting text and dashboard tiles.' },
+    { id: 'sci_fi_hud', name: 'Sci-Fi HUD', note: 'Animated rings, calendar grid and technical dock.' },
+    { id: 'dynamic_ambient', name: 'Dynamic Ambient', note: 'Soft landscape colors with a centered glass rail.' },
+    { id: 'floating_islands', name: 'Floating Islands', note: 'Time and widgets float in separate glass islands.' },
+    { id: 'ultra_minimal_dots', name: 'Ultra Minimal Dot UI', note: 'Sparse clock with colored dot status list.' },
+    { id: 'home_intelligence', name: 'Home Intelligence', note: 'Readable home summary with calendar and insights.' },
+    { id: 'planetary_orbital', name: 'Planetary Orbital', note: 'Planet-centered layout with orbiting status capsules.' },
+  ];
+}
+
+_normalizeScreenSaverStyle_(style) {
+  const presets = this._getScreenSaverPresets_?.() || [];
+  const ids = new Set(presets.map((preset) => preset.id));
+  const raw = String(style || 'visionos_glass')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const aliases = {
+    glass: 'visionos_glass',
+    visionos: 'visionos_glass',
+    scandi: 'minimal_scandi',
+    minimal: 'minimal_scandi',
+    cinematic: 'cinematic_dashboard',
+    dashboard: 'cinematic_dashboard',
+    hud: 'sci_fi_hud',
+    sci_fi: 'sci_fi_hud',
+    ambient: 'dynamic_ambient',
+    islands: 'floating_islands',
+    dots: 'ultra_minimal_dots',
+    intelligence: 'home_intelligence',
+    orbital: 'planetary_orbital',
+    planet: 'planetary_orbital',
+  };
+  const next = aliases[raw] || raw;
+  return ids.has(next) ? next : 'visionos_glass';
+}
+
+_getScreenSaverEntitySlots_() {
+  return [
+    {
+      key: 'weather',
+      title: 'Weather',
+      note: 'Weather, outdoor temperature, or any outside sensor.',
+      icon: 'mdi:weather-partly-cloudy',
+      tone: 'blue',
+      placeholder: 'weather.home or sensor.outdoor_temperature',
+    },
+    {
+      key: 'home',
+      title: 'Home / security',
+      note: 'Alarm, lock, person, presence, or house mode entity.',
+      icon: 'mdi:shield-home-outline',
+      tone: 'green',
+      placeholder: 'alarm_control_panel.home or lock.front_door',
+    },
+    {
+      key: 'lights',
+      title: 'Lights',
+      note: 'A light group, room light, switch, or helper.',
+      icon: 'mdi:lightbulb-on-outline',
+      tone: 'amber',
+      placeholder: 'light.living_room or group.all_lights',
+    },
+    {
+      key: 'energy',
+      title: 'Energy',
+      note: 'Power, energy, price, battery, or utility sensor.',
+      icon: 'mdi:chart-bell-curve-cumulative',
+      tone: 'purple',
+      placeholder: 'sensor.energy_usage',
+    },
+  ];
+}
+
+_normalizeScreenSaverEntities_(value) {
+  const slots = this._getScreenSaverEntitySlots_?.() || [];
+  const input = value ?? [];
+  const byKey = new Map();
+
+  if (Array.isArray(input)) {
+    input.forEach((item, index) => {
+      const slot = slots[index] || {};
+      if (typeof item === 'string') {
+        byKey.set(slot.key || `status_${index + 1}`, { entity: item });
+        return;
+      }
+      if (item && typeof item === 'object') {
+        const key = String(item.key || item.id || slot.key || `status_${index + 1}`);
+        byKey.set(key, item);
+      }
+    });
+  } else if (input && typeof input === 'object') {
+    Object.entries(input).forEach(([key, item]) => {
+      if (typeof item === 'string') byKey.set(key, { entity: item });
+      else if (item && typeof item === 'object') byKey.set(key, { ...item, key });
+    });
+  }
+
+  return slots.map((slot, index) => {
+    const raw = byKey.get(slot.key) || {};
+    const entity = String(raw.entity || raw.entity_id || '').trim();
+    return {
+      key: slot.key,
+      title: slot.title,
+      note: slot.note,
+      placeholder: slot.placeholder,
+      entity,
+      label: String(raw.label || raw.name || '').trim(),
+      icon: String(raw.icon || slot.icon || 'mdi:circle-outline').trim(),
+      tone: String(raw.tone || slot.tone || 'blue').trim(),
+      order: index,
+    };
+  });
+}
+
+_renderScreenSaverStyleOptions_() {
+  const presets = this._getScreenSaverPresets_?.() || [];
+  const selected = this._normalizeScreenSaverStyle_?.(this.screenSaverStyle) || 'visionos_glass';
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+  return presets.map((preset, index) => {
+    const active = preset.id === selected;
+    return `
+      <button type="button" class="ss-style-card" data-screensaver-style="${esc(preset.id)}" role="option" aria-selected="${active ? 'true' : 'false'}" tabindex="${active ? '0' : '-1'}">
+        <span class="ss-style-preview ss-style-preview--${esc(preset.id)}" aria-hidden="true">
+          <span class="ss-mini-time">09:25</span>
+          <span class="ss-mini-date">Friday, May 15</span>
+          <span class="ss-mini-rail">
+            <span class="ss-mini-chip"></span>
+            <span class="ss-mini-chip"></span>
+            <span class="ss-mini-chip"></span>
+          </span>
+        </span>
+        <span class="ss-style-meta">
+          <span class="ss-style-name">${index + 1}. ${esc(preset.name)}</span>
+          <span class="ss-style-note">${esc(preset.note)}</span>
+        </span>
+      </button>
+    `;
+  }).join('');
+}
+
 
 _ensureSettingsStyles_() {
   if (this.shadowRoot.querySelector('#ddc-settings-styles')) return;
@@ -298,16 +451,90 @@ _ensureSettingsStyles_() {
   .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--primary-color); color:#fff; }
   .dlg-head h3 { margin:0; font-size:1.1rem; font-weight:700; }
   .icon-btn { border:0; background:transparent; color:inherit; cursor:pointer; display:grid; place-items:center; }
+  .settings-tabs {
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--divider-color, rgba(0,0,0,.12));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--ha-card-background, #fff) 94%, var(--primary-color, #03a9f4) 6%),
+        color-mix(in oklab, var(--card-background-color, #fff) 98%, transparent)
+      );
+    overflow-x:auto;
+    overflow-y:hidden;
+    scrollbar-width:thin;
+  }
+  .settings-tabs::-webkit-scrollbar{ height:6px; }
+  .settings-tabs::-webkit-scrollbar-thumb{
+    background:color-mix(in oklab, var(--primary-text-color, #111827) 22%, transparent);
+    border-radius:999px;
+  }
+  .settings-tab {
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:38px;
+    padding:0 13px;
+    border-radius:999px;
+    border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.18)) 78%, transparent);
+    background:transparent;
+    color:color-mix(in oklab, var(--primary-text-color, #111827) 82%, transparent);
+    font:700 .9rem/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing:0;
+    cursor:pointer;
+    transition:background .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease;
+  }
+  .settings-tab ha-icon{ --mdc-icon-size:18px; }
+  .settings-tab:hover{
+    transform:translateY(-1px);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 36%, transparent);
+    background:color-mix(in oklab, var(--primary-color, #03a9f4) 10%, transparent);
+  }
+  .settings-tab.active,
+  .settings-tab[aria-selected="true"]{
+    color:var(--text-primary-color, #fff);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 44%, transparent);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--primary-color, #03a9f4) 86%, rgba(255,255,255,.14)),
+        color-mix(in oklab, var(--primary-color, #03a9f4) 74%, rgba(0,0,0,.06))
+      );
+    box-shadow:
+      0 10px 22px color-mix(in oklab, var(--primary-color, #03a9f4) 22%, transparent),
+      inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .settings-tab:focus-visible{
+    outline:none;
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--primary-color, #03a9f4) 54%, transparent),
+      0 0 0 5px color-mix(in oklab, var(--primary-color, #03a9f4) 14%, transparent);
+  }
   .settings-body {
     flex:1 1 auto;
     min-height:0;
     display:grid;
     row-gap:clamp(18px, 2vw, 26px);
-    column-gap:clamp(68px, 8vw, 144px);
+    column-gap:0;
     padding:clamp(14px, 1.8vw, 22px);
     overflow:auto;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+    grid-template-columns:minmax(0, min(100%, 1040px));
     align-content:start;
+    justify-content:center;
+    justify-items:stretch;
+  }
+  .settings-body > .card[hidden]{
+    display:none !important;
+  }
+  .settings-body > .card{
+    width:100%;
+    justify-self:center;
   }
   .card { background:var(--ha-card-background, #fff); border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:12px 14px; display:flex; flex-direction:column; gap:10px; min-width:0; }
   .card h4 { margin:0; font-size:1rem; font-weight:700; color:var(--primary-text-color); }
@@ -321,6 +548,268 @@ _ensureSettingsStyles_() {
   .chip { border:1px solid var(--divider-color, rgba(0,0,0,.25)); padding:6px 10px; border-radius:999px; background:transparent; cursor:pointer; font-size:.9rem; }
   .chip[aria-pressed="true"] { background:var(--primary-color); color:#fff; border-color:transparent; }
   .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
+
+  .ss-style-picker{
+    display:grid;
+    gap:12px;
+    margin-top:4px;
+  }
+  .ss-style-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .ss-style-current{
+    min-width:0;
+    display:grid;
+    gap:2px;
+  }
+  .ss-style-current strong{
+    color:var(--primary-text-color);
+    font-size:.95rem;
+  }
+  .ss-style-current span{
+    color:var(--secondary-text-color);
+    font-size:.84rem;
+    line-height:1.35;
+  }
+  .ss-style-nav{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .ss-style-nav button{
+    width:36px;
+    height:36px;
+    display:grid;
+    place-items:center;
+    border-radius:999px;
+    border:1px solid var(--divider-color, rgba(0,0,0,.18));
+    background:var(--card-background-color, #fff);
+    color:var(--primary-text-color);
+    cursor:pointer;
+  }
+  .ss-style-carousel{
+    display:flex;
+    gap:12px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding:2px 2px 10px;
+    scroll-snap-type:x mandatory;
+    scrollbar-width:thin;
+  }
+  .ss-style-card{
+    flex:0 0 min(360px, 82vw);
+    display:grid;
+    gap:10px;
+    padding:9px;
+    border-radius:14px;
+    border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.18)) 82%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, #fff 18%, transparent), transparent),
+      var(--ha-card-background, #fff);
+    color:var(--primary-text-color);
+    text-align:left;
+    cursor:pointer;
+    scroll-snap-align:start;
+    transition:border-color .16s ease, box-shadow .16s ease, transform .14s ease;
+  }
+  .ss-style-card:hover{
+    transform:translateY(-1px);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 36%, transparent);
+  }
+  .ss-style-card[aria-selected="true"]{
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 68%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--primary-color, #03a9f4) 18%, transparent),
+      0 14px 30px color-mix(in oklab, var(--primary-color, #03a9f4) 16%, transparent);
+  }
+  .ss-style-preview{
+    position:relative;
+    min-height:172px;
+    border-radius:11px;
+    overflow:hidden;
+    isolation:isolate;
+    background:#06101d;
+    color:#fff;
+  }
+  .ss-style-preview::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:-2;
+    background:
+      radial-gradient(90% 75% at 66% 14%, rgba(255,255,255,.18), transparent 32%),
+      radial-gradient(95% 80% at 50% 112%, rgba(69,134,176,.55), transparent 48%),
+      linear-gradient(180deg, #03070d, #081424 62%, #030609);
+  }
+  .ss-style-preview::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:-1;
+    background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 36%, rgba(0,0,0,.22));
+  }
+  .ss-style-preview--minimal_scandi::before,
+  .ss-style-preview--ultra_minimal_dots::before{
+    background:
+      radial-gradient(85% 44% at 58% 74%, rgba(120,161,183,.46), transparent 58%),
+      linear-gradient(180deg, #020407, #07101a 66%, #030508);
+  }
+  .ss-style-preview--cinematic_dashboard::before{
+    background:
+      radial-gradient(44% 58% at 75% 38%, rgba(231,116,47,.58), transparent 48%),
+      linear-gradient(130deg, #020308, #121015 48%, #030406);
+  }
+  .ss-style-preview--sci_fi_hud::before{
+    background:
+      radial-gradient(circle at 22% 44%, rgba(168,85,247,.28), transparent 34%),
+      repeating-radial-gradient(circle at 22% 44%, rgba(34,211,238,.26) 0 1px, transparent 1px 18px),
+      linear-gradient(135deg, #03030a, #070a16 60%, #02030a);
+  }
+  .ss-style-preview--dynamic_ambient::before{
+    background:
+      radial-gradient(70% 58% at 54% 50%, rgba(255,172,91,.56), transparent 42%),
+      linear-gradient(135deg, #3d195f, #18213e 54%, #090713);
+  }
+  .ss-style-preview--floating_islands::before{
+    background:
+      radial-gradient(82% 62% at 54% 110%, rgba(84,148,198,.64), transparent 55%),
+      linear-gradient(180deg, #05111e, #071827 62%, #03070c);
+  }
+  .ss-style-preview--home_intelligence::before{
+    background:
+      radial-gradient(52% 54% at 92% 12%, rgba(153,102,55,.32), transparent 42%),
+      linear-gradient(135deg, #100b08, #08090d 52%, #030305);
+  }
+  .ss-style-preview--planetary_orbital::before{
+    background:
+      radial-gradient(circle at 52% 52%, rgba(80,150,202,.82) 0 15%, transparent 16%),
+      radial-gradient(70% 70% at 52% 52%, rgba(252,183,91,.24), transparent 48%),
+      linear-gradient(145deg, #03070d, #08111d 60%, #020306);
+  }
+  .ss-mini-time{
+    position:absolute;
+    left:22px;
+    top:26px;
+    font-size:34px;
+    font-weight:300;
+    letter-spacing:.02em;
+  }
+  .ss-mini-date{
+    position:absolute;
+    left:24px;
+    top:68px;
+    font-size:11px;
+    opacity:.86;
+  }
+  .ss-mini-rail{
+    position:absolute;
+    left:18px;
+    right:18px;
+    bottom:18px;
+    display:flex;
+    gap:8px;
+  }
+  .ss-mini-chip{
+    flex:1;
+    min-height:34px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.1);
+    backdrop-filter:blur(8px);
+  }
+  .ss-style-preview--sci_fi_hud .ss-mini-chip,
+  .ss-style-preview--ultra_minimal_dots .ss-mini-chip{
+    min-height:6px;
+    border-radius:999px;
+    background:rgba(34,211,238,.62);
+  }
+  .ss-style-preview--floating_islands .ss-mini-chip,
+  .ss-style-preview--planetary_orbital .ss-mini-chip{
+    border-radius:999px;
+  }
+  .ss-style-meta{
+    display:grid;
+    gap:3px;
+  }
+  .ss-style-name{
+    font-weight:800;
+    font-size:.92rem;
+  }
+  .ss-style-note{
+    color:var(--secondary-text-color);
+    font-size:.82rem;
+    line-height:1.35;
+  }
+  .ss-entity-list{
+    display:grid;
+    gap:10px;
+    margin-top:4px;
+  }
+  .ss-entity-row{
+    display:grid;
+    grid-template-columns:minmax(180px, .8fr) minmax(0, 1.2fr);
+    gap:12px;
+    align-items:start;
+    padding:12px;
+    border-radius:14px;
+    border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.18)) 82%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, #fff 16%, transparent), transparent),
+      color-mix(in oklab, var(--ha-card-background, #fff) 92%, var(--primary-color, #03a9f4) 8%);
+  }
+  .ss-entity-slot{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    min-width:0;
+  }
+  .ss-entity-slot ha-icon{
+    --mdc-icon-size:22px;
+    flex:0 0 auto;
+    color:color-mix(in oklab, var(--primary-color, #03a9f4) 72%, var(--primary-text-color) 28%);
+  }
+  .ss-entity-slot strong,
+  .ss-entity-slot span{
+    display:block;
+  }
+  .ss-entity-slot strong{
+    color:var(--primary-text-color);
+    font-size:.92rem;
+    line-height:1.2;
+  }
+  .ss-entity-slot span{
+    margin-top:3px;
+    color:var(--secondary-text-color);
+    font-size:.8rem;
+    line-height:1.35;
+  }
+  .ss-entity-fields{
+    display:grid;
+    grid-template-columns:minmax(0, 1.2fr) minmax(120px, .8fr);
+    gap:10px;
+    align-items:start;
+  }
+  .ss-entity-picker-host,
+  .ss-entity-fields input{
+    min-width:0;
+  }
+  .ss-entity-picker-host ha-entity-picker{
+    width:100%;
+  }
+  .ss-entity-fields input{
+    width:100%;
+    box-sizing:border-box;
+  }
+  @media (max-width: 820px){
+    .ss-entity-row,
+    .ss-entity-fields{
+      grid-template-columns:1fr;
+    }
+  }
+
   /* ---- Grid demo ---- */
   .grid-demo{
     --g: 100px;                               /* cell size injected via JS */
@@ -1237,19 +1726,20 @@ _ensureSettingsStyles_() {
 
   @media (min-width: 1380px) {
     .settings-body{
-      grid-template-columns:minmax(340px, 0.9fr) minmax(620px, 1.28fr);
-      column-gap:clamp(96px, 11vw, 208px);
+      grid-template-columns:minmax(0, min(100%, 1040px));
+      column-gap:0;
+      justify-content:center;
     }
     .card[aria-labelledby="behaviour-head"],
     .tabs-card,
     .layers-card,
     .packages-card{
-      grid-column:1 / -1;
+      grid-column:auto;
     }
   }
 
   @media (min-width: 1280px) {
-    .tabs-card, .layers-card, .packages-card { grid-column: 1 / -1; }
+    .tabs-card, .layers-card, .packages-card { grid-column: auto; }
   }
 
   @media (max-width: 899px){
@@ -1259,6 +1749,15 @@ _ensureSettingsStyles_() {
       border-radius:16px;
     }
     .settings-body{ grid-template-columns: 1fr; }
+    .settings-tabs{
+      padding:9px 10px;
+      justify-content:flex-start;
+    }
+    .settings-tab{
+      min-height:36px;
+      padding-inline:11px;
+      font-size:.84rem;
+    }
     .setting .row{ flex-direction:column; align-items:stretch; gap:10px; }
     .setting .title{ flex:0 0 auto; min-width:0; }
     .setting .hint{ margin-left:0; }
@@ -3820,6 +4319,8 @@ async _onToolbarAction_(action, ctx = {}) {
       hide_HA_Sidebar: false,
       screen_saver_enabled: true,
       screen_saver_delay: 1500000,
+      screen_saver_style: 'visionos_glass',
+      screen_saver_entities: [],
       tabs: [
         { id: 'home', label: 'Home', icon: 'mdi:home', label_mode: 'both' }
       ],
@@ -4719,6 +5220,7 @@ _setActiveLayerIds_(ids = [], { persist = true, refresh = true } = {}) {
   if (persist) this._persistActiveLayerIds_();
   if (refresh) {
     this._applyLayerVisibilityChange_?.();
+    this._syncLayerTriggerState_?.();
   }
   return next;
 }
@@ -4760,46 +5262,239 @@ _sanitizeResponsiveLayoutLayerMembership_() {
   });
 }
 
+_hasLayerMenu_() {
+  return !!this.layersEnabled && Array.isArray(this.layers) && this.layers.length > 0;
+}
+
+_getLayerSelectionSummary_() {
+  const layers = Array.isArray(this.layers) ? this.layers : [];
+  const validIds = new Set(layers.map((layer) => layer.id));
+  const activeIds = (Array.isArray(this.activeLayerIds) ? this.activeLayerIds : []).filter((id) => validIds.has(id));
+  return {
+    layers,
+    activeIds,
+    activeSet: new Set(activeIds),
+    allActive: !!layers.length && activeIds.length === layers.length,
+  };
+}
+
+_removeLayerMenuDismissHandlers_() {
+  try {
+    if (this.__layerMenuDismissHandler) {
+      document.removeEventListener('pointerdown', this.__layerMenuDismissHandler, true);
+      this.__layerMenuDismissHandler = null;
+    }
+    if (this.__layerMenuEscapeHandler) {
+      document.removeEventListener('keydown', this.__layerMenuEscapeHandler, true);
+      this.__layerMenuEscapeHandler = null;
+    }
+  } catch {}
+}
+
+_closeLayersMenu_({ render = true } = {}) {
+  this.__layersMenuOpen = false;
+  this._removeLayerMenuDismissHandlers_?.();
+  if (render) {
+    try { this._renderTabs?.(); } catch {}
+  }
+}
+
+_installLayerMenuDismissHandlers_() {
+  this._removeLayerMenuDismissHandlers_?.();
+  if (!this.__layersMenuOpen) return;
+  this.__layerMenuDismissHandler = (ev) => {
+    const menu = this.shadowRoot?.querySelector?.('.ddc-layer-menu');
+    const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+    if (menu && path.includes(menu)) return;
+    this._closeLayersMenu_?.();
+  };
+  this.__layerMenuEscapeHandler = (ev) => {
+    if (ev.key === 'Escape') {
+      ev.stopPropagation?.();
+      this._closeLayersMenu_?.();
+    }
+  };
+  try {
+    document.addEventListener('pointerdown', this.__layerMenuDismissHandler, true);
+    document.addEventListener('keydown', this.__layerMenuEscapeHandler, true);
+  } catch {}
+}
+
+_syncLayerTriggerState_() {
+  if (!this.shadowRoot) return;
+  const { layers, activeIds, activeSet, allActive } = this._getLayerSelectionSummary_?.() || {};
+  const total = Array.isArray(layers) ? layers.length : 0;
+  const activeCount = Array.isArray(activeIds) ? activeIds.length : 0;
+  const trigger = this.shadowRoot.querySelector?.('.ddc-layer-trigger');
+  if (trigger) {
+    trigger.classList.toggle('active', !!this.__layersMenuOpen || allActive);
+    trigger.setAttribute('aria-label', `Layers (${activeCount} of ${total} active)`);
+    const badge = trigger.querySelector?.('.ddc-layer-count');
+    if (badge) badge.textContent = String(activeCount);
+  }
+  this.shadowRoot.querySelectorAll?.('.ddc-layer-option').forEach((btn) => {
+    const isAll = btn.dataset.layerOption === 'all';
+    const isActive = isAll ? allActive : activeSet?.has?.(btn.dataset.layerId);
+    btn.classList.toggle('active', !!isActive);
+    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+}
+
+_createLayerOptionButton_(option = {}) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `ddc-layer-option ${option.active ? 'active' : ''}`.trim();
+  btn.setAttribute('role', 'menuitemcheckbox');
+  btn.setAttribute('aria-checked', option.active ? 'true' : 'false');
+  btn.dataset.layerOption = option.id === '__all__' ? 'all' : 'layer';
+  if (option.id !== '__all__') btn.dataset.layerId = option.id;
+  btn.style.setProperty('--ddc-layer-accent', option.color || 'var(--primary-color, #8b5cf6)');
+
+  const icon = document.createElement('ha-icon');
+  icon.setAttribute('icon', option.icon || 'mdi:layers-triple-outline');
+  icon.className = 'ddc-layer-option-icon';
+  btn.appendChild(icon);
+
+  const label = document.createElement('span');
+  label.className = 'ddc-layer-option-label';
+  label.textContent = option.label || option.id || 'Layer';
+  btn.appendChild(label);
+
+  const check = document.createElement('ha-icon');
+  check.setAttribute('icon', 'mdi:check');
+  check.className = 'ddc-layer-option-check';
+  check.setAttribute('aria-hidden', 'true');
+  btn.appendChild(check);
+
+  btn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const { layers, activeSet } = this._getLayerSelectionSummary_?.() || {};
+    if (!Array.isArray(layers) || !layers.length) return;
+    if (option.id === '__all__') {
+      this._setActiveLayerIds_(layers.map((layer) => layer.id));
+      return;
+    }
+    const next = new Set(activeSet || []);
+    if (next.has(option.id)) next.delete(option.id);
+    else next.add(option.id);
+    this._setActiveLayerIds_(Array.from(next));
+  });
+
+  btn.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
+      ev.stopPropagation();
+      this._closeLayersMenu_?.();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(ev.key)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const items = Array.from(this.shadowRoot?.querySelectorAll?.('.ddc-layer-option') || []);
+    if (!items.length) return;
+    const idx = items.indexOf(ev.currentTarget);
+    let nextIdx = idx;
+    if (ev.key === 'ArrowDown') nextIdx = (idx + 1) % items.length;
+    if (ev.key === 'ArrowUp') nextIdx = (idx - 1 + items.length) % items.length;
+    if (ev.key === 'Home') nextIdx = 0;
+    if (ev.key === 'End') nextIdx = items.length - 1;
+    items[nextIdx]?.focus?.();
+  });
+  return btn;
+}
+
+_appendLayersMenuToTabs_(bar) {
+  if (!bar || !this._hasLayerMenu_?.()) return;
+  const { layers, activeIds, activeSet, allActive } = this._getLayerSelectionSummary_();
+  const wrap = document.createElement('div');
+  wrap.className = 'ddc-layer-menu';
+  wrap.setAttribute('role', 'presentation');
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = `ddc-layer-trigger ${this.__layersMenuOpen || allActive ? 'active' : ''}`.trim();
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', this.__layersMenuOpen ? 'true' : 'false');
+  trigger.setAttribute('aria-label', `Layers (${activeIds.length} of ${layers.length} active)`);
+  trigger.title = 'Layers';
+
+  const triggerIcon = document.createElement('ha-icon');
+  triggerIcon.setAttribute('icon', 'mdi:layers-triple-outline');
+  trigger.appendChild(triggerIcon);
+
+  const triggerLabel = document.createElement('span');
+  triggerLabel.className = 'ddc-layer-trigger-label';
+  triggerLabel.textContent = 'Layers';
+  trigger.appendChild(triggerLabel);
+
+  const count = document.createElement('span');
+  count.className = 'ddc-layer-count';
+  count.textContent = String(activeIds.length);
+  trigger.appendChild(count);
+
+  trigger.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    this.__layersMenuOpen = !this.__layersMenuOpen;
+    this._renderTabs?.();
+  });
+  trigger.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
+      ev.stopPropagation();
+      this._closeLayersMenu_?.();
+      return;
+    }
+    if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!this.__layersMenuOpen) {
+        this.__layersMenuOpen = true;
+        this._renderTabs?.();
+      }
+      requestAnimationFrame(() => {
+        this.shadowRoot?.querySelector?.('.ddc-layer-option')?.focus?.();
+      });
+    }
+  });
+  wrap.appendChild(trigger);
+
+  if (this.__layersMenuOpen) {
+    const panel = document.createElement('div');
+    panel.className = 'ddc-layer-menu-panel';
+    panel.setAttribute('role', 'menu');
+    panel.setAttribute('aria-label', 'Layers');
+    panel.addEventListener('click', (ev) => ev.stopPropagation());
+
+    panel.appendChild(this._createLayerOptionButton_({
+      id: '__all__',
+      label: 'All',
+      icon: 'mdi:layers-triple-outline',
+      color: 'var(--primary-color, #8b5cf6)',
+      active: allActive,
+    }));
+
+    layers.forEach((layer) => {
+      panel.appendChild(this._createLayerOptionButton_({
+        id: layer.id,
+        label: layer.label || layer.id,
+        icon: layer.icon || 'mdi:layers-outline',
+        color: layer.color || '#8b5cf6',
+        active: activeSet.has(layer.id),
+      }));
+    });
+    wrap.appendChild(panel);
+    requestAnimationFrame(() => this._installLayerMenuDismissHandlers_?.());
+  }
+
+  bar.appendChild(wrap);
+}
+
 _renderLayersBar_() {
   const bar = this.layersBar;
-  if (!bar) return;
-  const layers = Array.isArray(this.layers) ? this.layers : [];
-  if (!this.layersEnabled || !layers.length) {
+  if (bar) {
     bar.style.display = 'none';
     bar.innerHTML = '';
-    return;
   }
-  bar.style.display = '';
-  bar.className = 'ddc-layers';
-  bar.innerHTML = '';
-
-  const activeIds = Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [];
-  const allBtn = document.createElement('button');
-  allBtn.type = 'button';
-  allBtn.className = `ddc-layer-btn ${activeIds.length === layers.length ? 'active' : ''}`.trim();
-  allBtn.innerHTML = '<ha-icon icon="mdi:layers-triple-outline"></ha-icon><span>All</span>';
-  allBtn.title = 'Show all layers';
-  allBtn.addEventListener('click', () => {
-    this._setActiveLayerIds_(layers.map((layer) => layer.id));
-  });
-  bar.appendChild(allBtn);
-
-  layers.forEach((layer) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `ddc-layer-btn ${activeIds.includes(layer.id) ? 'active' : ''}`.trim();
-    btn.dataset.layerId = layer.id;
-    btn.title = layer.label || layer.id;
-    btn.style.setProperty('--ddc-layer-accent', layer.color || '#60a5fa');
-    btn.innerHTML = `${layer.icon ? `<ha-icon icon="${layer.icon}"></ha-icon>` : ''}<span>${layer.label || layer.id}</span>`;
-    btn.addEventListener('click', () => {
-      const set = new Set(Array.isArray(this.activeLayerIds) ? this.activeLayerIds : []);
-      if (set.has(layer.id)) set.delete(layer.id);
-      else set.add(layer.id);
-      this._setActiveLayerIds_(Array.from(set));
-    });
-    bar.appendChild(btn);
-  });
+  if (this.__renderingTabs) return;
+  try { this._renderTabs?.(); } catch {}
 }
 
 _defaultConnectorConfig_() {
@@ -7186,6 +7881,8 @@ _getMobileTextAssistScale_() {
   }
   _dbgDump() { return [...this._dbgBuffer]; }
   _safe(s) { return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  get ddc() { return this._getDashboardLocalApi_?.(); }
+  get dashboardApi() { return this._getDashboardLocalApi_?.(); }
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
@@ -7282,6 +7979,8 @@ _getMobileTextAssistScale_() {
     // Delay stored in ms; default to 5 minutes if not provided
     const ssDelay = Number(config.screen_saver_delay);
     this.screenSaverDelay = Number.isFinite(ssDelay) && ssDelay > 0 ? ssDelay : (5 * 60000);
+    this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(config.screen_saver_style ?? config.screensaver_style ?? config.screen_saver_variant) || 'visionos_glass';
+    this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(config.screen_saver_entities ?? config.screensaver_entities ?? []) || [];
 
     if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
     this._applyAutoScale?.();
@@ -8441,6 +9140,1028 @@ _getMobileTextAssistScale_() {
 /* Optional: make sure all children use border-box inside the toolbar */
 .ddc-toolbar.streamlined.v2 *,
 .ddc-toolbar.streamlined.v3 * { box-sizing: border-box; }
+
+/* ===== DDC Toolbar - segmented edit command bar ===== */
+.ddc-toolbar.streamlined.v2,
+.ddc-toolbar.streamlined.v3{
+  --ddc-segment-accent: var(--primary-color, #8b5cf6);
+  --ddc-segment-bg:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    color-mix(in oklab, var(--card-background-color, #111827) 86%, var(--primary-background-color, #050811) 14%);
+  display:none;
+  flex-direction:column;
+  gap:10px;
+  width:min(100%, calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px));
+  max-width:1390px;
+  margin:8px auto 12px;
+  padding:12px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in oklab, var(--ddc-segment-accent) 12%, transparent), transparent 32%),
+    var(--ddc-segment-bg);
+  box-shadow:
+    0 18px 38px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  border-top:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
+  overflow:hidden;
+}
+
+.ddc-toolbar.streamlined.v2[data-force-open="1"],
+.ddc-toolbar.streamlined.v3[data-force-open="1"]{
+  display:flex !important;
+}
+
+.ddc-toolbar.streamlined.v2.is-open,
+.ddc-toolbar.streamlined.v3.is-open{
+  display:flex !important;
+}
+
+.ddc-toolbar.streamlined.v2.is-collapsed,
+.ddc-toolbar.streamlined.v3.is-collapsed{
+  display:flex !important;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:10px;
+  padding:12px;
+  overflow:hidden;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-toggle,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-toggle{
+  display:none !important;
+}
+
+.ddc-toolbar-segments{
+  position:relative;
+  z-index:2;
+  display:grid;
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(170px, .96fr)
+    minmax(220px, 1.08fr)
+    minmax(170px, .9fr)
+    minmax(142px, auto);
+  align-items:stretch;
+  gap:0;
+  min-height:58px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+    color-mix(in oklab, var(--primary-background-color, #08111f) 72%, transparent);
+  overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.ddc-toolbar-segment{
+  position:relative;
+  min-width:0;
+  min-height:58px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:0 18px;
+  border:0;
+  border-right:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 62%, transparent);
+  background:transparent;
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 84%, transparent);
+  font:800 13px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:
+    color .16s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    transform .12s ease;
+}
+
+.ddc-toolbar-segment::after{
+  content:"";
+  position:absolute;
+  left:24px;
+  right:24px;
+  bottom:0;
+  height:3px;
+  border-radius:999px 999px 0 0;
+  background:var(--ddc-segment-accent);
+  opacity:0;
+  transform:scaleX(.35);
+  transform-origin:center;
+  transition:opacity .18s ease, transform .18s ease;
+}
+
+.ddc-toolbar-segment ha-icon{
+  --mdc-icon-size:22px;
+  flex:0 0 auto;
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 78%, transparent);
+}
+
+.ddc-toolbar-segment span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.ddc-toolbar-segment-chevron{
+  --mdc-icon-size:18px !important;
+  opacity:.76;
+  transition:transform .18s ease, color .16s ease;
+}
+
+.ddc-toolbar-segment:hover{
+  color:var(--primary-text-color, #f8fafc);
+  background:color-mix(in oklab, var(--ddc-segment-accent) 8%, transparent);
+}
+
+.ddc-toolbar-segment.active,
+.ddc-toolbar-segment[aria-pressed="true"]{
+  color:color-mix(in oklab, var(--ddc-segment-accent) 72%, #fff 28%);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--ddc-segment-accent) 16%, transparent), transparent 76%),
+    color-mix(in oklab, var(--ddc-segment-accent) 8%, transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.ddc-toolbar-segment.active::after,
+.ddc-toolbar-segment[aria-pressed="true"]::after{
+  opacity:1;
+  transform:scaleX(1);
+}
+
+.ddc-toolbar-segment.active ha-icon,
+.ddc-toolbar-segment[aria-pressed="true"] ha-icon,
+.ddc-toolbar-segment.active .ddc-toolbar-segment-chevron,
+.ddc-toolbar-segment[aria-pressed="true"] .ddc-toolbar-segment-chevron{
+  color:color-mix(in oklab, var(--ddc-segment-accent) 72%, #fff 28%);
+}
+
+.ddc-toolbar-segment.active .ddc-toolbar-segment-chevron,
+.ddc-toolbar-segment[aria-pressed="true"] .ddc-toolbar-segment-chevron{
+  transform:rotate(180deg);
+}
+
+.ddc-toolbar-segment:focus-visible{
+  outline:none;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in oklab, var(--ddc-segment-accent) 54%, transparent),
+    inset 0 0 0 5px color-mix(in oklab, var(--ddc-segment-accent) 15%, transparent);
+}
+
+.ddc-toolbar-segments .sec-status{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  padding:8px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+
+.ddc-toolbar.streamlined.v2.is-collapsed .ddc-toolbar-segments .sec-status,
+.ddc-toolbar.streamlined.v3.is-collapsed .ddc-toolbar-segments .sec-status{
+  display:flex !important;
+}
+
+.ddc-toolbar-segments .sec-status .ddc-sec-head{
+  display:none !important;
+}
+
+.ddc-toolbar-segments .sec-status .ddc-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  margin:0;
+}
+
+.ddc-toolbar-segments .store-badge,
+.ddc-toolbar-segments .ddc-t-status{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  width:100%;
+  min-width:122px;
+  max-width:180px;
+  min-height:42px;
+  padding:0 14px 0 15px;
+  border-radius:16px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:color-mix(in oklab, #86efac 70%, var(--primary-text-color, #f8fafc) 30%);
+  font:800 13px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    color-mix(in oklab, #22c55e 10%, var(--primary-background-color, #07111d));
+  border:1px solid color-mix(in oklab, #22c55e 20%, rgba(255,255,255,.12));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.ddc-toolbar-segments .store-badge::before{
+  content:"";
+  width:10px;
+  height:10px;
+  flex:0 0 auto;
+  border-radius:999px;
+  background:#52e01c;
+  box-shadow:0 0 0 5px color-mix(in oklab, #52e01c 12%, transparent);
+}
+
+.ddc-toolbar-segments .store-badge.warn{
+  color:color-mix(in oklab, #fbbf24 78%, var(--primary-text-color, #f8fafc) 22%);
+}
+
+.ddc-toolbar-segments .store-badge.warn::before{
+  background:#f59e0b;
+  box-shadow:0 0 0 5px color-mix(in oklab, #f59e0b 14%, transparent);
+}
+
+.ddc-toolbar-segments .ddc-t-status .ddc-t-dot{
+  width:10px;
+  height:10px;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .sec-status,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .sec-status{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  padding:8px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .sec-status .ddc-sec-head,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .sec-status .ddc-sec-head{
+  display:none !important;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .sec-status .ddc-row,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .sec-status .ddc-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  margin:0;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .store-badge,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .store-badge,
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .ddc-t-status,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .ddc-t-status{
+  flex-direction:row;
+  width:100%;
+  min-width:122px;
+  max-width:180px;
+  min-height:42px;
+  padding:0 14px 0 15px;
+  border-radius:16px;
+  font-size:13px;
+  line-height:1;
+  text-shadow:none;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+  display:none !important;
+}
+
+.ddc-toolbar.streamlined.v2[data-active-section="primary"] [data-toolbar-panel="primary"],
+.ddc-toolbar.streamlined.v3[data-active-section="primary"] [data-toolbar-panel="primary"],
+.ddc-toolbar.streamlined.v2[data-active-section="clip"] [data-toolbar-panel="clip"],
+.ddc-toolbar.streamlined.v3[data-active-section="clip"] [data-toolbar-panel="clip"],
+.ddc-toolbar.streamlined.v2[data-active-section="share"] [data-toolbar-panel="share"],
+.ddc-toolbar.streamlined.v3[data-active-section="share"] [data-toolbar-panel="share"],
+.ddc-toolbar.streamlined.v2[data-active-section="misc"] [data-toolbar-panel="misc"],
+.ddc-toolbar.streamlined.v3[data-active-section="misc"] [data-toolbar-panel="misc"],
+.ddc-toolbar.streamlined.v2[data-active-section="layouts"] [data-toolbar-panel="layouts"],
+.ddc-toolbar.streamlined.v3[data-active-section="layouts"] [data-toolbar-panel="layouts"],
+.ddc-toolbar.streamlined.v2[data-active-section="view"] [data-toolbar-panel="view"],
+.ddc-toolbar.streamlined.v3[data-active-section="view"] [data-toolbar-panel="view"]{
+  display:grid !important;
+  animation:ddc-toolbar-panel-in .16s ease-out both;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+  grid-template-columns:1fr;
+  align-content:start;
+  gap:10px;
+  padding:12px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 18%, rgba(255,255,255,.12));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 8%, transparent), transparent 64%),
+    color-mix(in oklab, var(--primary-background-color, #09111d) 44%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    0 10px 24px rgba(0,0,0,.14);
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .ddc-sec-head,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .ddc-sec-head{
+  display:none !important;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .ddc-row,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .ddc-row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  margin:0;
+  grid-template-columns:none;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v2.is-collapsed [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v3.is-collapsed [data-toolbar-panel] .btn{
+  width:auto;
+  min-width:118px;
+  flex:0 0 auto;
+  height:40px;
+  padding:0 14px;
+  border-radius:14px;
+  gap:8px;
+  display:inline-flex !important;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn .label,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn .label,
+.ddc-toolbar.streamlined.v2.is-collapsed [data-toolbar-panel] .btn .label,
+.ddc-toolbar.streamlined.v3.is-collapsed [data-toolbar-panel] .btn .label{
+  display:inline !important;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn.cta-add,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn.cta-add{
+  min-width:142px;
+  height:42px;
+  grid-column:auto;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] #applyLayoutBtn,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] #applyLayoutBtn,
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] #settingsBtn,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] #settingsBtn{
+  grid-column:auto;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn.cta-add::after,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn.cta-add::after{
+  display:none;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-utils .ddc-preview-stack,
+.ddc-toolbar.streamlined.v3 .sec-utils .ddc-preview-stack{
+  margin-top:2px;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-layouts,
+.ddc-toolbar.streamlined.v3 .sec-layouts{
+  grid-template-columns:1fr;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-layouts .ddc-row.center,
+.ddc-toolbar.streamlined.v3 .sec-layouts .ddc-row.center{
+  display:block;
+}
+
+@keyframes ddc-toolbar-panel-in{
+  from{ opacity:0; transform:translateY(-4px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+@container ddc-root (max-width: 1100px){
+  .ddc-toolbar-segments{
+    grid-template-columns:repeat(2, minmax(150px, 1fr));
+  }
+  .ddc-toolbar-segments .sec-status{
+    grid-column:1 / -1;
+    border-top:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 62%, transparent);
+  }
+  .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar-segments .ddc-t-status{
+    max-width:none;
+  }
+}
+
+@container ddc-root (max-width: 660px){
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    width:100%;
+    margin:8px 0 10px;
+    padding:9px;
+    border-radius:18px;
+  }
+  .ddc-toolbar-segments{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    border-radius:15px;
+  }
+  .ddc-toolbar-segment{
+    min-height:52px;
+    padding-inline:10px;
+    gap:8px;
+    font-size:11px;
+  }
+  .ddc-toolbar-segment ha-icon{
+    --mdc-icon-size:20px;
+  }
+  .ddc-toolbar-segment-chevron{
+    display:none;
+  }
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel] .ddc-row,
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel] .ddc-row{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn,
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn{
+    width:100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+    animation:none !important;
+  }
+  .ddc-toolbar-segment,
+  .ddc-toolbar-segment::after,
+  .ddc-toolbar-segment-chevron{
+    transition:none !important;
+  }
+}
+
+/* Compact dropdown mode for the edit toolbar */
+.ddc-toolbar.streamlined.v2,
+.ddc-toolbar.streamlined.v3{
+  --ddc-toolbar-surface: color-mix(in oklab, var(--card-background-color, #ffffff) 90%, var(--primary-background-color, #f6f8fb) 10%);
+  --ddc-toolbar-elevated: color-mix(in oklab, var(--card-background-color, #ffffff) 84%, var(--primary-color, #8b5cf6) 3%);
+  --ddc-toolbar-text: var(--primary-text-color, #111827);
+  --ddc-toolbar-muted: var(--secondary-text-color, #64748b);
+  --ddc-toolbar-line: color-mix(in oklab, var(--divider-color, rgba(15,23,42,.16)) 78%, transparent);
+  --ddc-toolbar-shadow: 0 14px 34px rgba(15,23,42,.16), inset 0 1px 0 rgba(255,255,255,.32);
+  --ddc-dropdown-shadow: 0 20px 44px rgba(15,23,42,.22), inset 0 1px 0 rgba(255,255,255,.28);
+  gap:0;
+  padding:8px;
+  border-radius:20px;
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in oklab, var(--ddc-segment-accent) 8%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in oklab, var(--ddc-toolbar-surface) 96%, rgba(255,255,255,.08)), var(--ddc-toolbar-surface));
+  border-color:var(--ddc-toolbar-line);
+  box-shadow:var(--ddc-toolbar-shadow);
+  overflow:visible;
+}
+
+.ddc-toolbar.streamlined.v2.is-collapsed,
+.ddc-toolbar.streamlined.v3.is-collapsed{
+  gap:0;
+  padding:8px;
+  overflow:visible;
+}
+
+.ddc-toolbar-segments{
+  min-height:48px;
+  border-radius:16px;
+  border-color:var(--ddc-toolbar-line);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--ddc-toolbar-elevated) 96%, rgba(255,255,255,.08)), var(--ddc-toolbar-elevated));
+  box-shadow:inset 0 1px 0 color-mix(in oklab, #fff 36%, transparent);
+}
+
+.ddc-toolbar-segment{
+  min-height:48px;
+  padding:0 16px;
+  color:color-mix(in oklab, var(--ddc-toolbar-text) 82%, transparent);
+  border-right-color:var(--ddc-toolbar-line);
+}
+
+.ddc-toolbar-segment ha-icon{
+  color:color-mix(in oklab, var(--ddc-toolbar-text) 68%, transparent);
+}
+
+.ddc-toolbar-segment:hover{
+  color:var(--ddc-toolbar-text);
+  background:color-mix(in oklab, var(--ddc-segment-accent) 9%, transparent);
+}
+
+.ddc-toolbar-segment.active,
+.ddc-toolbar-segment[aria-pressed="true"]{
+  color:color-mix(in oklab, var(--ddc-segment-accent) 72%, var(--ddc-toolbar-text) 28%);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--ddc-segment-accent) 15%, transparent), transparent 78%),
+    color-mix(in oklab, var(--ddc-segment-accent) 8%, transparent);
+}
+
+.ddc-toolbar-segment.active ha-icon,
+.ddc-toolbar-segment[aria-pressed="true"] ha-icon,
+.ddc-toolbar-segment.active .ddc-toolbar-segment-chevron,
+.ddc-toolbar-segment[aria-pressed="true"] .ddc-toolbar-segment-chevron{
+  color:color-mix(in oklab, var(--ddc-segment-accent) 74%, var(--ddc-toolbar-text) 26%);
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+  position:absolute;
+  top:var(--ddc-toolbar-dropdown-top, calc(100% + 8px));
+  left:var(--ddc-toolbar-dropdown-left, 8px);
+  width:var(--ddc-toolbar-dropdown-width, min(420px, calc(100% - 16px)));
+  max-width:calc(100% - 16px);
+  max-height:min(58vh, 520px);
+  overflow:auto;
+  z-index:60;
+  padding:10px;
+  border-radius:16px;
+  border:1px solid color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 24%, var(--ddc-toolbar-line));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 7%, transparent), transparent 58%),
+    color-mix(in oklab, var(--card-background-color, #ffffff) 90%, var(--primary-background-color, #f6f8fb) 10%);
+  box-shadow:var(--ddc-dropdown-shadow);
+  backdrop-filter:blur(18px) saturate(1.05);
+  -webkit-backdrop-filter:blur(18px) saturate(1.05);
+  transform-origin:var(--ddc-toolbar-dropdown-origin, top center);
+}
+
+.ddc-toolbar.streamlined.v2:not([data-dropdown-open="1"]) [data-toolbar-panel],
+.ddc-toolbar.streamlined.v3:not([data-dropdown-open="1"]) [data-toolbar-panel]{
+  display:none !important;
+}
+
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="primary"] [data-toolbar-panel="primary"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="primary"] [data-toolbar-panel="primary"],
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="clip"] [data-toolbar-panel="clip"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="clip"] [data-toolbar-panel="clip"],
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="share"] [data-toolbar-panel="share"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="share"] [data-toolbar-panel="share"],
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="misc"] [data-toolbar-panel="misc"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="misc"] [data-toolbar-panel="misc"],
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="layouts"] [data-toolbar-panel="layouts"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="layouts"] [data-toolbar-panel="layouts"],
+.ddc-toolbar.streamlined.v2[data-dropdown-open="1"][data-active-section="view"] [data-toolbar-panel="view"],
+.ddc-toolbar.streamlined.v3[data-dropdown-open="1"][data-active-section="view"] [data-toolbar-panel="view"]{
+  display:grid !important;
+  animation:ddc-toolbar-dropdown-in .14s ease-out both;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .ddc-row,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .ddc-row{
+  gap:8px;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v2.is-collapsed [data-toolbar-panel] .btn,
+.ddc-toolbar.streamlined.v3.is-collapsed [data-toolbar-panel] .btn{
+  min-width:112px;
+  height:38px;
+  border-color:color-mix(in oklab, var(--divider-color, rgba(15,23,42,.16)) 72%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, #fff 22%, transparent), transparent),
+    color-mix(in oklab, var(--card-background-color, #ffffff) 86%, var(--primary-background-color, #f6f8fb) 14%);
+  color:var(--ddc-toolbar-text);
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn:hover,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn:hover{
+  border-color:color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 34%, transparent);
+  background:color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 10%, var(--card-background-color, #fff));
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn.info,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn.info,
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn.danger,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn.danger{
+  color:var(--ddc-toolbar-text);
+}
+
+.ddc-toolbar.streamlined.v2 .sec-utils .ddc-preview-stack,
+.ddc-toolbar.streamlined.v3 .sec-utils .ddc-preview-stack{
+  max-height:320px;
+  overflow:auto;
+}
+
+.ddc-toolbar-segments .store-badge,
+.ddc-toolbar-segments .ddc-t-status{
+  min-height:36px;
+  color:color-mix(in oklab, #15803d 74%, var(--ddc-toolbar-text) 26%);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, #fff 24%, transparent), transparent),
+    color-mix(in oklab, #22c55e 10%, var(--card-background-color, #ffffff));
+  border-color:color-mix(in oklab, #22c55e 28%, var(--ddc-toolbar-line));
+}
+
+@media (prefers-color-scheme: dark){
+  .ddc-toolbar.streamlined.v2,
+  .ddc-toolbar.streamlined.v3{
+    --ddc-toolbar-surface: color-mix(in oklab, var(--card-background-color, #101722) 88%, var(--primary-background-color, #050811) 12%);
+    --ddc-toolbar-elevated: color-mix(in oklab, var(--card-background-color, #101722) 86%, var(--primary-color, #8b5cf6) 7%);
+    --ddc-toolbar-text: var(--primary-text-color, #f8fafc);
+    --ddc-toolbar-muted: var(--secondary-text-color, #a7b1c2);
+    --ddc-toolbar-line: color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
+    --ddc-toolbar-shadow: 0 16px 38px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08);
+    --ddc-dropdown-shadow: 0 20px 44px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--pill-accent, var(--ddc-segment-accent)) 10%, transparent), transparent 58%),
+      color-mix(in oklab, var(--card-background-color, #101722) 88%, var(--primary-background-color, #050811) 12%);
+  }
+
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel] .btn,
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel] .btn,
+  .ddc-toolbar.streamlined.v2.is-collapsed [data-toolbar-panel] .btn,
+  .ddc-toolbar.streamlined.v3.is-collapsed [data-toolbar-panel] .btn{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.014)),
+      color-mix(in oklab, var(--primary-background-color, #050811) 30%, transparent);
+  }
+
+  .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar-segments .ddc-t-status{
+    color:color-mix(in oklab, #86efac 74%, var(--ddc-toolbar-text) 26%);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.014)),
+      color-mix(in oklab, #22c55e 10%, var(--primary-background-color, #050811));
+  }
+
+  .ddc-toolbar-settings-main{
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #8b5cf6) 22%, transparent), transparent 76%),
+      color-mix(in oklab, var(--primary-color, #8b5cf6) 12%, var(--ddc-toolbar-elevated));
+  }
+
+  .ddc-toolbar-settings-main .ddc-toolbar-settings-icon{
+    background:color-mix(in oklab, var(--primary-color, #8b5cf6) 18%, var(--primary-background-color, #050811));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.08),
+      0 0 0 1px color-mix(in oklab, var(--primary-color, #8b5cf6) 32%, transparent);
+  }
+}
+
+@keyframes ddc-toolbar-dropdown-in{
+  from{ opacity:0; transform:translateY(-5px) scale(.98); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+@container ddc-root (max-width: 660px){
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel],
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel]{
+    left:8px;
+    width:calc(100% - 16px);
+    max-width:calc(100% - 16px);
+  }
+}
+
+.ddc-toolbar-segments{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:stretch;
+  overflow:hidden;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+
+.ddc-toolbar-segments::-webkit-scrollbar{
+  display:none;
+}
+
+.ddc-toolbar-segment{
+  flex:1 1 max-content;
+  width:auto;
+  min-width:0;
+}
+
+.ddc-toolbar-segment[data-toolbar-segment="share"]{
+  flex:1.18 1 max-content;
+}
+
+.ddc-toolbar-segment[data-toolbar-segment="misc"],
+.ddc-toolbar-segment[data-toolbar-segment="layouts"],
+.ddc-toolbar-segment[data-toolbar-segment="view"]{
+  flex:.78 1 max-content;
+}
+
+.ddc-toolbar-settings-main{
+  appearance:none;
+  -webkit-appearance:none;
+  position:relative;
+  flex:.92 1 max-content;
+  width:auto;
+  min-width:0;
+  min-height:48px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:0 16px;
+  border:0;
+  border-right:1px solid var(--ddc-toolbar-line);
+  border-left:1px solid var(--ddc-toolbar-line);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #8b5cf6) 18%, transparent), transparent 76%),
+    color-mix(in oklab, var(--primary-color, #8b5cf6) 10%, var(--ddc-toolbar-elevated));
+  color:color-mix(in oklab, var(--primary-color, #8b5cf6) 66%, var(--ddc-toolbar-text) 34%);
+  font:900 13px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:
+    color .16s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    transform .12s ease;
+}
+
+.ddc-toolbar-settings-main > span:not(.ddc-toolbar-settings-icon){
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.ddc-toolbar-settings-main::after{
+  content:"";
+  position:absolute;
+  left:24px;
+  right:24px;
+  bottom:0;
+  height:3px;
+  border-radius:999px 999px 0 0;
+  background:var(--primary-color, #8b5cf6);
+  opacity:.9;
+  box-shadow:0 -8px 18px color-mix(in oklab, var(--primary-color, #8b5cf6) 24%, transparent);
+}
+
+.ddc-toolbar-settings-main .ddc-toolbar-settings-icon{
+  width:30px;
+  height:30px;
+  display:inline-grid;
+  place-items:center;
+  border-radius:999px;
+  background:color-mix(in oklab, var(--primary-color, #8b5cf6) 13%, var(--card-background-color, #ffffff));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, #fff 32%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--primary-color, #8b5cf6) 24%, transparent);
+}
+
+.ddc-toolbar-settings-main ha-icon{
+  --mdc-icon-size:19px;
+  color:currentColor;
+}
+
+.ddc-toolbar-settings-main:hover{
+  color:color-mix(in oklab, var(--primary-color, #8b5cf6) 76%, var(--ddc-toolbar-text) 24%);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #8b5cf6) 24%, transparent), transparent 76%),
+    color-mix(in oklab, var(--primary-color, #8b5cf6) 15%, var(--ddc-toolbar-elevated));
+  box-shadow:inset 0 1px 0 color-mix(in oklab, #fff 24%, transparent);
+}
+
+.ddc-toolbar-settings-main:active{
+  transform:translateY(1px);
+}
+
+.ddc-toolbar-settings-main:focus-visible{
+  outline:none;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in oklab, var(--primary-color, #8b5cf6) 54%, transparent),
+    inset 0 0 0 5px color-mix(in oklab, var(--primary-color, #8b5cf6) 15%, transparent);
+}
+
+.ddc-toolbar-segments .sec-status,
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .sec-status,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .sec-status{
+  grid-column:auto !important;
+  flex:.92 1 max-content;
+  align-self:stretch;
+  margin-left:0;
+  min-width:0;
+  border-top:0 !important;
+  border-left:1px solid var(--ddc-toolbar-line);
+}
+
+.ddc-toolbar-segments .store-badge,
+.ddc-toolbar-segments .ddc-t-status,
+.ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .store-badge,
+.ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .store-badge{
+  min-width:0;
+  max-width:none;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .sec-layouts,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .sec-layouts{
+  position:static;
+  display:grid !important;
+  width:100%;
+  max-width:none;
+  max-height:none;
+  margin-top:10px;
+  overflow:visible;
+  border-radius:14px;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .sec-layouts .ddc-sec-head,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .sec-layouts .ddc-sec-head{
+  display:inline-flex !important;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel] .sec-layouts .ddc-row,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel] .sec-layouts .ddc-row{
+  display:block;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel="misc"] .ddc-row,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel="misc"] .ddc-row{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel="misc"] .btn,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel="misc"] .btn{
+  width:100%;
+  min-width:0;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-layouts[data-toolbar-panel="layouts"],
+.ddc-toolbar.streamlined.v3 .sec-layouts[data-toolbar-panel="layouts"]{
+  grid-template-columns:1fr;
+  align-items:stretch;
+  gap:10px;
+  margin-top:0;
+  overflow:visible;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-layouts[data-toolbar-panel="layouts"] .ddc-row.center,
+.ddc-toolbar.streamlined.v3 .sec-layouts[data-toolbar-panel="layouts"] .ddc-row.center{
+  display:block;
+}
+
+.ddc-toolbar.streamlined.v2 .sec-layouts[data-toolbar-panel="layouts"] .ddc-switcher-inline,
+.ddc-toolbar.streamlined.v3 .sec-layouts[data-toolbar-panel="layouts"] .ddc-switcher-inline{
+  grid-template-columns:auto minmax(0, 1fr) auto auto auto;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel="view"] .ddc-preview-stack,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel="view"] .ddc-preview-stack{
+  margin:0;
+  max-height:none;
+  overflow:visible;
+}
+
+.ddc-toolbar.streamlined.v2 [data-toolbar-panel="view"] .ddc-preview-modes,
+.ddc-toolbar.streamlined.v3 [data-toolbar-panel="view"] .ddc-preview-modes{
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+}
+
+@container ddc-root (max-width: 980px){
+  .ddc-toolbar-segment,
+  .ddc-toolbar-settings-main{
+    padding-inline:9px;
+    gap:6px;
+    font-size:10.5px;
+    letter-spacing:.018em;
+  }
+
+  .ddc-toolbar-segment ha-icon{
+    --mdc-icon-size:18px;
+  }
+
+  .ddc-toolbar-segment-chevron{
+    --mdc-icon-size:14px !important;
+  }
+
+  .ddc-toolbar-settings-main .ddc-toolbar-settings-icon{
+    width:25px;
+    height:25px;
+  }
+
+  .ddc-toolbar-settings-main ha-icon{
+    --mdc-icon-size:17px;
+  }
+
+  .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar-segments .ddc-t-status,
+  .ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .store-badge{
+    min-width:0;
+    padding-inline:10px;
+    font-size:12px;
+  }
+}
+
+@container ddc-root (max-width: 760px){
+  .ddc-toolbar-segment,
+  .ddc-toolbar-settings-main{
+    padding-inline:6px;
+    gap:4px;
+    font-size:9.5px;
+    letter-spacing:0;
+  }
+
+  .ddc-toolbar-segment ha-icon{
+    --mdc-icon-size:16px;
+  }
+
+  .ddc-toolbar-segment-chevron{
+    --mdc-icon-size:12px !important;
+  }
+
+  .ddc-toolbar-settings-main{
+    min-height:48px;
+  }
+
+  .ddc-toolbar-settings-main .ddc-toolbar-settings-icon{
+    width:22px;
+    height:22px;
+  }
+
+  .ddc-toolbar-settings-main ha-icon{
+    --mdc-icon-size:15px;
+  }
+
+  .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar-segments .ddc-t-status,
+  .ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .store-badge{
+    padding-inline:6px;
+    font-size:10px;
+  }
+
+  .ddc-toolbar.streamlined.v2 .sec-layouts[data-toolbar-panel="layouts"] .ddc-switcher-inline,
+  .ddc-toolbar.streamlined.v3 .sec-layouts[data-toolbar-panel="layouts"] .ddc-switcher-inline{
+    grid-template-columns:1fr;
+  }
+
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel="view"] .ddc-preview-modes,
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel="view"] .ddc-preview-modes,
+  .ddc-toolbar.streamlined.v2 [data-toolbar-panel="misc"] .ddc-row,
+  .ddc-toolbar.streamlined.v3 [data-toolbar-panel="misc"] .ddc-row{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container ddc-root (max-width: 560px){
+  .ddc-toolbar-segment > span,
+  .ddc-toolbar-settings-main > span:not(.ddc-toolbar-settings-icon){
+    display:none;
+  }
+
+  .ddc-toolbar-segment,
+  .ddc-toolbar-settings-main{
+    padding-inline:5px;
+  }
+
+  .ddc-toolbar-segment-chevron{
+    display:none;
+  }
+
+  .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar-segments .ddc-t-status,
+  .ddc-toolbar.streamlined.v2 .ddc-toolbar-segments .store-badge,
+  .ddc-toolbar.streamlined.v3 .ddc-toolbar-segments .store-badge{
+    font-size:9px;
+  }
+}
+
+@media (prefers-color-scheme: dark){
+  .ddc-toolbar-settings-main{
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #8b5cf6) 22%, transparent), transparent 76%),
+      color-mix(in oklab, var(--primary-color, #8b5cf6) 12%, var(--ddc-toolbar-elevated));
+  }
+
+  .ddc-toolbar-settings-main .ddc-toolbar-settings-icon{
+    background:color-mix(in oklab, var(--primary-color, #8b5cf6) 18%, var(--primary-background-color, #050811));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.08),
+      0 0 0 1px color-mix(in oklab, var(--primary-color, #8b5cf6) 32%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .ddc-toolbar-settings-main,
+  .ddc-toolbar-settings-main::after{
+    transition:none !important;
+  }
+}
 
 /* ===== DDC Toolbar — END ===== */
 
@@ -9696,112 +11417,368 @@ _getMobileTextAssistScale_() {
 
 /* ===== DDC Tabs —END ==================== */
 
-/* ===== DDC Layers ==================== */
+/* ===== DDC Layers menu ==================== */
 .ddc-layers{
-  position: relative;
-  z-index: 4;
+  display:none !important;
+}
+
+.ddc-tabs.ddc-layer-menu-open{
+  overflow:visible;
+  scrollbar-gutter:auto;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-layer-menu-open{
+  overflow:visible !important;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-menu{
+  width:auto;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-trigger{
+  width:auto;
+  min-width:58px;
+  height:46px;
+  min-height:46px;
+  padding:0 12px;
+  border-radius:999px;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-trigger-label{
+  position:static;
+  inline-size:auto;
+  block-size:auto;
+  overflow:visible;
+  clip-path:none;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-count{
+  position:static;
+  min-width:24px;
+  height:24px;
+  font-size:12px;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-menu-panel{
+  top:calc(100% + 10px);
+  right:0;
+  bottom:auto;
+  left:auto;
+  transform:none;
+  transform-origin:top right;
+  animation:ddc-layer-menu-in .16s ease-out both;
+}
+
+.ddc-layer-menu{
+  position:relative;
+  z-index:12;
+  flex:0 0 auto;
   display:flex;
   align-items:center;
   justify-content:center;
-  flex-wrap:wrap;
-  gap:8px;
-  width:fit-content;
-  max-width:min(100%, calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 28px));
-  margin:8px auto 10px;
-  padding:8px 10px;
-  border-radius:22px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--card-background-color, #16181c) 92%, rgba(255,255,255,.05)),
-      color-mix(in oklab, var(--primary-background-color, #0f1216) 90%, rgba(255,255,255,.02))
-    );
-  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
-  box-shadow:0 16px 30px rgba(16,18,23,.16);
-  backdrop-filter: blur(12px) saturate(1.01);
-  -webkit-backdrop-filter: blur(12px) saturate(1.01);
-  overflow-x:auto;
-  overflow-y:hidden;
-  scrollbar-width:thin;
-  scrollbar-color: color-mix(in oklab, var(--primary-text-color, #fff) 18%, transparent) transparent;
 }
 
-.ddc-layers::-webkit-scrollbar{ height:6px; }
-.ddc-layers::-webkit-scrollbar-thumb{
-  background: color-mix(in oklab, var(--primary-text-color, #fff) 18%, transparent);
-  border-radius:999px;
-}
-.ddc-layers::-webkit-scrollbar-track{ background:transparent; }
-
-.ddc-layer-btn{
-  --ddc-layer-accent: var(--primary-color, #60a5fa);
-  flex:0 0 auto;
+.ddc-layer-trigger{
+  --ddc-layer-accent: var(--primary-color, #8b5cf6);
+  position:relative;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:8px;
-  min-height:38px;
-  padding:0 12px;
+  gap:10px;
+  min-width:132px;
+  min-height:46px;
+  padding:0 14px 0 16px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
   border-radius:999px;
-  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
-  background:transparent;
-  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 92%, rgba(0,0,0,.16));
-  font:600 12px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  letter-spacing:.03em;
-  cursor:pointer;
-  transition:
-    transform .16s ease,
-    color .16s ease,
-    background .18s ease,
-    border-color .18s ease,
-    box-shadow .18s ease;
-}
-
-.ddc-layer-btn ha-icon{
-  --mdc-icon-size:18px;
-  opacity:.94;
-}
-
-.ddc-layer-btn:hover{
-  transform:translateY(-1px);
-  border-color:color-mix(in oklab, var(--ddc-layer-accent) 44%, transparent);
-  background:color-mix(in oklab, var(--ddc-layer-accent) 10%, transparent);
-}
-
-.ddc-layer-btn.active{
-  color:#fff;
-  border-color:color-mix(in oklab, var(--ddc-layer-accent) 54%, transparent);
   background:
     linear-gradient(
       180deg,
-      color-mix(in oklab, var(--ddc-layer-accent) 84%, rgba(255,255,255,.16)),
-      color-mix(in oklab, var(--ddc-layer-accent) 72%, rgba(0,0,0,.08))
+      color-mix(in oklab, var(--card-background-color, #111827) 88%, var(--ddc-layer-accent) 12%),
+      color-mix(in oklab, var(--primary-background-color, #0b1220) 92%, var(--ddc-layer-accent) 8%)
+    );
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 88%, var(--ddc-layer-accent) 12%);
+  font:700 14px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:0;
+  cursor:pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 12px 26px rgba(0,0,0,.16);
+  transition:
+    transform .16s ease,
+    color .16s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease;
+}
+
+.ddc-layer-trigger ha-icon{
+  --mdc-icon-size:24px;
+  color:color-mix(in oklab, var(--ddc-layer-accent) 72%, var(--primary-text-color, #f8fafc) 28%);
+}
+
+.ddc-layer-trigger:hover,
+.ddc-layer-trigger.active{
+  transform:translateY(-1px);
+  color:var(--primary-color, #a855f7);
+  border-color:color-mix(in oklab, var(--ddc-layer-accent) 44%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ddc-layer-accent) 18%, var(--card-background-color, #111827)),
+      color-mix(in oklab, var(--ddc-layer-accent) 12%, var(--primary-background-color, #0b1220))
     );
   box-shadow:
-    0 10px 22px color-mix(in oklab, var(--ddc-layer-accent) 24%, transparent),
-    inset 0 1px 0 rgba(255,255,255,.16);
+    0 18px 34px color-mix(in oklab, var(--ddc-layer-accent) 20%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.12);
 }
 
-.ddc-layer-btn:focus-visible{
+.ddc-layer-trigger:focus-visible{
   outline:none;
   box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--ddc-layer-accent) 58%, transparent),
-    0 0 0 5px color-mix(in oklab, var(--ddc-layer-accent) 16%, transparent);
+    0 0 0 2px color-mix(in oklab, var(--ddc-layer-accent) 62%, transparent),
+    0 0 0 6px color-mix(in oklab, var(--ddc-layer-accent) 18%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.12);
 }
 
-@media (max-width: 768px){
-  .ddc-layers{
-    max-width:calc(100vw - 18px);
-    margin-inline:auto;
-    padding-inline:8px;
+.ddc-layer-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:28px;
+  height:28px;
+  padding:0 8px;
+  border-radius:999px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.22), transparent 42%),
+    color-mix(in oklab, var(--ddc-layer-accent) 84%, rgba(0,0,0,.04));
+  color:#fff;
+  font-size:13px;
+  line-height:1;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.2),
+    0 8px 18px color-mix(in oklab, var(--ddc-layer-accent) 28%, transparent);
+}
+
+.ddc-layer-menu-panel{
+  --ddc-menu-bg: color-mix(in oklab, var(--card-background-color, #0f172a) 88%, rgba(15,23,42,.38));
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  z-index:40;
+  display:grid;
+  gap:4px;
+  min-width:220px;
+  padding:10px;
+  border-radius:16px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 70%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
+    var(--ddc-menu-bg);
+  box-shadow:
+    0 20px 42px rgba(0,0,0,.32),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  transform-origin:top right;
+  animation:ddc-layer-menu-in .16s ease-out both;
+}
+
+.ddc-tabs-bottom .ddc-layer-menu-panel{
+  top:auto;
+  bottom:calc(100% + 10px);
+  transform-origin:bottom right;
+}
+
+.ddc-layer-option{
+  --ddc-layer-accent: var(--primary-color, #8b5cf6);
+  display:grid;
+  grid-template-columns:26px minmax(0, 1fr) 24px;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:42px;
+  padding:0 8px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 86%, transparent);
+  font:650 13px/1.2 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing:0;
+  text-align:left;
+  cursor:pointer;
+  transition:
+    color .16s ease,
+    background .16s ease,
+    box-shadow .16s ease;
+}
+
+.ddc-layer-option-icon{
+  --mdc-icon-size:23px;
+  color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 74%, transparent);
+}
+
+.ddc-layer-option-label{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-layer-option-check{
+  --mdc-icon-size:23px;
+  justify-self:end;
+  color:color-mix(in oklab, var(--ddc-layer-accent) 76%, #fff 24%);
+  opacity:0;
+  transform:scale(.82);
+  transition:opacity .16s ease, transform .16s ease;
+}
+
+.ddc-layer-option:hover,
+.ddc-layer-option:focus-visible,
+.ddc-layer-option.active{
+  outline:none;
+  color:color-mix(in oklab, var(--ddc-layer-accent) 78%, #fff 22%);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--ddc-layer-accent) 18%, transparent),
+      color-mix(in oklab, var(--ddc-layer-accent) 7%, transparent)
+    );
+  box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--ddc-layer-accent) 16%, transparent);
+}
+
+.ddc-layer-option:hover .ddc-layer-option-icon,
+.ddc-layer-option:focus-visible .ddc-layer-option-icon,
+.ddc-layer-option.active .ddc-layer-option-icon{
+  color:color-mix(in oklab, var(--ddc-layer-accent) 72%, #fff 28%);
+}
+
+.ddc-layer-option.active .ddc-layer-option-check{
+  opacity:1;
+  transform:scale(1);
+}
+
+.ddc-tabs-left .ddc-layer-menu{
+  width:100%;
+}
+
+.ddc-tabs-left .ddc-layer-trigger{
+  width:58px;
+  min-width:58px;
+  height:58px;
+  min-height:58px;
+  padding:0;
+  border-radius:18px;
+}
+
+.ddc-tabs-left .ddc-layer-trigger-label{
+  position:absolute;
+  inline-size:1px;
+  block-size:1px;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+}
+
+.ddc-tabs-left .ddc-layer-count{
+  position:absolute;
+  top:5px;
+  right:5px;
+  min-width:19px;
+  height:19px;
+  padding:0 5px;
+  font-size:10px;
+}
+
+.ddc-tabs-left .ddc-layer-menu-panel{
+  top:50%;
+  right:auto;
+  left:calc(100% + 10px);
+  transform:translateY(-50%);
+  transform-origin:left center;
+  animation:ddc-layer-menu-left-in .16s ease-out both;
+}
+
+@keyframes ddc-layer-menu-in{
+  from{ opacity:0; transform:translateY(-4px) scale(.98); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+@keyframes ddc-layer-menu-left-in{
+  from{ opacity:0; transform:translateY(-50%) translateX(-4px) scale(.98); }
+  to{ opacity:1; transform:translateY(-50%) translateX(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .ddc-layer-menu-panel{
+    animation:none !important;
   }
-  .ddc-layer-btn{
-    min-height:36px;
-    padding-inline:11px;
-    font-size:11px;
+  .ddc-layer-trigger,
+  .ddc-layer-option,
+  .ddc-layer-option-check{
+    transition:none !important;
   }
 }
-/* ===== DDC Layers —END ==================== */
+
+@container ddc-root (max-width: 980px){
+  .ddc-tabs-left .ddc-layer-menu{
+    width:auto;
+  }
+  .ddc-tabs-left .ddc-layer-trigger{
+    width:auto;
+    min-width:58px;
+    height:46px;
+    min-height:46px;
+    padding:0 12px;
+    border-radius:999px;
+  }
+  .ddc-tabs-left .ddc-layer-trigger-label{
+    position:static;
+    inline-size:auto;
+    block-size:auto;
+    overflow:visible;
+    clip-path:none;
+  }
+  .ddc-tabs-left .ddc-layer-count{
+    position:static;
+    min-width:24px;
+    height:24px;
+    font-size:12px;
+  }
+  .ddc-tabs-left .ddc-layer-menu-panel{
+    top:calc(100% + 10px);
+    right:0;
+    bottom:auto;
+    left:auto;
+    transform:none;
+    transform-origin:top right;
+    animation:ddc-layer-menu-in .16s ease-out both;
+  }
+}
+
+@media (max-width: 640px){
+  .ddc-layer-trigger{
+    min-width:58px;
+    padding:0 11px;
+  }
+  .ddc-layer-trigger-label{
+    position:absolute;
+    inline-size:1px;
+    block-size:1px;
+    overflow:hidden;
+    clip-path:inset(50%);
+    white-space:nowrap;
+  }
+  .ddc-layer-count{
+    min-width:24px;
+    height:24px;
+    font-size:12px;
+  }
+  .ddc-layer-menu-panel{
+    min-width:205px;
+  }
+}
+/* ===== DDC Layers menu END ==================== */
 
 
         /* Fly‑in animation for card wrappers. When the animate_cards
@@ -10250,12 +12227,65 @@ _getMobileTextAssistScale_() {
         
 <div class="toolbar ddc-toolbar streamlined v2" role="toolbar" aria-label="Layout editor">
 
-  <button class="ddc-toolbar-toggle" id="toolbarToggleBtn" style="display:none" data-tooltip="Expand toolbar" title="Expand toolbar" aria-label="Expand toolbar" aria-expanded="false">
+  <button class="ddc-toolbar-toggle" id="toolbarToggleBtn" hidden style="display:none" data-tooltip="Expand toolbar" title="Expand toolbar" aria-label="Expand toolbar" aria-expanded="false">
     <ha-icon icon="mdi:chevron-down"></ha-icon>
   </button>
 
+  <div class="ddc-toolbar-segments" role="group" aria-label="Edit toolbar categories">
+    <button type="button" class="ddc-toolbar-segment active" data-toolbar-segment="primary" aria-pressed="true" aria-expanded="true">
+      <ha-icon icon="mdi:plus-circle-outline" aria-hidden="true"></ha-icon>
+      <span>Add &amp; Save</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+    <button type="button" class="ddc-toolbar-segment" data-toolbar-segment="clip" aria-pressed="false" aria-expanded="false">
+      <ha-icon icon="mdi:clipboard-outline" aria-hidden="true"></ha-icon>
+      <span>Clipboard</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+    <button type="button" class="ddc-toolbar-segment" data-toolbar-segment="share" aria-pressed="false" aria-expanded="false">
+      <ha-icon icon="mdi:tray-arrow-up" aria-hidden="true"></ha-icon>
+      <span>Import &amp; Share</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+    <button type="button" class="ddc-toolbar-settings-main" id="settingsBtn" style="display:none" data-tooltip="Dashboard Settings" aria-label="Open dashboard settings">
+      <span class="ddc-toolbar-settings-icon" aria-hidden="true">
+        <ha-icon icon="mdi:cog-outline"></ha-icon>
+      </span>
+      <span>Settings</span>
+    </button>
+    <button type="button" class="ddc-toolbar-segment" data-toolbar-segment="misc" aria-pressed="false" aria-expanded="false">
+      <ha-icon icon="mdi:tools" aria-hidden="true"></ha-icon>
+      <span>Misc</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+    <button type="button" class="ddc-toolbar-segment" data-toolbar-segment="layouts" aria-pressed="false" aria-expanded="false">
+      <ha-icon icon="mdi:view-dashboard-outline" aria-hidden="true"></ha-icon>
+      <span>Layouts</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+    <button type="button" class="ddc-toolbar-segment" data-toolbar-segment="view" aria-pressed="false" aria-expanded="false">
+      <ha-icon icon="mdi:monitor-eye" aria-hidden="true"></ha-icon>
+      <span>View</span>
+      <ha-icon class="ddc-toolbar-segment-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+    </button>
+
+    <section class="ddc-sec sec-status" aria-label="Status">
+      <header class="ddc-sec-head">
+        <span class="ddc-sec-dot" aria-hidden="true"></span>
+        <span class="ddc-sec-title">Status</span>
+      </header>
+      <div class="ddc-row">
+        <span class="ddc-t-status ok" id="ddcStatus" style="display:none" aria-live="polite">
+          <span class="ddc-t-dot" id="ddcDot" aria-hidden="true"></span>
+          <span class="ddc-t-text" id="ddcStatusText">System OK</span>
+        </span>
+        <span class="store-badge" id="storeBadge" title="Where layout is persisted" style="display:none">System OK</span>
+      </div>
+    </section>
+  </div>
+
   <!-- Add & Save -->
-  <section class="ddc-sec sec-primary" aria-label="Add & Save">
+  <section class="ddc-sec sec-primary" data-toolbar-panel="primary" aria-label="Add & Save">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
       <span class="ddc-sec-title">Add &amp; Save</span>
@@ -10271,7 +12301,7 @@ _getMobileTextAssistScale_() {
   </section>
 
   <!-- Clipboard -->
-  <section class="ddc-sec sec-clip" aria-label="Clipboard">
+  <section class="ddc-sec sec-clip" data-toolbar-panel="clip" aria-label="Clipboard">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
       <span class="ddc-sec-title">Clipboard</span>
@@ -10287,7 +12317,7 @@ _getMobileTextAssistScale_() {
   </section>
 
   <!-- Import & Share -->
-  <section class="ddc-sec sec-share" aria-label="Import & Share">
+  <section class="ddc-sec sec-share" data-toolbar-panel="share" aria-label="Import & Share">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
       <span class="ddc-sec-title">Import &amp; Share</span>
@@ -10309,26 +12339,42 @@ _getMobileTextAssistScale_() {
   </section>
   
 
-  <!-- Utilities -->
-  <section class="ddc-sec sec-utils" aria-label="Utilities">
+  <!-- Misc -->
+  <section class="ddc-sec sec-utils" data-toolbar-panel="misc" aria-label="Misc">
     <header class="ddc-sec-head">
       <span class="ddc-sec-dot" aria-hidden="true"></span>
-      <span class="ddc-sec-title">Utilities</span>
+      <span class="ddc-sec-title">Misc</span>
     </header>
     <div class="ddc-row">
+      <button class="btn secondary" id="lineModeBtn" style="display:none" data-tooltip="Add line">
+        <ha-icon icon="mdi:vector-polyline-plus"></ha-icon><span class="label">Add line</span>
+      </button>
       <button class="btn secondary" id="reloadBtn" style="display:none" data-tooltip="Reload">
         <ha-icon icon="mdi:refresh"></ha-icon><span class="label">Reload</span>
       </button>
       <button class="btn secondary" id="diagBtn" style="display:none" data-tooltip="Diagnostics">
         <ha-icon icon="mdi:play-circle-outline"></ha-icon><span class="label">Diagnostics</span>
       </button>
-      <button class="btn secondary" id="lineModeBtn" style="display:none" data-tooltip="Draw connectors">
-        <ha-icon icon="mdi:vector-polyline-plus"></ha-icon><span class="label">Draw Line</span>
-      </button>
-      <button class="btn secondary" id="settingsBtn" style="display:none" data-tooltip="Card Settings">
-        <ha-icon icon="mdi:cog"></ha-icon><span class="label">Card Settings</span>
-      </button>
     </div>
+  </section>
+
+  <!-- Layouts -->
+  <section class="ddc-sec sec-layouts" data-toolbar-panel="layouts" aria-label="Layouts">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">Layouts</span>
+    </header>
+    <div class="ddc-row center">
+      <div class="layout-host"></div>
+    </div>
+  </section>
+
+  <!-- View -->
+  <section class="ddc-sec sec-view" data-toolbar-panel="view" aria-label="View">
+    <header class="ddc-sec-head">
+      <span class="ddc-sec-dot" aria-hidden="true"></span>
+      <span class="ddc-sec-title">View</span>
+    </header>
     <div class="ddc-preview-stack" id="previewModeControls">
       <div class="ddc-preview-head">
         <div class="ddc-preview-label">Responsive Layout</div>
@@ -10353,21 +12399,6 @@ _getMobileTextAssistScale_() {
           <ha-icon icon="mdi:phone-rotate-landscape"></ha-icon>
         </button>
       </div>
-    </div>
-  </section>
-
-  <!-- Status -->
-  <section class="ddc-sec sec-status" aria-label="Status">
-    <header class="ddc-sec-head">
-      <span class="ddc-sec-dot" aria-hidden="true"></span>
-      <span class="ddc-sec-title">Status</span>
-    </header>
-    <div class="ddc-row">
-      <span class="ddc-t-status ok" id="ddcStatus" style="display:none" aria-live="polite">
-        <span class="ddc-t-dot" id="ddcDot" aria-hidden="true"></span>
-        <span class="ddc-t-text" id="ddcStatusText">storage: backend · OK</span>
-      </span>
-      <span class="store-badge" id="storeBadge" title="Where layout is persisted" style="display:none">storage: backend · OK</span>
     </div>
   </section>
 
@@ -10421,6 +12452,24 @@ _getMobileTextAssistScale_() {
           const text = String(node.getAttribute('data-tooltip') || '').trim();
           if (text && !node.getAttribute('title')) node.setAttribute('title', text);
         } catch {}
+      });
+      const toolbarSegmentButtons = Array.from(this.shadowRoot.querySelectorAll('[data-toolbar-segment]'));
+      toolbarSegmentButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          this._activateToolbarSegment_?.(btn.dataset.toolbarSegment || 'primary', { toggle: true });
+        });
+        btn.addEventListener('keydown', (ev) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+          ev.preventDefault();
+          const current = toolbarSegmentButtons.indexOf(btn);
+          let next = current;
+          if (ev.key === 'ArrowRight') next = (current + 1) % toolbarSegmentButtons.length;
+          if (ev.key === 'ArrowLeft') next = (current - 1 + toolbarSegmentButtons.length) % toolbarSegmentButtons.length;
+          if (ev.key === 'Home') next = 0;
+          if (ev.key === 'End') next = toolbarSegmentButtons.length - 1;
+          const target = toolbarSegmentButtons[next];
+          this._activateToolbarSegment_?.(target?.dataset?.toolbarSegment || 'primary', { focus: true, open: true });
+        });
       });
       this.toolbarToggleBtn?.addEventListener('click', () => {
         this._setToolbarExpanded_?.(!this.__toolbarExpanded);
@@ -10479,7 +12528,10 @@ _getMobileTextAssistScale_() {
         this.copyBtn?.addEventListener('click', () => this._copySelection());
         this.pasteBtn?.addEventListener('click', () => this._pasteClipboard());
         this.lineModeBtn?.addEventListener('click', () => this._toggleConnectorDrawMode_?.());
-        this.settingsBtn?.addEventListener('click', () => this._openDashboardSettings());
+        this.settingsBtn?.addEventListener('click', () => {
+          this._closeToolbarDropdown_?.();
+          this._openDashboardSettings();
+        });
         this.exploreBtn?.addEventListener('click', () =>
           window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer')
         );
@@ -10660,6 +12712,12 @@ connectedCallback() {
     this.removeEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
     this.addEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
 
+    if (!this.__dashboardApiRequestHandler) {
+      this.__dashboardApiRequestHandler = (ev) => this._handleDashboardApiRequest_?.(ev);
+    }
+    this.removeEventListener('ddc-api-request', this.__dashboardApiRequestHandler);
+    this.addEventListener('ddc-api-request', this.__dashboardApiRequestHandler);
+
     if (!this.__keyHandlerBound) {
       this.__keyHandler = (e) => this._onKeyDown_(e);
       window.addEventListener('keydown', this.__keyHandler);
@@ -10748,6 +12806,9 @@ connectedCallback() {
 
     if (this.__autoFillAfterDragHandler) {
       this.removeEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
+    }
+    if (this.__dashboardApiRequestHandler) {
+      this.removeEventListener('ddc-api-request', this.__dashboardApiRequestHandler);
     }
 
     try {
@@ -10924,7 +12985,7 @@ connectedCallback() {
         // including these keys, the screensaver delay can become stuck because the overlay
         // of YAML values never occurs. Adding them keeps behaviour consistent with other
         // settings like disable_overlap.
-        'screen_saver_enabled', 'screen_saver_delay'
+        'screen_saver_enabled', 'screen_saver_delay', 'screen_saver_style', 'screen_saver_entities'
       ];
       const cfgOpts = {};
       for (const k of overrideKeys) {
@@ -11002,8 +13063,11 @@ connectedCallback() {
   _renderTabs() {
     const bar = this.tabsBar; if (!bar) return;
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+    const hasLayerMenu = !!this._hasLayerMenu_?.();
+    const shouldRenderTabs = !!tabs.length && !(tabs.length === 1 && this.hideTabsWhenSingle);
     this._syncTabsPlacement_?.();
-    if (!tabs.length || (tabs.length === 1 && this.hideTabsWhenSingle)) {
+    if (!shouldRenderTabs && !hasLayerMenu) {
+      this._closeLayersMenu_?.({ render: false });
       bar.style.display = 'none';
       this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
       this.rootEl?.classList?.remove?.('ddc-tabs-bottom-layout');
@@ -11013,6 +13077,9 @@ connectedCallback() {
     const classes = ['ddc-tabs'];
     if (this.tabsPosition === 'left') classes.push('ddc-tabs-left');
     if (this.tabsPosition === 'bottom') classes.push('ddc-tabs-bottom');
+    if (hasLayerMenu) classes.push('ddc-tabs-has-layers');
+    if (this.__layersMenuOpen) classes.push('ddc-layer-menu-open');
+    this.__renderingTabs = true;
     bar.className = classes.join(' ');
     bar.innerHTML = '';
 
@@ -11022,7 +13089,9 @@ connectedCallback() {
       bar.style.width = '';
       bar.style.maxWidth = '';
     } catch {}
-    for (const t of tabs) {
+    if (!hasLayerMenu) this._closeLayersMenu_?.({ render: false });
+    if (!this.__layersMenuOpen) this._removeLayerMenuDismissHandlers_?.();
+    for (const t of (shouldRenderTabs ? tabs : [])) {
       const btn = document.createElement('button');
       btn.className = [
         'ddc-tab',
@@ -11035,6 +13104,7 @@ connectedCallback() {
       btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
       btn.addEventListener('click', () => {
         if (this.activeTab !== t.id) {
+          this._closeLayersMenu_?.({ render: false });
           this.activeTab = t.id;
           try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
           this._applyActiveTab();
@@ -11051,6 +13121,8 @@ connectedCallback() {
       });
       bar.appendChild(btn);
     }
+    this._appendLayersMenuToTabs_?.(bar);
+    this.__renderingTabs = false;
     this._syncTabsPlacement_?.();
   
     try { this._updateTabsA11y_?.(); } catch {}
@@ -11982,7 +14054,7 @@ _toggleEditMode(force = null) {
 
   // Helpers that are null-safe
   const setDisplay = (el, val) => { try { if (el) el.style.display = val; } catch {} };
-  const on  = 'inline-block';
+  const on  = 'inline-flex';
   const off = 'none';
 
   const showButtons = () => {
@@ -11999,7 +14071,7 @@ _toggleEditMode(force = null) {
     setDisplay(this.pasteBtn, on);
     setDisplay(this.lineModeBtn, on);
     setDisplay(this.settingsBtn, on);
-    setDisplay(this.toolbarToggleBtn, 'inline-flex');
+    setDisplay(this.toolbarToggleBtn, off);
   };
 
   const hideButtons = () => {
@@ -12028,11 +14100,18 @@ _toggleEditMode(force = null) {
       // Make sure it can be measured even if CSS says display:none !important
       toolbar.setAttribute('data-force-open', '1');
       // also hard-force as an ultimate fallback
-      toolbar.style.display = 'grid';
+      toolbar.style.display = 'flex';
 
       // Reveal buttons first so height is real
       showButtons();
-      this._setToolbarExpanded_?.(false, { toolbar });
+      toolbar.classList.remove('is-collapsed');
+      toolbar.setAttribute('data-toolbar-expanded', '1');
+      let initialSegment = this.__toolbarActiveSegment || 'primary';
+      try {
+        const storedSegment = localStorage.getItem(`ddc_toolbar_segment_${this.storageKey || 'default'}`);
+        if (storedSegment) initialSegment = storedSegment;
+      } catch {}
+      this._activateToolbarSegment_?.(initialSegment, { toolbar, persist: false, open: false });
 
       // Let layout settle, then measure & open
       requestAnimationFrame(() => {
@@ -12047,7 +14126,7 @@ _toggleEditMode(force = null) {
     } else {
       // Ensure it’s visible while we animate out
       toolbar.setAttribute('data-force-open', '1');
-      toolbar.style.display = 'grid';
+      toolbar.style.display = 'flex';
 
       // Lock current height as start, then collapse next frame
       const h = toolbar.scrollHeight || 0;
@@ -12059,7 +14138,8 @@ _toggleEditMode(force = null) {
 
       // After the CSS transition ends, actually hide buttons and release shim
       setTimeout(() => {
-        this._setToolbarExpanded_?.(false, { toolbar });
+        toolbar.classList.remove('is-collapsed');
+        this._closeToolbarDropdown_?.({ toolbar });
         hideButtons();
         toolbar.removeAttribute('data-force-open');
         // Let your existing CSS take over (display:none when not in edit)
@@ -12340,12 +14420,12 @@ _syncEmptyStateUI() {
   const empty = this._isLayoutEmpty();
   if (this.addButton) {
     const show = this.editMode || empty;
-    this.addButton.style.display = show ? 'inline-block' : 'none';
+    this.addButton.style.display = show ? 'inline-flex' : 'none';
     this.addButton.classList.toggle('cta-empty', !this.editMode && empty);
   }
 
   // Keep other toolbar buttons hidden unless we’re in edit mode
-  const toggle = (el) => el && (el.style.display = this.editMode ? 'inline-block' : 'none');
+  const toggle = (el) => el && (el.style.display = this.editMode ? 'inline-flex' : 'none');
   toggle(this.reloadBtn);
   toggle(this.diagBtn);
   toggle(this.exitEditBtn);
@@ -13280,6 +15360,126 @@ _startScaleWatch() {
     }
   }
 
+_removeToolbarDropdownDismissHandlers_() {
+  try {
+    if (this.__toolbarDropdownPointerHandler) {
+      document.removeEventListener('pointerdown', this.__toolbarDropdownPointerHandler, true);
+      this.__toolbarDropdownPointerHandler = null;
+    }
+    if (this.__toolbarDropdownKeyHandler) {
+      document.removeEventListener('keydown', this.__toolbarDropdownKeyHandler, true);
+      this.__toolbarDropdownKeyHandler = null;
+    }
+  } catch {}
+}
+
+_installToolbarDropdownDismissHandlers_(toolbar = null) {
+  try {
+    this._removeToolbarDropdownDismissHandlers_?.();
+    const host = this.shadowRoot || this.renderRoot || this;
+    const bar = toolbar || host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!bar || bar.dataset.dropdownOpen !== '1') return;
+    this.__toolbarDropdownPointerHandler = (ev) => {
+      const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+      if (path.includes(bar)) return;
+      this._closeToolbarDropdown_?.({ toolbar: bar });
+    };
+    this.__toolbarDropdownKeyHandler = (ev) => {
+      if (ev.key !== 'Escape') return;
+      ev.stopPropagation?.();
+      this._closeToolbarDropdown_?.({ toolbar: bar, focus: true });
+    };
+    document.addEventListener('pointerdown', this.__toolbarDropdownPointerHandler, true);
+    document.addEventListener('keydown', this.__toolbarDropdownKeyHandler, true);
+  } catch {}
+}
+
+_closeToolbarDropdown_(opts = {}) {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = opts?.toolbar || host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!toolbar) return;
+    toolbar.dataset.dropdownOpen = '0';
+    toolbar.querySelectorAll?.('[data-toolbar-segment]')?.forEach((btn) => {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('tabindex', btn.dataset.toolbarSegment === this.__toolbarActiveSegment ? '0' : '-1');
+    });
+    this._removeToolbarDropdownDismissHandlers_?.();
+    if (opts.focus) {
+      const activeBtn = toolbar.querySelector?.(`[data-toolbar-segment="${this.__toolbarActiveSegment || 'primary'}"]`);
+      try { activeBtn?.focus?.({ preventScroll: true }); } catch {}
+    }
+    this._refreshToolbarOpenHeight_?.();
+  } catch {}
+}
+
+_positionToolbarDropdown_(toolbar = null) {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const bar = toolbar || host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!bar) return;
+    const segment = bar.querySelector?.(`[data-toolbar-segment="${this.__toolbarActiveSegment || 'primary'}"]`);
+    const segments = bar.querySelector?.('.ddc-toolbar-segments');
+    if (!segment || !segments) return;
+    const barRect = bar.getBoundingClientRect();
+    const segmentRect = segment.getBoundingClientRect();
+    const available = Math.max(260, barRect.width - 16);
+    const activeSegment = this.__toolbarActiveSegment || 'primary';
+    const desiredWidth = activeSegment === 'layouts' ? 620 : activeSegment === 'view' ? 520 : 420;
+    const panelWidth = Math.min(Math.max(segmentRect.width, desiredWidth), available);
+    let left = segmentRect.left - barRect.left;
+    if (left + panelWidth > barRect.width - 8) left = barRect.width - 8 - panelWidth;
+    left = Math.max(8, left);
+    const top = segments.offsetTop + segments.offsetHeight + 8;
+    bar.style.setProperty('--ddc-toolbar-dropdown-left', `${Math.round(left)}px`);
+    bar.style.setProperty('--ddc-toolbar-dropdown-width', `${Math.round(panelWidth)}px`);
+    bar.style.setProperty('--ddc-toolbar-dropdown-top', `${Math.round(top)}px`);
+    bar.style.setProperty('--ddc-toolbar-dropdown-origin', `${Math.round(segmentRect.left - barRect.left + (segmentRect.width / 2) - left)}px top`);
+  } catch {}
+}
+
+_activateToolbarSegment_(section = 'primary', opts = {}) {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = opts?.toolbar || host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!toolbar) return;
+    const valid = new Set(['primary', 'clip', 'share', 'misc', 'layouts', 'view']);
+    const next = valid.has(section) ? section : 'primary';
+    const wasOpen = toolbar.dataset.dropdownOpen === '1';
+    const wasSame = this.__toolbarActiveSegment === next;
+    const shouldOpen = opts.open !== undefined ? !!opts.open : (opts.toggle ? !(wasOpen && wasSame) : true);
+    this.__toolbarActiveSegment = next;
+    toolbar.dataset.activeSection = next;
+    toolbar.dataset.dropdownOpen = shouldOpen ? '1' : '0';
+    toolbar.querySelectorAll?.('[data-toolbar-segment]')?.forEach((btn) => {
+      const selectedSegment = btn.dataset.toolbarSegment === next;
+      const active = shouldOpen && selectedSegment;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.setAttribute('aria-expanded', active ? 'true' : 'false');
+      btn.setAttribute('tabindex', selectedSegment ? '0' : '-1');
+      if (selectedSegment && opts.focus) {
+        try { btn.focus({ preventScroll: true }); } catch {}
+      }
+    });
+    if (opts.persist !== false) {
+      try { localStorage.setItem(`ddc_toolbar_segment_${this.storageKey || 'default'}`, next); } catch {}
+    }
+    if (shouldOpen) {
+      requestAnimationFrame(() => {
+        this._positionToolbarDropdown_?.(toolbar);
+        this._installToolbarDropdownDismissHandlers_?.(toolbar);
+        this._refreshToolbarOpenHeight_?.();
+      });
+    } else {
+      this._removeToolbarDropdownDismissHandlers_?.();
+      requestAnimationFrame(() => this._refreshToolbarOpenHeight_?.());
+    }
+  } catch {}
+}
+
 _setToolbarExpanded_(expanded = false, opts = {}) {
   try {
     const host = this.shadowRoot || this.renderRoot || this;
@@ -13317,8 +15517,15 @@ _refreshToolbarOpenHeight_() {
     requestAnimationFrame(() => {
       try {
         const isOpen = toolbar.classList.contains('is-open') || toolbar.hasAttribute('data-force-open');
-        const h = isOpen ? (toolbar.scrollHeight || toolbar.offsetHeight || 0) : 0;
+        const segments = toolbar.querySelector?.('.ddc-toolbar-segments');
+        const styles = window.getComputedStyle?.(toolbar);
+        const paddingBottom = parseFloat(styles?.paddingBottom || '0') || 0;
+        const baseHeight = segments
+          ? Math.ceil(segments.offsetTop + segments.offsetHeight + paddingBottom)
+          : (toolbar.scrollHeight || toolbar.offsetHeight || 0);
+        const h = isOpen ? baseHeight : 0;
         toolbar.style.setProperty('--open-h', `${h}px`);
+        this._positionToolbarDropdown_?.(toolbar);
         if (root) root.style.setProperty('--ddc-toolbar-height', `${h}px`);
         if (!this.autoResizeCards && this.cardContainer) {
           this.cardContainer.style.marginTop = h > 0 ? `${h}px` : '';
@@ -17960,10 +20167,41 @@ modal.innerHTML = `
     </button>
   </div>
 
-  <div class="settings-body">
+  <nav class="settings-tabs" role="tablist" aria-label="Dashboard settings sections">
+    <button type="button" class="settings-tab active" id="ddc-settings-tab-layout" data-settings-tab="layout" role="tab" aria-selected="true">
+      <ha-icon icon="mdi:view-grid-plus-outline" aria-hidden="true"></ha-icon>
+      <span>Layout</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-appearance" data-settings-tab="appearance" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
+      <span>Appearance</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-behaviour" data-settings-tab="behaviour" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:tune" aria-hidden="true"></ha-icon>
+      <span>Behaviour</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-tabs" data-settings-tab="tabs" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:tab" aria-hidden="true"></ha-icon>
+      <span>Tabs</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-layers" data-settings-tab="layers" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:layers-triple-outline" aria-hidden="true"></ha-icon>
+      <span>Layers</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-screensaver" data-settings-tab="screensaver" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:clock-outline" aria-hidden="true"></ha-icon>
+      <span>Screen saver</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-packages" data-settings-tab="packages" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:puzzle-plus-outline" aria-hidden="true"></ha-icon>
+      <span>Packages</span>
+    </button>
+  </nav>
+
+  <div class="settings-body" data-active-tab="layout">
 
     <!-- Layout -->
-    <section class="card" aria-labelledby="layout-head">
+    <section class="card" data-settings-section="layout" aria-labelledby="layout-head" role="tabpanel" aria-describedby="ddc-settings-tab-layout">
       <div class="section-head">
         <ha-icon icon="mdi:view-grid-plus-outline" aria-hidden="true"></ha-icon>
         <h4 id="layout-head">Layout</h4>
@@ -18184,7 +20422,7 @@ modal.innerHTML = `
     </section>
 
     <!-- Appearance -->
-    <section class="card" aria-labelledby="appearance-head">
+    <section class="card" data-settings-section="appearance" aria-labelledby="appearance-head" role="tabpanel" aria-describedby="ddc-settings-tab-appearance" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
         <h4 id="appearance-head">Appearance</h4>
@@ -18602,7 +20840,7 @@ modal.innerHTML = `
     </section>
 
     <!-- Behaviour -->
-    <section class="card" aria-labelledby="behaviour-head">
+    <section class="card" data-settings-section="behaviour" aria-labelledby="behaviour-head" role="tabpanel" aria-describedby="ddc-settings-tab-behaviour" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:tune" aria-hidden="true"></ha-icon>
         <h4 id="behaviour-head">Behaviour</h4>
@@ -18669,7 +20907,7 @@ modal.innerHTML = `
     </section>
 
     <!-- Screen Saver -->
-    <section class="card" aria-labelledby="screensaver-head">
+    <section class="card" data-settings-section="screensaver" aria-labelledby="screensaver-head" role="tabpanel" aria-describedby="ddc-settings-tab-screensaver" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:clock-outline" aria-hidden="true"></ha-icon>
         <h4 id="screensaver-head">Screen saver</h4>
@@ -18706,10 +20944,53 @@ modal.innerHTML = `
         </div>
         <div class="hint">Delay (in minutes) before the screen saver activates.</div>
       </div>
+
+      <!-- Style picker -->
+      <div class="setting" role="group" aria-labelledby="lbl-ss-style">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:image-filter-hdr" aria-hidden="true"></ha-icon>
+            <label id="lbl-ss-style">Screen saver design</label>
+          </div>
+        </div>
+        <input type="hidden" id="ddc-setting-screenSaverStyle" />
+        <div class="ss-style-picker">
+          <div class="ss-style-toolbar">
+            <div class="ss-style-current">
+              <strong id="ddc-screenSaverStyleName">VisionOS Glass</strong>
+              <span id="ddc-screenSaverStyleNote">Layered glass, date card and calm Home status.</span>
+            </div>
+            <div class="ss-style-nav" aria-label="Screen saver preview navigation">
+              <button type="button" id="ddc-screenSaverStylePrev" aria-label="Previous screen saver design">
+                <ha-icon icon="mdi:chevron-left"></ha-icon>
+              </button>
+              <button type="button" id="ddc-screenSaverStyleNext" aria-label="Next screen saver design">
+                <ha-icon icon="mdi:chevron-right"></ha-icon>
+              </button>
+            </div>
+          </div>
+          <div class="ss-style-carousel" id="ddc-screenSaverStyleCarousel" role="listbox" aria-labelledby="lbl-ss-style">
+            ${this._renderScreenSaverStyleOptions_?.() || ''}
+          </div>
+        </div>
+        <div class="hint">Choose the full-screen idle experience. The preview cards are live-rendered miniatures of the available designs.</div>
+      </div>
+
+      <!-- Status entities -->
+      <div class="setting" role="group" aria-labelledby="lbl-ss-entities">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:home-analytics" aria-hidden="true"></ha-icon>
+            <label id="lbl-ss-entities">Status entities</label>
+          </div>
+        </div>
+        <div class="ss-entity-list" id="ddc-screenSaverEntityList"></div>
+        <div class="hint">Only selected Home Assistant entities are shown. Empty slots are hidden from the screen saver.</div>
+      </div>
     </section>
 
     <!-- Tabs -->
-    <section class="card tabs-card" aria-labelledby="tabs-head">
+    <section class="card tabs-card" data-settings-section="tabs" aria-labelledby="tabs-head" role="tabpanel" aria-describedby="ddc-settings-tab-tabs" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:tab" aria-hidden="true"></ha-icon>
         <h4 id="tabs-head">Tabs</h4>
@@ -18755,7 +21036,7 @@ modal.innerHTML = `
     </section>
 
     <!-- Layers -->
-    <section class="card layers-card" aria-labelledby="layers-head">
+    <section class="card layers-card" data-settings-section="layers" aria-labelledby="layers-head" role="tabpanel" aria-describedby="ddc-settings-tab-layers" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:layers-triple-outline" aria-hidden="true"></ha-icon>
         <h4 id="layers-head">Layers</h4>
@@ -18794,15 +21075,15 @@ modal.innerHTML = `
       </div>
     </section>
 
-    <!-- Features -->
-    <section class="card packages-card" aria-labelledby="packages-head">
+    <!-- Packages -->
+    <section class="card packages-card" data-settings-section="packages" aria-labelledby="packages-head" role="tabpanel" aria-describedby="ddc-settings-tab-packages" hidden>
       <div class="section-head">
         <ha-icon icon="mdi:puzzle-plus-outline" aria-hidden="true"></ha-icon>
-        <h4 id="packages-head">Add features</h4>
+        <h4 id="packages-head">Packages</h4>
       </div>
-      <p class="caption">Build Home Assistant features directly from the dashboard. Each feature is stored as package YAML in the dashboard JSON and synced by the backend into your HA <code>packages</code> folder.</p>
+      <p class="caption">Build Home Assistant package YAML directly from the dashboard. Each package is stored in the dashboard JSON and synced by the backend into your HA <code>packages</code> folder.</p>
 
-      <div class="feature-quick-actions" aria-label="Add feature shortcuts">
+      <div class="feature-quick-actions" aria-label="Add package shortcuts">
         <button type="button" class="mini-action primary ddc-feature-add-btn" data-feature-type="automation">
           <ha-icon icon="mdi:robot-outline"></ha-icon>
           <span>Add automation</span>
@@ -18852,7 +21133,7 @@ modal.innerHTML = `
       <div id="ddc-package-diagnostics" class="package-sync-status">Run package sync diagnostics to verify backend support, package directory, and detected files.</div>
 
       <div id="ddc-packages-list" class="packages-list" aria-live="polite"></div>
-      <div class="hint">Each feature becomes one package bundle behind the scenes. Use <code>Misc</code> whenever you need to add YAML that does not fit the guided shortcuts.</div>
+      <div class="hint">Each entry becomes one package bundle behind the scenes. Use <code>Misc</code> whenever you need to add YAML that does not fit the guided shortcuts.</div>
     </section>
 
   </div>
@@ -18883,6 +21164,56 @@ modal.innerHTML = `
     // Append to our own shadow root so built-in .modal styles apply and centering works
     this.__settingsModal = modal;
     this.shadowRoot.appendChild(modal);
+
+    const settingsTabs = Array.from(modal.querySelectorAll('[data-settings-tab]'));
+    const settingsSections = Array.from(modal.querySelectorAll('[data-settings-section]'));
+    const settingsBody = modal.querySelector('.settings-body');
+    const settingsTabKeys = new Set(settingsTabs.map((btn) => btn.dataset.settingsTab).filter(Boolean));
+    const activateSettingsTab = (key, { persist = true, focus = false } = {}) => {
+      const nextKey = settingsTabKeys.has(key) ? key : 'layout';
+      if (settingsBody) settingsBody.dataset.activeTab = nextKey;
+      settingsTabs.forEach((btn) => {
+        const active = btn.dataset.settingsTab === nextKey;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        btn.setAttribute('tabindex', active ? '0' : '-1');
+        if (active) {
+          try { btn.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {}
+          if (focus) {
+            try { btn.focus({ preventScroll: true }); } catch {}
+          }
+        }
+      });
+      settingsSections.forEach((section) => {
+        section.hidden = section.dataset.settingsSection !== nextKey;
+      });
+      if (persist) {
+        try { localStorage.setItem(`ddc_settings_tab_${this.storageKey || 'default'}`, nextKey); } catch {}
+      }
+    };
+    settingsTabs.forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        activateSettingsTab(btn.dataset.settingsTab);
+      });
+      btn.addEventListener('keydown', (ev) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+        ev.preventDefault();
+        const currentIndex = settingsTabs.indexOf(btn);
+        let nextIndex = currentIndex;
+        if (ev.key === 'ArrowRight') nextIndex = (currentIndex + 1) % settingsTabs.length;
+        if (ev.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + settingsTabs.length) % settingsTabs.length;
+        if (ev.key === 'Home') nextIndex = 0;
+        if (ev.key === 'End') nextIndex = settingsTabs.length - 1;
+        activateSettingsTab(settingsTabs[nextIndex]?.dataset.settingsTab, { focus: true });
+      });
+    });
+    let initialSettingsTab = 'layout';
+    try {
+      const storedSettingsTab = localStorage.getItem(`ddc_settings_tab_${this.storageKey || 'default'}`);
+      if (settingsTabKeys.has(storedSettingsTab)) initialSettingsTab = storedSettingsTab;
+    } catch {}
+    activateSettingsTab(initialSettingsTab, { persist: false });
 
     // Prepopulate current settings
     const chkAuto    = modal.querySelector('#ddc-setting-autoResize');
@@ -18933,6 +21264,14 @@ modal.innerHTML = `
     const chkScreenSaver   = modal.querySelector('#ddc-setting-screenSaverEnabled');
     const rngScreenDelay   = modal.querySelector('#ddc-setting-screenSaverDelay');
     const outScreenDelay   = modal.querySelector('#ddc-screenSaverDelayOut');
+    const inpScreenSaverStyle = modal.querySelector('#ddc-setting-screenSaverStyle');
+    const screenSaverStyleCarousel = modal.querySelector('#ddc-screenSaverStyleCarousel');
+    const screenSaverStyleCards = Array.from(modal.querySelectorAll('[data-screensaver-style]'));
+    const screenSaverStylePrev = modal.querySelector('#ddc-screenSaverStylePrev');
+    const screenSaverStyleNext = modal.querySelector('#ddc-screenSaverStyleNext');
+    const screenSaverStyleName = modal.querySelector('#ddc-screenSaverStyleName');
+    const screenSaverStyleNote = modal.querySelector('#ddc-screenSaverStyleNote');
+    const screenSaverEntityList = modal.querySelector('#ddc-screenSaverEntityList');
 
     const selBgMode           = modal.querySelector('#ddc-bg-mode');
     const secImg              = modal.querySelector('[data-bg-section="image"]');
@@ -19721,6 +22060,145 @@ modal.innerHTML = `
       });
     }
 
+    const screenSaverPresets = this._getScreenSaverPresets_?.() || [];
+    let screenSaverEntityDrafts = this._normalizeScreenSaverEntities_?.(this.screenSaverEntities) || [];
+    const updateLiveScreenSaverEntities = () => {
+      this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(screenSaverEntityDrafts) || [];
+      try {
+        this._renderScreenSaverOverlayContent_?.();
+        this._updateScreenSaverClock?.();
+      } catch {}
+    };
+    const renderScreenSaverEntityList = () => {
+      if (!screenSaverEntityList) return;
+      screenSaverEntityList.innerHTML = '';
+      screenSaverEntityDrafts = this._normalizeScreenSaverEntities_?.(screenSaverEntityDrafts) || [];
+      const mountPicker = (host, item, index) => {
+        if (!host) return;
+        host.innerHTML = '';
+        if (customElements.get('ha-entity-picker')) {
+          const picker = document.createElement('ha-entity-picker');
+          picker.hass = this.hass || this._hass;
+          picker.value = item.entity || '';
+          picker.setAttribute('label', 'Entity');
+          picker.removeAttribute('hide-clear-icon');
+          host.appendChild(picker);
+          picker.addEventListener('value-changed', (ev) => {
+            ev.stopPropagation();
+            const nextValue = String(ev.detail?.value || ev.detail || ev.target?.value || '').trim();
+            screenSaverEntityDrafts[index].entity = nextValue;
+            updateLiveScreenSaverEntities();
+          });
+          return;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = item.entity || '';
+        input.placeholder = item.placeholder || 'sensor.example';
+        input.setAttribute('aria-label', `${item.title || 'Status'} entity`);
+        host.appendChild(input);
+        input.addEventListener('input', () => {
+          screenSaverEntityDrafts[index].entity = String(input.value || '').trim();
+          updateLiveScreenSaverEntities();
+        });
+      };
+
+      screenSaverEntityDrafts.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'ss-entity-row';
+        row.dataset.ssEntityKey = item.key || String(index);
+        row.innerHTML = `
+          <div class="ss-entity-slot">
+            <ha-icon icon="${this._safe?.(item.icon || 'mdi:circle-outline') || item.icon || 'mdi:circle-outline'}" aria-hidden="true"></ha-icon>
+            <div>
+              <strong>${this._safe?.(item.title || item.key || `Status ${index + 1}`) || item.title || `Status ${index + 1}`}</strong>
+              <span>${this._safe?.(item.note || '') || item.note || ''}</span>
+            </div>
+          </div>
+          <div class="ss-entity-fields">
+            <div class="ss-entity-picker-host"></div>
+            <input type="text" class="ss-entity-label-input" value="${this._safe?.(item.label || '') || ''}" placeholder="Display label (optional)" aria-label="${this._safe?.(item.title || item.key || 'Status') || 'Status'} display label" />
+          </div>
+        `;
+        screenSaverEntityList.appendChild(row);
+        mountPicker(row.querySelector('.ss-entity-picker-host'), item, index);
+        const labelInput = row.querySelector('.ss-entity-label-input');
+        labelInput?.addEventListener('input', () => {
+          screenSaverEntityDrafts[index].label = String(labelInput.value || '').trim();
+          updateLiveScreenSaverEntities();
+        });
+      });
+      updateLiveScreenSaverEntities();
+    };
+    renderScreenSaverEntityList();
+    if (!customElements.get('ha-entity-picker')) {
+      customElements.whenDefined('ha-entity-picker').then(() => {
+        if (!modal.isConnected) return;
+        renderScreenSaverEntityList();
+      }).catch(() => {});
+    }
+
+    const syncScreenSaverStylePicker = (style, { scroll = false, focus = false } = {}) => {
+      const selectedStyle = this._normalizeScreenSaverStyle_?.(style) || 'visionos_glass';
+      const preset = screenSaverPresets.find((item) => item.id === selectedStyle) || screenSaverPresets[0];
+      if (inpScreenSaverStyle) inpScreenSaverStyle.value = selectedStyle;
+      if (screenSaverStyleName) screenSaverStyleName.textContent = preset?.name || 'Screen saver';
+      if (screenSaverStyleNote) screenSaverStyleNote.textContent = preset?.note || '';
+      screenSaverStyleCards.forEach((card) => {
+        const active = card.dataset.screensaverStyle === selectedStyle;
+        card.setAttribute('aria-selected', active ? 'true' : 'false');
+        card.tabIndex = active ? 0 : -1;
+        if (active && scroll) {
+          try { card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch {}
+        }
+        if (active && focus) {
+          try { card.focus({ preventScroll: true }); } catch {}
+        }
+      });
+    };
+    const chooseScreenSaverStyle = (style, opts = {}) => {
+      const selectedStyle = this._normalizeScreenSaverStyle_?.(style) || 'visionos_glass';
+      this.screenSaverStyle = selectedStyle;
+      syncScreenSaverStylePicker(selectedStyle, opts);
+      try {
+        this._renderScreenSaverOverlayContent_?.();
+        this._updateScreenSaverClock?.();
+      } catch {}
+    };
+    chooseScreenSaverStyle(this.screenSaverStyle, { scroll: true });
+    screenSaverStyleCards.forEach((card) => {
+      card.addEventListener('click', () => chooseScreenSaverStyle(card.dataset.screensaverStyle, { scroll: true }));
+      card.addEventListener('keydown', (ev) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(ev.key)) return;
+        ev.preventDefault();
+        const currentIndex = screenSaverStyleCards.indexOf(card);
+        let nextIndex = currentIndex;
+        if (ev.key === 'ArrowRight') nextIndex = (currentIndex + 1) % screenSaverStyleCards.length;
+        if (ev.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + screenSaverStyleCards.length) % screenSaverStyleCards.length;
+        if (ev.key === 'Home') nextIndex = 0;
+        if (ev.key === 'End') nextIndex = screenSaverStyleCards.length - 1;
+        if (ev.key === 'Enter' || ev.key === ' ') nextIndex = currentIndex;
+        chooseScreenSaverStyle(screenSaverStyleCards[nextIndex]?.dataset.screensaverStyle, { scroll: true, focus: true });
+      });
+    });
+    const nudgeScreenSaverStyle = (direction = 1) => {
+      if (!screenSaverStyleCards.length) return;
+      const selectedStyle = this._normalizeScreenSaverStyle_?.(inpScreenSaverStyle?.value || this.screenSaverStyle) || 'visionos_glass';
+      const currentIndex = Math.max(0, screenSaverStyleCards.findIndex((card) => card.dataset.screensaverStyle === selectedStyle));
+      const nextIndex = (currentIndex + direction + screenSaverStyleCards.length) % screenSaverStyleCards.length;
+      chooseScreenSaverStyle(screenSaverStyleCards[nextIndex]?.dataset.screensaverStyle, { scroll: true, focus: true });
+    };
+    screenSaverStylePrev?.addEventListener('click', () => nudgeScreenSaverStyle(-1));
+    screenSaverStyleNext?.addEventListener('click', () => nudgeScreenSaverStyle(1));
+    try {
+      screenSaverStyleCarousel?.addEventListener('wheel', (ev) => {
+        if (Math.abs(ev.deltaY) <= Math.abs(ev.deltaX)) return;
+        ev.preventDefault();
+        screenSaverStyleCarousel.scrollLeft += ev.deltaY;
+      }, { passive: false });
+    } catch {}
+
 
     // ===== UI polish hooks =====
   
@@ -20052,8 +22530,13 @@ modal.innerHTML = `
     // Close quality improvements
     modal.addEventListener('click', (evt) => { if (evt.target === modal) { evt.stopPropagation(); closeModal(); } });
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeModal(); } };
-    document.addEventListener('keydown', onKey, { once: true });
-    setTimeout(() => modal.querySelector('#ddc-setting-gridSize')?.focus(), 0);
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => {
+      const focusTarget = initialSettingsTab === 'layout'
+        ? modal.querySelector('#ddc-setting-gridSize')
+        : modal.querySelector('.settings-tab.active');
+      try { focusTarget?.focus?.({ preventScroll: true }); } catch {}
+    }, 0);
 
 
     // Build extra inputs for container size mode (custom dimensions or preset list)
@@ -20552,6 +23035,7 @@ modal.innerHTML = `
     const closeModal = () => {
       try { closeFeatureEditor(); } catch {}
       try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
+      try { document.removeEventListener('keydown', onKey); } catch {}
       try { modal.remove(); } catch {}
       if (this.__settingsModal === modal) this.__settingsModal = null;
     };
@@ -20640,6 +23124,8 @@ modal.innerHTML = `
       const newScreenSaverEnabled   = !!chkScreenSaver?.checked;
       const newScreenSaverDelayMin  = parseInt(rngScreenDelay?.value || '1', 10);
       const newScreenSaverDelayMs   = (Number.isFinite(newScreenSaverDelayMin) ? newScreenSaverDelayMin : 1) * 60000;
+      const newScreenSaverStyle     = this._normalizeScreenSaverStyle_?.(inpScreenSaverStyle?.value || this.screenSaverStyle) || 'visionos_glass';
+      const newScreenSaverEntities  = this._normalizeScreenSaverEntities_?.(screenSaverEntityDrafts) || [];
 
       // hero image not exposed to user
       try {
@@ -20863,6 +23349,8 @@ modal.innerHTML = `
         // Screen saver settings
         this.screenSaverEnabled = newScreenSaverEnabled;
         this.screenSaverDelay   = newScreenSaverDelayMs;
+        this.screenSaverStyle   = newScreenSaverStyle;
+        this.screenSaverEntities = newScreenSaverEntities;
         this._updateScreensaverSettings?.();
 
 
@@ -20929,6 +23417,8 @@ modal.innerHTML = `
           // Screen saver config
           this._config.screen_saver_enabled    = !!this.screenSaverEnabled;
           this._config.screen_saver_delay      = this.screenSaverDelay;
+          this._config.screen_saver_style      = this.screenSaverStyle;
+          this._config.screen_saver_entities   = this._cloneJson_?.(this.screenSaverEntities) || this.screenSaverEntities;
           // Background image src is already updated in this._config.background_image above
         } catch (cfgErr) {
           console.warn('[drag-and-drop-card] Failed to update config', cfgErr);
@@ -21062,6 +23552,10 @@ modal.innerHTML = `
       // Screen saver
       screen_saver_enabled: !!this.screenSaverEnabled,
       screen_saver_delay: this.screenSaverDelay,
+      screen_saver_style: this._normalizeScreenSaverStyle_?.(this.screenSaverStyle) || 'visionos_glass',
+      screen_saver_entities: (this._normalizeScreenSaverEntities_?.(this.screenSaverEntities) || [])
+        .filter((item) => item.entity || item.label)
+        .map(({ key, entity, label, icon, tone }) => ({ key, entity, label, icon, tone })),
     };
 
     // strip undefined to keep files tidy
@@ -21095,6 +23589,7 @@ modal.innerHTML = `
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
     if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
+    if ('edit_mode_pin' in opts || 'editModePin' in opts) this.editModePin = String(opts.edit_mode_pin ?? opts.editModePin ?? '');
     if ('do_not_resize_text' in opts) this.doNotResizeText = !!opts.do_not_resize_text;
     if ('optimize_for_mobile' in opts) this.optimizeForMobile = !!opts.optimize_for_mobile;
     if ('mobile_dynamic_behavior' in opts) {
@@ -21116,6 +23611,13 @@ modal.innerHTML = `
     if ('apply_background_to_page' in opts) this.applyBackgroundToPage = !!opts.apply_background_to_page;
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     if ('card_shadow' in opts)          this.cardShadowEnabled = !!opts.card_shadow;
+    if ('animate_cards' in opts)        this.animateCards = !!opts.animate_cards;
+    if ('hide_HA_Header' in opts || 'hide_ha_header' in opts) {
+      this.hideHaHeader = !!(opts.hide_HA_Header ?? opts.hide_ha_header);
+    }
+    if ('hide_HA_Sidebar' in opts || 'hide_ha_sidebar' in opts) {
+      this.hideHaSidebar = !!(opts.hide_HA_Sidebar ?? opts.hide_ha_sidebar);
+    }
     if ('dashboard_theme_enabled' in opts || 'theme_enabled' in opts) {
       this.dashboardThemeEnabled = !!(opts.dashboard_theme_enabled ?? opts.theme_enabled);
     }
@@ -21193,19 +23695,50 @@ modal.innerHTML = `
       const ms = Number(opts.screen_saver_delay);
       this.screenSaverDelay = Number.isFinite(ms) && ms > 0 ? ms : this.screenSaverDelay;
     }
-    if ('screen_saver_enabled' in opts || 'screen_saver_delay' in opts) {
+    if ('screen_saver_style' in opts || 'screensaver_style' in opts || 'screen_saver_variant' in opts) {
+      this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(opts.screen_saver_style ?? opts.screensaver_style ?? opts.screen_saver_variant) || 'visionos_glass';
+    }
+    if ('screen_saver_entities' in opts || 'screensaver_entities' in opts) {
+      this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(opts.screen_saver_entities ?? opts.screensaver_entities ?? []) || [];
+    }
+    if ('screen_saver_enabled' in opts || 'screen_saver_delay' in opts || 'screen_saver_style' in opts || 'screensaver_style' in opts || 'screen_saver_variant' in opts || 'screen_saver_entities' in opts || 'screensaver_entities' in opts) {
       if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
     }
 
+    if ('tabs' in opts) {
+      this.tabs = Array.isArray(opts.tabs) ? opts.tabs.map((tab, index) => ({
+        id: String(tab?.id || tab?.label || `tab_${index + 1}`).trim() || `tab_${index + 1}`,
+        label: String(tab?.label || tab?.id || `Tab ${index + 1}`).trim(),
+        icon: tab?.icon || '',
+        label_mode: tab?.label_mode || tab?.labelMode || 'both',
+      })) : [];
+    }
+    if ('default_tab' in opts) {
+      this.defaultTab = String(opts.default_tab || '').trim() || (this.tabs?.[0]?.id ?? 'default');
+    }
+    if ('hide_tabs_when_single' in opts) {
+      this.hideTabsWhenSingle = opts.hide_tabs_when_single !== false;
+    }
     if ('tabs_position' in opts) {
       const tabsPosition = String(opts.tabs_position || 'top').toLowerCase();
       this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
       this._syncTabsPlacement_?.();
     }
+    if (Array.isArray(this.tabs) && this.tabs.length) {
+      const validTabIds = new Set(this.tabs.map((tab) => tab.id));
+      if (!validTabIds.has(this.defaultTab)) this.defaultTab = this.tabs[0]?.id || 'default';
+      if (!validTabIds.has(this.activeTab)) this.activeTab = this.defaultTab;
+    }
 
 
     this._applyDashboardThemeStyling_?.();
     this._applyGridVars();
+    if ('background_mode' in opts || 'background_image' in opts || 'background_particles' in opts || 'background_youtube' in opts) {
+      try { this._applyBackgroundFromConfig?.(); } catch {}
+    }
+    if ('hide_HA_Header' in opts || 'hide_ha_header' in opts || 'hide_HA_Sidebar' in opts || 'hide_ha_sidebar' in opts) {
+      try { this._applyHaChromeVisibility_?.(); } catch {}
+    }
 
     if (recalc) {
       this._applyContainerSizingFromConfig(true);
@@ -21214,7 +23747,7 @@ modal.innerHTML = `
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs_position' in opts) {
+    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts) {
       this._renderTabs?.();
       this._applyActiveTab?.();
       this._syncTabsWidth_?.();
@@ -21226,6 +23759,323 @@ modal.innerHTML = `
     this._renderConnectors?.();
     this.__ddcTextLockDirty = true;
     this._scheduleTextResizeLockRefresh_?.(true);
+  }
+
+  _getDashboardSettingsApiSchema_() {
+    return {
+      storage_key: { type: 'string' },
+      grid: { type: 'number' },
+      drag_live_snap: { type: 'boolean' },
+      auto_save: { type: 'boolean' },
+      auto_save_debounce: { type: 'number' },
+      debug: { type: 'boolean' },
+      disable_overlap: { type: 'boolean' },
+      edit_mode_pin: { type: 'string' },
+      animate_cards: { type: 'boolean' },
+      auto_resize_cards: { type: 'boolean' },
+      optimize_for_mobile: { type: 'boolean' },
+      mobile_dynamic_behavior: { type: 'string' },
+      do_not_resize_text: { type: 'boolean' },
+      outer_grid_buffer: { type: 'boolean' },
+      responsive_viewports: { type: 'object' },
+      connectors: { type: 'array' },
+      responsive_connectors: { type: 'object' },
+      container_background: { type: 'string' },
+      apply_background_to_page: { type: 'boolean' },
+      card_background: { type: 'string' },
+      card_shadow: { type: 'boolean' },
+      dashboard_theme_enabled: { type: 'boolean' },
+      dashboard_theme: { type: 'string' },
+      dashboard_theme_override_all_design: { type: 'boolean' },
+      container_size_mode: { type: 'string' },
+      container_fixed_width: { type: 'number' },
+      container_fixed_height: { type: 'number' },
+      container_preset: { type: 'string' },
+      container_preset_orientation: { type: 'string' },
+      tabs: { type: 'array' },
+      tabs_position: { type: 'string' },
+      default_tab: { type: 'string' },
+      hide_tabs_when_single: { type: 'boolean' },
+      layers_enabled: { type: 'boolean' },
+      layers: { type: 'array' },
+      hide_HA_Header: { type: 'boolean' },
+      hide_HA_Sidebar: { type: 'boolean' },
+      background_mode: { type: 'string' },
+      background_image: { type: 'object' },
+      background_particles: { type: 'object' },
+      background_youtube: { type: 'object' },
+      screen_saver_enabled: { type: 'boolean' },
+      screen_saver_delay: { type: 'number' },
+      screen_saver_style: { type: 'string' },
+      screen_saver_entities: { type: 'array' },
+    };
+  }
+
+  _normalizeDashboardSettingApiKey_(key) {
+    const raw = String(key || '').trim();
+    if (!raw) return '';
+    const aliases = {
+      storageKey: 'storage_key',
+      dragLiveSnap: 'drag_live_snap',
+      autoSave: 'auto_save',
+      autoSaveDebounce: 'auto_save_debounce',
+      disableOverlap: 'disable_overlap',
+      editModePin: 'edit_mode_pin',
+      animateCards: 'animate_cards',
+      autoResizeCards: 'auto_resize_cards',
+      optimizeForMobile: 'optimize_for_mobile',
+      mobileDynamicBehavior: 'mobile_dynamic_behavior',
+      doNotResizeText: 'do_not_resize_text',
+      outerGridBuffer: 'outer_grid_buffer',
+      responsiveViewports: 'responsive_viewports',
+      responsiveConnectors: 'responsive_connectors',
+      containerBackground: 'container_background',
+      applyBackgroundToPage: 'apply_background_to_page',
+      cardBackground: 'card_background',
+      cardShadow: 'card_shadow',
+      dashboardThemeEnabled: 'dashboard_theme_enabled',
+      dashboardTheme: 'dashboard_theme',
+      dashboardThemeOverrideAllDesign: 'dashboard_theme_override_all_design',
+      containerSizeMode: 'container_size_mode',
+      containerFixedWidth: 'container_fixed_width',
+      containerFixedHeight: 'container_fixed_height',
+      containerPreset: 'container_preset',
+      containerPresetOrientation: 'container_preset_orientation',
+      tabsPosition: 'tabs_position',
+      defaultTab: 'default_tab',
+      hideTabsWhenSingle: 'hide_tabs_when_single',
+      layersEnabled: 'layers_enabled',
+      enable_layers: 'layers_enabled',
+      hideHAHeader: 'hide_HA_Header',
+      hideHaHeader: 'hide_HA_Header',
+      hide_ha_header: 'hide_HA_Header',
+      hideHASidebar: 'hide_HA_Sidebar',
+      hideHaSidebar: 'hide_HA_Sidebar',
+      hide_ha_sidebar: 'hide_HA_Sidebar',
+      backgroundMode: 'background_mode',
+      backgroundImage: 'background_image',
+      backgroundParticles: 'background_particles',
+      backgroundYoutube: 'background_youtube',
+      backgroundYouTube: 'background_youtube',
+      screenSaverEnabled: 'screen_saver_enabled',
+      screensaverEnabled: 'screen_saver_enabled',
+      screenSaverDelay: 'screen_saver_delay',
+      screensaverDelay: 'screen_saver_delay',
+      screenSaverStyle: 'screen_saver_style',
+      screensaverStyle: 'screen_saver_style',
+      screenSaverEntities: 'screen_saver_entities',
+      screensaverEntities: 'screen_saver_entities',
+    };
+    if (aliases[raw]) return aliases[raw];
+    const schema = this._getDashboardSettingsApiSchema_?.() || {};
+    if (schema[raw]) return raw;
+    const snake = raw
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[\s-]+/g, '_')
+      .replace(/__+/g, '_')
+      .toLowerCase();
+    const schemaKey = Object.keys(schema).find((item) => item.toLowerCase() === snake);
+    return schemaKey || snake;
+  }
+
+  _cloneDashboardApiValue_(value) {
+    if (value === undefined || value === null) return value;
+    try { return JSON.parse(JSON.stringify(value)); } catch { return value; }
+  }
+
+  _coerceDashboardApiSettingValue_(key, value) {
+    const schema = this._getDashboardSettingsApiSchema_?.() || {};
+    const type = schema[key]?.type || '';
+    if (type === 'boolean') {
+      if (typeof value === 'string') {
+        const lowered = value.trim().toLowerCase();
+        if (['false', '0', 'off', 'no', 'disabled', 'disable'].includes(lowered)) return false;
+        if (['true', '1', 'on', 'yes', 'enabled', 'enable'].includes(lowered)) return true;
+      }
+      return !!value;
+    }
+    if (type === 'number') {
+      if (value === '' || value === null || value === undefined) return null;
+      const next = Number(value);
+      return Number.isFinite(next) ? next : value;
+    }
+    if ((type === 'array' || type === 'object') && typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (type === 'array') return Array.isArray(parsed) ? parsed : value;
+        return parsed && typeof parsed === 'object' ? parsed : value;
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  _normalizeDashboardApiPatch_(patch = {}) {
+    const out = {};
+    const schema = this._getDashboardSettingsApiSchema_?.() || {};
+    const current = this._exportableOptions?.() || {};
+    const source = patch && typeof patch === 'object' ? patch : {};
+    for (const [rawKey, rawValue] of Object.entries(source)) {
+      const key = this._normalizeDashboardSettingApiKey_(rawKey);
+      if (!key) continue;
+      const known = !!schema[key] || Object.prototype.hasOwnProperty.call(current, key) || Object.prototype.hasOwnProperty.call(this._config || {}, key);
+      if (!known) {
+        console.warn(`[ddc:api] Unknown dashboard setting "${rawKey}".`);
+        continue;
+      }
+      out[key] = this._coerceDashboardApiSettingValue_(key, rawValue);
+    }
+    return out;
+  }
+
+  _listDashboardApiSettings_() {
+    const schema = this._getDashboardSettingsApiSchema_?.() || {};
+    const options = this._exportableOptions?.() || {};
+    const keys = Array.from(new Set([...Object.keys(schema), ...Object.keys(options)])).sort();
+    return keys.map((key) => ({
+      key,
+      type: schema[key]?.type || (Array.isArray(options[key]) ? 'array' : typeof options[key]),
+      value: this._cloneDashboardApiValue_(options[key]),
+      boolean: (schema[key]?.type || typeof options[key]) === 'boolean',
+    }));
+  }
+
+  _getDashboardApiSetting_(key) {
+    const normalized = this._normalizeDashboardSettingApiKey_(key);
+    const options = this._exportableOptions?.() || {};
+    return this._cloneDashboardApiValue_(options[normalized]);
+  }
+
+  async _persistDashboardApiSettings_(opts = {}) {
+    const options = this._exportableOptions?.() || {};
+    const result = { backend: false, yaml: false, local: false };
+    try {
+      if (this.storageKey && opts.backend !== false) {
+        result.backend = await this._saveOptionsToBackend?.(this.storageKey, options);
+      } else {
+        await this._saveLayout?.(true);
+        result.local = true;
+      }
+    } catch (err) {
+      console.warn('[ddc:api] Failed to persist settings to backend/local storage', err);
+    }
+    if (opts.yaml !== false) {
+      try {
+        const yamlResult = await this._persistOptionsToYaml?.(options, { noDownload: true });
+        result.yaml = !!(yamlResult && (yamlResult.yamlSaved !== false));
+      } catch (err) {
+        console.warn('[ddc:api] Failed to persist settings to dashboard YAML/storage', err);
+      }
+    }
+    return result;
+  }
+
+  async _setDashboardApiSettings_(patch = {}, opts = {}) {
+    const normalized = this._normalizeDashboardApiPatch_(patch);
+    const keys = Object.keys(normalized);
+    if (!keys.length) return this._exportableOptions?.() || {};
+    const before = this._exportableOptions?.() || {};
+    this._applyImportedOptions(normalized, opts.recalc !== false);
+    this._markDirty?.('api-settings');
+    this._updateApplyBtn?.();
+    const after = this._exportableOptions?.() || {};
+    const detail = {
+      source: 'api',
+      keys,
+      patch: this._cloneDashboardApiValue_(normalized),
+      before: this._cloneDashboardApiValue_(before),
+      after: this._cloneDashboardApiValue_(after),
+    };
+    this.dispatchEvent(new CustomEvent('ddc:settings-changed', {
+      detail,
+      bubbles: true,
+      composed: true,
+    }));
+    if (opts.persist === true) {
+      detail.persist = await this._persistDashboardApiSettings_(opts);
+    }
+    return this._cloneDashboardApiValue_(after);
+  }
+
+  _getDashboardLocalApi_() {
+    if (this.__dashboardLocalApi) return this.__dashboardLocalApi;
+    const owner = this;
+    const settings = {
+      list() {
+        return owner._listDashboardApiSettings_?.() || [];
+      },
+      all() {
+        return owner._cloneDashboardApiValue_(owner._exportableOptions?.() || {});
+      },
+      options() {
+        return this.all();
+      },
+      get(key) {
+        return owner._getDashboardApiSetting_?.(key);
+      },
+      set(key, value, opts = {}) {
+        return owner._setDashboardApiSettings_?.({ [key]: value }, opts);
+      },
+      setMany(patch = {}, opts = {}) {
+        return owner._setDashboardApiSettings_?.(patch, opts);
+      },
+      toggle(key, opts = {}) {
+        const next = !owner._getDashboardApiSetting_?.(key);
+        return owner._setDashboardApiSettings_?.({ [key]: next }, opts).then(() => next);
+      },
+      enable(key, opts = {}) {
+        return owner._setDashboardApiSettings_?.({ [key]: true }, opts).then(() => true);
+      },
+      disable(key, opts = {}) {
+        return owner._setDashboardApiSettings_?.({ [key]: false }, opts).then(() => false);
+      },
+      save(opts = {}) {
+        return owner._persistDashboardApiSettings_?.({ ...opts, yaml: opts.yaml !== false });
+      },
+      subscribe(handler) {
+        if (typeof handler !== 'function') return () => {};
+        const listener = (ev) => handler(ev.detail, ev);
+        owner.addEventListener('ddc:settings-changed', listener);
+        return () => owner.removeEventListener('ddc:settings-changed', listener);
+      },
+    };
+    const api = {
+      version: 1,
+      card: owner,
+      settings,
+      getSetting: settings.get.bind(settings),
+      setSetting: settings.set.bind(settings),
+      setSettings: settings.setMany.bind(settings),
+      toggleSetting: settings.toggle.bind(settings),
+      enableSetting: settings.enable.bind(settings),
+      disableSetting: settings.disable.bind(settings),
+      listSettings: settings.list.bind(settings),
+      saveSettings: settings.save.bind(settings),
+      openSettings() {
+        return owner._openDashboardSettings?.();
+      },
+      saveLayout(silent = true) {
+        return owner._saveLayout?.(silent);
+      },
+      setEditMode(enabled) {
+        return owner._toggleEditMode?.(!!enabled);
+      },
+    };
+    this.__dashboardLocalApi = api;
+    return api;
+  }
+
+  _handleDashboardApiRequest_(ev) {
+    try {
+      const api = this._getDashboardLocalApi_?.();
+      if (!api) return;
+      if (ev?.detail && typeof ev.detail === 'object') ev.detail.api = api;
+      if (typeof ev?.detail?.receive === 'function') ev.detail.receive(api);
+      ev?.stopPropagation?.();
+    } catch (err) {
+      console.warn('[ddc:api] Failed to answer API request', err);
+    }
   }
 
   _downloadJsonFile_(name, payload) {
@@ -21512,7 +24362,7 @@ _importDesign() {
     'background_mode','background_image','background_particles','background_youtube',
 
     // Screen saver
-    'screen_saver_enabled','screen_saver_delay',
+    'screen_saver_enabled','screen_saver_delay','screen_saver_style','screen_saver_entities',
   ];
   // ----------------------------------
 
@@ -21974,14 +24824,14 @@ _importDesign() {
       if (hasPackagePayload && !('package_sync' in (res || {}))) {
         this._dbgPush('packages', 'Package sync unsupported by backend', res);
         console.warn('[ddc] backend save succeeded, but no package_sync info was returned. Backend may be outdated.');
-        this._toast?.('Features were saved in dashboard JSON, but this backend does not report package sync. Update the Drag And Drop Card backend in Home Assistant.');
+        this._toast?.('Packages were saved in dashboard JSON, but this backend does not report package sync. Update the Drag And Drop Card backend in Home Assistant.');
       } else if (res?.package_sync?.ok === false) {
         this._dbgPush('packages', 'Package sync failed', res.package_sync);
         console.warn('[ddc] package sync failed', res.package_sync);
         this._toast?.(`Package sync failed: ${res?.package_sync?.error || 'unknown error'}`);
       } else if (res?.package_sync?.count) {
         this._dbgPush('packages', 'Package sync OK', res.package_sync);
-        this._toast?.(`Synced ${res.package_sync.count} feature package file${res.package_sync.count === 1 ? '' : 's'} to Home Assistant.`);
+        this._toast?.(`Synced ${res.package_sync.count} package file${res.package_sync.count === 1 ? '' : 's'} to Home Assistant.`);
       }
       return res;
     } catch (e) {
@@ -22012,7 +24862,11 @@ _importDesign() {
   _updateStoreBadge() {
     const el = this.storeBadge; if (!el) return;
     const usingHost = this._backendOK && !!this.storageKey;
-    el.textContent = usingHost ? 'storage: backend - OK' : 'storage: local. Your Changes are NOT being SAVED. You need to download the Drag and Drop Card backend integration';
+    el.textContent = usingHost ? 'System OK' : 'Local storage';
+    el.title = usingHost
+      ? 'Storage backend connected'
+      : 'Your changes are not being saved by the backend. Download the Drag and Drop Card backend integration.';
+    el.classList.toggle('warn', !usingHost);
     el.style.background = usingHost ? 'rgba(76,175,80,.15)' : 'rgba(255,193,7,.15)';
     el.style.borderColor = usingHost ? 'rgba(76,175,80,.45)' : 'rgba(255,193,7,.45)';
   }
@@ -22021,6 +24875,885 @@ _importDesign() {
 
   /* =========================== Screen saver =========================== */
 
+  _escapeScreenSaverHtml_(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  _formatScreenSaverState_(state) {
+    const raw = String(state ?? '').trim();
+    if (!raw) return '';
+    return raw
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+
+  _defaultScreenSaverIconForEntity_(entityId = '') {
+    const domain = String(entityId).split('.')[0];
+    const icons = {
+      alarm_control_panel: 'mdi:shield-home-outline',
+      binary_sensor: 'mdi:checkbox-marked-circle-outline',
+      climate: 'mdi:thermostat',
+      cover: 'mdi:window-shutter',
+      device_tracker: 'mdi:map-marker-radius-outline',
+      humidifier: 'mdi:air-humidifier',
+      light: 'mdi:lightbulb-on-outline',
+      lock: 'mdi:lock-outline',
+      person: 'mdi:account-circle-outline',
+      sensor: 'mdi:gauge',
+      switch: 'mdi:toggle-switch-outline',
+      vacuum: 'mdi:robot-vacuum',
+      weather: 'mdi:weather-partly-cloudy',
+    };
+    return icons[domain] || 'mdi:home-analytics';
+  }
+
+  _resolveScreenSaverEntityStatus_(item = {}) {
+    const entityId = String(item.entity || item.entity_id || '').trim();
+    if (!entityId) return null;
+    const hass = this.hass || this._hass;
+    const stateObj = hass?.states?.[entityId];
+    const domain = entityId.split('.')[0];
+    const fallbackIcon = item.icon || this._defaultScreenSaverIconForEntity_(entityId);
+    if (!stateObj) {
+      return {
+        key: item.key || entityId,
+        entity: entityId,
+        icon: fallbackIcon,
+        value: 'Unavailable',
+        label: item.label || entityId,
+        detail: 'Entity not found',
+        tone: 'warn',
+      };
+    }
+
+    const attrs = stateObj.attributes || {};
+    const friendlyName = attrs.friendly_name || entityId;
+    const label = item.label || friendlyName;
+    const unit = attrs.unit_of_measurement || '';
+    const rawState = stateObj.state;
+    const unavailable = ['unknown', 'unavailable'].includes(String(rawState || '').toLowerCase());
+    let value = this._formatScreenSaverState_(rawState) || 'Unavailable';
+    let detail = friendlyName;
+
+    if (unavailable) {
+      value = 'Unavailable';
+      detail = friendlyName;
+    } else if (domain === 'weather' && attrs.temperature !== undefined && attrs.temperature !== null) {
+      value = `${attrs.temperature}${attrs.temperature_unit || unit || ''}`;
+      detail = this._formatScreenSaverState_(rawState);
+    } else if (unit) {
+      value = `${rawState}${String(unit).startsWith('°') || String(unit).startsWith('%') ? '' : ' '}${unit}`;
+    }
+
+    return {
+      key: item.key || entityId,
+      entity: entityId,
+      icon: attrs.icon || fallbackIcon,
+      value,
+      label,
+      detail,
+      tone: unavailable ? 'warn' : (item.tone || 'blue'),
+    };
+  }
+
+  _getScreenSaverStatusItems_() {
+    return (this._normalizeScreenSaverEntities_?.(this.screenSaverEntities) || [])
+      .map((item) => this._resolveScreenSaverEntityStatus_(item))
+      .filter(Boolean);
+  }
+
+  _renderScreenSaverStatusCards_(items = []) {
+    const esc = (value) => this._escapeScreenSaverHtml_(value);
+    return items.map((item, index) => `
+      <article class="ss-status-card ss-status-${esc(item.tone || 'blue')}" data-ss-status="${esc(item.key || index)}" title="${esc(item.entity || '')}">
+        <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}" aria-hidden="true"></ha-icon>
+        <div>
+          <strong>${esc(item.value || '')}</strong>
+          <span>${esc(item.label || '')}</span>
+        </div>
+      </article>
+    `).join('');
+  }
+
+  _renderScreenSaverIntelligenceRows_(items = []) {
+    const esc = (value) => this._escapeScreenSaverHtml_(value);
+    return items.map((item) => `
+      <div class="ss-intel-row ss-status-${esc(item.tone || 'blue')}" title="${esc(item.entity || '')}">
+        <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}" aria-hidden="true"></ha-icon>
+        <div>
+          <strong>${esc(item.value || '')} ${esc(item.label || '')}</strong>
+          <span>${esc(item.detail || item.entity || '')}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  _getScreenSaverStatusSummary_(items = []) {
+    return items.length
+      ? 'Showing live Home Assistant entity states.'
+      : 'Select status entities in Screen saver settings.';
+  }
+
+  _updateScreenSaverStatusContent_() {
+    const overlay = this.screenSaverOverlay;
+    if (!overlay) return;
+    const statusItems = this._getScreenSaverStatusItems_?.() || [];
+    overlay.dataset.hasStatus = statusItems.length ? '1' : '0';
+    overlay.dataset.statusCount = String(statusItems.length);
+    const rail = overlay.querySelector('.ss-status-rail');
+    if (rail) rail.innerHTML = this._renderScreenSaverStatusCards_(statusItems);
+    const intelligence = overlay.querySelector('.ss-intelligence');
+    if (intelligence) {
+      intelligence.innerHTML = `
+        <h3>Home Intelligence</h3>
+        ${this._renderScreenSaverIntelligenceRows_(statusItems)}
+      `;
+    }
+    const quote = overlay.querySelector('.ss-quote');
+    if (quote) quote.textContent = this._getScreenSaverStatusSummary_(statusItems);
+  }
+
+  _getScreenSaverTimeParts_(date = new Date()) {
+    let time = '';
+    let period = '';
+    try {
+      const parts = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).formatToParts(date);
+      time = parts.filter((part) => part.type !== 'dayPeriod').map((part) => part.value).join('').trim();
+      period = (parts.find((part) => part.type === 'dayPeriod')?.value || '').toUpperCase();
+    } catch {
+      time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return {
+      time,
+      period,
+      seconds: date.toLocaleTimeString([], { second: '2-digit' }),
+      date: date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      shortDate: date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }),
+      month: date.toLocaleDateString([], { month: 'long', year: 'numeric' }),
+      day: date.toLocaleDateString([], { day: '2-digit' }),
+      weekday: date.toLocaleDateString([], { weekday: 'long' }),
+    };
+  }
+
+  _renderScreenSaverOverlayContent_() {
+    const overlay = this.screenSaverOverlay;
+    if (!overlay) return;
+    const styleId = this._normalizeScreenSaverStyle_?.(this.screenSaverStyle) || 'visionos_glass';
+    const wasActive = overlay.classList.contains('active') || !!this.screensaverActive;
+    const now = new Date();
+    const time = this._getScreenSaverTimeParts_(now);
+    const statusItems = this._getScreenSaverStatusItems_?.() || [];
+    const esc = (value) => this._escapeScreenSaverHtml_(value);
+    const statusHtml = this._renderScreenSaverStatusCards_(statusItems);
+    const intelligenceHtml = this._renderScreenSaverIntelligenceRows_(statusItems);
+    const statusSummary = this._getScreenSaverStatusSummary_(statusItems);
+
+    overlay.dataset.ssStyle = styleId;
+    overlay.dataset.hasStatus = statusItems.length ? '1' : '0';
+    overlay.dataset.statusCount = String(statusItems.length);
+    overlay.className = `screensaver-overlay ss-style-${styleId}${wasActive ? ' active' : ''}`;
+    overlay.innerHTML = `
+      <div class="ss-visual-layer" aria-hidden="true">
+        <div class="ss-earth"></div>
+        <div class="ss-planet"></div>
+        <div class="ss-orbit ss-orbit-a"></div>
+        <div class="ss-orbit ss-orbit-b"></div>
+        <div class="ss-hud-ring"></div>
+      </div>
+      <main class="screensaver-content">
+        <section class="ss-hero">
+          <div class="ss-greeting">Good evening</div>
+          <div class="ss-time-line">
+            <span class="screensaver-clock">${esc(time.time)}</span>
+            <span class="ss-period">${esc(time.period)}</span>
+          </div>
+          <div class="screensaver-date">${esc(time.date)}</div>
+          <p class="ss-quote">${esc(statusSummary)}</p>
+        </section>
+        <section class="screensaver-calendar" aria-label="Calendar"></section>
+        <section class="ss-status-rail" aria-label="Home status">${statusHtml}</section>
+        <section class="ss-intelligence" aria-label="Home intelligence">
+          <h3>Home Intelligence</h3>
+          ${intelligenceHtml}
+        </section>
+        <section class="ss-date-tile" aria-label="Today">
+          <span>${esc(time.month)}</span>
+          <strong>${esc(time.day)}</strong>
+          <em>${esc(time.weekday)}</em>
+        </section>
+      </main>
+    `;
+  }
+
+  _getScreenSaverModernCss_() {
+    return `
+      .screensaver-overlay{
+        --ss-accent:#8bd3ff;
+        --ss-accent-2:#b57cff;
+        --ss-panel:rgba(255,255,255,.105);
+        --ss-panel-strong:rgba(255,255,255,.16);
+        --ss-line:rgba(255,255,255,.16);
+        --ss-text:#f8fbff;
+        --ss-muted:rgba(248,251,255,.72);
+        overflow:hidden;
+        background:#03070d;
+        color:var(--ss-text);
+        font-family:"Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      }
+      .screensaver-overlay::before{
+        content:"";
+        position:absolute;
+        inset:0;
+        background:
+          radial-gradient(90% 70% at 58% 112%, rgba(65,129,176,.54), transparent 52%),
+          radial-gradient(52% 46% at 78% 14%, rgba(255,255,255,.16), transparent 42%),
+          linear-gradient(180deg, #02050a, #081522 62%, #030609);
+        opacity:1;
+      }
+      .screensaver-overlay::after{
+        content:"";
+        position:absolute;
+        inset:0;
+        background:
+          linear-gradient(90deg, rgba(0,0,0,.28), transparent 42%, rgba(0,0,0,.2)),
+          radial-gradient(circle at 50% 50%, transparent 0 42%, rgba(0,0,0,.22) 100%);
+        pointer-events:none;
+      }
+      .screensaver-overlay .ss-visual-layer{
+        position:absolute;
+        inset:0;
+        overflow:hidden;
+        pointer-events:none;
+        z-index:0;
+      }
+      .screensaver-overlay .ss-earth{
+        position:absolute;
+        left:8%;
+        right:8%;
+        bottom:-42%;
+        height:72%;
+        border-radius:50%;
+        background:
+          radial-gradient(72% 42% at 50% 0%, rgba(255,255,255,.18), transparent 20%),
+          radial-gradient(70% 55% at 46% 28%, rgba(84,150,186,.48), transparent 48%),
+          radial-gradient(80% 68% at 52% 45%, rgba(250,184,97,.18), transparent 60%),
+          #07111d;
+        box-shadow:0 -28px 80px rgba(90,159,220,.22), inset 0 18px 42px rgba(255,255,255,.08);
+        opacity:.95;
+      }
+      .screensaver-overlay .ss-planet{
+        position:absolute;
+        width:min(34vw, 420px);
+        aspect-ratio:1;
+        left:50%;
+        top:52%;
+        transform:translate(-50%, -50%);
+        border-radius:50%;
+        background:
+          radial-gradient(circle at 38% 32%, rgba(255,255,255,.22), transparent 18%),
+          radial-gradient(circle at 48% 48%, rgba(76,142,194,.78), rgba(14,33,60,.96) 58%, rgba(1,6,14,1));
+        box-shadow:0 0 70px rgba(91,158,220,.28), inset -26px -22px 44px rgba(0,0,0,.55);
+        opacity:0;
+      }
+      .screensaver-overlay .ss-orbit{
+        position:absolute;
+        left:50%;
+        top:52%;
+        border:1px dashed rgba(255,255,255,.18);
+        border-radius:50%;
+        transform:translate(-50%, -50%) rotate(-16deg);
+        opacity:0;
+      }
+      .screensaver-overlay .ss-orbit-a{ width:min(58vw, 760px); height:min(30vw, 390px); }
+      .screensaver-overlay .ss-orbit-b{ width:min(76vw, 980px); height:min(42vw, 540px); transform:translate(-50%, -50%) rotate(18deg); }
+      .screensaver-overlay .ss-hud-ring{
+        position:absolute;
+        width:min(34vw, 420px);
+        aspect-ratio:1;
+        left:22%;
+        top:48%;
+        transform:translate(-50%, -50%);
+        border-radius:50%;
+        opacity:0;
+        background:
+          repeating-radial-gradient(circle, transparent 0 30px, rgba(34,211,238,.2) 31px 32px),
+          conic-gradient(from 20deg, rgba(168,85,247,.88), transparent 18%, rgba(34,211,238,.9) 32%, transparent 52%, rgba(168,85,247,.72), transparent 82%);
+        -webkit-mask:radial-gradient(circle, transparent 0 43%, #000 44% 47%, transparent 48% 57%, #000 58% 60%, transparent 61%);
+        mask:radial-gradient(circle, transparent 0 43%, #000 44% 47%, transparent 48% 57%, #000 58% 60%, transparent 61%);
+      }
+      .screensaver-overlay .screensaver-content{
+        position:absolute;
+        inset:0;
+        top:auto;
+        left:auto;
+        transform:none;
+        z-index:1;
+        display:grid;
+        grid-template-columns:minmax(280px, 1fr) minmax(260px, 420px);
+        grid-template-rows:1fr auto;
+        grid-template-areas:
+          "hero calendar"
+          "status status";
+        align-items:center;
+        gap:clamp(18px, 3vw, 44px);
+        padding:clamp(26px, 5vw, 78px);
+      }
+      .screensaver-overlay .ss-hero{
+        grid-area:hero;
+        display:grid;
+        justify-items:start;
+        gap:clamp(8px, 1.1vw, 14px);
+        max-width:760px;
+      }
+      .screensaver-overlay .ss-greeting{
+        display:none;
+        color:rgba(255,255,255,.95);
+        font-size:clamp(1.1rem, 2vw, 2rem);
+        font-weight:750;
+      }
+      .screensaver-overlay .ss-time-line{
+        display:flex;
+        align-items:baseline;
+        gap:clamp(8px, 1vw, 14px);
+      }
+      .screensaver-overlay .screensaver-clock{
+        font-family:"Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+        font-size:clamp(4rem, 10vw, 9rem);
+        font-weight:250;
+        letter-spacing:0;
+        line-height:.92;
+        text-shadow:0 20px 60px rgba(0,0,0,.34);
+      }
+      .screensaver-overlay .ss-period{
+        font-size:clamp(1rem, 2vw, 1.7rem);
+        color:rgba(255,255,255,.86);
+      }
+      .screensaver-overlay .screensaver-date{
+        margin:0;
+        font-family:inherit;
+        font-size:clamp(1rem, 1.6vw, 1.45rem);
+        color:rgba(255,255,255,.86);
+      }
+      .screensaver-overlay .ss-quote{
+        display:none;
+        max-width:460px;
+        margin:clamp(12px, 2vw, 28px) 0 0;
+        color:rgba(255,255,255,.88);
+        font-size:clamp(.98rem, 1.25vw, 1.24rem);
+        line-height:1.5;
+      }
+      .screensaver-overlay .screensaver-calendar,
+      .screensaver-overlay .ss-date-tile,
+      .screensaver-overlay .ss-status-card{
+        border:1px solid var(--ss-line);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.045)),
+          var(--ss-panel);
+        box-shadow:0 22px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
+        backdrop-filter:blur(24px) saturate(1.12);
+        -webkit-backdrop-filter:blur(24px) saturate(1.12);
+      }
+      .screensaver-overlay .screensaver-calendar{
+        grid-area:calendar;
+        align-self:start;
+        justify-self:end;
+        width:min(34vw, 420px);
+        max-width:none;
+        margin:0;
+        padding:clamp(16px, 2vw, 26px);
+        border-radius:28px;
+      }
+      .screensaver-overlay .screensaver-calendar .calendar-header{
+        margin:0 0 14px;
+        padding:0;
+        border:0;
+        text-align:center;
+        font-size:clamp(1rem, 1.3vw, 1.35rem);
+        font-weight:650;
+      }
+      .screensaver-overlay .screensaver-calendar .calendar-grid{
+        gap:clamp(4px, .55vw, 8px);
+      }
+      .screensaver-overlay .screensaver-calendar .calendar-grid div{
+        padding:.42rem 0;
+        border-radius:10px;
+        font-size:clamp(.72rem, .88vw, .95rem);
+      }
+      .screensaver-overlay .screensaver-calendar .calendar-grid div.today{
+        background:color-mix(in oklab, var(--ss-accent) 54%, white 18%);
+        color:#08111d;
+        box-shadow:0 8px 20px color-mix(in oklab, var(--ss-accent) 26%, transparent);
+      }
+      .screensaver-overlay .ss-status-rail{
+        grid-area:status;
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+        gap:clamp(10px, 1.4vw, 18px);
+        align-self:end;
+      }
+      .screensaver-overlay .ss-status-card{
+        min-height:76px;
+        display:flex;
+        align-items:center;
+        gap:14px;
+        padding:14px 18px;
+        border-radius:18px;
+        min-width:0;
+        overflow:hidden;
+      }
+      .screensaver-overlay .ss-status-card ha-icon{
+        --mdc-icon-size:26px;
+        color:var(--ss-accent);
+        flex:0 0 auto;
+      }
+      .screensaver-overlay .ss-status-card div{
+        display:grid;
+        min-width:0;
+      }
+      .screensaver-overlay .ss-status-card strong{
+        font-size:clamp(.98rem, 1.2vw, 1.18rem);
+        font-weight:760;
+        line-height:1.1;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .screensaver-overlay .ss-status-card span{
+        margin-top:4px;
+        color:var(--ss-muted);
+        font-size:.82rem;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .screensaver-overlay .ss-status-green ha-icon{ color:#8ef0b3; }
+      .screensaver-overlay .ss-status-amber ha-icon{ color:#ffc16a; }
+      .screensaver-overlay .ss-status-purple ha-icon{ color:#c084fc; }
+      .screensaver-overlay .ss-status-warn ha-icon{ color:#fbbf24; }
+      .screensaver-overlay[data-has-status="0"] .ss-status-rail,
+      .screensaver-overlay[data-has-status="0"] .ss-intelligence{
+        display:none !important;
+      }
+      .screensaver-overlay .ss-intelligence,
+      .screensaver-overlay .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay .ss-date-tile{
+        border-radius:26px;
+        padding:18px;
+        text-align:center;
+      }
+      .screensaver-overlay .ss-date-tile span,
+      .screensaver-overlay .ss-date-tile em{
+        display:block;
+        color:var(--ss-muted);
+        font-style:normal;
+        font-size:.88rem;
+      }
+      .screensaver-overlay .ss-date-tile strong{
+        display:block;
+        margin:8px 0 2px;
+        font-size:2.6rem;
+        line-height:1;
+        font-weight:350;
+      }
+
+      .screensaver-overlay.ss-style-minimal_scandi::before{
+        background:
+          radial-gradient(86% 34% at 56% 68%, rgba(92,135,161,.44), transparent 58%),
+          linear-gradient(180deg, #010306, #06101a 58%, #020407);
+      }
+      .screensaver-overlay.ss-style-minimal_scandi .screensaver-content,
+      .screensaver-overlay.ss-style-dynamic_ambient .screensaver-content{
+        grid-template-columns:1fr;
+        grid-template-rows:1fr auto;
+        grid-template-areas:"hero" "status";
+        text-align:center;
+      }
+      .screensaver-overlay.ss-style-minimal_scandi .ss-hero,
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-hero{
+        justify-self:center;
+        justify-items:center;
+      }
+      .screensaver-overlay.ss-style-minimal_scandi .screensaver-calendar,
+      .screensaver-overlay.ss-style-minimal_scandi .ss-quote,
+      .screensaver-overlay.ss-style-minimal_scandi .ss-date-tile,
+      .screensaver-overlay.ss-style-dynamic_ambient .screensaver-calendar,
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay.ss-style-minimal_scandi .ss-status-card{
+        min-height:62px;
+        border-color:transparent;
+        background:transparent;
+        box-shadow:none;
+        backdrop-filter:none;
+      }
+
+      .screensaver-overlay.ss-style-cinematic_dashboard{ --ss-accent:#ffb06a; }
+      .screensaver-overlay.ss-style-cinematic_dashboard::before{
+        background:
+          radial-gradient(48% 56% at 74% 38%, rgba(235,110,43,.62), transparent 52%),
+          linear-gradient(130deg, #030305, #151117 48%, #050508);
+      }
+      .screensaver-overlay.ss-style-cinematic_dashboard .screensaver-content{
+        grid-template-columns:minmax(280px, 560px) 1fr;
+        grid-template-areas:"hero ." "status status";
+      }
+      .screensaver-overlay.ss-style-cinematic_dashboard .screensaver-calendar,
+      .screensaver-overlay.ss-style-cinematic_dashboard .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay.ss-style-cinematic_dashboard .ss-quote{
+        display:block;
+      }
+      .screensaver-overlay.ss-style-cinematic_dashboard .screensaver-clock{
+        font-size:clamp(4rem, 8vw, 7rem);
+      }
+
+      .screensaver-overlay.ss-style-sci_fi_hud{ --ss-accent:#22d3ee; --ss-accent-2:#a855f7; }
+      .screensaver-overlay.ss-style-sci_fi_hud::before{
+        background:
+          radial-gradient(circle at 22% 48%, rgba(168,85,247,.18), transparent 36%),
+          repeating-linear-gradient(90deg, rgba(34,211,238,.045) 0 1px, transparent 1px 72px),
+          repeating-linear-gradient(0deg, rgba(34,211,238,.035) 0 1px, transparent 1px 72px),
+          linear-gradient(135deg, #02030a, #070a16 58%, #02030a);
+      }
+      .screensaver-overlay.ss-style-sci_fi_hud .ss-hud-ring{ opacity:.92; animation:ss-spin 18s linear infinite; }
+      .screensaver-overlay.ss-style-sci_fi_hud .screensaver-content{
+        grid-template-columns:minmax(320px, .9fr) minmax(300px, 430px);
+        grid-template-areas:"hero calendar" "status status";
+      }
+      .screensaver-overlay.ss-style-sci_fi_hud .ss-hero{
+        justify-self:start;
+        justify-items:center;
+        margin-left:clamp(12px, 4vw, 90px);
+      }
+      .screensaver-overlay.ss-style-sci_fi_hud .screensaver-clock{
+        font-size:clamp(3rem, 5.8vw, 5.4rem);
+      }
+      .screensaver-overlay.ss-style-sci_fi_hud .ss-status-rail{
+        border:1px solid rgba(34,211,238,.38);
+        border-radius:20px;
+        padding:10px;
+        background:rgba(3,10,22,.62);
+      }
+
+      .screensaver-overlay.ss-style-dynamic_ambient{ --ss-accent:#d8a0ff; }
+      .screensaver-overlay.ss-style-dynamic_ambient::before{
+        background:
+          radial-gradient(70% 60% at 54% 52%, rgba(255,178,101,.58), transparent 42%),
+          linear-gradient(135deg, #451d68, #192348 52%, #090713);
+      }
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-status-rail{
+        justify-self:center;
+        width:min(920px, 100%);
+        padding:10px;
+        border-radius:999px;
+        border:1px solid rgba(255,255,255,.18);
+        background:rgba(28,14,48,.34);
+        backdrop-filter:blur(22px);
+      }
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-status-card{
+        border:0;
+        background:transparent;
+        box-shadow:none;
+        backdrop-filter:none;
+      }
+
+      .screensaver-overlay.ss-style-floating_islands{ --ss-accent:#a7d8ff; }
+      .screensaver-overlay.ss-style-floating_islands .ss-earth{
+        left:-8%;
+        right:-8%;
+        bottom:-36%;
+        height:78%;
+      }
+      .screensaver-overlay.ss-style-floating_islands .screensaver-content{
+        display:block;
+        padding:clamp(24px, 5vw, 76px);
+      }
+      .screensaver-overlay.ss-style-floating_islands .ss-hero{
+        position:absolute;
+        left:50%;
+        top:50%;
+        transform:translate(-50%, -50%);
+        justify-items:center;
+        text-align:center;
+        padding:28px 38px;
+        border-radius:34px;
+        background:rgba(255,255,255,.13);
+        border:1px solid rgba(255,255,255,.2);
+        backdrop-filter:blur(24px);
+      }
+      .screensaver-overlay.ss-style-floating_islands .screensaver-clock{
+        font-size:clamp(3.6rem, 6vw, 5.8rem);
+      }
+      .screensaver-overlay.ss-style-floating_islands .screensaver-calendar{
+        position:absolute;
+        right:clamp(28px, 6vw, 92px);
+        bottom:clamp(28px, 6vw, 84px);
+        width:180px;
+        padding:18px;
+      }
+      .screensaver-overlay.ss-style-floating_islands .screensaver-calendar .calendar-grid{ display:none; }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-rail{
+        position:absolute;
+        inset:0;
+        display:block;
+      }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card{
+        position:absolute;
+        width:clamp(168px, 17vw, 238px);
+        min-width:0;
+        border-radius:999px;
+      }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card:nth-child(1){ left:8%; top:18%; }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card:nth-child(2){ right:9%; top:16%; }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card:nth-child(3){ left:13%; bottom:18%; }
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card:nth-child(4){ right:9%; bottom:18%; }
+      .screensaver-overlay.ss-style-floating_islands[data-status-count="4"] .screensaver-calendar{ display:none; }
+
+      .screensaver-overlay.ss-style-ultra_minimal_dots::before{
+        background:
+          radial-gradient(92% 42% at 70% 78%, rgba(80,133,167,.42), transparent 58%),
+          linear-gradient(180deg, #020408, #06101a 66%, #020407);
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .screensaver-content{
+        grid-template-columns:minmax(260px, 520px) 1fr;
+        grid-template-areas:"hero ." "status .";
+        align-content:center;
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .screensaver-calendar,
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .screensaver-clock{
+        font-size:clamp(4rem, 7vw, 6.6rem);
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-rail{
+        grid-template-columns:1fr;
+        max-width:360px;
+        gap:12px;
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-card{
+        min-height:auto;
+        padding:0;
+        border:0;
+        background:transparent;
+        box-shadow:none;
+        backdrop-filter:none;
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-card ha-icon{
+        --mdc-icon-size:14px;
+      }
+
+      .screensaver-overlay.ss-style-home_intelligence{ --ss-accent:#9be7b6; }
+      .screensaver-overlay.ss-style-home_intelligence::before{
+        background:
+          radial-gradient(52% 54% at 92% 12%, rgba(154,101,51,.34), transparent 42%),
+          linear-gradient(135deg, #110c08, #08090d 54%, #030305);
+      }
+      .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
+        grid-template-columns:minmax(340px, 1fr) minmax(300px, 410px);
+        grid-template-areas:"intel calendar";
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-hero,
+      .screensaver-overlay.ss-style-home_intelligence .ss-status-rail,
+      .screensaver-overlay.ss-style-home_intelligence .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intelligence{
+        grid-area:intel;
+        display:grid;
+        gap:16px;
+        max-width:620px;
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intelligence h3{
+        margin:0 0 8px;
+        font-size:clamp(1.8rem, 3vw, 3rem);
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row{
+        display:flex;
+        align-items:flex-start;
+        gap:14px;
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row ha-icon{
+        --mdc-icon-size:24px;
+        color:var(--ss-accent);
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row strong,
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row span{
+        display:block;
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row span,
+      .screensaver-overlay.ss-style-home_intelligence .ss-intelligence p{
+        color:var(--ss-muted);
+        margin:3px 0 0;
+      }
+
+      .screensaver-overlay.ss-style-planetary_orbital{ --ss-accent:#ffbf75; }
+      .screensaver-overlay.ss-style-planetary_orbital::before{
+        background:
+          radial-gradient(70% 70% at 52% 52%, rgba(252,183,91,.16), transparent 48%),
+          linear-gradient(145deg, #03070d, #08111d 60%, #020306);
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-planet,
+      .screensaver-overlay.ss-style-planetary_orbital .ss-orbit{
+        opacity:1;
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-orbit-a{ animation:ss-spin 42s linear infinite; }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-orbit-b{ animation:ss-spin-reverse 58s linear infinite; }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-earth{ opacity:0; }
+      .screensaver-overlay.ss-style-planetary_orbital .screensaver-content{
+        display:block;
+        padding:clamp(26px, 5vw, 70px);
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-hero{
+        position:absolute;
+        left:clamp(26px, 5vw, 70px);
+        top:clamp(24px, 8vh, 86px);
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .screensaver-clock{
+        font-size:clamp(3.2rem, 6vw, 5.8rem);
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .screensaver-calendar,
+      .screensaver-overlay.ss-style-planetary_orbital .ss-date-tile{
+        display:none;
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-rail{
+        position:absolute;
+        inset:0;
+        display:block;
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
+        position:absolute;
+        width:clamp(164px, 16vw, 226px);
+        min-width:0;
+        border-radius:999px;
+      }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(1){ right:10%; top:34%; }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(2){ right:16%; top:10%; }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(3){ right:28%; bottom:12%; }
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(4){ left:10%; bottom:24%; }
+
+      @keyframes ss-spin{ to{ transform:translate(-50%, -50%) rotate(344deg); } }
+      @keyframes ss-spin-reverse{ to{ transform:translate(-50%, -50%) rotate(-342deg); } }
+
+      @media (prefers-reduced-motion: reduce){
+        .screensaver-overlay .ss-orbit,
+        .screensaver-overlay .ss-hud-ring{
+          animation:none !important;
+        }
+      }
+
+      @media (max-width: 1180px){
+        .screensaver-overlay .screensaver-content,
+        .screensaver-overlay.ss-style-sci_fi_hud .screensaver-content,
+        .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
+          grid-template-columns:1fr;
+          grid-template-rows:auto auto auto;
+          grid-template-areas:"hero" "calendar" "status";
+          align-content:center;
+        }
+        .screensaver-overlay .screensaver-calendar{
+          justify-self:stretch;
+          width:min(100%, 520px);
+        }
+        .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
+          grid-template-areas:"intel" "calendar";
+        }
+        .screensaver-overlay.ss-style-floating_islands .screensaver-content,
+        .screensaver-overlay.ss-style-planetary_orbital .screensaver-content{
+          display:grid;
+          grid-template-columns:minmax(0, 1fr);
+          grid-template-rows:auto auto;
+          grid-template-areas:"hero" "status";
+          align-content:center;
+          gap:clamp(18px, 4vh, 36px);
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-hero,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-hero,
+        .screensaver-overlay.ss-style-floating_islands .ss-status-card,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
+          position:static;
+          transform:none;
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-hero,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-hero{
+          justify-self:center;
+          width:min(100%, 520px);
+        }
+        .screensaver-overlay.ss-style-floating_islands .screensaver-calendar,
+        .screensaver-overlay.ss-style-planetary_orbital .screensaver-calendar{
+          display:none;
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-status-rail,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-status-rail{
+          position:static;
+          inset:auto;
+          display:grid;
+          grid-template-columns:repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-status-card,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
+          width:auto;
+        }
+      }
+
+      @media (max-width: 820px){
+        .screensaver-overlay .screensaver-content,
+        .screensaver-overlay.ss-style-sci_fi_hud .screensaver-content,
+        .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
+          grid-template-columns:1fr;
+          grid-template-rows:auto auto auto;
+          grid-template-areas:"hero" "calendar" "status";
+          align-content:center;
+          padding:24px;
+        }
+        .screensaver-overlay .screensaver-calendar{
+          justify-self:stretch;
+          width:100%;
+          padding:14px;
+        }
+        .screensaver-overlay .ss-status-rail{
+          grid-template-columns:repeat(2, minmax(0, 1fr));
+        }
+        .screensaver-overlay .ss-status-card{
+          min-height:64px;
+          padding:12px;
+        }
+        .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
+          grid-template-areas:"intel" "calendar";
+        }
+        .screensaver-overlay.ss-style-floating_islands .screensaver-content,
+        .screensaver-overlay.ss-style-planetary_orbital .screensaver-content{
+          display:grid;
+          grid-template-columns:1fr;
+          grid-template-areas:"hero" "status";
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-hero,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-hero,
+        .screensaver-overlay.ss-style-floating_islands .ss-status-card,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
+          position:static;
+          transform:none;
+        }
+        .screensaver-overlay.ss-style-floating_islands .ss-status-rail,
+        .screensaver-overlay.ss-style-planetary_orbital .ss-status-rail{
+          position:static;
+          display:grid;
+          grid-template-columns:1fr;
+        }
+      }
+    `;
+  }
+
   /**
    * Ensure styles for the screen saver overlay are injected once into
    * the component's shadow root. This creates a dark overlay with a
@@ -22028,10 +25761,15 @@ _importDesign() {
    * activated.
    */
   _ensureScreenSaverStyles() {
-    if (this.shadowRoot?.querySelector('#ddc-screensaver-styles')) return;
+    const existing = this.shadowRoot?.querySelector('#ddc-screensaver-styles');
+    if (existing?.dataset?.version === '2') return;
+    if (existing) {
+      try { existing.remove(); } catch {}
+    }
     try {
       const style = document.createElement('style');
       style.id = 'ddc-screensaver-styles';
+      style.dataset.version = '2';
       style.textContent = `
         .screensaver-overlay {
           /* Cover the entire viewport, not just the card container */
@@ -22126,6 +25864,7 @@ _importDesign() {
           /* Slightly accent weekends */
           color: #ffb074;
         }
+        ${this._getScreenSaverModernCss_?.() || ''}
       `;
       this.shadowRoot.appendChild(style);
     } catch (e) {
@@ -22141,10 +25880,15 @@ _importDesign() {
    * injected once per page.
    */
   _ensureScreenSaverGlobalStyles() {
-    if (document.head.querySelector('#ddc-screensaver-global-styles')) return;
+    const existing = document.head.querySelector('#ddc-screensaver-global-styles');
+    if (existing?.dataset?.version === '2') return;
+    if (existing) {
+      try { existing.remove(); } catch {}
+    }
     try {
       const style = document.createElement('style');
       style.id = 'ddc-screensaver-global-styles';
+      style.dataset.version = '2';
       style.textContent = `
         .screensaver-overlay {
           position: fixed;
@@ -22233,6 +25977,7 @@ _importDesign() {
         .screensaver-overlay .screensaver-calendar .calendar-grid div.weekend {
           color: #ffb074;
         }
+        ${this._getScreenSaverModernCss_?.() || ''}
       `;
       document.head.appendChild(style);
     } catch (e) {
@@ -22258,12 +26003,14 @@ _importDesign() {
 
     // If overlay already exists and is attached to document.body, nothing to do
     if (this.screenSaverOverlay && this.screenSaverOverlay.parentNode === document.body) {
+      this._renderScreenSaverOverlayContent_?.();
       return;
     }
 
     // If an overlay exists but was removed from the DOM (e.g. during rebuild), reattach it to document.body
     if (this.screenSaverOverlay && !this.screenSaverOverlay.parentNode) {
       document.body.appendChild(this.screenSaverOverlay);
+      this._renderScreenSaverOverlayContent_?.();
       return;
     }
 
@@ -22271,17 +26018,11 @@ _importDesign() {
     const overlay = document.createElement('div');
     overlay.className = 'screensaver-overlay';
     overlay.id = desiredId;
-    overlay.innerHTML = `
-      <div class="screensaver-content" id="${desiredId}-content">
-        <div class="screensaver-clock" id="${desiredId}-clock"></div>
-        <div class="screensaver-date" id="${desiredId}-date"></div>
-        <div class="screensaver-calendar" id="${desiredId}-calendar"></div>
-      </div>
-    `;
     // exit screensaver on click/touch/key
     overlay.addEventListener('click', () => this._deactivateScreenSaver());
     overlay.addEventListener('keydown', () => this._deactivateScreenSaver());
     this.screenSaverOverlay = overlay;
+    this._renderScreenSaverOverlayContent_?.();
     document.body.appendChild(overlay);
   }
 
@@ -22360,6 +26101,7 @@ _importDesign() {
     this._ensureScreenSaverOverlay();
     if (!this.screenSaverOverlay) return;
     this.screensaverActive = true;
+    this._renderScreenSaverOverlayContent_?.();
     this.screenSaverOverlay.classList.add('active');
     // Hide the tabs bar while screensaver is active
     try {
@@ -22410,13 +26152,30 @@ _importDesign() {
     const overlay = this.screenSaverOverlay;
     const clockEl = overlay?.querySelector('.screensaver-clock');
     const dateEl  = overlay?.querySelector('.screensaver-date');
+    const periodEl = overlay?.querySelector('.ss-period');
+    const dayTile = overlay?.querySelector('.ss-date-tile');
     const now = new Date();
+    const parts = this._getScreenSaverTimeParts_?.(now) || {};
     if (clockEl) {
-      clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      clockEl.textContent = parts.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     if (dateEl) {
-      dateEl.textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      dateEl.textContent = parts.date || now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
+    if (periodEl) {
+      periodEl.textContent = parts.period || '';
+    }
+    if (dayTile) {
+      const monthEl = dayTile.querySelector('span');
+      const dayEl = dayTile.querySelector('strong');
+      const weekdayEl = dayTile.querySelector('em');
+      if (monthEl) monthEl.textContent = parts.month || '';
+      if (dayEl) dayEl.textContent = parts.day || '';
+      if (weekdayEl) weekdayEl.textContent = parts.weekday || '';
+    }
+    try {
+      this._updateScreenSaverStatusContent_?.();
+    } catch {}
 
     // Update calendar as well
     try {
@@ -22497,6 +26256,8 @@ _importDesign() {
    * clear timers and hide the overlay.
    */
   _updateScreensaverSettings() {
+    this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(this.screenSaverStyle) || 'visionos_glass';
+    try { this._renderScreenSaverOverlayContent_?.(); } catch {}
     // ensure overlay exists if enabling
     if (this.screenSaverEnabled) {
       this._ensureScreenSaverOverlay();
@@ -26570,13 +30331,33 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       }
     }
 
+    _resolveDashboardApi_() {
+      let api = null;
+      try {
+        this.dispatchEvent(new CustomEvent('ddc-api-request', {
+          detail: {
+            source: this,
+            receive(value) {
+              api = value || null;
+            }
+          },
+          bubbles: true,
+          composed: true,
+        }));
+      } catch {}
+      return api;
+    }
+
     _buildRuntimeContext_(reason = 'update') {
       const hass = this._hass;
       const states = this._getLiveStatesProxy_();
       const root = this._contentEl;
       const host = this;
+      const ddc = this._resolveDashboardApi_();
       const listeners = [];
       const helpers = {
+        ddc,
+        dashboard: ddc,
         query(selector, scope = root) {
           return scope?.querySelector?.(selector) || null;
         },
@@ -26615,7 +30396,7 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
           return `${friendly}: ${entity.state}`;
         }
       };
-      return { hass, states, config: this._config, root, host, helpers, reason, listeners };
+      return { hass, states, config: this._config, root, host, helpers, ddc, reason, listeners };
     }
 
     _getLiveStatesProxy_() {
@@ -26673,10 +30454,11 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
           'root',
           'host',
           'helpers',
+          'ddc',
           'reason',
           `${source}`
         );
-        const result = await runner(ctx.hass, ctx.states, ctx.config, ctx.root, ctx.host, ctx.helpers, ctx.reason);
+        const result = await runner(ctx.hass, ctx.states, ctx.config, ctx.root, ctx.host, ctx.helpers, ctx.ddc, ctx.reason);
         if (token !== this._scriptToken) return;
 
         if (Array.isArray(ctx.listeners) && ctx.listeners.length) {
@@ -26887,7 +30669,7 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
         <div class="editor">
           <div class="intro">
             <strong>Build a card with your own code</strong>
-            <span>Your JavaScript receives <code>hass</code>, <code>states</code>, <code>config</code>, <code>root</code>, <code>host</code> and <code>helpers</code>. Return <code>{ update, destroy }</code> if you want live updates without re-running the whole script.</span>
+            <span>Your JavaScript receives <code>hass</code>, <code>states</code>, <code>config</code>, <code>root</code>, <code>host</code>, <code>helpers</code> and <code>ddc</code>. Use <code>ddc.settings</code> to read or change dashboard settings. Return <code>{ update, destroy }</code> if you want live updates without re-running the whole script.</span>
           </div>
 
           <div class="grid">
@@ -27445,7 +31227,7 @@ async function _persistOptionsToYaml(opts, {
         const hui = (host.getRootNode && host.getRootNode())?.host;
         edit = !!(this.editMode || (ll && (ll.editMode === true || (hui && hui.editMode === true))));
       } catch {}
-      el.style.display = edit ? 'inline-flex' : 'none';
+      el.style.display = edit ? '' : 'none';
       if (sec) sec.style.display = edit ? '' : 'none';
       this._refreshToolbarOpenHeight_?.();
     } catch {}
@@ -27456,7 +31238,15 @@ async function _persistOptionsToYaml(opts, {
       const host = this.shadowRoot || this.renderRoot || this;
       const toolbar = host.querySelector('.toolbar');
       if (!toolbar) return;
-      let layoutHost = toolbar.querySelector('.sec-layouts .layout-host');
+      const layoutPanel = toolbar.querySelector('.sec-layouts[data-toolbar-panel="layouts"]') || toolbar;
+      let layoutHost = layoutPanel.querySelector?.('.layout-host') || toolbar.querySelector('.sec-layouts .layout-host');
+      const existingSec = layoutHost?.closest?.('.sec-layouts');
+      if (existingSec && existingSec !== layoutPanel) {
+        try { existingSec.removeAttribute('data-toolbar-panel'); } catch {}
+        if (layoutPanel && existingSec.parentElement !== layoutPanel) {
+          try { layoutPanel.appendChild(existingSec); } catch {}
+        }
+      }
       if (!layoutHost) {
         const sec = document.createElement('section');
         sec.className = 'ddc-sec sec-layouts';
@@ -27471,9 +31261,14 @@ async function _persistOptionsToYaml(opts, {
             <div class="layout-host"></div>
           </div>
         `;
-        toolbar.appendChild(sec);
+        layoutPanel.appendChild(sec);
+        try { this._activateToolbarSegment_?.(this.__toolbarActiveSegment || toolbar.dataset.activeSection || 'primary', { toolbar, persist: false }); } catch {}
         layoutHost = sec.querySelector('.layout-host');
       }
+      try {
+        const closestLayouts = layoutHost?.closest?.('.sec-layouts');
+        if (closestLayouts && closestLayouts !== layoutPanel) closestLayouts.removeAttribute?.('data-toolbar-panel');
+      } catch {}
       const wrap = document.createElement('div');
       wrap.className = 'ddc-switcher-inline';
       const label = document.createElement('span');

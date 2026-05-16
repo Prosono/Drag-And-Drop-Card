@@ -454,6 +454,66 @@ These are the most important option keys for an LLM to know:
 | `responsive_viewports` | object | Editor preview sizes for desktop/tablet/mobile |
 | `responsive_connectors` | object | Animated connector overlay layouts |
 
+### Local dashboard settings API
+
+`custom:ddc-html-card` JavaScript can read and change dashboard-level settings through a local API exposed as `ddc` and `helpers.ddc`.
+
+This API is intended for interactive dashboard controls such as buttons that enable/disable layers, screen saver, animations, tabs behavior, backgrounds, and other settings without opening the dashboard settings dialog.
+
+Use the same option keys that appear in import/export JSON:
+
+```js
+// Read a setting
+const screenSaverOn = ddc.settings.get('screen_saver_enabled');
+
+// Change a setting live for the current dashboard session
+await ddc.settings.set('screen_saver_enabled', false);
+
+// Persist the changed setting to storage/YAML when available
+await ddc.settings.set('layers_enabled', true, { persist: true });
+
+// Convenience helpers for boolean settings
+await ddc.settings.enable('animate_cards');
+await ddc.settings.disable('hide_tabs_when_single');
+await ddc.settings.toggle('screen_saver_enabled');
+
+// Change multiple settings at once
+await ddc.settings.setMany({
+  screen_saver_enabled: true,
+  screen_saver_delay: 300000,
+  animate_cards: false
+}, { persist: true });
+```
+
+Available methods:
+
+| Method | Purpose |
+|--------|---------|
+| `ddc.settings.list()` | List known settings with current values and inferred types |
+| `ddc.settings.all()` / `ddc.settings.options()` | Return the current exportable dashboard options |
+| `ddc.settings.get(key)` | Read one setting |
+| `ddc.settings.set(key, value, options?)` | Apply one setting |
+| `ddc.settings.setMany(patch, options?)` | Apply several settings |
+| `ddc.settings.enable(key)` / `disable(key)` / `toggle(key)` | Boolean convenience helpers |
+| `ddc.settings.save()` | Persist current settings |
+| `ddc.settings.subscribe(handler)` | Listen for local `ddc:settings-changed` updates |
+| `ddc.openSettings()` | Open the dashboard settings dialog |
+| `ddc.saveLayout()` | Save the full layout |
+
+By default, `set`, `setMany`, `enable`, `disable`, and `toggle` apply settings live only. Pass `{ "persist": true }` when the change should be saved.
+
+Example HTML card button:
+
+```json
+{
+  "type": "custom:ddc-html-card",
+  "title": "Dashboard controls",
+  "html": "<button id='toggle-ss'>Toggle screen saver</button><span id='state'></span>",
+  "css": "button { padding: 10px 14px; border-radius: 12px; } #state { margin-left: 10px; }",
+  "js": "const btn = root.querySelector('#toggle-ss'); const label = root.querySelector('#state'); const render = () => { label.textContent = ddc.settings.get('screen_saver_enabled') ? 'On' : 'Off'; }; btn.addEventListener('click', async () => { await ddc.settings.toggle('screen_saver_enabled', { persist: true }); render(); }); const off = ddc.settings.subscribe(render); render(); return () => off();"
+}
+```
+
 ### Tabs
 
 Tabs are configured in `options.tabs`:
@@ -586,6 +646,9 @@ Runtime JavaScript receives access to:
 - `root`
 - `host`
 - `helpers`
+- `ddc`
+
+The `ddc` object is the local dashboard API. For dashboard setting controls, prefer `ddc.settings.get`, `ddc.settings.set`, `ddc.settings.toggle`, `ddc.settings.enable`, and `ddc.settings.disable`.
 
 #### 2. `custom:ddc-text-card`
 
@@ -756,10 +819,11 @@ When generating a full demo dashboard, use this checklist:
    - `custom:ddc-table-card`
    - `custom:ddc-html-card`
 4. Add at least one connector in `responsive_connectors`.
-5. Keep card `tabId` and connector `tabId` aligned.
-6. If the dashboard should work on fresh installs, include demo `packages`.
-7. Prefer `mobile.portrait` and `tablet.landscape` variants instead of relying on desktop-only layout.
-8. Keep `z` values consistent and start at `6`.
+5. For interactive dashboard controls, use `custom:ddc-html-card` with `ddc.settings`.
+6. Keep card `tabId` and connector `tabId` aligned.
+7. If the dashboard should work on fresh installs, include demo `packages`.
+8. Prefer `mobile.portrait` and `tablet.landscape` variants instead of relying on desktop-only layout.
+9. Keep `z` values consistent and start at `6`.
 
 ### Recommended demo dashboard ingredients
 
