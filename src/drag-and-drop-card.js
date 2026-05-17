@@ -295,6 +295,92 @@ _getScreenSaverPresets_() {
   ];
 }
 
+_getScreenSaverBackgroundImages_() {
+  return {
+    visionos_glass: 'https://i.postimg.cc/FRHzddLk/Chat-GPT-Image-May-16-2026-10-39-26-PM.png',
+    minimal_scandi: 'https://i.postimg.cc/B6nbLLKL/Chat-GPT-Image-May-16-2026-10-39-34-PM.png',
+    cinematic_dashboard: 'https://i.postimg.cc/XJYqGGCZ/Chat-GPT-Image-May-16-2026-10-39-38-PM.png',
+    sci_fi_hud: 'https://i.postimg.cc/9MQ0RR7D/Chat-GPT-Image-May-16-2026-10-39-42-PM.png',
+    dynamic_ambient: 'https://i.postimg.cc/bJwrDDts/Chat-GPT-Image-May-16-2026-10-39-46-PM.png',
+    floating_islands: 'https://i.postimg.cc/B6nbLLKb/Chat-GPT-Image-May-16-2026-10-39-49-PM.png',
+    ultra_minimal_dots: 'https://i.postimg.cc/rmws00rz/Chat-GPT-Image-May-16-2026-10-39-57-PM.png',
+    home_intelligence: 'https://i.postimg.cc/ZR5nBBdq/Chat-GPT-Image-May-16-2026-10-40-00-PM.png',
+    planetary_orbital: 'https://i.postimg.cc/V6kvrrC6/Chat-GPT-Image-May-16-2026-10-40-04-PM.png',
+  };
+}
+
+_getScreenSaverBackgroundImage_(style) {
+  const styleId = this._normalizeScreenSaverStyle_?.(style) || 'visionos_glass';
+  return this._getScreenSaverBackgroundImages_?.()?.[styleId] || '';
+}
+
+_screenSaverCssUrl_(url = '') {
+  return `url("${String(url).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+}
+
+_preloadScreenSaverBackground_(url = '') {
+  const src = String(url || '').trim();
+  if (!src) return Promise.resolve(false);
+  if (!this.__screenSaverBgLoaded) this.__screenSaverBgLoaded = new Set();
+  if (this.__screenSaverBgLoaded.has(src)) return Promise.resolve(true);
+  if (!this.__screenSaverBgPending) this.__screenSaverBgPending = new Map();
+  if (this.__screenSaverBgPending.has(src)) return this.__screenSaverBgPending.get(src);
+
+  const promise = new Promise((resolve) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      this.__screenSaverBgLoaded.add(src);
+      this.__screenSaverBgPending.delete(src);
+      resolve(true);
+    };
+    img.onerror = () => {
+      this.__screenSaverBgPending.delete(src);
+      resolve(false);
+    };
+    img.src = src;
+  });
+
+  this.__screenSaverBgPending.set(src, promise);
+  return promise;
+}
+
+_applyScreenSaverBackgroundImage_(style) {
+  const overlay = this.screenSaverOverlay;
+  if (!overlay) return;
+  const styleId = this._normalizeScreenSaverStyle_?.(style) || 'visionos_glass';
+  const url = this._getScreenSaverBackgroundImage_(styleId);
+  const token = `${styleId}:${url}`;
+  this.__screenSaverBgToken = token;
+
+  const applyLoaded = () => {
+    overlay.style.setProperty('--ss-bg-image', this._screenSaverCssUrl_(url));
+    overlay.dataset.ssBgReady = '1';
+    overlay.dataset.ssBgSource = 'postimg';
+  };
+  const applyFallback = () => {
+    overlay.style.removeProperty('--ss-bg-image');
+    overlay.dataset.ssBgReady = '0';
+    overlay.dataset.ssBgSource = 'fallback';
+  };
+
+  if (!url) {
+    applyFallback();
+    return;
+  }
+  if (this.__screenSaverBgLoaded?.has(url)) {
+    applyLoaded();
+    return;
+  }
+
+  applyFallback();
+  this._preloadScreenSaverBackground_(url).then((loaded) => {
+    if (this.__screenSaverBgToken !== token || overlay !== this.screenSaverOverlay) return;
+    if (loaded) applyLoaded();
+    else applyFallback();
+  });
+}
+
 _normalizeScreenSaverStyle_(style) {
   const presets = this._getScreenSaverPresets_?.() || [];
   const ids = new Set(presets.map((preset) => preset.id));
@@ -325,32 +411,24 @@ _normalizeScreenSaverStyle_(style) {
 _getScreenSaverEntitySlots_() {
   return [
     {
-      key: 'weather',
-      title: 'Weather',
-      note: 'Weather, outdoor temperature, or any outside sensor.',
-      icon: 'mdi:weather-partly-cloudy',
-      tone: 'blue',
-      placeholder: 'weather.home or sensor.outdoor_temperature',
-    },
-    {
-      key: 'home',
-      title: 'Home / security',
+      key: 'alarm',
+      title: 'Alarm',
       note: 'Alarm, lock, person, presence, or house mode entity.',
       icon: 'mdi:shield-home-outline',
       tone: 'green',
       placeholder: 'alarm_control_panel.home or lock.front_door',
     },
     {
-      key: 'lights',
-      title: 'Lights',
-      note: 'A light group, room light, switch, or helper.',
-      icon: 'mdi:lightbulb-on-outline',
-      tone: 'amber',
-      placeholder: 'light.living_room or group.all_lights',
+      key: 'weather',
+      title: 'Vær',
+      note: 'Weather, outdoor temperature, or any outside sensor.',
+      icon: 'mdi:weather-partly-cloudy',
+      tone: 'blue',
+      placeholder: 'weather.home or sensor.outdoor_temperature',
     },
     {
       key: 'energy',
-      title: 'Energy',
+      title: 'Energi',
       note: 'Power, energy, price, battery, or utility sensor.',
       icon: 'mdi:chart-bell-curve-cumulative',
       tone: 'purple',
@@ -363,23 +441,35 @@ _normalizeScreenSaverEntities_(value) {
   const slots = this._getScreenSaverEntitySlots_?.() || [];
   const input = value ?? [];
   const byKey = new Map();
+  const normalizeKey = (key) => {
+    const raw = String(key || '').trim().toLowerCase();
+    if (raw === 'home' || raw === 'security' || raw === 'house') return 'alarm';
+    if (raw === 'weather') return 'weather';
+    if (raw === 'power') return 'energy';
+    return raw;
+  };
 
   if (Array.isArray(input)) {
+    const legacyArrayKeys = input.length > slots.length
+      ? ['weather', 'alarm', 'lights', 'energy']
+      : slots.map((slot) => slot.key);
     input.forEach((item, index) => {
       const slot = slots[index] || {};
+      const arrayKey = legacyArrayKeys[index] || slot.key || `status_${index + 1}`;
       if (typeof item === 'string') {
-        byKey.set(slot.key || `status_${index + 1}`, { entity: item });
+        byKey.set(normalizeKey(arrayKey), { entity: item });
         return;
       }
       if (item && typeof item === 'object') {
-        const key = String(item.key || item.id || slot.key || `status_${index + 1}`);
+        const key = normalizeKey(item.key || item.id || arrayKey);
         byKey.set(key, item);
       }
     });
   } else if (input && typeof input === 'object') {
     Object.entries(input).forEach(([key, item]) => {
-      if (typeof item === 'string') byKey.set(key, { entity: item });
-      else if (item && typeof item === 'object') byKey.set(key, { ...item, key });
+      const normalizedKey = normalizeKey(key);
+      if (typeof item === 'string') byKey.set(normalizedKey, { entity: item });
+      else if (item && typeof item === 'object') byKey.set(normalizedKey, { ...item, key: normalizedKey });
     });
   }
 
@@ -412,9 +502,13 @@ _renderScreenSaverStyleOptions_() {
   }[ch]));
   return presets.map((preset, index) => {
     const active = preset.id === selected;
+    const previewImage = this._getScreenSaverBackgroundImage_?.(preset.id) || '';
+    const previewStyle = previewImage
+      ? ` style="--ss-preview-bg-image:${esc(this._screenSaverCssUrl_(previewImage))}" data-ss-preview-image="1"`
+      : '';
     return `
       <button type="button" class="ss-style-card" data-screensaver-style="${esc(preset.id)}" role="option" aria-selected="${active ? 'true' : 'false'}" tabindex="${active ? '0' : '-1'}">
-        <span class="ss-style-preview ss-style-preview--${esc(preset.id)}" aria-hidden="true">
+        <span class="ss-style-preview ss-style-preview--${esc(preset.id)}" aria-hidden="true"${previewStyle}>
           <span class="ss-mini-time">09:25</span>
           <span class="ss-mini-date">Friday, May 15</span>
           <span class="ss-mini-rail">
@@ -602,6 +696,7 @@ _ensureSettingsStyles_() {
   .ss-style-card{
     flex:0 0 min(360px, 82vw);
     display:grid;
+    grid-template-rows:172px minmax(54px, auto);
     gap:10px;
     padding:9px;
     border-radius:14px;
@@ -627,6 +722,7 @@ _ensureSettingsStyles_() {
   }
   .ss-style-preview{
     position:relative;
+    height:172px;
     min-height:172px;
     border-radius:11px;
     overflow:hidden;
@@ -689,6 +785,15 @@ _ensureSettingsStyles_() {
       radial-gradient(70% 70% at 52% 52%, rgba(252,183,91,.24), transparent 48%),
       linear-gradient(145deg, #03070d, #08111d 60%, #020306);
   }
+  .ss-style-preview[data-ss-preview-image="1"]::before{
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.4), rgba(0,0,0,.08) 48%, rgba(0,0,0,.28)),
+      linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.42)),
+      var(--ss-preview-bg-image);
+    background-position:center;
+    background-size:cover;
+    background-repeat:no-repeat;
+  }
   .ss-mini-time{
     position:absolute;
     left:22px;
@@ -709,30 +814,25 @@ _ensureSettingsStyles_() {
     left:18px;
     right:18px;
     bottom:18px;
-    display:flex;
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
     gap:8px;
   }
   .ss-mini-chip{
-    flex:1;
+    height:34px;
     min-height:34px;
     border-radius:10px;
     border:1px solid rgba(255,255,255,.12);
-    background:rgba(255,255,255,.1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05)),
+      rgba(18,22,34,.52);
     backdrop-filter:blur(8px);
-  }
-  .ss-style-preview--sci_fi_hud .ss-mini-chip,
-  .ss-style-preview--ultra_minimal_dots .ss-mini-chip{
-    min-height:6px;
-    border-radius:999px;
-    background:rgba(34,211,238,.62);
-  }
-  .ss-style-preview--floating_islands .ss-mini-chip,
-  .ss-style-preview--planetary_orbital .ss-mini-chip{
-    border-radius:999px;
   }
   .ss-style-meta{
     display:grid;
+    align-content:start;
     gap:3px;
+    min-height:54px;
   }
   .ss-style-name{
     font-weight:800;
@@ -742,6 +842,10 @@ _ensureSettingsStyles_() {
     color:var(--secondary-text-color);
     font-size:.82rem;
     line-height:1.35;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
   }
   .ss-entity-list{
     display:grid;
@@ -3468,7 +3572,7 @@ _evaluateVisibility_(visList) {
  */
 _applyVisibility_() {
   try {
-    const wraps = this.cardContainer?.children || [];
+    const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
     for (const wrap of wraps) {
       if (!wrap || !wrap.firstElementChild) continue;
       this._applyWrapDisplayState_(wrap);
@@ -3538,7 +3642,7 @@ _applyLayerVisibilityChange_() {
 
   async _onKeyDown_(e) {
   if (!this.editMode) return;
-  if (this._isTypingTarget_(e.target)) return;
+  if (this._isTypingTarget_(e)) return;
 
   const gs = Number(this.gridSize || 10);
   const step = e.altKey ? 1 : (e.shiftKey ? gs * 5 : gs);
@@ -3853,12 +3957,43 @@ _refreshTabsAlignment_() {
 
 
 
-  _isTypingTarget_(t) {
-  if (!t || t === window || t === document) return false;
-  const editable = t.closest?.('input, textarea, [contenteditable="true"], ha-textfield, mwc-textfield');
-  if (!editable) return false;
-  const tag = editable.tagName?.toLowerCase?.() || '';
-  return tag === 'input' || tag === 'textarea' || editable.hasAttribute?.('contenteditable');
+  _isTypingTarget_(targetOrEvent) {
+  const eventPath = typeof targetOrEvent?.composedPath === 'function'
+    ? targetOrEvent.composedPath()
+    : [];
+  const targets = eventPath.length
+    ? eventPath
+    : [targetOrEvent?.target || targetOrEvent];
+  const editableSelector = [
+    'input',
+    'textarea',
+    'select',
+    '[contenteditable="true"]',
+    '[contenteditable="plaintext-only"]',
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="searchbox"]',
+    'ha-textfield',
+    'mwc-textfield',
+    'ha-select',
+    'mwc-select',
+    'ha-combo-box',
+    'ha-entity-picker',
+    'ha-code-editor',
+    '.CodeMirror',
+    '.cm-editor',
+    '.monaco-editor',
+    '.ace_editor',
+    '.rich-surface',
+  ].join(',');
+  return targets.some((node) => {
+    if (!node || node === window || node === document) return false;
+    const tag = String(node.tagName || '').toLowerCase();
+    if (['input', 'textarea', 'select', 'option'].includes(tag)) return true;
+    if (node.isContentEditable || node.getAttribute?.('contenteditable')) return true;
+    if (node.matches?.(editableSelector) || node.closest?.(editableSelector)) return true;
+    return false;
+  });
 }
 
 
@@ -4363,9 +4498,69 @@ static getConfigElement() {
     helper.style.opacity = '0.7';
     helper.textContent = 'Unique key for saving layout positions. Leave blank to auto‑generate.';
     editor.appendChild(helper);
+    const cloneForEditor = (value = {}) => {
+      try {
+        if (typeof structuredClone === 'function') return structuredClone(value || {});
+        return JSON.parse(JSON.stringify(value || {}));
+      } catch {
+        return { ...(value || {}) };
+      }
+    };
+    const dedupeCssForEditor = (css = '') => {
+      const textValue = String(css ?? '');
+      if (!textValue.includes('{') || !textValue.includes('}')) return textValue;
+      const seen = new Set();
+      let changed = false;
+      const next = textValue.replace(/([^{}]+\{[^{}]*\})/g, (block) => {
+        const open = block.indexOf('{');
+        const close = block.lastIndexOf('}');
+        if (open < 0 || close <= open) return block;
+        const selector = block.slice(0, open).trim().replace(/\s+/g, ' ');
+        if (!selector || selector.startsWith('@')) return block;
+        const body = block
+          .slice(open + 1, close)
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/\s*;\s*/g, ';')
+          .replace(/\s*:\s*/g, ':');
+        const key = `${selector}{${body}}`;
+        if (!body || !seen.has(key)) {
+          seen.add(key);
+          return block;
+        }
+        changed = true;
+        return '';
+      });
+      return changed ? next.replace(/\n{3,}/g, '\n\n').trimEnd() : textValue;
+    };
+    const sanitizeStyleForEditor = (value) => {
+      if (typeof value === 'string') return dedupeCssForEditor(value);
+      if (Array.isArray(value)) return value.map(sanitizeStyleForEditor);
+      if (value && typeof value === 'object') {
+        const out = {};
+        for (const [key, child] of Object.entries(value)) out[key] = sanitizeStyleForEditor(child);
+        return out;
+      }
+      return value;
+    };
+    const sanitizeConfigForEditor = (config = {}) => {
+      const next = cloneForEditor(config);
+      const seen = new WeakSet();
+      const visit = (node) => {
+        if (!node || typeof node !== 'object' || seen.has(node)) return;
+        seen.add(node);
+        if (node.card_mod && typeof node.card_mod === 'object' && 'style' in node.card_mod) {
+          node.card_mod = { ...node.card_mod, style: sanitizeStyleForEditor(node.card_mod.style) };
+        }
+        if (node.card && typeof node.card === 'object') visit(node.card);
+        if (Array.isArray(node.cards)) node.cards.forEach((card) => visit(card));
+      };
+      visit(next);
+      return next;
+    };
     // setConfig: populate input from incoming config
     editor.setConfig = (config = {}) => {
-      editor._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
+      editor._config = sanitizeConfigForEditor({ type: config.type || 'custom:drag-and-drop-card', ...config });
       // Auto-generate a storage key if not provided
       if (!editor._config.storage_key) {
         editor._config.storage_key = `layout_${(crypto?.randomUUID?.() || Date.now().toString(36))}`;
@@ -4374,7 +4569,7 @@ static getConfigElement() {
     };
     // getConfig: return updated configuration containing only the storage_key
     editor.getConfig = () => {
-      const base = { ...(editor._config || {}) };
+      const base = sanitizeConfigForEditor(editor._config || {});
       base.type = 'custom:drag-and-drop-card';
       base.storage_key = text.value || '';
       return base;
@@ -4693,6 +4888,79 @@ _cloneJson_(value) {
   }
 }
 
+_cloneCardConfig_(value = {}) {
+  try {
+    if (typeof structuredClone === 'function') return structuredClone(value || {});
+    return JSON.parse(JSON.stringify(value || {}));
+  } catch {
+    return { ...(value || {}) };
+  }
+}
+
+_dedupeRepeatedCssBlocks_(css = '') {
+  const text = String(css ?? '');
+  if (!text.includes('{') || !text.includes('}')) return text;
+
+  const seen = new Set();
+  let changed = false;
+  const next = text.replace(/([^{}]+\{[^{}]*\})/g, (block) => {
+    const open = block.indexOf('{');
+    const close = block.lastIndexOf('}');
+    if (open < 0 || close <= open) return block;
+    const selector = block.slice(0, open).trim().replace(/\s+/g, ' ');
+    if (!selector || selector.startsWith('@')) return block;
+    const body = block
+      .slice(open + 1, close)
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/\s*;\s*/g, ';')
+      .replace(/\s*:\s*/g, ':');
+    const key = `${selector}{${body}}`;
+    if (!body || !seen.has(key)) {
+      seen.add(key);
+      return block;
+    }
+    changed = true;
+    return '';
+  });
+
+  return changed ? next.replace(/\n{3,}/g, '\n\n').trimEnd() : text;
+}
+
+_sanitizeCardModStyleValue_(value) {
+  if (typeof value === 'string') return this._dedupeRepeatedCssBlocks_(value);
+  if (Array.isArray(value)) return value.map((item) => this._sanitizeCardModStyleValue_(item));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, child] of Object.entries(value)) {
+      out[key] = this._sanitizeCardModStyleValue_(child);
+    }
+    return out;
+  }
+  return value;
+}
+
+_sanitizeCardConfigForStorage_(cfg = {}) {
+  const clone = this._cloneCardConfig_(cfg);
+  const seen = new WeakSet();
+  const visit = (node) => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+
+    if (node.card_mod && typeof node.card_mod === 'object' && 'style' in node.card_mod) {
+      node.card_mod = {
+        ...node.card_mod,
+        style: this._sanitizeCardModStyleValue_(node.card_mod.style),
+      };
+    }
+
+    if (node.card && typeof node.card === 'object') visit(node.card);
+    if (Array.isArray(node.cards)) node.cards.forEach((card) => visit(card));
+  };
+  visit(clone);
+  return clone;
+}
+
 _genLayoutCardId_() {
   const token =
     globalThis.crypto?.randomUUID?.() ||
@@ -4986,6 +5254,7 @@ _normalizeSavedCardEntry_(entry = {}, fallback = null) {
     delete out.layer_ids;
   }
   if (!out.card && fallbackEntry.card) out.card = this._cloneJson_(fallbackEntry.card);
+  if (out.card && typeof out.card === 'object') out.card = this._sanitizeCardConfigForStorage_(out.card);
   if (!out.card_style && fallbackEntry.card_style) out.card_style = this._cloneJson_(fallbackEntry.card_style);
   if (!out.cardStyle && fallbackEntry.cardStyle) out.cardStyle = this._cloneJson_(fallbackEntry.cardStyle);
   if (!out.overflow && fallbackEntry.overflow) out.overflow = fallbackEntry.overflow;
@@ -5521,6 +5790,128 @@ _normalizeConnectorPoint_(point = {}, fallback = null) {
   return { x, y };
 }
 
+_normalizeConnectorCardIds_(value, extras = []) {
+  const out = [];
+  const add = (item) => {
+    if (item === null || item === undefined) return;
+    if (Array.isArray(item)) {
+      item.forEach(add);
+      return;
+    }
+    String(item)
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((id) => {
+        if (!out.includes(id)) out.push(id);
+      });
+  };
+  add(value);
+  add(extras);
+  return out;
+}
+
+_getCardWrapperCanvasRect_(wrap) {
+  if (!wrap) return null;
+  const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+  const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+  const width = parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || 0;
+  const height = parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || 0;
+  return { x, y, width, height };
+}
+
+_getWrapperByLayoutCardId_(cardId) {
+  const id = String(cardId || '').trim();
+  if (!id || !this.cardContainer) return null;
+  return Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
+    .find((wrap) => String(wrap.dataset.layoutCardId || '') === id) || null;
+}
+
+_getConnectorScopeWrappersFromSelection_(tabId = null) {
+  const currentTab = this._normalizeTabId(tabId || this.activeTab || this.defaultTab);
+  const selection = Array.from(this._selection || []);
+  return selection.filter((wrap) => {
+    if (!wrap || wrap.classList?.contains('ddc-placeholder')) return false;
+    if (!wrap.dataset?.layoutCardId) return false;
+    const wrapTab = this._normalizeTabId(wrap.dataset.tabId || this.defaultTab);
+    if (wrapTab !== currentTab) return false;
+    return this._isWrapVisibleForActiveLayers_(wrap);
+  });
+}
+
+_getConnectorPointOwnerWrapper_(point = {}, { tabId = null } = {}) {
+  if (!this.cardContainer || !point) return null;
+  const currentTab = this._normalizeTabId(tabId || this.activeTab || this.defaultTab);
+  const tolerance = Math.max(6, Number(this.gridSize || 10) * 0.35);
+  const candidates = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
+    .filter((wrap) => {
+      if (!wrap.dataset?.layoutCardId) return false;
+      const wrapTab = this._normalizeTabId(wrap.dataset.tabId || this.defaultTab);
+      if (wrapTab !== currentTab) return false;
+      if (!this._isWrapVisibleForActiveLayers_(wrap)) return false;
+      if (!this.editMode && !this._shouldWrapDisplayForCurrentContext_(wrap)) return false;
+      const rect = this._getCardWrapperCanvasRect_(wrap);
+      if (!rect) return false;
+      const x = Number(point.x) || 0;
+      const y = Number(point.y) || 0;
+      return x >= rect.x - tolerance
+        && x <= rect.x + rect.width + tolerance
+        && y >= rect.y - tolerance
+        && y <= rect.y + rect.height + tolerance;
+    })
+    .sort((a, b) => (parseInt(b.style.zIndex || '0', 10) || 0) - (parseInt(a.style.zIndex || '0', 10) || 0));
+  return candidates[0] || null;
+}
+
+_getConnectorScopeFromWrappers_(wrappers = [], { tabId = null } = {}) {
+  const picked = [];
+  (Array.isArray(wrappers) ? wrappers : []).forEach((wrap) => {
+    if (!wrap?.dataset?.layoutCardId) return;
+    if (!picked.includes(wrap)) picked.push(wrap);
+  });
+  const cardIds = picked.map((wrap) => wrap.dataset.layoutCardId).filter(Boolean);
+  const sourceCardId = cardIds[0] || '';
+  const targetCardId = cardIds[1] || sourceCardId || '';
+  const layerIds = [];
+  picked.forEach((wrap) => {
+    this._getWrapperLayerIds_(wrap).forEach((id) => {
+      if (!layerIds.includes(id)) layerIds.push(id);
+    });
+  });
+  if (!layerIds.length && this.layersEnabled && Array.isArray(this.activeLayerIds) && this.activeLayerIds.length) {
+    this.activeLayerIds.forEach((id) => {
+      if (id && !layerIds.includes(id)) layerIds.push(id);
+    });
+  }
+  return {
+    tabId: this._normalizeTabId(tabId || picked[0]?.dataset?.tabId || this.activeTab || this.defaultTab),
+    cardIds,
+    sourceCardId,
+    targetCardId,
+    layerIds,
+  };
+}
+
+_inferConnectorScopeFromPoints_(points = [], { tabId = null } = {}) {
+  const currentTab = this._normalizeTabId(tabId || this.activeTab || this.defaultTab);
+  const list = Array.isArray(points) ? points : [];
+  const wrappers = [];
+  const first = list[0];
+  const last = list[list.length - 1];
+  [first, last].forEach((point) => {
+    const wrap = this._getConnectorPointOwnerWrapper_(point, { tabId: currentTab });
+    if (wrap && !wrappers.includes(wrap)) wrappers.push(wrap);
+  });
+  return this._getConnectorScopeFromWrappers_(wrappers, { tabId: currentTab });
+}
+
+_getConnectorScopeForNewConnector_(points = [], { tabId = null } = {}) {
+  const currentTab = this._normalizeTabId(tabId || this.activeTab || this.defaultTab);
+  const selected = this._getConnectorScopeWrappersFromSelection_(currentTab);
+  if (selected.length) return this._getConnectorScopeFromWrappers_(selected.slice(0, 2), { tabId: currentTab });
+  return this._inferConnectorScopeFromPoints_(points, { tabId: currentTab });
+}
+
 _normalizeConnectorEntry_(entry = {}, fallback = null) {
   const source = this._cloneJson_(entry) || {};
   const fallbackEntry = fallback || {};
@@ -5546,6 +5937,48 @@ _normalizeConnectorEntry_(entry = {}, fallback = null) {
         this._normalizeConnectorPoint_(points[0] || { x: 0, y: 0 }),
         this._normalizeConnectorPoint_(points[1] || points[0] || { x: this.gridSize * 6, y: 0 }, { x: this.gridSize * 6, y: 0 })
       ];
+  const sourceCardId = String(
+    source.sourceCardId
+    || source.source_card_id
+    || fallbackEntry.sourceCardId
+    || fallbackEntry.source_card_id
+    || ''
+  ).trim();
+  const targetCardId = String(
+    source.targetCardId
+    || source.target_card_id
+    || fallbackEntry.targetCardId
+    || fallbackEntry.target_card_id
+    || ''
+  ).trim();
+  let cardIds = this._normalizeConnectorCardIds_(
+    source.cardIds
+    || source.card_ids
+    || source.anchorCardIds
+    || source.anchor_card_ids
+    || source.cardId
+    || source.card_id
+    || fallbackEntry.cardIds
+    || fallbackEntry.card_ids
+    || fallbackEntry.anchorCardIds
+    || fallbackEntry.anchor_card_ids
+    || fallbackEntry.cardId
+    || fallbackEntry.card_id
+    || [],
+    [sourceCardId, targetCardId]
+  );
+  let layerIds = this._normalizeCardLayerIds_(
+    source.layerIds
+    || source.layer_ids
+    || fallbackEntry.layerIds
+    || fallbackEntry.layer_ids
+    || []
+  );
+  if (!cardIds.length && this.cardContainer) {
+    const inferred = this._inferConnectorScopeFromPoints_(normalizedPoints, { tabId });
+    cardIds = inferred.cardIds || [];
+    if (!layerIds.length) layerIds = inferred.layerIds || [];
+  }
   const out = {
     ...defaults,
     ...fallbackEntry,
@@ -5554,6 +5987,23 @@ _normalizeConnectorEntry_(entry = {}, fallback = null) {
     tabId,
     points: normalizedPoints,
   };
+  if (cardIds.length) {
+    out.cardIds = cardIds;
+    out.sourceCardId = sourceCardId || cardIds[0];
+    out.targetCardId = targetCardId || cardIds[1] || cardIds[0];
+  } else {
+    delete out.cardIds;
+    delete out.card_ids;
+    delete out.sourceCardId;
+    delete out.source_card_id;
+    delete out.targetCardId;
+    delete out.target_card_id;
+  }
+  if (layerIds.length) out.layerIds = layerIds;
+  else {
+    delete out.layerIds;
+    delete out.layer_ids;
+  }
   out.thickness = Math.max(2, Math.min(28, Number(out.thickness) || defaults.thickness));
   out.animation_speed = Math.max(0.4, Math.min(8, Number(out.animation_speed) || defaults.animation_speed));
   out.entity = String(out.entity || '').trim();
@@ -5914,6 +6364,7 @@ _ensureConnectorsLayer_() {
     layer.setAttribute('aria-hidden', 'true');
     this.cardContainer.appendChild(layer);
   }
+  layer.style.display = '';
   return layer;
 }
 
@@ -6131,6 +6582,278 @@ _getConnectorById_(connectorId) {
   return (this._getCurrentConnectorEntries_() || []).find((entry) => entry.id === connectorId) || null;
 }
 
+_getConnectorScopedCardIds_(connector = {}) {
+  return this._normalizeConnectorCardIds_(connector.cardIds || connector.card_ids || connector.anchorCardIds || connector.anchor_card_ids || [], [
+    connector.sourceCardId || connector.source_card_id,
+    connector.targetCardId || connector.target_card_id,
+  ]);
+}
+
+_ensureResponsiveConnectorsMemory_() {
+  if (!this._responsiveConnectors) {
+    this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(
+      this._config?.connectors || [],
+      this._config?.responsive_connectors || null
+    );
+  }
+  return this._responsiveConnectors;
+}
+
+_collectConnectorLayoutsForCard_(cardId) {
+  const id = String(cardId || '').trim();
+  const out = {};
+  if (!id) return out;
+  this._ensureResponsiveConnectorsMemory_?.();
+  this._ensureConnectorScopesForCurrentLayout_?.({ render: false });
+  (this._responsiveLayoutVariantKeys_?.() || Object.keys(this._responsiveConnectors || {})).forEach((variantKey) => {
+    const entries = Array.isArray(this._responsiveConnectors?.[variantKey]) ? this._responsiveConnectors[variantKey] : [];
+    const matches = entries
+      .filter((entry) => this._getConnectorScopedCardIds_(entry).includes(id))
+      .map((entry) => this._normalizeConnectorEntry_(entry));
+    if (matches.length) out[variantKey] = matches;
+  });
+  return out;
+}
+
+_remapSingleCardConnector_(connector = {}, {
+  oldCardId = '',
+  newCardId = '',
+  sourceEntry = {},
+  importedEntry = {},
+  connectorIdMap = null,
+} = {}) {
+  const nextCardId = String(newCardId || '').trim();
+  if (!connector || !nextCardId) return null;
+  const prevCardId = String(oldCardId || '').trim();
+  const scopedIds = this._getConnectorScopedCardIds_(connector);
+  if (prevCardId && scopedIds.length && !scopedIds.includes(prevCardId)) return null;
+
+  const oldConnectorId = String(connector.id || `connector_${Math.random().toString(36).slice(2)}`);
+  if (connectorIdMap && !connectorIdMap.has(oldConnectorId)) {
+    connectorIdMap.set(oldConnectorId, `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`);
+  }
+  const nextConnectorId = connectorIdMap?.get(oldConnectorId) || `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+  const sourcePos = sourceEntry?.position || {};
+  const targetPos = importedEntry?.position || {};
+  const dx = (Number(targetPos.x) || 0) - (Number(sourcePos.x) || 0);
+  const dy = (Number(targetPos.y) || 0) - (Number(sourcePos.y) || 0);
+  const points = (Array.isArray(connector.points) ? connector.points : [])
+    .map((point) => this._normalizeConnectorPoint_({
+      x: (Number(point?.x) || 0) + dx,
+      y: (Number(point?.y) || 0) + dy,
+    }));
+  const importedLayerIds = this._normalizeCardLayerIds_(importedEntry.layerIds || importedEntry.layer_ids || []);
+  const connectorLayerIds = this._normalizeCardLayerIds_(connector.layerIds || connector.layer_ids || []);
+  const layerIds = connectorLayerIds.length ? connectorLayerIds : importedLayerIds;
+  return this._normalizeConnectorEntry_({
+    ...this._cloneJson_(connector),
+    id: nextConnectorId,
+    tabId: this._normalizeTabId(importedEntry.tabId || importedEntry.tab_id || this.activeTab || this.defaultTab),
+    cardIds: [nextCardId],
+    sourceCardId: nextCardId,
+    targetCardId: nextCardId,
+    ...(layerIds.length ? { layerIds } : {}),
+    points,
+  });
+}
+
+_isConnectorLayerVisible_(connector = {}) {
+  if (!this.layersEnabled) return true;
+  const layerIds = this._normalizeCardLayerIds_(connector.layerIds || connector.layer_ids || []);
+  if (!layerIds.length) return true;
+  const active = Array.isArray(this.activeLayerIds) ? this.activeLayerIds : [];
+  if (!active.length) return false;
+  return layerIds.some((id) => active.includes(id));
+}
+
+_connectorMatchesCurrentContext_(connector = {}, currentTab = null) {
+  const activeTab = this._normalizeTabId(currentTab || this.activeTab || this.defaultTab);
+  const connectorTab = this._normalizeTabId(connector.tabId || connector.tab_id || activeTab);
+  if (connectorTab !== activeTab) return false;
+  if (!this._isConnectorLayerVisible_(connector)) return false;
+
+  const cardIds = this._normalizeConnectorCardIds_(connector.cardIds || connector.card_ids || connector.anchorCardIds || connector.anchor_card_ids || [], [
+    connector.sourceCardId || connector.source_card_id,
+    connector.targetCardId || connector.target_card_id,
+  ]);
+  if (!cardIds.length) return true;
+
+  return cardIds.every((cardId) => {
+    const wrap = this._getWrapperByLayoutCardId_(cardId);
+    if (!wrap) return false;
+    const wrapTab = this._normalizeTabId(wrap.dataset.tabId || this.defaultTab);
+    if (wrapTab !== activeTab) return false;
+    if (!this._isWrapVisibleForActiveLayers_(wrap)) return false;
+    return this.editMode ? true : this._shouldWrapDisplayForCurrentContext_(wrap);
+  });
+}
+
+_refreshConnectorScope_(connectorId, { reason = 'connector-scope', render = true } = {}) {
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    if (entry.id !== connectorId) return entry;
+    const next = this._normalizeConnectorEntry_(entry);
+    const inferred = this._inferConnectorScopeFromPoints_(next.points || [], { tabId: next.tabId });
+    if (!inferred.cardIds?.length) return next;
+    changed = true;
+    return {
+      ...next,
+      tabId: inferred.tabId || next.tabId,
+      cardIds: inferred.cardIds,
+      sourceCardId: inferred.sourceCardId || inferred.cardIds[0],
+      targetCardId: inferred.targetCardId || inferred.cardIds[1] || inferred.cardIds[0],
+      ...(inferred.layerIds?.length ? { layerIds: inferred.layerIds } : {}),
+    };
+  }), { reason: changed ? reason : null, render });
+  return changed;
+}
+
+_syncConnectorsForCardScopeChange_(wrap, { reason = 'connector-scope-card-change', render = true } = {}) {
+  const cardId = String(wrap?.dataset?.layoutCardId || '').trim();
+  if (!cardId) return;
+  const tabId = this._normalizeTabId(wrap.dataset.tabId || this.activeTab || this.defaultTab);
+  const cardLayerIds = this._getWrapperLayerIds_(wrap);
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    const cardIds = this._normalizeConnectorCardIds_(entry.cardIds || entry.card_ids || [], [
+      entry.sourceCardId || entry.source_card_id,
+      entry.targetCardId || entry.target_card_id,
+    ]);
+    if (!cardIds.includes(cardId)) return entry;
+    changed = true;
+    const ownerLayerIds = [];
+    cardIds.forEach((id) => {
+      const owner = this._getWrapperByLayoutCardId_(id);
+      const layers = owner ? this._getWrapperLayerIds_(owner) : (id === cardId ? cardLayerIds : []);
+      layers.forEach((layerId) => {
+        if (!ownerLayerIds.includes(layerId)) ownerLayerIds.push(layerId);
+      });
+    });
+    return {
+      ...entry,
+      tabId,
+      ...(ownerLayerIds.length ? { layerIds: ownerLayerIds } : { layerIds: undefined }),
+    };
+  }), { reason: changed ? reason : null, render });
+}
+
+_moveConnectorsForCardDeltas_(deltas = [], { reason = null, render = true } = {}) {
+  const deltaMap = new Map();
+  (Array.isArray(deltas) ? deltas : []).forEach((item) => {
+    const id = String(item?.id || '').trim();
+    const dx = Number(item?.dx) || 0;
+    const dy = Number(item?.dy) || 0;
+    if (!id || (!dx && !dy)) return;
+    deltaMap.set(id, { dx, dy });
+  });
+  if (!deltaMap.size) return false;
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    const cardIds = this._normalizeConnectorCardIds_(entry.cardIds || entry.card_ids || [], [
+      entry.sourceCardId || entry.source_card_id,
+      entry.targetCardId || entry.target_card_id,
+    ]);
+    if (!cardIds.some((id) => deltaMap.has(id))) return entry;
+    const points = Array.isArray(entry.points) ? entry.points.map((point) => ({ ...point })) : [];
+    if (points.length < 2) return entry;
+    const sourceId = String(entry.sourceCardId || entry.source_card_id || cardIds[0] || '').trim();
+    const targetId = String(entry.targetCardId || entry.target_card_id || cardIds[1] || sourceId || '').trim();
+    const allIdsMoved = cardIds.length && cardIds.every((id) => deltaMap.has(id));
+    if (cardIds.length === 1 && deltaMap.has(cardIds[0])) {
+      const delta = deltaMap.get(cardIds[0]);
+      points.forEach((point) => {
+        point.x += delta.dx;
+        point.y += delta.dy;
+      });
+      changed = true;
+      return { ...entry, points };
+    }
+    if (allIdsMoved) {
+      const firstDelta = deltaMap.get(cardIds[0]);
+      const sameDelta = cardIds.every((id) => {
+        const delta = deltaMap.get(id);
+        return delta && delta.dx === firstDelta.dx && delta.dy === firstDelta.dy;
+      });
+      if (sameDelta) {
+        points.forEach((point) => {
+          point.x += firstDelta.dx;
+          point.y += firstDelta.dy;
+        });
+        changed = true;
+        return { ...entry, points };
+      }
+    }
+    const sourceDelta = sourceId ? deltaMap.get(sourceId) : null;
+    const targetDelta = targetId ? deltaMap.get(targetId) : null;
+    if (sourceDelta) {
+      points[0].x += sourceDelta.dx;
+      points[0].y += sourceDelta.dy;
+      changed = true;
+    }
+    if (targetDelta) {
+      const last = points.length - 1;
+      points[last].x += targetDelta.dx;
+      points[last].y += targetDelta.dy;
+      changed = true;
+    }
+    return { ...entry, points };
+  }), { reason: changed ? reason : null, render });
+  return changed;
+}
+
+_removeConnectorsForCardIds_(cardIds = [], { reason = 'connector-card-delete', render = true } = {}) {
+  const ids = this._normalizeConnectorCardIds_(cardIds);
+  if (!ids.length || !this._responsiveConnectors) return false;
+  let changed = false;
+  const variants = this._responsiveLayoutVariantKeys_?.() || Object.keys(this._responsiveConnectors || {});
+  variants.forEach((variantKey) => {
+    const entries = Array.isArray(this._responsiveConnectors?.[variantKey]) ? this._responsiveConnectors[variantKey] : [];
+    const next = entries.filter((entry) => {
+      const connectorIds = this._normalizeConnectorCardIds_(entry.cardIds || entry.card_ids || [], [
+        entry.sourceCardId || entry.source_card_id,
+        entry.targetCardId || entry.target_card_id,
+      ]);
+      return !connectorIds.some((id) => ids.includes(id));
+    });
+    if (next.length !== entries.length) {
+      changed = true;
+      this._responsiveConnectors[variantKey] = next;
+    }
+  });
+  if (changed) {
+    this._syncConnectorLayoutsToConfig_?.();
+    if (render) this._renderConnectors_?.();
+    if (reason) this._queueSave?.(reason);
+  }
+  return changed;
+}
+
+_ensureConnectorScopesForCurrentLayout_({ render = false } = {}) {
+  const entries = this._getCurrentConnectorEntries_() || [];
+  let changed = false;
+  const next = entries.map((entry) => {
+    const cardIds = this._normalizeConnectorCardIds_(entry.cardIds || entry.card_ids || [], [
+      entry.sourceCardId || entry.source_card_id,
+      entry.targetCardId || entry.target_card_id,
+    ]);
+    if (cardIds.length) return entry;
+    const normalized = this._normalizeConnectorEntry_(entry);
+    const inferred = this._inferConnectorScopeFromPoints_(normalized.points || [], { tabId: normalized.tabId });
+    if (!inferred.cardIds?.length) return normalized;
+    changed = true;
+    return {
+      ...normalized,
+      tabId: inferred.tabId || normalized.tabId,
+      cardIds: inferred.cardIds,
+      sourceCardId: inferred.sourceCardId || inferred.cardIds[0],
+      targetCardId: inferred.targetCardId || inferred.cardIds[1] || inferred.cardIds[0],
+      ...(inferred.layerIds?.length ? { layerIds: inferred.layerIds } : {}),
+    };
+  });
+  if (changed) this._setCurrentConnectorEntries_(next, { reason: null, render });
+  return changed;
+}
+
 _getConnectorVisibleRect_() {
   const container = this.cardContainer;
   const { width, height } = this._getConnectorCanvasSize_();
@@ -6155,10 +6878,17 @@ _createConnectorAtViewport_({ openSettings = true } = {}) {
   const centerY = top + (height / 2);
   const start = this._snapConnectorPoint_({ x: centerX - (span / 2), y: centerY });
   const end = this._snapConnectorPoint_({ x: centerX + (span / 2), y: centerY });
+  const scope = this._getConnectorScopeForNewConnector_([start, end], { tabId: currentTab });
   const connector = this._normalizeConnectorEntry_({
     ...this._defaultConnectorConfig_(),
     id: `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
-    tabId: currentTab,
+    tabId: scope.tabId || currentTab,
+    ...(scope.cardIds?.length ? {
+      cardIds: scope.cardIds,
+      sourceCardId: scope.sourceCardId || scope.cardIds[0],
+      targetCardId: scope.targetCardId || scope.cardIds[1] || scope.cardIds[0],
+    } : {}),
+    ...(scope.layerIds?.length ? { layerIds: scope.layerIds } : {}),
     points: [start, end],
   });
   this._connectorDraft = null;
@@ -6210,11 +6940,19 @@ _finalizeConnectorDraft_({ openSettings = true } = {}) {
     this._cancelConnectorDraft_();
     return;
   }
+  const tabId = this._normalizeTabId(draft.tabId || this.activeTab || this.defaultTab);
+  const scope = this._getConnectorScopeForNewConnector_(draft.points, { tabId });
   const connector = this._normalizeConnectorEntry_({
     ...this._defaultConnectorConfig_(),
     ...(draft.settings || {}),
     id: `connector_${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
-    tabId: this._normalizeTabId(draft.tabId || this.activeTab || this.defaultTab),
+    tabId: scope.tabId || tabId,
+    ...(scope.cardIds?.length ? {
+      cardIds: scope.cardIds,
+      sourceCardId: scope.sourceCardId || scope.cardIds[0],
+      targetCardId: scope.targetCardId || scope.cardIds[1] || scope.cardIds[0],
+    } : {}),
+    ...(scope.layerIds?.length ? { layerIds: scope.layerIds } : {}),
     points: draft.points,
   });
   this._selectedConnectorId = connector.id;
@@ -6751,8 +7489,9 @@ _renderConnectors_() {
   layer.appendChild(defs);
 
   const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
+  this._ensureConnectorScopesForCurrentLayout_?.({ render: false });
   const connectors = (this._getCurrentConnectorEntries_() || []).filter((entry) => {
-    return this._normalizeTabId(entry.tabId || currentTab) === currentTab;
+    return this._connectorMatchesCurrentContext_(entry, currentTab);
   });
   if (this._selectedConnectorId && !connectors.some((entry) => entry.id === this._selectedConnectorId)) {
     this._selectedConnectorId = null;
@@ -6939,7 +7678,13 @@ _renderConnectors_() {
               window.removeEventListener('pointerup', onUp, true);
               window.removeEventListener('pointercancel', onUp, true);
               this.__connectorPointDrag = null;
+              const latest = this._getConnectorById_(connector.id);
+              const latestPoints = Array.isArray(latest?.points) ? latest.points : points;
+              if (index === 0 || index === latestPoints.length - 1) {
+                this._refreshConnectorScope_?.(connector.id, { reason: 'connector-anchor-change', render: false });
+              }
               this._queueSave?.('connector-point-move');
+              this._renderConnectors_?.();
             };
             window.addEventListener('pointermove', onMove, true);
             window.addEventListener('pointerup', onUp, true);
@@ -11813,6 +12558,10 @@ _getMobileTextAssistScale_() {
   overflow:visible;
   pointer-events:none;
 }
+.card-container.grid-on .ddc-connectors-layer,
+.card-container.ddc-connector-draw-mode .ddc-connectors-layer{
+  z-index:100000;
+}
 .ddc-connectors-layer .ddc-connector-track,
 .ddc-connectors-layer .ddc-connector-line,
 .ddc-connectors-layer .ddc-connector-flow,
@@ -12547,8 +13296,7 @@ _getMobileTextAssistScale_() {
 
         this.__escapeShortcutHandler = (e) => {
           if (!this.editMode) return;
-          const target = e.target;
-          const inField = !!target?.closest?.('input, textarea, select, ha-code-editor, .CodeMirror');
+          const inField = this._isTypingTarget_?.(e);
           if (e.key === 'Escape') {
             if (this._isConnectorSettingsOpen_?.()) {
               e.preventDefault();
@@ -13310,6 +14058,7 @@ _animateCards(targetWraps = null) {
     wrapper.dataset.tabId = cur;
     sel.onchange = () => {
       wrapper.dataset.tabId = this._normalizeTabId(sel.value);
+      this._syncConnectorsForCardScopeChange_?.(wrapper, { reason: null, render: false });
       this._applyActiveTab();
       // Reapply visibility so conditions evaluate in the new tab context.
       try { this._applyVisibility_(); } catch {}
@@ -13838,6 +14587,7 @@ _animateCards(targetWraps = null) {
       tabSelect.addEventListener('change', () => {
         const val = tabSelect.value;
         wrap.dataset.tabId = this._normalizeTabId(val);
+        try { this._syncConnectorsForCardScopeChange_?.(wrap, { reason: null, render: false }); } catch {}
         try { this._addTabSelectorToChip?.(wrap, wrap.dataset.tabId); } catch {}
         try { this._applyActiveTab(); } catch {}
         try { this._applyVisibility_(); } catch {}
@@ -13901,6 +14651,7 @@ _animateCards(targetWraps = null) {
           if (selectedLayers.has(layer.id)) selectedLayers.delete(layer.id);
           else selectedLayers.add(layer.id);
           this._setWrapperLayerIds_(wrap, Array.from(selectedLayers));
+          try { this._syncConnectorsForCardScopeChange_?.(wrap, { reason: null, render: false }); } catch {}
           syncLayerChips();
           try { this._applyActiveTab?.(); } catch {}
           try { this._applyVisibility_?.(); } catch {}
@@ -14604,15 +15355,24 @@ _syncEmptyStateUI() {
           }
 
           // Snap cards to the grid and update raw coordinates
+          const connectorDeltas = [];
           for (const pr of endRects) {
+            const start = this.__groupDrag.startRaw.get(pr.el) || { x: pr.snapX, y: pr.snapY };
             this._setCardPosition(pr.el, pr.snapX, pr.snapY);
             pr.el.setAttribute('data-x-raw', String(pr.snapX));
             pr.el.setAttribute('data-y-raw', String(pr.snapY));
+            connectorDeltas.push({
+              id: pr.el.dataset?.layoutCardId,
+              dx: pr.snapX - start.x,
+              dy: pr.snapY - start.y,
+            });
           }
+          this._moveConnectorsForCardDeltas_?.(connectorDeltas, { reason: null, render: false });
 
           // Cleanup
           for (const m of this.__groupDrag.members) m.classList.remove('dragging');
           this._resizeContainer();
+          this._renderConnectors_?.();
           if (this._isContainerFixed()) this._clampAllCardsInside();
           this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
           this.__groupDrag = null;
@@ -14716,57 +15476,51 @@ _syncEmptyStateUI() {
 
   /* ------------------------ Card creation & wrapper ------------------------ */
   async _createCard(cfg) {
-    const sourceCfg = (() => {
-      try {
-        if (typeof structuredClone === 'function') return structuredClone(cfg || {});
-        return JSON.parse(JSON.stringify(cfg || {}));
-      } catch {
-        return { ...(cfg || {}) };
-      }
-    })();
-    const type = String(cfg?.type || '');
+    const sourceCfg = this._sanitizeCardConfigForStorage_(cfg || {});
+    const runtimeCfg = this._cloneCardConfig_(sourceCfg);
+    const type = String(sourceCfg?.type || '');
     if (type === 'custom:ddc-html-card') {
       const el = document.createElement('ddc-html-card');
       el.__ddcSourceConfig = sourceCfg;
-      el.setConfig?.(cfg);
+      el.setConfig?.(this._cloneCardConfig_(sourceCfg));
       el.hass = this.hass;
       return el;
     }
     if (type === 'custom:ddc-line-card') {
       const el = document.createElement('ddc-line-card');
       el.__ddcSourceConfig = sourceCfg;
-      el.setConfig?.(cfg);
+      el.setConfig?.(this._cloneCardConfig_(sourceCfg));
       el.hass = this.hass;
       return el;
     }
     if (type === 'custom:ddc-table-card') {
       const el = document.createElement('ddc-table-card');
       el.__ddcSourceConfig = sourceCfg;
-      el.setConfig?.(cfg);
+      el.setConfig?.(this._cloneCardConfig_(sourceCfg));
       el.hass = this.hass;
       return el;
     }
     if (type === 'custom:ddc-icon-card') {
       const el = document.createElement('ddc-icon-card');
       el.__ddcSourceConfig = sourceCfg;
-      el.setConfig?.(cfg);
+      el.setConfig?.(this._cloneCardConfig_(sourceCfg));
       el.hass = this.hass;
       return el;
     }
     if (type === 'custom:ddc-text-card') {
       const el = document.createElement('ddc-text-card');
       el.__ddcSourceConfig = sourceCfg;
-      el.setConfig?.(cfg);
+      el.setConfig?.(this._cloneCardConfig_(sourceCfg));
       el.hass = this.hass;
       return el;
     }
     const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
-    const el = helpers.createCardElement(cfg);
+    const el = helpers.createCardElement(runtimeCfg);
     el.__ddcSourceConfig = sourceCfg;
     el.hass = this.hass;
     
     // Special handling for mod-card
-    if (cfg.type === 'custom:mod-card') {
+    if (sourceCfg.type === 'custom:mod-card') {
       // mod-card needs to be fully initialized before we can work with it
       await new Promise(resolve => setTimeout(resolve, 0));
       
@@ -14774,7 +15528,7 @@ _syncEmptyStateUI() {
       if (el.setConfig && typeof el.setConfig === 'function') {
         try {
           // Re-apply config to ensure mod-card processes it
-          el.setConfig(cfg);
+          el.setConfig(this._cloneCardConfig_(sourceCfg));
         } catch {}
       }
     }
@@ -14848,14 +15602,18 @@ _syncEmptyStateUI() {
       // delete all selected cards. Otherwise delete just this wrapper.
       if (this._selection.size > 1 && this._selection.has(wrap)) {
         const toDel = Array.from(this._selection);
+        this._removeConnectorsForCardIds_?.(toDel.map((w) => w.dataset?.layoutCardId).filter(Boolean), { reason: null, render: false });
         toDel.forEach(w => w.remove());
         this._clearSelection();
         this._resizeContainer();
+        this._renderConnectors_?.();
         this._queueSave('delete-multi');
         this._ensurePlaceholderIfEmpty?.();
       } else {
+        this._removeConnectorsForCardIds_?.([wrap.dataset?.layoutCardId].filter(Boolean), { reason: null, render: false });
         wrap.remove();
         this._resizeContainer();
+        this._renderConnectors_?.();
         this._queueSave('delete');
         this._ensurePlaceholderIfEmpty?.();
       }
@@ -14871,11 +15629,13 @@ _syncEmptyStateUI() {
       if (act === 'delete') {
         if (this._selection.size > 1 && this._selection.has(wrap)) {
           const toDel = Array.from(this._selection);
+          this._removeConnectorsForCardIds_?.(toDel.map((w) => w.dataset?.layoutCardId).filter(Boolean), { reason: null, render: false });
           toDel.forEach(w => w.remove());
           this._clearSelection();
-          this._resizeContainer(); this._queueSave('delete-multi'); this._ensurePlaceholderIfEmpty();
+          this._resizeContainer(); this._renderConnectors_?.(); this._queueSave('delete-multi'); this._ensurePlaceholderIfEmpty();
         } else {
-          wrap.remove(); this._resizeContainer(); this._queueSave('delete'); this._ensurePlaceholderIfEmpty();
+          this._removeConnectorsForCardIds_?.([wrap.dataset?.layoutCardId].filter(Boolean), { reason: null, render: false });
+          wrap.remove(); this._resizeContainer(); this._renderConnectors_?.(); this._queueSave('delete'); this._ensurePlaceholderIfEmpty();
         }
       } else if (act === 'export-card') {
         this._exportSingleCard_?.(wrap);
@@ -15040,9 +15800,12 @@ _syncEmptyStateUI() {
 
     // cache the card config on the wrapper
     try {
-      const cfg = cardEl._config || cardEl.config;
+      const cfg = this._sanitizeCardConfigForStorage_(
+        cardEl.__ddcSourceConfig || cardEl._config || cardEl.config
+      );
       if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
         wrap.dataset.cfg = JSON.stringify(cfg);
+        cardEl.__ddcSourceConfig = cfg;
         
         // Mark if this needs card_mod processing
         if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
@@ -15139,7 +15902,9 @@ _syncEmptyStateUI() {
       const card = wrap.firstElementChild;
       if (!card) return;
       
-      const config = card._config || card.config;
+      const config = this._sanitizeCardConfigForStorage_(
+        card.__ddcSourceConfig || card._config || card.config
+      );
       if (!config) return;
       
       // For mod-card specifically, we need to wait for it to be fully initialized
@@ -15152,14 +15917,14 @@ _syncEmptyStateUI() {
             });
           } else if (card.setConfig) {
             try {
-              card.setConfig({...config});
+              card.setConfig(this._cloneCardConfig_(config));
             } catch {}
           }
         }, 100);
       } else if (config.card_mod && card.setConfig) {
         // Regular card_mod
         try {
-          card.setConfig({...config});
+          card.setConfig(this._cloneCardConfig_(config));
         } catch {}
       }
     });
@@ -16298,7 +17063,7 @@ _applyAutoFillNoScale() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          return parsed;
+          return this._sanitizeCardConfigForStorage_(parsed);
         }
       }
     } catch {}
@@ -16307,14 +17072,7 @@ _applyAutoFillNoScale() {
     // wrapper cache is unavailable.
     const sourceCfg = cardEl.__ddcSourceConfig;
     if (sourceCfg && typeof sourceCfg === 'object' && Object.keys(sourceCfg).length) {
-      try {
-        if (typeof structuredClone === 'function') {
-          return structuredClone(sourceCfg);
-        }
-        return JSON.parse(JSON.stringify(sourceCfg));
-      } catch {
-        return { ...sourceCfg };
-      }
+      return this._sanitizeCardConfigForStorage_(sourceCfg);
     }
     // attempt to read the card's own config
     const cfg = cardEl._config || cardEl.config;
@@ -16322,15 +17080,7 @@ _applyAutoFillNoScale() {
       // Always return a deep clone of the config so editing one card cannot
       // inadvertently mutate the config of another. Use structuredClone when
       // available for fidelity; fall back to JSON serialization otherwise.
-      try {
-        if (typeof structuredClone === 'function') {
-          return structuredClone(cfg);
-        }
-        return JSON.parse(JSON.stringify(cfg));
-      } catch {
-        // As a last resort perform a shallow copy
-        return { ...cfg };
-      }
+      return this._sanitizeCardConfigForStorage_(cfg);
     }
     return {};
   }
@@ -20104,6 +20854,15 @@ return {
             return;
           }
           this._setDashboardPackages_(json.packages || []);
+          const importedOptions = json.options
+            ? { ...json.options }
+            : (typeof json.grid === 'number' ? { grid: json.grid } : {});
+          if (json.connectors && !('connectors' in importedOptions)) importedOptions.connectors = json.connectors;
+          if (json.responsive_connectors && !('responsive_connectors' in importedOptions)) {
+            importedOptions.responsive_connectors = json.responsive_connectors;
+          }
+          delete importedOptions.storage_key;
+          this._applyImportedOptions?.(importedOptions, false);
           this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
             json.options?.responsive_viewports || this.responsiveViewportProfiles
           );
@@ -24166,14 +24925,19 @@ modal.innerHTML = `
     if (!responsiveEntries[activeLayoutKey]) {
       responsiveEntries[activeLayoutKey] = this._normalizeSavedCardEntry_(activeEntry, activeEntry);
     }
+    const connectorEntries = this._collectConnectorLayoutsForCard_?.(layoutCardId) || {};
+    const activeConnectors = connectorEntries[activeLayoutKey] || connectorEntries[this._getPrimaryResponsiveLayoutKey_?.()] || [];
 
     return {
       kind: 'ddc-card',
-      version: 1,
+      version: 2,
       exported_at: new Date().toISOString(),
       source_storage_key: this.storageKey || null,
+      connector_card_id: layoutCardId,
       entry: this._normalizeSavedCardEntry_(activeEntry, activeEntry),
       responsive_entries: this._cloneJson_(responsiveEntries),
+      connectors: this._cloneJson_(activeConnectors),
+      responsive_connectors: this._cloneJson_(this._serializeResponsiveConnectorLayouts_(connectorEntries, activeConnectors)),
     };
   }
 
@@ -24250,10 +25014,17 @@ modal.innerHTML = `
     }
 
     const responsiveEntriesRaw = payload?.responsive_entries || payload?.responsiveEntries || {};
+    const importedConnectorLayouts = this._normalizeResponsiveConnectorLayouts_(
+      payload?.connectors || [],
+      payload?.responsive_connectors || payload?.responsiveConnectors || null
+    );
     const variantKeys = this._responsiveLayoutVariantKeys_?.() || [this._activeResponsiveLayoutKey || 'desktop_landscape'];
     const newLayoutCardId = this._genLayoutCardId_();
+    const oldLayoutCardId = String(payload?.connector_card_id || payload?.connectorCardId || baseEntryRaw.id || payload?.entry?.id || '').trim();
     const targetTabId = this._normalizeTabId(this.activeTab || this.defaultTab);
     const importedByVariant = {};
+    const connectorIdMap = new Map();
+    this._ensureResponsiveConnectorsMemory_?.();
 
     variantKeys.forEach((variantKey) => {
       const sourceEntryRaw = responsiveEntriesRaw?.[variantKey]?.card
@@ -24279,7 +25050,29 @@ modal.innerHTML = `
       currentEntries.push(importedEntry);
       this._responsiveLayouts[variantKey] = currentEntries;
       importedByVariant[variantKey] = importedEntry;
+
+      const sourceConnectors = Array.isArray(importedConnectorLayouts?.[variantKey])
+        ? importedConnectorLayouts[variantKey]
+        : [];
+      if (sourceConnectors.length) {
+        const currentConnectors = Array.isArray(this._responsiveConnectors?.[variantKey])
+          ? this._responsiveConnectors[variantKey].map((entry) => this._normalizeConnectorEntry_(entry))
+          : [];
+        const importedConnectors = sourceConnectors
+          .map((connector) => this._remapSingleCardConnector_(connector, {
+            oldCardId: oldLayoutCardId,
+            newCardId: newLayoutCardId,
+            sourceEntry,
+            importedEntry,
+            connectorIdMap,
+          }))
+          .filter(Boolean);
+        if (importedConnectors.length) {
+          this._responsiveConnectors[variantKey] = [...currentConnectors, ...importedConnectors];
+        }
+      }
     });
+    this._syncConnectorLayoutsToConfig_?.();
 
     const activeLayoutKey = this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
     const activeEntry = importedByVariant[activeLayoutKey] || importedByVariant[this._getPrimaryResponsiveLayoutKey_?.()] || Object.values(importedByVariant)[0];
@@ -24411,11 +25204,65 @@ _importDesign() {
           ? !!json.options.hide_tabs_when_single
           : true;
       // -------------------------------------------------------------------------
+      const runtimeImportedOptions = json.options
+        ? { ...json.options }
+        : (typeof json.grid === 'number' ? { grid: json.grid } : {});
+      if (json.connectors && !('connectors' in runtimeImportedOptions)) {
+        runtimeImportedOptions.connectors = json.connectors;
+      }
+      if (json.responsive_connectors && !('responsive_connectors' in runtimeImportedOptions)) {
+        runtimeImportedOptions.responsive_connectors = json.responsive_connectors;
+      }
+      if ((!Array.isArray(runtimeImportedOptions.layers) || !runtimeImportedOptions.layers.length) && runtimeImportedOptions.layers_enabled !== false) {
+        const layerIds = [];
+        const addLayerId = (value) => {
+          if (value === null || value === undefined) return;
+          if (Array.isArray(value)) {
+            value.forEach(addLayerId);
+            return;
+          }
+          String(value)
+            .split(',')
+            .map((part) => this._normalizeLayerId_(part, part))
+            .filter(Boolean)
+            .forEach((id) => {
+              if (!layerIds.includes(id)) layerIds.push(id);
+            });
+        };
+        const visitLayoutEntries = (value) => {
+          if (!value) return;
+          if (Array.isArray(value)) {
+            value.forEach((entry) => {
+              if (entry && typeof entry === 'object') addLayerId(entry.layerIds || entry.layer_ids);
+            });
+            return;
+          }
+          if (typeof value !== 'object') return;
+          if (Array.isArray(value.cards)) visitLayoutEntries(value.cards);
+          Object.values(value).forEach((nested) => {
+            if (nested && typeof nested === 'object') visitLayoutEntries(nested);
+          });
+        };
+        visitLayoutEntries(json.cards || []);
+        visitLayoutEntries(json.responsive_layouts || null);
+        if (layerIds.length) {
+          runtimeImportedOptions.layers = layerIds.map((id) => ({
+            id,
+            label: id.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+            icon: 'mdi:layers-outline',
+          }));
+          runtimeImportedOptions.layers_enabled = runtimeImportedOptions.layers_enabled ?? true;
+        }
+      }
+      runtimeImportedOptions.tabs = runtimeImportedOptions.tabs ?? compatTabs;
+      runtimeImportedOptions.tabs_position = runtimeImportedOptions.tabs_position ?? compatTabsPosition;
+      runtimeImportedOptions.default_tab = runtimeImportedOptions.default_tab ?? compatDefaultTab;
+      runtimeImportedOptions.hide_tabs_when_single = runtimeImportedOptions.hide_tabs_when_single ?? compatHideSingle;
+      if (!ADOPT_IMPORTED_STORAGE_KEY) delete runtimeImportedOptions.storage_key;
 
       // ---- APPLY OPTIONS (with hard-replace or merge) ----
       if (json.options) {
-        const imported = { ...json.options };
-        if (!ADOPT_IMPORTED_STORAGE_KEY) delete imported.storage_key;
+        const imported = { ...runtimeImportedOptions };
 
         if (HARD_REPLACE) {
           const cfg = this._config || { type: 'custom:drag-and-drop-card' };
@@ -24490,12 +25337,13 @@ _importDesign() {
         }
       } else if (typeof json.grid === 'number') {
         // v1 fallback
-        const imported = { grid: json.grid };
+        const imported = { ...runtimeImportedOptions };
         HARD_REPLACE
           ? (this._config = { ...(this._config||{}), ...imported })
           : this._applyImportedOptions(imported, true);
         this.requestUpdate?.();
       }
+      this._applyImportedOptions?.(runtimeImportedOptions, false);
 
       // Ensure instance tab options exist even for old files (after options applied)
       if (!Array.isArray(this.tabs) || !this.tabs.length) this.tabs = compatTabs;
@@ -24509,8 +25357,7 @@ _importDesign() {
         const targetKey = this._config?.storage_key || this.storageKey || null;
 
         // Start from what the file had (v2) or v1 fallback
-        const importedOptions = json.options
-          ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
+        const importedOptions = runtimeImportedOptions;
 
         // Ensure tabs keys are present (either from file or from current instance state)
         const persistOptions = {
@@ -24913,6 +25760,258 @@ _importDesign() {
     return icons[domain] || 'mdi:home-analytics';
   }
 
+  _screenSaverWeatherIcon_(state = '') {
+    const value = String(state || '').toLowerCase().replace(/_/g, '-');
+    const icons = {
+      sunny: 'mdi:weather-sunny',
+      clear: 'mdi:weather-sunny',
+      'clear-night': 'mdi:weather-night',
+      cloudy: 'mdi:weather-cloudy',
+      fog: 'mdi:weather-fog',
+      hail: 'mdi:weather-hail',
+      lightning: 'mdi:weather-lightning',
+      'lightning-rainy': 'mdi:weather-lightning-rainy',
+      partlycloudy: 'mdi:weather-partly-cloudy',
+      'partly-cloudy': 'mdi:weather-partly-cloudy',
+      pouring: 'mdi:weather-pouring',
+      rainy: 'mdi:weather-rainy',
+      snowy: 'mdi:weather-snowy',
+      'snowy-rainy': 'mdi:weather-snowy-rainy',
+      windy: 'mdi:weather-windy',
+      'windy-variant': 'mdi:weather-windy-variant',
+      exceptional: 'mdi:weather-tornado',
+    };
+    return icons[value] || 'mdi:weather-partly-cloudy';
+  }
+
+  _screenSaverAlarmIcon_(state = '', domain = '') {
+    const value = String(state || '').toLowerCase();
+    if (domain === 'lock') {
+      if (value === 'locked') return 'mdi:lock-check-outline';
+      if (value === 'unlocked') return 'mdi:lock-open-alert-outline';
+      return 'mdi:lock-outline';
+    }
+    if (value.includes('triggered')) return 'mdi:alarm-light-outline';
+    if (value.includes('pending')) return 'mdi:shield-alert-outline';
+    if (value.includes('armed')) return 'mdi:shield-lock-outline';
+    if (value.includes('disarmed')) return 'mdi:shield-check-outline';
+    if (value === 'home' || value === 'on') return 'mdi:home-shield';
+    return 'mdi:shield-home-outline';
+  }
+
+  _screenSaverStatusIcon_(item = {}, stateObj = null, fallbackIcon = 'mdi:circle-outline') {
+    const entityId = String(item.entity || item.entity_id || '').trim();
+    const domain = entityId.split('.')[0];
+    const state = stateObj?.state;
+    if (item.key === 'weather' || domain === 'weather') return this._screenSaverWeatherIcon_(state);
+    if (item.key === 'alarm' || domain === 'alarm_control_panel' || domain === 'lock') return this._screenSaverAlarmIcon_(state, domain);
+    if (item.key === 'energy') return stateObj?.attributes?.icon || 'mdi:flash';
+    return stateObj?.attributes?.icon || fallbackIcon;
+  }
+
+  _getScreenSaverNumericValue_(state) {
+    const normalized = String(state ?? '').trim().replace(',', '.');
+    if (!normalized || ['unknown', 'unavailable'].includes(normalized.toLowerCase())) return null;
+    const value = Number.parseFloat(normalized);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  _rememberScreenSaverSparkline_(key = '', value = null) {
+    if (!key || !Number.isFinite(value)) return [];
+    if (!this.__screenSaverSparklineData) this.__screenSaverSparklineData = new Map();
+    const now = Date.now();
+    const samples = this.__screenSaverSparklineData.get(key) || [];
+    const last = samples[samples.length - 1];
+    if (!last || last.v !== value || now - last.t > 30000) {
+      samples.push({ t: now, v: value });
+      while (samples.length > 16) samples.shift();
+      this.__screenSaverSparklineData.set(key, samples);
+    }
+    return samples;
+  }
+
+  _screenSaverSparklinePoints_(samples = []) {
+    const values = (Array.isArray(samples) ? samples : [])
+      .map((sample) => Number(sample?.v))
+      .filter((value) => Number.isFinite(value));
+    if (!values.length) return '';
+    const plotted = values.length === 1 ? [values[0], values[0]] : values;
+    const min = Math.min(...plotted);
+    const max = Math.max(...plotted);
+    const span = Math.max(max - min, Math.abs(max || 1) * 0.08, 1);
+    return plotted.map((value, index) => {
+      const x = plotted.length === 1 ? 60 : (index / Math.max(1, plotted.length - 1)) * 120;
+      const y = 30 - ((value - min) / span) * 24;
+      return `${x.toFixed(1)},${Math.max(4, Math.min(30, y)).toFixed(1)}`;
+    }).join(' ');
+  }
+
+  _getScreenSaverLocale_() {
+    const hass = this.hass || this._hass;
+    return hass?.locale?.language || hass?.selectedLanguage || (typeof navigator !== 'undefined' ? navigator.language : undefined) || undefined;
+  }
+
+  _formatScreenSaverTimestamp_(value) {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const locale = this._getScreenSaverLocale_?.();
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    if (sameDay) return time;
+    return `${date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} ${time}`;
+  }
+
+  _screenSaverAttrValue_(value, unit = '') {
+    if (value === undefined || value === null || value === '') return '';
+    const suffix = String(unit || '').trim();
+    return `${value}${suffix && !String(suffix).startsWith('%') && !String(suffix).startsWith('°') ? ' ' : ''}${suffix}`;
+  }
+
+  _screenSaverCleanLabel_(label = '', entityId = '') {
+    const raw = String(label || entityId || '').trim();
+    if (!raw) return '';
+    const withoutDomain = raw.includes('.') ? raw.split('.').slice(1).join('.') : raw;
+    const cleaned = withoutDomain
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b(sensor|binary sensor|power sensor|energy sensor)\b$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned) return raw;
+    return cleaned.replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+
+  _pushScreenSaverMeta_(meta, label, value, unit = '') {
+    if (!Array.isArray(meta) || value === undefined || value === null || value === '') return;
+    meta.push({
+      label: String(label || '').trim(),
+      value: this._screenSaverAttrValue_(value, unit),
+    });
+  }
+
+  _screenSaverKnownTimestamp_(attrs = {}, keys = []) {
+    for (const key of keys) {
+      const value = attrs?.[key];
+      const date = value ? new Date(value) : null;
+      if (date && Number.isFinite(date.getTime())) return date;
+    }
+    return null;
+  }
+
+  _isScreenSaverAlarmActive_(state = '', domain = '') {
+    const value = String(state || '').toLowerCase();
+    if (domain === 'lock') return value === 'locked';
+    return value.includes('armed') || value.includes('triggered') || value.includes('pending') || value === 'on' || value === 'home';
+  }
+
+  _rememberScreenSaverAlarmActive_(entityId = '', stateObj = null, rawState = '', domain = '') {
+    if (!entityId || !stateObj) return null;
+    if (!this.__screenSaverAlarmActiveTimes) this.__screenSaverAlarmActiveTimes = new Map();
+    const attrs = stateObj.attributes || {};
+    const explicit = this._screenSaverKnownTimestamp_(attrs, [
+      'last_activated',
+      'last_armed',
+      'last_triggered',
+      'armed_at',
+      'triggered_at',
+      'last_tripped',
+    ]);
+    if (explicit) {
+      this.__screenSaverAlarmActiveTimes.set(entityId, explicit);
+      return explicit;
+    }
+    if (this._isScreenSaverAlarmActive_(rawState, domain)) {
+      const activeAt = new Date(stateObj.last_changed || stateObj.last_updated || Date.now());
+      if (Number.isFinite(activeAt.getTime())) this.__screenSaverAlarmActiveTimes.set(entityId, activeAt);
+      return activeAt;
+    }
+    return this.__screenSaverAlarmActiveTimes.get(entityId) || null;
+  }
+
+  _screenSaverSparklineStats_(samples = []) {
+    const values = (Array.isArray(samples) ? samples : [])
+      .map((sample) => Number(sample?.v))
+      .filter((value) => Number.isFinite(value));
+    if (!values.length) return null;
+    const sum = values.reduce((total, value) => total + value, 0);
+    return {
+      count: values.length,
+      min: Math.min(...values),
+      max: Math.max(...values),
+      avg: sum / values.length,
+    };
+  }
+
+  _roundScreenSaverNumber_(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return value;
+    if (Math.abs(number) >= 100) return Math.round(number);
+    if (Math.abs(number) >= 10) return Math.round(number * 10) / 10;
+    return Math.round(number * 100) / 100;
+  }
+
+  _buildScreenSaverMeta_(item = {}, stateObj = null, rawState = '', unit = '', samples = []) {
+    const attrs = stateObj?.attributes || {};
+    const domain = String(item.entity || item.entity_id || '').split('.')[0];
+    const meta = [];
+    const detailParts = [];
+    const updatedAt = this._formatScreenSaverTimestamp_(stateObj?.last_updated || stateObj?.last_changed);
+    let metaLimit = 3;
+
+    if (item.key === 'alarm') {
+      const activeAt = this._rememberScreenSaverAlarmActive_(item.entity || item.entity_id, stateObj, rawState, domain);
+      const activeLabel = domain === 'lock' ? 'Sist låst' : 'Sist aktivert';
+      if (activeAt) this._pushScreenSaverMeta_(meta, activeLabel, this._formatScreenSaverTimestamp_(activeAt));
+      else if (stateObj?.last_changed) this._pushScreenSaverMeta_(meta, 'Sist endret', this._formatScreenSaverTimestamp_(stateObj.last_changed));
+      if (attrs.changed_by) this._pushScreenSaverMeta_(meta, 'Av', attrs.changed_by);
+      if (attrs.battery_level !== undefined) this._pushScreenSaverMeta_(meta, 'Batteri', attrs.battery_level, '%');
+      if (activeAt) detailParts.push(`${activeLabel} ${this._formatScreenSaverTimestamp_(activeAt)}`);
+      else if (String(rawState || '').toLowerCase().includes('disarmed')) detailParts.push('Alle systemer normal');
+      else if (updatedAt) detailParts.push(`Oppdatert ${updatedAt}`);
+    } else if (item.key === 'weather' || domain === 'weather') {
+      const tempUnit = attrs.temperature_unit || unit || '°';
+      if (attrs.apparent_temperature !== undefined) this._pushScreenSaverMeta_(meta, 'Føles', attrs.apparent_temperature, tempUnit);
+      if (attrs.humidity !== undefined) this._pushScreenSaverMeta_(meta, 'Fukt', attrs.humidity, '%');
+      if (attrs.wind_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Vind', attrs.wind_speed, attrs.wind_speed_unit || '');
+      if (meta.length < 3 && attrs.precipitation !== undefined) this._pushScreenSaverMeta_(meta, 'Nedbør', attrs.precipitation, attrs.precipitation_unit || 'mm');
+      if (meta.length < 3 && attrs.wind_gust_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Kast', attrs.wind_gust_speed, attrs.wind_speed_unit || '');
+      if (meta.length < 3 && attrs.pressure !== undefined) this._pushScreenSaverMeta_(meta, 'Trykk', attrs.pressure, attrs.pressure_unit || 'hPa');
+      const condition = this._formatScreenSaverState_(rawState);
+      if (condition) detailParts.push(condition);
+    } else if (item.key === 'energy') {
+      const stats = this._screenSaverSparklineStats_(samples);
+      if (stats?.count > 1) {
+        this._pushScreenSaverMeta_(meta, 'Snitt', this._roundScreenSaverNumber_(stats.avg), unit);
+        this._pushScreenSaverMeta_(meta, 'Topp', this._roundScreenSaverNumber_(stats.max), unit);
+      }
+      const attrPairs = [
+        ['today', 'I dag', unit],
+        ['energy_today', 'I dag', unit],
+        ['daily_energy', 'I dag', unit],
+        ['cost_today', 'Kost', attrs.currency || ''],
+        ['price', 'Pris', attrs.currency || ''],
+        ['voltage', 'Volt', 'V'],
+        ['current', 'Amp', 'A'],
+        ['power_factor', 'PF', ''],
+        ['battery_level', 'Batteri', '%'],
+      ];
+      attrPairs.forEach(([key, label, suffix]) => {
+        if (meta.length < 3 && attrs[key] !== undefined) this._pushScreenSaverMeta_(meta, label, attrs[key], suffix);
+      });
+      if (stats?.count > 1) {
+        detailParts.push(`Snitt ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.avg), unit)} · Topp ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.max), unit)}`);
+      } else if (updatedAt) {
+        detailParts.push(`Oppdatert ${updatedAt}`);
+      }
+    }
+
+    return {
+      detail: detailParts.filter(Boolean).join(' · '),
+      meta: meta.slice(0, metaLimit),
+    };
+  }
+
   _resolveScreenSaverEntityStatus_(item = {}) {
     const entityId = String(item.entity || item.entity_id || '').trim();
     if (!entityId) return null;
@@ -24923,10 +26022,11 @@ _importDesign() {
     if (!stateObj) {
       return {
         key: item.key || entityId,
+        category: item.title || (item.key ? this._formatScreenSaverState_(item.key) : 'Status'),
         entity: entityId,
         icon: fallbackIcon,
         value: 'Unavailable',
-        label: item.label || entityId,
+        label: item.label || this._screenSaverCleanLabel_(entityId, entityId),
         detail: 'Entity not found',
         tone: 'warn',
       };
@@ -24934,12 +26034,15 @@ _importDesign() {
 
     const attrs = stateObj.attributes || {};
     const friendlyName = attrs.friendly_name || entityId;
-    const label = item.label || friendlyName;
+    const label = item.label || this._screenSaverCleanLabel_(friendlyName, entityId);
     const unit = attrs.unit_of_measurement || '';
     const rawState = stateObj.state;
+    const numericValue = this._getScreenSaverNumericValue_(rawState);
     const unavailable = ['unknown', 'unavailable'].includes(String(rawState || '').toLowerCase());
     let value = this._formatScreenSaverState_(rawState) || 'Unavailable';
     let detail = friendlyName;
+    let sparklinePoints = '';
+    let sparklineSamples = [];
 
     if (unavailable) {
       value = 'Unavailable';
@@ -24950,14 +26053,25 @@ _importDesign() {
     } else if (unit) {
       value = `${rawState}${String(unit).startsWith('°') || String(unit).startsWith('%') ? '' : ' '}${unit}`;
     }
+    if (!unavailable && item.key === 'energy' && Number.isFinite(numericValue)) {
+      sparklineSamples = this._rememberScreenSaverSparkline_(`${item.key || 'status'}:${entityId}`, numericValue);
+      sparklinePoints = this._screenSaverSparklinePoints_(sparklineSamples);
+    }
+    const richInfo = unavailable
+      ? { detail, meta: [] }
+      : this._buildScreenSaverMeta_(item, stateObj, rawState, unit, sparklineSamples);
+    if (richInfo.detail) detail = richInfo.detail;
 
     return {
       key: item.key || entityId,
+      category: item.title || (item.key ? this._formatScreenSaverState_(item.key) : 'Status'),
       entity: entityId,
-      icon: attrs.icon || fallbackIcon,
+      icon: this._screenSaverStatusIcon_(item, stateObj, fallbackIcon),
       value,
       label,
       detail,
+      meta: richInfo.meta || [],
+      sparklinePoints,
       tone: unavailable ? 'warn' : (item.tone || 'blue'),
     };
   }
@@ -24972,10 +26086,29 @@ _importDesign() {
     const esc = (value) => this._escapeScreenSaverHtml_(value);
     return items.map((item, index) => `
       <article class="ss-status-card ss-status-${esc(item.tone || 'blue')}" data-ss-status="${esc(item.key || index)}" title="${esc(item.entity || '')}">
-        <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}" aria-hidden="true"></ha-icon>
-        <div>
+        <span class="ss-status-icon" aria-hidden="true">
+          <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}"></ha-icon>
+        </span>
+        <div class="ss-status-copy">
+          <span class="ss-status-category">${esc(item.category || item.key || 'Status')}</span>
           <strong>${esc(item.value || '')}</strong>
-          <span>${esc(item.label || '')}</span>
+          <span class="ss-status-name">${esc(item.label || '')}</span>
+          ${item.detail ? `<small class="ss-status-detail">${esc(item.detail)}</small>` : ''}
+          ${Array.isArray(item.meta) && item.meta.length ? `
+            <div class="ss-status-meta">
+              ${item.meta.map((meta) => `
+                <span class="ss-status-chip">
+                  <b>${esc(meta.label || '')}</b>
+                  <em>${esc(meta.value || '')}</em>
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+          ${item.sparklinePoints ? `
+            <svg class="ss-status-sparkline" viewBox="0 0 120 34" focusable="false" aria-hidden="true">
+              <polyline points="${esc(item.sparklinePoints)}"></polyline>
+            </svg>
+          ` : ''}
         </div>
       </article>
     `).join('');
@@ -25022,22 +26155,23 @@ _importDesign() {
   _getScreenSaverTimeParts_(date = new Date()) {
     let time = '';
     let period = '';
+    const locale = this._getScreenSaverLocale_?.();
     try {
-      const parts = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).formatToParts(date);
+      const parts = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).formatToParts(date);
       time = parts.filter((part) => part.type !== 'dayPeriod').map((part) => part.value).join('').trim();
       period = (parts.find((part) => part.type === 'dayPeriod')?.value || '').toUpperCase();
     } catch {
-      time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     }
     return {
       time,
       period,
-      seconds: date.toLocaleTimeString([], { second: '2-digit' }),
-      date: date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-      shortDate: date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }),
-      month: date.toLocaleDateString([], { month: 'long', year: 'numeric' }),
-      day: date.toLocaleDateString([], { day: '2-digit' }),
-      weekday: date.toLocaleDateString([], { weekday: 'long' }),
+      seconds: date.toLocaleTimeString(locale, { second: '2-digit' }),
+      date: date.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      shortDate: date.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }),
+      month: date.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+      day: date.toLocaleDateString(locale, { day: '2-digit' }),
+      weekday: date.toLocaleDateString(locale, { weekday: 'long' }),
     };
   }
 
@@ -25058,6 +26192,7 @@ _importDesign() {
     overlay.dataset.hasStatus = statusItems.length ? '1' : '0';
     overlay.dataset.statusCount = String(statusItems.length);
     overlay.className = `screensaver-overlay ss-style-${styleId}${wasActive ? ' active' : ''}`;
+    this._applyScreenSaverBackgroundImage_?.(styleId);
     overlay.innerHTML = `
       <div class="ss-visual-layer" aria-hidden="true">
         <div class="ss-earth"></div>
@@ -25224,21 +26359,23 @@ _importDesign() {
       }
       .screensaver-overlay .screensaver-clock{
         font-family:"Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-        font-size:clamp(4rem, 10vw, 9rem);
+        font-size:clamp(5.8rem, 12vw, 12rem);
         font-weight:250;
         letter-spacing:0;
-        line-height:.92;
+        line-height:.9;
         text-shadow:0 20px 60px rgba(0,0,0,.34);
       }
       .screensaver-overlay .ss-period{
-        font-size:clamp(1rem, 2vw, 1.7rem);
+        font-size:clamp(1.4rem, 2.4vw, 2.25rem);
         color:rgba(255,255,255,.86);
       }
       .screensaver-overlay .screensaver-date{
         margin:0;
         font-family:inherit;
-        font-size:clamp(1rem, 1.6vw, 1.45rem);
-        color:rgba(255,255,255,.86);
+        font-size:clamp(1.85rem, 3vw, 3.4rem);
+        color:rgba(255,255,255,.9);
+        line-height:1.05;
+        text-shadow:0 14px 42px rgba(0,0,0,.38);
       }
       .screensaver-overlay .ss-quote{
         display:none;
@@ -25293,44 +26430,141 @@ _importDesign() {
       .screensaver-overlay .ss-status-rail{
         grid-area:status;
         display:grid;
-        grid-template-columns:repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-        gap:clamp(10px, 1.4vw, 18px);
+        grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+        gap:clamp(14px, 1.8vw, 28px);
         align-self:end;
       }
       .screensaver-overlay .ss-status-card{
-        min-height:76px;
+        min-height:clamp(144px, 15vh, 190px);
         display:flex;
         align-items:center;
-        gap:14px;
-        padding:14px 18px;
-        border-radius:18px;
+        gap:clamp(18px, 1.6vw, 28px);
+        padding:clamp(18px, 2vw, 28px);
+        border-radius:26px;
         min-width:0;
         overflow:hidden;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.055)),
+          rgba(14,18,28,.66);
+        border-color:rgba(255,255,255,.18);
+      }
+      .screensaver-overlay .ss-status-icon{
+        width:clamp(58px, 5.8vw, 82px);
+        height:clamp(58px, 5.8vw, 82px);
+        border-radius:50%;
+        display:grid;
+        place-items:center;
+        flex:0 0 auto;
+        background:
+          radial-gradient(circle at 34% 28%, rgba(255,255,255,.28), transparent 42%),
+          rgba(255,255,255,.12);
+        border:1px solid rgba(255,255,255,.14);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 16px 34px rgba(0,0,0,.22);
       }
       .screensaver-overlay .ss-status-card ha-icon{
-        --mdc-icon-size:26px;
+        --mdc-icon-size:clamp(34px, 3.5vw, 52px);
         color:var(--ss-accent);
         flex:0 0 auto;
       }
-      .screensaver-overlay .ss-status-card div{
+      .screensaver-overlay .ss-status-copy{
         display:grid;
         min-width:0;
+        gap:5px;
+        align-content:start;
+        flex:1 1 auto;
+      }
+      .screensaver-overlay .ss-status-category{
+        color:var(--ss-accent);
+        font-size:clamp(.82rem, .88vw, 1rem);
+        font-weight:780;
+        line-height:1;
+        text-transform:uppercase;
       }
       .screensaver-overlay .ss-status-card strong{
-        font-size:clamp(.98rem, 1.2vw, 1.18rem);
-        font-weight:760;
-        line-height:1.1;
+        font-size:clamp(1.8rem, 2.4vw, 3rem);
+        font-weight:800;
+        line-height:1.02;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        font-variant-numeric:tabular-nums;
+      }
+      .screensaver-overlay .ss-status-name{
+        color:var(--ss-muted);
+        font-size:clamp(1rem, 1.1vw, 1.22rem);
+        font-weight:540;
+        line-height:1.2;
         overflow:hidden;
         text-overflow:ellipsis;
         white-space:nowrap;
       }
-      .screensaver-overlay .ss-status-card span{
-        margin-top:4px;
-        color:var(--ss-muted);
-        font-size:.82rem;
+      .screensaver-overlay .ss-status-detail{
+        display:block;
+        color:rgba(248,251,255,.78);
+        font-size:clamp(.84rem, .92vw, 1rem);
+        font-weight:520;
+        line-height:1.22;
         overflow:hidden;
         text-overflow:ellipsis;
         white-space:nowrap;
+      }
+      .screensaver-overlay .ss-status-meta{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:8px;
+        min-width:0;
+        margin-top:8px;
+        max-width:min(100%, 420px);
+      }
+      .screensaver-overlay .ss-status-chip{
+        display:grid;
+        align-content:center;
+        gap:3px;
+        min-width:0;
+        max-width:100%;
+        min-height:42px;
+        padding:7px 10px;
+        border-radius:13px;
+        background:rgba(255,255,255,.095);
+        border:1px solid rgba(255,255,255,.105);
+        color:rgba(248,251,255,.9);
+        line-height:1;
+      }
+      .screensaver-overlay .ss-status-chip b,
+      .screensaver-overlay .ss-status-chip em{
+        display:block;
+        min-width:0;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        font-style:normal;
+        white-space:nowrap;
+      }
+      .screensaver-overlay .ss-status-chip b{
+        color:rgba(248,251,255,.62);
+        font-size:clamp(.62rem, .68vw, .78rem);
+        font-weight:680;
+      }
+      .screensaver-overlay .ss-status-chip em{
+        color:rgba(248,251,255,.94);
+        font-size:clamp(.82rem, .9vw, 1rem);
+        font-weight:720;
+        font-variant-numeric:tabular-nums;
+      }
+      .screensaver-overlay .ss-status-sparkline{
+        width:min(100%, 210px);
+        height:30px;
+        margin-top:8px;
+        overflow:visible;
+        color:var(--ss-accent);
+        opacity:.92;
+      }
+      .screensaver-overlay .ss-status-sparkline polyline{
+        fill:none;
+        stroke:currentColor;
+        stroke-width:4;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        filter:drop-shadow(0 4px 10px color-mix(in oklab, var(--ss-accent) 42%, transparent));
       }
       .screensaver-overlay .ss-status-green ha-icon{ color:#8ef0b3; }
       .screensaver-overlay .ss-status-amber ha-icon{ color:#ffc16a; }
@@ -25389,7 +26623,7 @@ _importDesign() {
         display:none;
       }
       .screensaver-overlay.ss-style-minimal_scandi .ss-status-card{
-        min-height:62px;
+        min-height:clamp(140px, 15vh, 188px);
         border-color:transparent;
         background:transparent;
         box-shadow:none;
@@ -25414,7 +26648,7 @@ _importDesign() {
         display:block;
       }
       .screensaver-overlay.ss-style-cinematic_dashboard .screensaver-clock{
-        font-size:clamp(4rem, 8vw, 7rem);
+        font-size:clamp(5.4rem, 10vw, 10rem);
       }
 
       .screensaver-overlay.ss-style-sci_fi_hud{ --ss-accent:#22d3ee; --ss-accent-2:#a855f7; }
@@ -25436,7 +26670,7 @@ _importDesign() {
         margin-left:clamp(12px, 4vw, 90px);
       }
       .screensaver-overlay.ss-style-sci_fi_hud .screensaver-clock{
-        font-size:clamp(3rem, 5.8vw, 5.4rem);
+        font-size:clamp(4.8rem, 8vw, 8.6rem);
       }
       .screensaver-overlay.ss-style-sci_fi_hud .ss-status-rail{
         border:1px solid rgba(34,211,238,.38);
@@ -25492,7 +26726,7 @@ _importDesign() {
         backdrop-filter:blur(24px);
       }
       .screensaver-overlay.ss-style-floating_islands .screensaver-clock{
-        font-size:clamp(3.6rem, 6vw, 5.8rem);
+        font-size:clamp(4.8rem, 8vw, 8.8rem);
       }
       .screensaver-overlay.ss-style-floating_islands .screensaver-calendar{
         position:absolute;
@@ -25509,7 +26743,7 @@ _importDesign() {
       }
       .screensaver-overlay.ss-style-floating_islands .ss-status-card{
         position:absolute;
-        width:clamp(168px, 17vw, 238px);
+        width:clamp(260px, 24vw, 390px);
         min-width:0;
         border-radius:999px;
       }
@@ -25534,12 +26768,12 @@ _importDesign() {
         display:none;
       }
       .screensaver-overlay.ss-style-ultra_minimal_dots .screensaver-clock{
-        font-size:clamp(4rem, 7vw, 6.6rem);
+        font-size:clamp(5.6rem, 9vw, 9.8rem);
       }
       .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-rail{
         grid-template-columns:1fr;
-        max-width:360px;
-        gap:12px;
+        max-width:520px;
+        gap:18px;
       }
       .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-card{
         min-height:auto;
@@ -25550,7 +26784,12 @@ _importDesign() {
         backdrop-filter:none;
       }
       .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-card ha-icon{
-        --mdc-icon-size:14px;
+        --mdc-icon-size:30px;
+      }
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-icon{
+        width:42px;
+        height:42px;
+        background:rgba(255,255,255,.1);
       }
 
       .screensaver-overlay.ss-style-home_intelligence{ --ss-accent:#9be7b6; }
@@ -25576,25 +26815,30 @@ _importDesign() {
       }
       .screensaver-overlay.ss-style-home_intelligence .ss-intelligence h3{
         margin:0 0 8px;
-        font-size:clamp(1.8rem, 3vw, 3rem);
+        font-size:clamp(2.6rem, 4vw, 4.6rem);
       }
       .screensaver-overlay.ss-style-home_intelligence .ss-intel-row{
         display:flex;
         align-items:flex-start;
-        gap:14px;
+        gap:18px;
       }
       .screensaver-overlay.ss-style-home_intelligence .ss-intel-row ha-icon{
-        --mdc-icon-size:24px;
+        --mdc-icon-size:38px;
         color:var(--ss-accent);
       }
       .screensaver-overlay.ss-style-home_intelligence .ss-intel-row strong,
       .screensaver-overlay.ss-style-home_intelligence .ss-intel-row span{
         display:block;
       }
+      .screensaver-overlay.ss-style-home_intelligence .ss-intel-row strong{
+        font-size:clamp(1.35rem, 2vw, 2.2rem);
+        line-height:1.12;
+      }
       .screensaver-overlay.ss-style-home_intelligence .ss-intel-row span,
       .screensaver-overlay.ss-style-home_intelligence .ss-intelligence p{
         color:var(--ss-muted);
         margin:3px 0 0;
+        font-size:clamp(1rem, 1.25vw, 1.28rem);
       }
 
       .screensaver-overlay.ss-style-planetary_orbital{ --ss-accent:#ffbf75; }
@@ -25620,7 +26864,7 @@ _importDesign() {
         top:clamp(24px, 8vh, 86px);
       }
       .screensaver-overlay.ss-style-planetary_orbital .screensaver-clock{
-        font-size:clamp(3.2rem, 6vw, 5.8rem);
+        font-size:clamp(4.8rem, 8vw, 8.8rem);
       }
       .screensaver-overlay.ss-style-planetary_orbital .screensaver-calendar,
       .screensaver-overlay.ss-style-planetary_orbital .ss-date-tile{
@@ -25633,7 +26877,7 @@ _importDesign() {
       }
       .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
         position:absolute;
-        width:clamp(164px, 16vw, 226px);
+        width:clamp(260px, 23vw, 370px);
         min-width:0;
         border-radius:999px;
       }
@@ -25641,6 +26885,85 @@ _importDesign() {
       .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(2){ right:16%; top:10%; }
       .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(3){ right:28%; bottom:12%; }
       .screensaver-overlay.ss-style-planetary_orbital .ss-status-card:nth-child(4){ left:10%; bottom:24%; }
+
+      .screensaver-overlay[data-ss-bg-ready="1"]::before{
+        background-image:
+          linear-gradient(90deg, rgba(0,0,0,.42), rgba(0,0,0,.12) 44%, rgba(0,0,0,.36)),
+          linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,.46)),
+          var(--ss-bg-image);
+        background-position:center;
+        background-size:cover;
+        background-repeat:no-repeat;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-visual-layer{
+        display:none;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-content{
+        position:absolute;
+        inset:0;
+        display:block !important;
+        padding:clamp(28px, 4.5vw, 76px);
+        overflow:hidden;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-hero,
+      .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-calendar,
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail,
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+        position:static !important;
+        inset:auto !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:auto !important;
+        transform:none !important;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-hero{
+        position:absolute !important;
+        left:clamp(34px, 5.2vw, 96px) !important;
+        top:clamp(42px, 8.5vh, 118px) !important;
+        display:grid !important;
+        justify-items:start;
+        gap:clamp(8px, 1.1vh, 14px);
+        width:min(70vw, 760px);
+        padding:0;
+        text-align:left;
+        border:0;
+        background:transparent;
+        box-shadow:none;
+        backdrop-filter:none;
+        -webkit-backdrop-filter:none;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-calendar{
+        display:none !important;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+        position:absolute !important;
+        left:clamp(34px, 5vw, 96px) !important;
+        right:clamp(34px, 5vw, 96px) !important;
+        bottom:clamp(42px, 8.5vh, 104px) !important;
+        display:grid !important;
+        grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+        gap:clamp(14px, 2vw, 26px);
+        align-items:end;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+        width:auto !important;
+        min-height:clamp(144px, 15vh, 190px);
+        min-width:0;
+        border-radius:clamp(24px, 2.4vw, 34px);
+        justify-content:flex-start;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.055)),
+          rgba(18,22,34,.46);
+        border-color:rgba(255,255,255,.22);
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-intelligence,
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-date-tile{
+        display:none !important;
+      }
+      .screensaver-overlay[data-ss-bg-ready="1"][data-has-status="0"] .screensaver-content{
+        display:block !important;
+      }
 
       @keyframes ss-spin{ to{ transform:translate(-50%, -50%) rotate(344deg); } }
       @keyframes ss-spin-reverse{ to{ transform:translate(-50%, -50%) rotate(-342deg); } }
@@ -25704,6 +27027,37 @@ _importDesign() {
         .screensaver-overlay.ss-style-planetary_orbital .ss-status-card{
           width:auto;
         }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-sci_fi_hud .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-home_intelligence .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-floating_islands .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-planetary_orbital .screensaver-content{
+          display:block !important;
+          padding:clamp(24px, 4vw, 56px);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-hero{
+          left:clamp(28px, 5vw, 72px) !important;
+          top:clamp(34px, 7.5vh, 86px) !important;
+          justify-self:auto;
+          justify-items:start;
+          text-align:left;
+          width:min(76vw, 620px);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-clock{
+          font-size:clamp(5rem, 11vw, 9rem);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-date{
+          font-size:clamp(1.55rem, 2.6vw, 2.45rem);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-calendar{
+          display:none !important;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          left:clamp(28px, 5vw, 72px) !important;
+          right:clamp(28px, 5vw, 72px) !important;
+          bottom:clamp(34px, 7.5vh, 76px) !important;
+          grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+        }
       }
 
       @media (max-width: 820px){
@@ -25725,8 +27079,8 @@ _importDesign() {
           grid-template-columns:repeat(2, minmax(0, 1fr));
         }
         .screensaver-overlay .ss-status-card{
-          min-height:64px;
-          padding:12px;
+          min-height:88px;
+          padding:14px;
         }
         .screensaver-overlay.ss-style-home_intelligence .screensaver-content{
           grid-template-areas:"intel" "calendar";
@@ -25749,6 +27103,268 @@ _importDesign() {
           position:static;
           display:grid;
           grid-template-columns:1fr;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-sci_fi_hud .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-home_intelligence .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-floating_islands .screensaver-content,
+        .screensaver-overlay[data-ss-bg-ready="1"].ss-style-planetary_orbital .screensaver-content{
+          display:block !important;
+          padding:24px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-hero{
+          left:24px !important;
+          top:32px !important;
+          width:calc(100% - 48px);
+          justify-items:start;
+          text-align:left;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-clock{
+          font-size:clamp(4.2rem, 15vw, 6.8rem);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          left:20px !important;
+          right:20px !important;
+          bottom:24px !important;
+          grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+          gap:10px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+          min-height:112px;
+          padding:10px 12px;
+          gap:9px;
+          border-radius:18px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-icon{
+          width:38px;
+          height:38px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card ha-icon{
+          --mdc-icon-size:26px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card strong{
+          font-size:1.1rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-category{
+          font-size:.66rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-name{
+          font-size:.8rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-detail{
+          display:none;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-meta{
+          display:none;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-sparkline{
+          height:24px;
+          margin-top:2px;
+        }
+      }
+
+      @media (max-height: 700px){
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-content{
+          display:block !important;
+          padding:20px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-calendar{
+          display:none !important;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-hero{
+          top:clamp(20px, 5vh, 40px) !important;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .screensaver-clock{
+          font-size:clamp(4rem, 12vh, 6.5rem);
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          bottom:clamp(18px, 5vh, 34px) !important;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+          min-height:106px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-meta{
+          display:none;
+        }
+      }
+
+      @media (max-width: 560px){
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          left:14px !important;
+          right:14px !important;
+          gap:8px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+          min-height:84px;
+          padding:8px;
+          gap:6px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-icon{
+          width:32px;
+          height:32px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card ha-icon{
+          --mdc-icon-size:22px;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card strong{
+          font-size:.95rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-category{
+          font-size:.58rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-name{
+          font-size:.7rem;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-detail,
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-meta{
+          display:none;
+        }
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-sparkline{
+          display:none;
+        }
+      }
+
+      .screensaver-overlay.ss-style-home_intelligence .ss-intelligence{
+        display:none !important;
+      }
+      .screensaver-overlay.ss-style-home_intelligence .ss-hero{
+        display:grid !important;
+      }
+      .screensaver-overlay .ss-status-rail,
+      .screensaver-overlay.ss-style-minimal_scandi .ss-status-rail,
+      .screensaver-overlay.ss-style-cinematic_dashboard .ss-status-rail,
+      .screensaver-overlay.ss-style-sci_fi_hud .ss-status-rail,
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-status-rail,
+      .screensaver-overlay.ss-style-floating_islands .ss-status-rail,
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-rail,
+      .screensaver-overlay.ss-style-home_intelligence .ss-status-rail,
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-rail,
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+        position:absolute !important;
+        inset:auto !important;
+        left:clamp(34px, 5vw, 96px) !important;
+        right:clamp(34px, 5vw, 96px) !important;
+        bottom:clamp(42px, 8.5vh, 104px) !important;
+        display:grid !important;
+        grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+        grid-auto-rows:1fr !important;
+        align-items:stretch !important;
+        gap:clamp(18px, 2vw, 34px) !important;
+        width:auto !important;
+        max-width:none !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:transparent !important;
+        box-shadow:none !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+      }
+      .screensaver-overlay[data-has-status="0"] .ss-status-rail{
+        display:none !important;
+      }
+      .screensaver-overlay .ss-status-card,
+      .screensaver-overlay.ss-style-minimal_scandi .ss-status-card,
+      .screensaver-overlay.ss-style-cinematic_dashboard .ss-status-card,
+      .screensaver-overlay.ss-style-sci_fi_hud .ss-status-card,
+      .screensaver-overlay.ss-style-dynamic_ambient .ss-status-card,
+      .screensaver-overlay.ss-style-floating_islands .ss-status-card,
+      .screensaver-overlay.ss-style-ultra_minimal_dots .ss-status-card,
+      .screensaver-overlay.ss-style-home_intelligence .ss-status-card,
+      .screensaver-overlay.ss-style-planetary_orbital .ss-status-card,
+      .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+        position:relative !important;
+        inset:auto !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:auto !important;
+        transform:none !important;
+        width:auto !important;
+        height:100% !important;
+        min-height:clamp(154px, 15vh, 198px) !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        display:flex !important;
+        align-items:center !important;
+        gap:clamp(22px, 2vw, 34px) !important;
+        padding:clamp(24px, 2.4vw, 34px) !important;
+        border-radius:clamp(20px, 1.8vw, 30px) !important;
+        border:1px solid rgba(255,255,255,.18) !important;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.05)),
+          rgba(9,18,29,.62) !important;
+        box-shadow:0 22px 60px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.13) !important;
+        backdrop-filter:blur(24px) saturate(1.12) !important;
+        -webkit-backdrop-filter:blur(24px) saturate(1.12) !important;
+      }
+      .screensaver-overlay .ss-status-card::after{
+        content:"›";
+        margin-left:auto;
+        color:rgba(248,251,255,.62);
+        font-size:clamp(2rem, 2.6vw, 3.1rem);
+        line-height:1;
+        font-weight:240;
+      }
+      .screensaver-overlay .ss-status-name,
+      .screensaver-overlay .ss-status-meta,
+      .screensaver-overlay .ss-status-sparkline{
+        display:none !important;
+      }
+      .screensaver-overlay .ss-status-detail{
+        color:rgba(248,251,255,.72);
+        font-size:clamp(1.02rem, 1.1vw, 1.28rem);
+      }
+
+      @media (max-width: 1180px){
+        .screensaver-overlay .ss-status-rail,
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          left:clamp(24px, 4.5vw, 72px) !important;
+          right:clamp(24px, 4.5vw, 72px) !important;
+          bottom:clamp(30px, 7vh, 74px) !important;
+          gap:clamp(12px, 1.6vw, 22px) !important;
+        }
+        .screensaver-overlay .ss-status-card,
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+          min-height:132px !important;
+          padding:18px !important;
+          gap:14px !important;
+        }
+      }
+
+      @media (max-width: 700px){
+        .screensaver-overlay .ss-status-rail,
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-rail{
+          left:12px !important;
+          right:12px !important;
+          bottom:18px !important;
+          gap:8px !important;
+        }
+        .screensaver-overlay .ss-status-card,
+        .screensaver-overlay[data-ss-bg-ready="1"] .ss-status-card{
+          min-height:96px !important;
+          padding:10px !important;
+          gap:8px !important;
+          border-radius:16px !important;
+        }
+        .screensaver-overlay .ss-status-icon{
+          width:34px !important;
+          height:34px !important;
+        }
+        .screensaver-overlay .ss-status-card ha-icon{
+          --mdc-icon-size:23px !important;
+        }
+        .screensaver-overlay .ss-status-category{
+          font-size:.58rem !important;
+        }
+        .screensaver-overlay .ss-status-card strong{
+          font-size:clamp(.95rem, 3.5vw, 1.35rem) !important;
+        }
+        .screensaver-overlay .ss-status-detail{
+          font-size:.68rem !important;
+        }
+        .screensaver-overlay .ss-status-card::after{
+          display:none;
         }
       }
     `;
@@ -26155,12 +27771,13 @@ _importDesign() {
     const periodEl = overlay?.querySelector('.ss-period');
     const dayTile = overlay?.querySelector('.ss-date-tile');
     const now = new Date();
+    const locale = this._getScreenSaverLocale_?.();
     const parts = this._getScreenSaverTimeParts_?.(now) || {};
     if (clockEl) {
-      clockEl.textContent = parts.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      clockEl.textContent = parts.time || now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     }
     if (dateEl) {
-      dateEl.textContent = parts.date || now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      dateEl.textContent = parts.date || now.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
     if (periodEl) {
       periodEl.textContent = parts.period || '';
@@ -26192,7 +27809,7 @@ _importDesign() {
     const calEl = this.screenSaverOverlay?.querySelector('.screensaver-calendar');
     if (!calEl) return;
     const now = new Date();
-    const locale = undefined; // use default locale
+    const locale = this._getScreenSaverLocale_?.();
     const year = now.getFullYear();
     const month = now.getMonth();
     // Month name

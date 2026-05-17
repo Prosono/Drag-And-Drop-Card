@@ -528,8 +528,8 @@
       },
       {
         "id": "api",
-        "label": "API",
-        "icon": "mdi:api",
+        "label": "Properties",
+        "icon": "mdi:tune-variant",
         "label_mode": "both"
       }
     ],
@@ -1734,252 +1734,37 @@
       }
     },
     {
-      "id": "api_heading",
+      "id": "api_property_cockpit",
       "card": {
-        "type": "custom:ddc-text-card",
-        "text": "Local dashboard API cockpit",
-        "variant": "h2",
-        "font_size": 44,
-        "color": "#f8fafc",
-        "align": "left",
-        "bold": true,
-        "letter_spacing": 0,
-        "line_height": 1.02
+        "type": "custom:ddc-html-card",
+        "title": "Dashboard property cockpit",
+        "html": "<section class='property-lab' data-ddc-property-lab><div class='boot'><span>ddc.settings</span><strong>Loading dashboard properties</strong></div></section>",
+        "css": ".property-lab{height:100%;min-height:0;box-sizing:border-box;display:grid;grid-template-rows:auto auto 1fr auto;gap:14px;padding:18px;border-radius:22px;background:linear-gradient(135deg,rgba(13,23,31,.94),rgba(31,25,18,.92) 54%,rgba(14,31,27,.92));border:1px solid rgba(255,255,255,.14);color:#f8fafc;overflow:hidden}.boot{height:100%;display:grid;place-content:center;gap:10px;text-align:center}.boot span,.eyebrow{font-size:11px;letter-spacing:0;text-transform:uppercase;font-weight:900;color:#fbbf24}.boot strong{font-size:28px}.top{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px;align-items:stretch}.headline{display:grid;gap:10px;align-content:center;min-width:0}.headline h2{margin:0;font-size:36px;line-height:1.02;color:#fff}.headline p{margin:0;max-width:74ch;color:rgba(226,232,240,.82);line-height:1.42}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.metric{min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(255,255,255,.07);padding:12px}.metric strong{display:block;font-size:26px;line-height:1;color:#fbbf24}.metric span{display:block;margin-top:7px;color:rgba(226,232,240,.76);font-size:12px}.toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:10px;border-radius:16px;background:rgba(2,6,23,.32);border:1px solid rgba(255,255,255,.09)}.toolbar label{display:inline-flex;gap:8px;align-items:center;color:rgba(226,232,240,.82);font-size:12px}.toolbar input{accent-color:#fbbf24}.toolbar button,.group button,.feature button{border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:10px 12px;background:rgba(255,255,255,.08);color:#f8fafc;font-weight:850;cursor:pointer;min-width:0}.toolbar button.primary{background:#fbbf24;color:#1f1300;border-color:#fbbf24}.toolbar button.ok{background:#34d399;color:#052e1b;border-color:#34d399}.toolbar button.warn{background:#fb7185;color:#330812;border-color:#fb7185}.toolbar button:hover,.group button:hover,.feature button:hover{transform:translateY(-1px);filter:brightness(1.07)}.body{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px}.groups{min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-right:4px}.group{min-width:0;align-self:start;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:rgba(255,255,255,.055);overflow:hidden}.group h3{margin:0;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.09);font-size:15px;color:#fff}.rows{display:grid}.row{display:grid;grid-template-columns:minmax(120px,.82fr) minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px 14px;border-top:1px solid rgba(255,255,255,.06)}.row:first-child{border-top:0}.key{font-size:12px;color:#bae6fd;font-weight:850;overflow:hidden;text-overflow:ellipsis}.value{min-width:0;color:rgba(241,245,249,.86);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.value code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#d1fae5}.pill{justify-self:end;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:900;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:#cbd5e1}.pill.on{background:rgba(52,211,153,.18);border-color:rgba(52,211,153,.45);color:#86efac}.pill.off{background:rgba(251,113,133,.13);border-color:rgba(251,113,133,.35);color:#fecdd3}.row button{justify-self:end;padding:8px 10px;font-size:11px}.side{min-height:0;display:grid;grid-template-rows:auto 1fr auto;gap:12px}.panel{min-width:0;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:rgba(2,6,23,.34);overflow:hidden}.panel h3{margin:0;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.09);font-size:15px}.features{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}.feature{min-width:0;border-radius:14px;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}.feature strong{display:block;font-size:12px;color:#fff}.feature span{display:block;margin-top:5px;font-size:11px;color:rgba(226,232,240,.72);line-height:1.28}.json{min-height:0;display:grid;grid-template-rows:auto 1fr}.json pre{margin:0;padding:13px;min-height:0;overflow:auto;white-space:pre-wrap;font-size:11px;line-height:1.4;color:#d1fae5;background:rgba(2,6,23,.42)}.log{min-height:38px;padding:11px 12px;border-radius:14px;background:rgba(2,6,23,.48);border:1px solid rgba(255,255,255,.1);color:#e0f2fe;font-size:12px}.error{height:100%;display:grid;place-content:center;gap:12px;text-align:center;padding:24px}.error strong{font-size:26px}.error span{color:rgba(226,232,240,.78)}@media(max-width:980px){.top,.body{grid-template-columns:1fr}.groups{grid-template-columns:1fr}.side{grid-template-rows:auto auto auto}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}",
+        "js": "const api=ddc||helpers.ddc||helpers.dashboard;const shell=root.querySelector('[data-ddc-property-lab]');if(!shell)return;if(!api||!api.settings){shell.innerHTML='<div class=\"error\"><strong>Dashboard API unavailable</strong><span>This HTML card will run once it is inside a Drag & Drop Card canvas.</span></div>';return {update(){}};}const owner=api.card||{};const groupDefs=[{id:'layout',title:'Layout and snapping',keys:['grid','drag_live_snap','disable_overlap','container_size_mode','container_fixed_width','container_fixed_height','container_preset','container_preset_orientation','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer']},{id:'persistence',title:'Persistence and editing',keys:['storage_key','auto_save','auto_save_debounce','debug','edit_mode_pin']},{id:'visual',title:'Card and theme styling',keys:['container_background','apply_background_to_page','card_background','card_shadow','animate_cards','dashboard_theme_enabled','dashboard_theme','dashboard_theme_override_all_design']},{id:'tabs',title:'Tabs and layers',keys:['tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers']},{id:'chrome',title:'Home Assistant chrome',keys:['hide_HA_Header','hide_HA_Sidebar']},{id:'backgrounds',title:'Background engines',keys:['background_mode','background_image','background_particles','background_youtube']},{id:'screensaver',title:'Screen saver',keys:['screen_saver_enabled','screen_saver_delay','screen_saver_style','screen_saver_entities']},{id:'responsive',title:'Responsive authoring',keys:['responsive_viewports','responsive_connectors','connectors']}];const cycles={tabs_position:['left','top','bottom'],background_mode:['image','particles','youtube','none'],container_size_mode:['fixed_custom','dynamic','auto','preset'],container_preset:['fhd','qhd','iphone-14-pro','ipad-11-pro','ultrawide-uwqhd'],container_preset_orientation:['auto','landscape','portrait'],mobile_dynamic_behavior:['scale','native'],screen_saver_style:['visionos_glass','minimal_scandi','ultra_minimal_dots']};const booleanKeys=new Set((api.settings.list()||[]).filter((item)=>item.type==='boolean'||item.boolean).map((item)=>item.key));const read=()=>api.settings.options?api.settings.options():api.settings.all();const esc=(value)=>String(value==null?'':value).replace(/[&<>\"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));function countCards(){try{return owner.cardContainer?owner.cardContainer.querySelectorAll('.card-wrapper').length:0;}catch(e){return 0;}}function countConnectors(opts){const rc=opts.responsive_connectors||{};let count=0;Object.values(rc).forEach((profile)=>{if(!profile||typeof profile!=='object')return;if(Array.isArray(profile.connectors))count+=profile.connectors.length;Object.values(profile).forEach((entry)=>{if(entry&&Array.isArray(entry.connectors))count+=entry.connectors.length;});});return count;}function summarize(value,key){if(key==='edit_mode_pin')return value?'configured':'empty';if(Array.isArray(value))return value.length+' items';if(value&&typeof value==='object'){const keys=Object.keys(value);if(key==='responsive_connectors')return countConnectors({responsive_connectors:value})+' connectors';return keys.length+' keys';}if(typeof value==='boolean')return value?'on':'off';if(value==null||value==='')return 'empty';return String(value);}function detailValue(value,key){if(key==='edit_mode_pin')return value?'configured':'empty';if(Array.isArray(value))return JSON.stringify(value.slice(0,3));if(value&&typeof value==='object')return JSON.stringify(value).slice(0,180);return String(value==null?'':value);}function buttonFor(key,value){if(booleanKeys.has(key))return '<button data-toggle=\"'+esc(key)+'\" class=\"pill '+(value?'on':'off')+'\">'+(value?'On':'Off')+'</button>';if(cycles[key])return '<button data-cycle=\"'+esc(key)+'\" class=\"pill\">Cycle</button>';if(key==='grid')return '<button data-grid class=\"pill\">Grid</button>';if(key==='auto_save_debounce')return '<button data-debounce class=\"pill\">Delay</button>';if(key==='screen_saver_delay')return '<button data-saver-delay class=\"pill\">Delay</button>';return '<span class=\"pill\">Read</span>';}function renderRows(keys,opts,seen){return keys.map((key)=>{seen.add(key);const value=opts[key];return '<div class=\"row\"><div class=\"key\">'+esc(key)+'</div><div class=\"value\" title=\"'+esc(detailValue(value,key))+'\"><code>'+esc(summarize(value,key))+'</code></div>'+buttonFor(key,value)+'</div>';}).join('');}function render(detail){const opts=read()||{};const list=api.settings.list()||[];const allKeys=list.map((item)=>item.key);const seen=new Set();let groups=groupDefs.map((group)=>'<section class=\"group\"><h3>'+esc(group.title)+'</h3><div class=\"rows\">'+renderRows(group.keys.filter((key)=>allKeys.includes(key)||Object.prototype.hasOwnProperty.call(opts,key)),opts,seen)+'</div></section>').join('');const other=allKeys.filter((key)=>!seen.has(key));if(other.length)groups+='<section class=\"group\"><h3>Other exportable settings</h3><div class=\"rows\">'+renderRows(other,opts,seen)+'</div></section>';const tabs=Array.isArray(opts.tabs)?opts.tabs:[];const layers=Array.isArray(opts.layers)?opts.layers:[];const packages=Array.isArray(owner._dashboardPackages)?owner._dashboardPackages.length:0;const activeToggles=list.filter((item)=>item.boolean&&item.value).length;const cards=countCards();const connectors=countConnectors(opts);const snapshot={storage_key:opts.storage_key,grid:opts.grid,container_size_mode:opts.container_size_mode,tabs_position:opts.tabs_position,background_mode:opts.background_mode,layers_enabled:opts.layers_enabled,screen_saver_enabled:opts.screen_saver_enabled,animate_cards:opts.animate_cards,visible_cards:cards,connector_entries:connectors,packages:packages};shell.innerHTML='<div class=\"top\"><div class=\"headline\"><div class=\"eyebrow\">custom:ddc-html-card / ddc.settings</div><h2>One card, every dashboard property</h2><p>Use this cockpit to inspect and change the Drag & Drop Card options that an LLM can author in import JSON.</p></div><div class=\"metrics\"><div class=\"metric\"><strong>'+list.length+'</strong><span>settings</span></div><div class=\"metric\"><strong>'+activeToggles+'</strong><span>active toggles</span></div><div class=\"metric\"><strong>'+tabs.length+'/'+layers.length+'</strong><span>tabs / layers</span></div><div class=\"metric\"><strong>'+connectors+'</strong><span>connectors</span></div></div></div><div class=\"toolbar\"><label><input type=\"checkbox\" data-persist> Persist API changes</label><button class=\"primary\" data-preset=\"demo\">Reset demo</button><button data-preset=\"kiosk\">Kiosk</button><button data-preset=\"mobile\">Mobile lab</button><button data-preset=\"quiet\">Quiet mode</button><button class=\"ok\" data-command=\"save-settings\">Save settings</button><button data-command=\"save-layout\">Save layout</button><button data-command=\"open-settings\">Open settings</button></div><div class=\"body\"><div class=\"groups\">'+groups+'</div><aside class=\"side\"><section class=\"panel\"><h3>Feature coverage</h3><div class=\"features\"><div class=\"feature\"><strong>Drag / resize</strong><span>Grid, live snap and overlap settings.</span></div><div class=\"feature\"><strong>Tabs / layers</strong><span>Visibility systems with stable IDs.</span></div><div class=\"feature\"><strong>Backgrounds</strong><span>Image, particles, YouTube and none.</span></div><div class=\"feature\"><strong>Responsive</strong><span>Viewport profiles and connector overlays.</span></div><div class=\"feature\"><strong>Persistence</strong><span>Auto-save, manual save and storage key.</span></div><div class=\"feature\"><strong>Packages</strong><span>'+packages+' helper package exported with this demo.</span></div></div></section><section class=\"panel json\"><h3>Live option snapshot</h3><pre>'+esc(JSON.stringify(snapshot,null,2))+'</pre></section><div class=\"log\" data-log>'+(detail&&detail.keys?'Changed: '+esc(detail.keys.join(', ')):'Ready')+'</div></aside></div>'; }function persistOpt(){return {persist:!!root.querySelector('[data-persist]')?.checked};}async function setPatch(patch){await api.settings.setMany(patch,persistOpt());render({keys:Object.keys(patch)});}helpers.listen(shell,'click',async(ev)=>{const target=ev.target.closest('button');if(!target)return;const key=target.dataset.toggle;if(key){const next=await api.settings.toggle(key,persistOpt());render({keys:[key]});return;}const cycleKey=target.dataset.cycle;if(cycleKey){const values=cycles[cycleKey]||[];const current=api.settings.get(cycleKey);const index=values.indexOf(current);await api.settings.set(cycleKey,values[(index+1+values.length)%values.length],persistOpt());render({keys:[cycleKey]});return;}if(target.dataset.grid!==undefined){const current=Number(api.settings.get('grid')||20);const next=current>=40?10:current+10;await api.settings.set('grid',next,persistOpt());render({keys:['grid']});return;}if(target.dataset.debounce!==undefined){const current=Number(api.settings.get('auto_save_debounce')||800);const values=[250,700,1200,2000];const next=values[(Math.max(0,values.indexOf(current))+1)%values.length];await api.settings.set('auto_save_debounce',next,persistOpt());render({keys:['auto_save_debounce']});return;}if(target.dataset.saverDelay!==undefined){const current=Number(api.settings.get('screen_saver_delay')||600000);const values=[60000,300000,600000,1200000];const next=values[(Math.max(0,values.indexOf(current))+1)%values.length];await api.settings.set('screen_saver_delay',next,persistOpt());render({keys:['screen_saver_delay']});return;}const preset=target.dataset.preset;if(preset==='demo')return setPatch({tabs_position:'left',background_mode:'image',container_size_mode:'fixed_custom',container_fixed_width:1440,container_fixed_height:920,grid:20,drag_live_snap:true,auto_save:true,animate_cards:true,card_shadow:true,layers_enabled:true,screen_saver_enabled:true,hide_HA_Header:false,hide_HA_Sidebar:false});if(preset==='kiosk')return setPatch({tabs_position:'bottom',hide_HA_Header:true,hide_HA_Sidebar:true,screen_saver_enabled:true,background_mode:'youtube',animate_cards:true,card_shadow:false});if(preset==='mobile')return setPatch({container_size_mode:'preset',container_preset:'iphone-14-pro',container_preset_orientation:'portrait',tabs_position:'top',mobile_dynamic_behavior:'scale',optimize_for_mobile:true,do_not_resize_text:false});if(preset==='quiet')return setPatch({background_mode:'none',animate_cards:false,card_shadow:false,screen_saver_enabled:false,hide_tabs_when_single:false});const command=target.dataset.command;if(command==='save-settings'){await api.settings.save();render({keys:['settings.save']});return;}if(command==='save-layout'){await api.saveLayout(false);render({keys:['saveLayout']});return;}if(command==='open-settings'){api.openSettings();return;}});const off=api.settings.subscribe((detail)=>render(detail));render();return()=>off();",
+        "rerun_on_hass_update": false
       },
       "position": {
         "x": 40,
         "y": 40
       },
       "size": {
-        "width": 760,
-        "height": 110
+        "width": 1350,
+        "height": 840
       },
-      "z": 10,
-      "tabId": "api",
-      "layerIds": [
-        "standard"
-      ],
-      "card_style": {
-        "background": "rgba(255,255,255,.05)",
-        "border_color": "rgba(255,255,255,.10)",
-        "card_shadow": "on",
-        "animate_cards": "on"
-      }
-    },
-    {
-      "id": "api_cockpit",
-      "card": {
-        "type": "custom:ddc-html-card",
-        "title": "ddc.settings demo",
-        "html": "<div class='api-cockpit'><header><span>ddc.settings</span><h2>Live dashboard controls</h2><p>These buttons run inside an imported HTML card and call the local dashboard API directly.</p></header><div class='meter'><strong data-count>0</strong><small>known settings</small><em>tabs <b data-position>left</b> / background <b data-bg-state>image</b></em></div><div class='switches'><button data-key='screen_saver_enabled'>Screen saver <b data-state='screen_saver_enabled'>...</b></button><button data-key='animate_cards'>Animate cards <b data-state='animate_cards'>...</b></button><button data-key='drag_live_snap'>Live snap <b data-state='drag_live_snap'>...</b></button><button data-key='card_shadow'>Card shadow <b data-state='card_shadow'>...</b></button><button data-key='layers_enabled'>Layers <b data-state='layers_enabled'>...</b></button><button data-key='auto_save'>Auto-save <b data-state='auto_save'>...</b></button></div><div class='actions'><button data-tabs>Cycle tabs</button><button data-bg>Cycle background</button><button data-focus>setMany focus</button><button data-reset>Reset lab</button><button data-persist>Save settings</button><button data-open>Open settings</button><button data-save>Save layout</button></div><output data-log>API ready</output></div>",
-        "css": ".api-cockpit{height:100%;display:grid;grid-template-columns:1.08fr .92fr;grid-template-rows:auto 1fr auto auto;gap:14px;padding:22px;border-radius:20px;background:linear-gradient(135deg,rgba(56,189,248,.18),rgba(12,18,27,.86) 48%,rgba(245,158,11,.14));border:1px solid rgba(255,255,255,.14);color:#f8fafc}header{display:grid;align-content:start;gap:10px;min-width:0}span{font-size:12px;letter-spacing:0;text-transform:uppercase;color:#bae6fd;font-weight:900}h2{margin:0;font-size:30px;line-height:1.05;color:#fff}p{margin:0;color:rgba(226,232,240,.82);line-height:1.42}.meter{display:grid;align-content:center;justify-items:center;gap:7px;border-radius:18px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);min-width:0}.meter strong{font-size:66px;line-height:.9;color:#fbbf24}.meter small,.meter em{font-style:normal;color:rgba(226,232,240,.78);text-align:center}.switches{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.actions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}button{min-width:0;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:11px 13px;background:rgba(255,255,255,.08);color:#f8fafc;font-weight:900;cursor:pointer;text-align:left}button b{display:block;margin-top:5px;color:#94a3b8;font-size:12px}button.on{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.42)}button.on b{color:#86efac}.actions button{background:#38bdf8;color:#082f49;text-align:center}.actions button:nth-child(2){background:#f59e0b;color:#111827}.actions button:nth-child(3){background:#22c55e;color:#052e16}.actions button:nth-child(n+4){background:rgba(255,255,255,.12);color:#f8fafc}button:hover{transform:translateY(-1px);filter:brightness(1.08)}output{grid-column:1/-1;min-height:38px;padding:11px 12px;border-radius:12px;background:rgba(2,6,23,.48);color:#dbeafe;border:1px solid rgba(255,255,255,.10)}@media(max-width:720px){.api-cockpit{grid-template-columns:1fr}.switches{grid-template-columns:1fr 1fr}.meter{min-height:130px}}",
-        "js": "const keys=['screen_saver_enabled','animate_cards','drag_live_snap','card_shadow','layers_enabled','auto_save'];const log=root.querySelector('[data-log]');const tabs=['left','top','bottom'];const backgrounds=['image','particles','youtube','none'];function say(msg){log.textContent=msg;}function paint(detail){keys.forEach((key)=>{const value=!!ddc.settings.get(key);const btn=root.querySelector('[data-key='+key+']');const state=root.querySelector('[data-state='+key+']');if(btn)btn.classList.toggle('on',value);if(state)state.textContent=value?'on':'off';});root.querySelector('[data-position]').textContent=ddc.settings.get('tabs_position')||'top';root.querySelector('[data-bg-state]').textContent=ddc.settings.get('background_mode')||'none';root.querySelector('[data-count]').textContent=String(ddc.settings.list().length);if(detail&&detail.keys)say('Changed: '+detail.keys.join(', '));}keys.forEach((key)=>helpers.listen(root.querySelector('[data-key='+key+']'),'click',async()=>{const next=await ddc.settings.toggle(key);say(key+' -> '+(next?'on':'off')+' (live)');paint();}));helpers.listen(root.querySelector('[data-tabs]'),'click',async()=>{const current=ddc.settings.get('tabs_position')||'left';const next=tabs[(tabs.indexOf(current)+1)%tabs.length]||'left';await ddc.settings.set('tabs_position',next);say('tabs_position -> '+next);paint();});helpers.listen(root.querySelector('[data-bg]'),'click',async()=>{const current=ddc.settings.get('background_mode')||'image';const next=backgrounds[(backgrounds.indexOf(current)+1)%backgrounds.length]||'image';await ddc.settings.set('background_mode',next);say('background_mode -> '+next);paint();});helpers.listen(root.querySelector('[data-focus]'),'click',async()=>{await ddc.settings.setMany({animate_cards:true,card_shadow:true,screen_saver_enabled:false,hide_tabs_when_single:false,auto_save:true});say('setMany applied: focus preset');paint();});helpers.listen(root.querySelector('[data-reset]'),'click',async()=>{await ddc.settings.setMany({tabs_position:'left',background_mode:'image',screen_saver_enabled:true,animate_cards:true,drag_live_snap:true,card_shadow:true,layers_enabled:true,auto_save:true});say('Reset demo settings live');paint();});helpers.listen(root.querySelector('[data-persist]'),'click',async()=>{await ddc.settings.save();say('settings.save() requested');});helpers.listen(root.querySelector('[data-open]'),'click',()=>{ddc.openSettings();say('openSettings() requested');});helpers.listen(root.querySelector('[data-save]'),'click',async()=>{await ddc.saveLayout(false);say('saveLayout(false) requested');});const off=ddc.settings.subscribe((detail)=>paint(detail));paint();return()=>off();",
-        "rerun_on_hass_update": false
-      },
-      "position": {
-        "x": 40,
-        "y": 190
-      },
-      "size": {
-        "width": 760,
-        "height": 430
-      },
-      "z": 11,
+      "z": 12,
       "tabId": "api",
       "layerIds": [
         "standard",
-        "actions"
+        "actions",
+        "explainers"
       ],
       "card_style": {
         "background": "rgba(8,13,20,.68)",
-        "border_color": "rgba(56,189,248,.30)",
+        "border_color": "rgba(251,191,36,.28)",
         "card_shadow": "on",
         "animate_cards": "on"
       },
       "overflow": "visible"
-    },
-    {
-      "id": "api_snapshot",
-      "card": {
-        "type": "custom:ddc-html-card",
-        "title": "Settings snapshot",
-        "html": "<div class='snapshot'><header><span>settings.options()</span><h2>Exportable options</h2><p>Subscribe keeps this JSON panel in sync when the cockpit changes settings.</p></header><pre data-json>{}</pre></div>",
-        "css": ".snapshot{height:100%;display:grid;grid-template-rows:auto 1fr;gap:14px;padding:22px;border-radius:20px;background:linear-gradient(135deg,rgba(251,113,133,.15),rgba(8,13,20,.88));border:1px solid rgba(255,255,255,.14);color:#f8fafc}header{display:grid;gap:9px}span{font-size:12px;letter-spacing:0;text-transform:uppercase;color:#fecdd3;font-weight:900}h2{margin:0;font-size:28px;color:#fff;line-height:1.05}p{margin:0;color:rgba(226,232,240,.80);line-height:1.4}pre{margin:0;overflow:auto;white-space:pre-wrap;min-width:0;padding:14px;border-radius:14px;background:rgba(2,6,23,.56);border:1px solid rgba(255,255,255,.10);color:#d1fae5;font-size:12px;line-height:1.42}",
-        "js": "const fields=['storage_key','grid','container_size_mode','container_fixed_width','container_fixed_height','tabs_position','background_mode','layers_enabled','animate_cards','screen_saver_enabled','auto_save','drag_live_snap','card_shadow'];const pre=root.querySelector('[data-json]');function render(){const options=ddc.settings.options();const view={};fields.forEach((key)=>{view[key]=options[key];});pre.textContent=JSON.stringify(view,null,2);}const off=ddc.settings.subscribe(render);render();return()=>off();",
-        "rerun_on_hass_update": false
-      },
-      "position": {
-        "x": 840,
-        "y": 190
-      },
-      "size": {
-        "width": 550,
-        "height": 430
-      },
-      "z": 10,
-      "tabId": "api",
-      "layerIds": [
-        "standard",
-        "explainers"
-      ],
-      "card_style": {
-        "background": "rgba(8,13,20,.68)",
-        "border_color": "rgba(251,113,133,.28)",
-        "card_shadow": "on",
-        "animate_cards": "on"
-      }
-    },
-    {
-      "id": "api_method_table",
-      "card": {
-        "type": "custom:ddc-table-card",
-        "title": "Local API method map",
-        "rows": 7,
-        "columns": 3,
-        "header_row": true,
-        "border": true,
-        "radius": 14,
-        "spacing": 10,
-        "cells": [
-          {
-            "type": "text",
-            "text": "Method",
-            "align": "left"
-          },
-          {
-            "type": "text",
-            "text": "Demo control",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Purpose",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "list/options",
-            "icon": "mdi:format-list-bulleted",
-            "align": "left",
-            "active_color": "#38bdf8"
-          },
-          {
-            "type": "text",
-            "text": "Snapshot panel",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Read exportable dashboard settings",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "get",
-            "icon": "mdi:eye-outline",
-            "align": "left",
-            "active_color": "#22c55e"
-          },
-          {
-            "type": "text",
-            "text": "Status pills",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Render current boolean values",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "set/toggle",
-            "icon": "mdi:toggle-switch-outline",
-            "align": "left",
-            "active_color": "#f59e0b"
-          },
-          {
-            "type": "text",
-            "text": "Live buttons",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Change settings without opening editor",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "setMany",
-            "icon": "mdi:playlist-edit",
-            "align": "left",
-            "active_color": "#fb7185"
-          },
-          {
-            "type": "text",
-            "text": "Focus / reset",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Patch several options in one action",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "subscribe",
-            "icon": "mdi:access-point",
-            "align": "left",
-            "active_color": "#38bdf8"
-          },
-          {
-            "type": "text",
-            "text": "Live refresh",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "React to ddc:settings-changed events",
-            "align": "left"
-          },
-          {
-            "type": "badge",
-            "text": "save/open",
-            "icon": "mdi:content-save-cog-outline",
-            "align": "left",
-            "active_color": "#22c55e"
-          },
-          {
-            "type": "text",
-            "text": "Toolbar actions",
-            "align": "center"
-          },
-          {
-            "type": "text",
-            "text": "Persist settings or open dashboard dialog",
-            "align": "left"
-          }
-        ]
-      },
-      "position": {
-        "x": 40,
-        "y": 660
-      },
-      "size": {
-        "width": 1350,
-        "height": 230
-      },
-      "z": 8,
-      "tabId": "api",
-      "layerIds": [
-        "standard",
-        "explainers"
-      ],
-      "card_style": {
-        "background": "rgba(8,13,20,.70)",
-        "border_color": "rgba(255,255,255,.14)",
-        "card_shadow": "on",
-        "animate_cards": "on"
-      }
     }
   ],
   "responsive_layouts": {
@@ -2234,55 +2019,16 @@
             "tabId": "responsive"
           },
           {
-            "id": "api_heading",
+            "id": "api_property_cockpit",
             "position": {
               "x": 30,
               "y": 30
             },
             "size": {
-              "width": 700,
-              "height": 110
-            },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_cockpit",
-            "position": {
-              "x": 30,
-              "y": 170
-            },
-            "size": {
-              "width": 670,
-              "height": 410
-            },
-            "z": 11,
-            "tabId": "api"
-          },
-          {
-            "id": "api_snapshot",
-            "position": {
-              "x": 730,
-              "y": 170
-            },
-            "size": {
-              "width": 420,
-              "height": 410
-            },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_method_table",
-            "position": {
-              "x": 30,
-              "y": 620
-            },
-            "size": {
               "width": 1120,
-              "height": 220
+              "height": 770
             },
-            "z": 8,
+            "z": 12,
             "tabId": "api"
           }
         ]
@@ -2407,55 +2153,16 @@
             "tabId": "layers"
           },
           {
-            "id": "api_heading",
+            "id": "api_property_cockpit",
             "position": {
               "x": 30,
               "y": 30
             },
             "size": {
               "width": 760,
-              "height": 120
+              "height": 1120
             },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_cockpit",
-            "position": {
-              "x": 30,
-              "y": 180
-            },
-            "size": {
-              "width": 760,
-              "height": 470
-            },
-            "z": 11,
-            "tabId": "api"
-          },
-          {
-            "id": "api_snapshot",
-            "position": {
-              "x": 30,
-              "y": 690
-            },
-            "size": {
-              "width": 760,
-              "height": 340
-            },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_method_table",
-            "position": {
-              "x": 30,
-              "y": 1060
-            },
-            "size": {
-              "width": 760,
-              "height": 260
-            },
-            "z": 8,
+            "z": 12,
             "tabId": "api"
           }
         ]
@@ -2517,55 +2224,16 @@
             "tabId": "overview"
           },
           {
-            "id": "api_heading",
+            "id": "api_property_cockpit",
             "position": {
               "x": 16,
               "y": 16
             },
             "size": {
-              "width": 390,
-              "height": 100
+              "width": 900,
+              "height": 690
             },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_cockpit",
-            "position": {
-              "x": 16,
-              "y": 136
-            },
-            "size": {
-              "width": 520,
-              "height": 280
-            },
-            "z": 11,
-            "tabId": "api"
-          },
-          {
-            "id": "api_snapshot",
-            "position": {
-              "x": 560,
-              "y": 56
-            },
-            "size": {
-              "width": 350,
-              "height": 300
-            },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_method_table",
-            "position": {
-              "x": 16,
-              "y": 450
-            },
-            "size": {
-              "width": 894,
-              "height": 260
-            },
-            "z": 8,
+            "z": 12,
             "tabId": "api"
           }
         ]
@@ -2820,55 +2488,16 @@
             "tabId": "responsive"
           },
           {
-            "id": "api_heading",
+            "id": "api_property_cockpit",
             "position": {
               "x": 16,
               "y": 20
             },
             "size": {
               "width": 398,
-              "height": 130
+              "height": 1460
             },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_cockpit",
-            "position": {
-              "x": 16,
-              "y": 180
-            },
-            "size": {
-              "width": 398,
-              "height": 530
-            },
-            "z": 11,
-            "tabId": "api"
-          },
-          {
-            "id": "api_snapshot",
-            "position": {
-              "x": 16,
-              "y": 740
-            },
-            "size": {
-              "width": 398,
-              "height": 380
-            },
-            "z": 10,
-            "tabId": "api"
-          },
-          {
-            "id": "api_method_table",
-            "position": {
-              "x": 16,
-              "y": 1150
-            },
-            "size": {
-              "width": 398,
-              "height": 420
-            },
-            "z": 8,
+            "z": 12,
             "tabId": "api"
           }
         ]

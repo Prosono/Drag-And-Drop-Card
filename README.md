@@ -592,6 +592,10 @@ Each connector entry looks like this:
 {
   "id": "connector_power_1",
   "tabId": "overview",
+  "cardIds": ["energy_card", "battery_card"],
+  "sourceCardId": "energy_card",
+  "targetCardId": "battery_card",
+  "layerIds": ["energy"],
   "points": [
     { "x": 120, "y": 200 },
     { "x": 420, "y": 200 },
@@ -617,6 +621,9 @@ Each connector entry looks like this:
 - `points` must contain at least **two** points.
 - Points should snap to the same grid as the dashboard.
 - `tabId` should match the tab where the line is visible.
+- `cardIds` should contain the unique layout card IDs the line belongs to.
+- `sourceCardId` and `targetCardId` should match the first and last endpoint owners when the line connects two cards.
+- `layerIds` should be included when the line belongs to specific layers; omit it only when the line should follow layer visibility from the owning card(s).
 - Use `entity` + `active_states` when the line should animate or change color based on Home Assistant state.
 
 ### Supported built-in DDC custom cards
@@ -820,7 +827,7 @@ When generating a full demo dashboard, use this checklist:
    - `custom:ddc-html-card`
 4. Add at least one connector in `responsive_connectors`.
 5. For interactive dashboard controls, use `custom:ddc-html-card` with `ddc.settings`.
-6. Keep card `tabId` and connector `tabId` aligned.
+6. Keep card `tabId` and connector `tabId` aligned, and bind connectors to the owning card IDs with `cardIds`.
 7. If the dashboard should work on fresh installs, include demo `packages`.
 8. Prefer `mobile.portrait` and `tablet.landscape` variants instead of relying on desktop-only layout.
 9. Keep `z` values consistent and start at `6`.

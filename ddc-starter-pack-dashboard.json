@@ -1,0 +1,1473 @@
+{
+  "version": 3,
+  "options": {
+    "storage_key": "ddc_starter_pack_dashboard",
+    "grid": 20,
+    "drag_live_snap": true,
+    "auto_save": true,
+    "auto_save_debounce": 700,
+    "disable_overlap": false,
+    "debug": false,
+    "container_size_mode": "fixed_custom",
+    "container_fixed_width": 1440,
+    "container_fixed_height": 900,
+    "container_preset": "fhd",
+    "container_preset_orientation": "landscape",
+    "auto_resize_cards": true,
+    "optimize_for_mobile": true,
+    "mobile_dynamic_behavior": "scale",
+    "do_not_resize_text": false,
+    "outer_grid_buffer": true,
+    "responsive_viewports": {
+      "desktop": {
+        "landscape": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "tablet": {
+        "landscape": {
+          "width": 1180,
+          "height": 820
+        },
+        "portrait": {
+          "width": 820,
+          "height": 1180
+        }
+      },
+      "mobile": {
+        "landscape": {
+          "width": 932,
+          "height": 430
+        },
+        "portrait": {
+          "width": 430,
+          "height": 980
+        }
+      }
+    },
+    "container_background": "radial-gradient(circle at 10% 8%, rgba(20,184,166,.16), transparent 30%), radial-gradient(circle at 84% 14%, rgba(245,158,11,.13), transparent 32%), radial-gradient(circle at 52% 92%, rgba(99,102,241,.10), transparent 38%), linear-gradient(140deg, #07100f 0%, #101514 44%, #17160f 100%)",
+    "apply_background_to_page": false,
+    "card_background": "rgba(9, 15, 17, 0.74)",
+    "card_shadow": true,
+    "dashboard_theme_enabled": false,
+    "dashboard_theme_override_all_design": false,
+    "animate_cards": true,
+    "hide_HA_Header": false,
+    "hide_HA_Sidebar": false,
+    "tabs": [
+      {
+        "id": "home",
+        "label": "Home",
+        "icon": "mdi:home-variant-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "security",
+        "label": "Security",
+        "icon": "mdi:shield-home-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "lights",
+        "label": "Lights",
+        "icon": "mdi:lightbulb-group-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "climate",
+        "label": "Climate",
+        "icon": "mdi:thermostat",
+        "label_mode": "both"
+      },
+      {
+        "id": "energy",
+        "label": "Energy",
+        "icon": "mdi:flash-outline",
+        "label_mode": "both"
+      },
+      {
+        "id": "media",
+        "label": "Media",
+        "icon": "mdi:play-circle-outline",
+        "label_mode": "both"
+      }
+    ],
+    "tabs_position": "top",
+    "default_tab": "home",
+    "hide_tabs_when_single": false,
+    "layers_enabled": true,
+    "layers": [
+      {
+        "id": "standard",
+        "label": "Standard",
+        "icon": "mdi:layers-outline",
+        "color": "#14b8a6",
+        "default_active": true
+      },
+      {
+        "id": "focus",
+        "label": "Focus",
+        "icon": "mdi:target",
+        "color": "#f59e0b",
+        "default_active": true
+      },
+      {
+        "id": "automation",
+        "label": "Automation",
+        "icon": "mdi:robot-outline",
+        "color": "#22c55e",
+        "default_active": true
+      },
+      {
+        "id": "details",
+        "label": "Details",
+        "icon": "mdi:table-eye",
+        "color": "#8b9cf6",
+        "default_active": true
+      }
+    ],
+    "background_mode": "none",
+    "screen_saver_enabled": true,
+    "screen_saver_delay": 300000,
+    "screen_saver_style": "planetary_orbital",
+    "screen_saver_entities": [
+      {
+        "key": "weather",
+        "entity": "sensor.ddc_starter_outdoor_temperature",
+        "label": "Outside",
+        "icon": "mdi:weather-partly-cloudy",
+        "tone": "cool"
+      },
+      {
+        "key": "security",
+        "entity": "input_boolean.ddc_starter_security_armed",
+        "label": "Security",
+        "icon": "mdi:shield-home",
+        "tone": "green"
+      },
+      {
+        "key": "lights",
+        "entity": "input_boolean.ddc_starter_all_lights",
+        "label": "Lights",
+        "icon": "mdi:lightbulb-group",
+        "tone": "amber"
+      },
+      {
+        "key": "energy",
+        "entity": "input_number.ddc_starter_energy_today",
+        "label": "Energy",
+        "icon": "mdi:flash",
+        "tone": "violet"
+      }
+    ],
+    "connectors": [
+      {
+        "id": "sp_connector_home_flow",
+        "tabId": "home",
+        "cardIds": [
+          "sp_home_quick",
+          "sp_home_modes"
+        ],
+        "sourceCardId": "sp_home_quick",
+        "targetCardId": "sp_home_modes",
+        "layerIds": [
+          "automation"
+        ],
+        "points": [
+          {
+            "x": 540,
+            "y": 320
+          },
+          {
+            "x": 760,
+            "y": 320
+          },
+          {
+            "x": 980,
+            "y": 320
+          }
+        ],
+        "entity": "input_boolean.ddc_starter_guest_mode",
+        "active_states": "on,active,home,>0",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 9,
+        "animate_mode": "active",
+        "animation_speed": 1.3,
+        "active_color": "#14b8a6",
+        "inactive_color": "rgba(148, 163, 184, 0.38)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "sp_connector_security_flow",
+        "tabId": "security",
+        "cardIds": [
+          "sp_security_alarm",
+          "sp_security_status"
+        ],
+        "sourceCardId": "sp_security_alarm",
+        "targetCardId": "sp_security_status",
+        "layerIds": [
+          "automation"
+        ],
+        "points": [
+          {
+            "x": 540,
+            "y": 320
+          },
+          {
+            "x": 760,
+            "y": 320
+          },
+          {
+            "x": 980,
+            "y": 320
+          }
+        ],
+        "entity": "input_boolean.ddc_starter_security_armed",
+        "active_states": "on,armed,active,>0",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "dashed",
+        "thickness": 9,
+        "animate_mode": "active",
+        "animation_speed": 1.1,
+        "active_color": "#22c55e",
+        "inactive_color": "rgba(148, 163, 184, 0.38)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "sp_connector_lights_flow",
+        "tabId": "lights",
+        "cardIds": [
+          "sp_lights_master",
+          "sp_lights_brightness"
+        ],
+        "sourceCardId": "sp_lights_master",
+        "targetCardId": "sp_lights_brightness",
+        "layerIds": [
+          "automation"
+        ],
+        "points": [
+          {
+            "x": 540,
+            "y": 320
+          },
+          {
+            "x": 760,
+            "y": 320
+          },
+          {
+            "x": 980,
+            "y": 320
+          }
+        ],
+        "entity": "input_boolean.ddc_starter_all_lights",
+        "active_states": "on,active,>0",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 10,
+        "animate_mode": "active",
+        "animation_speed": 1.25,
+        "active_color": "#f59e0b",
+        "inactive_color": "rgba(148, 163, 184, 0.38)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "sp_connector_climate_flow",
+        "tabId": "climate",
+        "cardIds": [
+          "sp_climate_temp",
+          "sp_climate_modes"
+        ],
+        "sourceCardId": "sp_climate_temp",
+        "targetCardId": "sp_climate_modes",
+        "layerIds": [
+          "automation"
+        ],
+        "points": [
+          {
+            "x": 540,
+            "y": 320
+          },
+          {
+            "x": 760,
+            "y": 320
+          },
+          {
+            "x": 980,
+            "y": 320
+          }
+        ],
+        "entity": "input_boolean.ddc_starter_climate_eco",
+        "active_states": "on,eco,active,>0",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "dotted",
+        "thickness": 10,
+        "animate_mode": "active",
+        "animation_speed": 1.5,
+        "active_color": "#5eead4",
+        "inactive_color": "rgba(148, 163, 184, 0.38)",
+        "glow": true,
+        "rounded": true
+      },
+      {
+        "id": "sp_connector_energy_flow",
+        "tabId": "energy",
+        "cardIds": [
+          "sp_energy_today",
+          "sp_energy_table"
+        ],
+        "sourceCardId": "sp_energy_today",
+        "targetCardId": "sp_energy_table",
+        "layerIds": [
+          "details"
+        ],
+        "points": [
+          {
+            "x": 540,
+            "y": 320
+          },
+          {
+            "x": 760,
+            "y": 320
+          },
+          {
+            "x": 980,
+            "y": 320
+          }
+        ],
+        "entity": "input_number.ddc_starter_energy_today",
+        "active_states": ">0",
+        "arrows": "end",
+        "flow_direction": "forward",
+        "line_style": "solid",
+        "thickness": 9,
+        "animate_mode": "active",
+        "animation_speed": 1.2,
+        "active_color": "#8b9cf6",
+        "inactive_color": "rgba(148, 163, 184, 0.38)",
+        "glow": true,
+        "rounded": true
+      }
+    ]
+  },
+  "cards": [
+    {
+      "id": "sp_home_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Home",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true,
+        "line_height": 1.02
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "home",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_home_quick",
+      "card": {
+        "type": "custom:ddc-html-card",
+        "title": "Command Surface",
+        "html": "<div class=\"deck\"><div class=\"pulse\"></div><div><strong>House Core</strong><span id=\"state\"></span></div></div><div class=\"actions\"><button data-setting=\"screen_saver_enabled\">Saver</button><button data-setting=\"animate_cards\">Motion</button><button data-setting=\"layers_enabled\">Layers</button></div>",
+        "css": ".deck{display:grid;grid-template-columns:54px 1fr;gap:16px;align-items:center}.deck strong{display:block;font-size:22px;letter-spacing:.02em}.deck span{display:block;margin-top:4px;color:rgba(238,245,239,.66);font-size:13px}.pulse{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,#f4f7f4 0 9%,#14b8a6 10% 32%,rgba(20,184,166,.18) 33% 100%);box-shadow:0 0 34px rgba(20,184,166,.34)}.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px}.actions button{border:1px solid rgba(210,221,207,.15);border-radius:12px;padding:15px 10px;background:linear-gradient(180deg,rgba(244,247,244,.09),rgba(244,247,244,.025));color:#eef5ef;font-weight:700;letter-spacing:.02em;cursor:pointer}.actions button:hover{border-color:rgba(20,184,166,.46);background:rgba(20,184,166,.16)}",
+        "js": "const render=()=>{const on=(k)=>ddc.settings.get(k)?'on':'off';root.querySelector('#state').textContent=`Saver ${on('screen_saver_enabled')} | Motion ${on('animate_cards')} | Layers ${on('layers_enabled')}`};root.querySelectorAll('button[data-setting]').forEach(btn=>btn.addEventListener('click',async()=>{await ddc.settings.toggle(btn.dataset.setting,{persist:true});render()}));const off=ddc.settings.subscribe(render);render();return()=>off();",
+        "rerun_on_hass_update": false
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "home",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(20,184,166,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(20,184,166,.34)",
+        "card_shadow": "on",
+        "text_color": "#effffb"
+      },
+      "overflow": "visible"
+    },
+    {
+      "id": "sp_home_status",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Live Surfaces",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "entity_id": "input_boolean.ddc_starter_*"
+            },
+            {
+              "entity_id": "input_select.ddc_starter_*"
+            },
+            {
+              "domain": "person"
+            },
+            {
+              "domain": "device_tracker"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            },
+            {
+              "state": "unknown"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "home",
+      "layerIds": [
+        "standard",
+        "details"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_home_modes",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Modes",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "entity_id": "input_select.ddc_starter_home_mode"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_guest_mode"
+            },
+            {
+              "entity_id": "scene.*"
+            },
+            {
+              "domain": "script"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "home",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(139,156,246,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(139,156,246,.30)",
+        "card_shadow": "on",
+        "text_color": "#f5f3ff"
+      }
+    },
+    {
+      "id": "sp_home_footer",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Rooms & Areas",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "domain": "light"
+            },
+            {
+              "domain": "climate"
+            },
+            {
+              "domain": "cover"
+            },
+            {
+              "domain": "fan"
+            },
+            {
+              "domain": "switch"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            },
+            {
+              "state": "unknown"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 40,
+        "y": 520
+      },
+      "size": {
+        "width": 1320,
+        "height": 220
+      },
+      "z": 6,
+      "tabId": "home",
+      "layerIds": [
+        "details"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_security_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Security",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "security",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_security_alarm",
+      "card": {
+        "type": "button",
+        "entity": "input_boolean.ddc_starter_security_armed",
+        "name": "Security Core",
+        "icon": "mdi:shield-home",
+        "show_state": true,
+        "tap_action": {
+          "action": "toggle"
+        }
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "security",
+      "layerIds": [
+        "standard",
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(34,197,94,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(34,197,94,.32)",
+        "card_shadow": "on",
+        "text_color": "#f0fdf4"
+      }
+    },
+    {
+      "id": "sp_security_status",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Perimeter",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "domain": "alarm_control_panel"
+            },
+            {
+              "domain": "lock"
+            },
+            {
+              "entity_id": "binary_sensor.*door*"
+            },
+            {
+              "entity_id": "binary_sensor.*window*"
+            },
+            {
+              "entity_id": "binary_sensor.*motion*"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_security_armed"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_front_door"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_motion_detected"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "security",
+      "layerIds": [
+        "standard",
+        "details"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_security_actions",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:cctv",
+        "entity": "input_boolean.ddc_starter_motion_detected",
+        "size": 120,
+        "color": "#94a3b8",
+        "active_color": "#22c55e",
+        "state_based_color": true,
+        "glow": true,
+        "pulse_when_active": true,
+        "active_states": "on"
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "security",
+      "layerIds": [
+        "focus",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_lights_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Lights",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "lights",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_lights_master",
+      "card": {
+        "type": "button",
+        "entity": "input_boolean.ddc_starter_all_lights",
+        "name": "All Lights",
+        "icon": "mdi:lightbulb-group",
+        "show_state": true,
+        "tap_action": {
+          "action": "toggle"
+        }
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "lights",
+      "layerIds": [
+        "standard",
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(245,158,11,.20), rgba(8,13,15,.82))",
+        "border_color": "rgba(245,158,11,.34)",
+        "card_shadow": "on",
+        "text_color": "#fff7ed"
+      }
+    },
+    {
+      "id": "sp_lights_brightness",
+      "card": {
+        "type": "gauge",
+        "entity": "input_number.ddc_starter_brightness",
+        "name": "Brightness",
+        "min": 0,
+        "max": 100,
+        "severity": {
+          "green": 30,
+          "yellow": 60,
+          "red": 85
+        }
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "lights",
+      "layerIds": [
+        "standard",
+        "details"
+      ],
+      "card_style": {
+        "background": "rgba(2,6,23,.64)",
+        "border_color": "rgba(245,158,11,.22)",
+        "card_shadow": "on",
+        "text_color": "#f8fafc"
+      }
+    },
+    {
+      "id": "sp_lights_scenes",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Light Network",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "domain": "light"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_all_lights"
+            },
+            {
+              "entity_id": "input_select.ddc_starter_light_scene"
+            },
+            {
+              "entity_id": "input_number.ddc_starter_brightness"
+            },
+            {
+              "domain": "scene"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "lights",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(245,158,11,.20), rgba(8,13,15,.82))",
+        "border_color": "rgba(245,158,11,.34)",
+        "card_shadow": "on",
+        "text_color": "#fff7ed"
+      }
+    },
+    {
+      "id": "sp_climate_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Climate",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "climate",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_climate_temp",
+      "card": {
+        "type": "gauge",
+        "entity": "input_number.ddc_starter_temperature",
+        "name": "Thermal Target",
+        "min": 15,
+        "max": 25,
+        "severity": {
+          "green": 18,
+          "yellow": 21,
+          "red": 24
+        }
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "climate",
+      "layerIds": [
+        "standard",
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(59,130,246,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(96,165,250,.30)",
+        "card_shadow": "on",
+        "text_color": "#eff6ff"
+      }
+    },
+    {
+      "id": "sp_climate_modes",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Climate Mesh",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "domain": "climate"
+            },
+            {
+              "entity_id": "sensor.*temperature*"
+            },
+            {
+              "entity_id": "sensor.*humidity*"
+            },
+            {
+              "entity_id": "input_number.ddc_starter_temperature"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_climate_eco"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            },
+            {
+              "state": "unknown"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "climate",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(59,130,246,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(96,165,250,.30)",
+        "card_shadow": "on",
+        "text_color": "#eff6ff"
+      }
+    },
+    {
+      "id": "sp_climate_icon",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:leaf",
+        "entity": "input_boolean.ddc_starter_climate_eco",
+        "size": 120,
+        "color": "#94a3b8",
+        "active_color": "#22c55e",
+        "state_based_color": true,
+        "glow": true,
+        "pulse_when_active": true,
+        "active_states": "on"
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "climate",
+      "layerIds": [
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_energy_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Energy",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "energy",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_energy_today",
+      "card": {
+        "type": "gauge",
+        "entity": "input_number.ddc_starter_energy_today",
+        "name": "Energy Today",
+        "min": 0,
+        "max": 60,
+        "severity": {
+          "green": 0,
+          "yellow": 25,
+          "red": 45
+        }
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "energy",
+      "layerIds": [
+        "standard",
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(139,156,246,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(139,156,246,.30)",
+        "card_shadow": "on",
+        "text_color": "#f5f3ff"
+      }
+    },
+    {
+      "id": "sp_energy_table",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "glance",
+          "title": "Consumption",
+          "state_color": true,
+          "columns": 3
+        },
+        "filter": {
+          "include": [
+            {
+              "entity_id": "input_number.ddc_starter_energy_today"
+            },
+            {
+              "entity_id": "sensor.*energy*"
+            },
+            {
+              "entity_id": "sensor.*power*"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            },
+            {
+              "state": "unknown"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "energy",
+      "layerIds": [
+        "standard",
+        "details"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    },
+    {
+      "id": "sp_energy_controls",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Energy Sources",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "entity_id": "sensor.*energy*"
+            },
+            {
+              "entity_id": "sensor.*power*"
+            },
+            {
+              "entity_id": "sensor.*battery*"
+            },
+            {
+              "entity_id": "input_number.ddc_starter_energy_today"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            },
+            {
+              "state": "unknown"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "energy",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(139,156,246,.18), rgba(8,13,15,.82))",
+        "border_color": "rgba(139,156,246,.30)",
+        "card_shadow": "on",
+        "text_color": "#f5f3ff"
+      }
+    },
+    {
+      "id": "sp_media_title",
+      "card": {
+        "type": "custom:ddc-text-card",
+        "text": "Media",
+        "variant": "title",
+        "font_size": 58,
+        "color": "#f8fafc",
+        "align": "left",
+        "bold": true
+      },
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "size": {
+        "width": 520,
+        "height": 100
+      },
+      "z": 6,
+      "tabId": "media",
+      "layerIds": [
+        "standard"
+      ],
+      "card_style": {
+        "background": "transparent",
+        "card_shadow": "off",
+        "text_color": "#f4f7f4"
+      }
+    },
+    {
+      "id": "sp_media_mode",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Media Nodes",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "domain": "media_player"
+            },
+            {
+              "domain": "remote"
+            },
+            {
+              "entity_id": "input_select.ddc_starter_media_scene"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_media_night"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "size": {
+        "width": 500,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "media",
+      "layerIds": [
+        "standard",
+        "automation"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(244,114,182,.16), rgba(8,13,15,.82))",
+        "border_color": "rgba(244,114,182,.28)",
+        "card_shadow": "on",
+        "text_color": "#fdf2f8"
+      }
+    },
+    {
+      "id": "sp_media_icon",
+      "card": {
+        "type": "custom:ddc-icon-card",
+        "icon": "mdi:play-circle",
+        "entity": "input_boolean.ddc_starter_media_night",
+        "size": 140,
+        "color": "#94a3b8",
+        "active_color": "#ec4899",
+        "state_based_color": true,
+        "glow": true,
+        "pulse_when_active": true,
+        "active_states": "on"
+      },
+      "position": {
+        "x": 580,
+        "y": 180
+      },
+      "size": {
+        "width": 380,
+        "height": 280
+      },
+      "z": 7,
+      "tabId": "media",
+      "layerIds": [
+        "focus"
+      ],
+      "card_style": {
+        "background": "rgba(2,6,23,.64)",
+        "border_color": "rgba(236,72,153,.22)",
+        "card_shadow": "on",
+        "text_color": "#f8fafc"
+      }
+    },
+    {
+      "id": "sp_media_shortcuts",
+      "card": {
+        "type": "custom:auto-entities",
+        "show_empty": false,
+        "card": {
+          "type": "entities",
+          "title": "Scene Shortcuts",
+          "state_color": true
+        },
+        "filter": {
+          "include": [
+            {
+              "entity_id": "input_select.ddc_starter_media_scene"
+            },
+            {
+              "entity_id": "input_boolean.ddc_starter_media_night"
+            },
+            {
+              "domain": "scene"
+            },
+            {
+              "domain": "script"
+            }
+          ],
+          "exclude": [
+            {
+              "state": "unavailable"
+            }
+          ]
+        },
+        "sort": {
+          "method": "name",
+          "ignore_case": true
+        },
+        "unique": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 180
+      },
+      "size": {
+        "width": 360,
+        "height": 280
+      },
+      "z": 6,
+      "tabId": "media",
+      "layerIds": [
+        "standard",
+        "focus"
+      ],
+      "card_style": {
+        "background": "linear-gradient(145deg, rgba(8,13,15,.84), rgba(20,26,24,.72))",
+        "border_color": "rgba(210, 221, 207, .16)",
+        "card_shadow": "on",
+        "text_color": "#eef5ef"
+      }
+    }
+  ],
+  "packages": [
+    {
+      "id": "ddc_starter_pack_helpers",
+      "name": "DDC Starter Pack Helpers",
+      "filename": "ddc_starter_pack_helpers.yaml",
+      "enabled": true,
+      "yaml": "input_boolean:\n  ddc_starter_security_armed:\n    name: Starter Security Armed\n    icon: mdi:shield-home\n  ddc_starter_front_door:\n    name: Starter Front Door\n    icon: mdi:door\n  ddc_starter_motion_detected:\n    name: Starter Motion Detected\n    icon: mdi:motion-sensor\n  ddc_starter_all_lights:\n    name: Starter All Lights\n    icon: mdi:lightbulb-group\n  ddc_starter_climate_eco:\n    name: Starter Climate Eco\n    icon: mdi:leaf\n  ddc_starter_guest_mode:\n    name: Starter Guest Mode\n    icon: mdi:account-multiple\n  ddc_starter_media_night:\n    name: Starter Media Night\n    icon: mdi:weather-night\n\ninput_number:\n  ddc_starter_brightness:\n    name: Starter Brightness\n    min: 0\n    max: 100\n    step: 1\n    unit_of_measurement: \"%\"\n    icon: mdi:brightness-6\n  ddc_starter_temperature:\n    name: Starter Target Temperature\n    min: 15\n    max: 25\n    step: 0.5\n    unit_of_measurement: \"\\u00b0C\"\n    icon: mdi:thermostat\n  ddc_starter_energy_today:\n    name: Starter Energy Today\n    min: 0\n    max: 60\n    step: 0.1\n    unit_of_measurement: \"kWh\"\n    icon: mdi:flash\n\ninput_select:\n  ddc_starter_home_mode:\n    name: Starter Home Mode\n    options:\n      - Home\n      - Away\n      - Night\n      - Guest\n    icon: mdi:home-automation\n  ddc_starter_light_scene:\n    name: Starter Light Scene\n    options:\n      - Relax\n      - Bright\n      - Movie\n      - Night\n    icon: mdi:palette\n  ddc_starter_media_scene:\n    name: Starter Media Scene\n    options:\n      - TV\n      - Music\n      - Movie\n      - Off\n    icon: mdi:play-box\n\ntemplate:\n  - sensor:\n      - name: DDC Starter Outdoor Temperature\n        unique_id: ddc_starter_outdoor_temperature\n        unit_of_measurement: \"\\u00b0C\"\n        state: \"{{ 18 }}\"\n      - name: DDC Starter Humidity\n        unique_id: ddc_starter_humidity\n        unit_of_measurement: \"%\"\n        state: \"{{ 42 }}\"\n"
+    }
+  ]
+}
