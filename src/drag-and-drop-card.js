@@ -1104,6 +1104,167 @@ _ensureSettingsStyles_() {
     .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
     .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
     .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+    .sidebar-item-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+      gap:10px;
+      width:100%;
+    }
+    .sidebar-item-toggle{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      min-height:46px;
+      padding:0 12px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.14));
+      border-radius:12px;
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 86%, transparent);
+    }
+    .sidebar-item-toggle > span{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+      font-weight:700;
+    }
+    .sidebar-item-toggle ha-icon{ --mdc-icon-size:18px; }
+    .sidebar-pill-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(148px, 1fr));
+      gap:10px;
+      width:100%;
+    }
+    .sidebar-pill-grid.compact{
+      grid-template-columns:repeat(auto-fit, minmax(118px, 1fr));
+    }
+    .sidebar-choice-pill{
+      position:relative;
+      min-width:0;
+      cursor:pointer;
+    }
+    .sidebar-choice-pill input{
+      position:absolute;
+      inset:0;
+      opacity:0;
+      pointer-events:none;
+    }
+    .sidebar-choice-pill .pill-shell{
+      min-height:44px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:9px;
+      padding:0 12px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.16));
+      border-radius:999px;
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 88%, transparent);
+      color:var(--primary-text-color);
+      font-weight:800;
+      transition:background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+    }
+    .sidebar-choice-pill .pill-shell ha-icon{ --mdc-icon-size:18px; opacity:.88; }
+    .sidebar-choice-pill input:checked + .pill-shell{
+      border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 56%, transparent);
+      background:color-mix(in oklab, var(--primary-color, #03a9f4) 16%, var(--ha-card-background, #fff));
+      box-shadow:0 8px 18px color-mix(in oklab, var(--primary-color, #03a9f4) 16%, transparent);
+    }
+    .sidebar-choice-pill:hover .pill-shell{ transform:translateY(-1px); }
+    .sidebar-media-setting .control.stack{
+      display:grid;
+      gap:8px;
+      align-items:stretch;
+    }
+    .sidebar-media-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      justify-content:flex-end;
+    }
+    .file-action{
+      cursor:pointer;
+    }
+    .sidebar-media-preview{
+      min-height:92px;
+      display:grid;
+      place-items:center;
+      gap:7px;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px dashed color-mix(in oklab, var(--divider-color, rgba(0,0,0,.18)) 80%, transparent);
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 88%, transparent);
+      color:var(--secondary-text-color);
+      font-weight:750;
+    }
+    .sidebar-media-preview img{
+      width:100%;
+      height:132px;
+      object-fit:cover;
+      display:block;
+    }
+    .sidebar-media-preview.has-image{
+      border-style:solid;
+      padding:0;
+    }
+    .sidebar-order-list{
+      display:grid;
+      gap:8px;
+      width:100%;
+    }
+    .sidebar-order-row,
+    .sidebar-order-empty{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      min-height:48px;
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.14)) 84%, transparent);
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 90%, transparent);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .sidebar-order-empty{
+      justify-content:center;
+      color:var(--secondary-text-color);
+      font-weight:750;
+    }
+    .sidebar-order-row-main{
+      min-width:0;
+      display:flex;
+      align-items:center;
+      gap:9px;
+    }
+    .sidebar-order-row-main strong{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:.92rem;
+    }
+    .sidebar-order-handle,
+    .sidebar-order-icon{
+      width:30px;
+      height:30px;
+      display:grid;
+      place-items:center;
+      border-radius:11px;
+      color:var(--secondary-text-color);
+      background:rgba(127,127,127,.08);
+    }
+    .sidebar-order-icon{
+      color:var(--primary-color, #03a9f4);
+      background:color-mix(in oklab, var(--primary-color, #03a9f4) 12%, transparent);
+    }
+    .sidebar-order-actions{
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .sidebar-order-actions .icon-btn:disabled{
+      opacity:.38;
+      cursor:not-allowed;
+    }
     .layers-card .layer-toggle-row{
       display:flex;
       align-items:center;
@@ -1956,6 +2117,98 @@ _ensureSettingsStyles_() {
       width: 72px; height: 42px; border-radius: 8px;
       background-size: cover; background-position: center center;
       border: 1px solid var(--divider-color, rgba(0,0,0,.25));
+    }
+
+    .default-bg-gallery {
+      display:grid;
+      gap:10px;
+      width:100%;
+      padding:10px;
+      border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.18)) 80%, transparent);
+      border-radius:14px;
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 86%, transparent);
+    }
+    .default-bg-gallery-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      min-width:0;
+    }
+    .default-bg-gallery-title {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+      font-weight:800;
+    }
+    .default-bg-gallery-title ha-icon { --mdc-icon-size:18px; color:var(--primary-color, #03a9f4); }
+    .default-bg-gallery-actions {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      flex:0 0 auto;
+    }
+    .default-bg-gallery-actions .icon-btn {
+      width:32px;
+      height:32px;
+      border-radius:999px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.18));
+      background:color-mix(in oklab, var(--primary-background-color, #0e1116) 16%, transparent);
+    }
+    .default-bg-gallery-actions .icon-btn:hover {
+      background:color-mix(in oklab, var(--primary-color, #03a9f4) 16%, transparent);
+    }
+    .default-bg-track {
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      overscroll-behavior-inline:contain;
+      scroll-snap-type:x proximity;
+      padding:2px 2px 6px;
+      scrollbar-width:thin;
+    }
+    .default-bg-card {
+      appearance:none;
+      -webkit-appearance:none;
+      flex:0 0 136px;
+      display:grid;
+      gap:7px;
+      padding:6px;
+      border:1px solid color-mix(in oklab, var(--divider-color, rgba(0,0,0,.2)) 80%, transparent);
+      border-radius:12px;
+      background:color-mix(in oklab, var(--card-background-color, #fff) 88%, transparent);
+      color:var(--primary-text-color);
+      cursor:pointer;
+      text-align:left;
+      scroll-snap-align:start;
+      transition:transform .12s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+    .default-bg-card:hover {
+      transform:translateY(-1px);
+      border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 42%, transparent);
+    }
+    .default-bg-card[aria-pressed="true"] {
+      border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 72%, transparent);
+      box-shadow:0 0 0 2px color-mix(in oklab, var(--primary-color, #03a9f4) 20%, transparent);
+    }
+    .default-bg-preview {
+      width:100%;
+      aspect-ratio:16 / 10;
+      border-radius:9px;
+      background-size:cover;
+      background-position:center;
+      background-color:rgba(127,127,127,.14);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .default-bg-card span {
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:.78rem;
+      font-weight:800;
+      line-height:1.2;
     }
 
     .media-browser-dialog{
@@ -3038,17 +3291,34 @@ _getYouTubeBackgroundSignature_(cfg = {}, opts = {}) {
 
 _getAvailableDashboardThemeNames_() {
   try {
-    const themes = this.hass?.themes?.themes;
+    const themes = this.hass?.themes?.themes || this.hass?.themes;
     if (!themes || typeof themes !== 'object') return [];
-    return Object.keys(themes).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    return Object.keys(themes)
+      .filter((name) => {
+        const value = themes?.[name];
+        return value && typeof value === 'object' && name !== 'modes';
+      })
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   } catch {
     return [];
   }
 }
 
+_getDashboardThemeName_() {
+  try {
+    return String(this.dashboardTheme ?? this._config?.dashboard_theme ?? this._config?.theme_name ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+_isDashboardThemeActive_() {
+  return !!this._getDashboardThemeName_();
+}
+
 _getEffectiveDashboardThemeMode_() {
   try {
-    const explicitDark = this.hass?.selectedTheme?.dark;
+    const explicitDark = this.hass?.selectedTheme?.dark ?? this.hass?.themes?.darkMode;
     if (typeof explicitDark === 'boolean') return explicitDark ? 'dark' : 'light';
   } catch {}
   try {
@@ -3060,24 +3330,33 @@ _getEffectiveDashboardThemeMode_() {
 
 _getDashboardThemeDefinition_(themeName = this.dashboardTheme) {
   try {
-    const raw = this.hass?.themes?.themes?.[themeName];
+    const raw = (this.hass?.themes?.themes || this.hass?.themes)?.[themeName];
     if (!raw || typeof raw !== 'object') return null;
+    const { modes, ...base } = raw;
     if (raw.modes && typeof raw.modes === 'object') {
       const mode = this._getEffectiveDashboardThemeMode_();
       const scoped = raw.modes?.[mode]
         || raw.modes?.light
         || raw.modes?.dark
         || Object.values(raw.modes || {}).find((v) => v && typeof v === 'object');
-      return scoped && typeof scoped === 'object' ? scoped : null;
+      return scoped && typeof scoped === 'object' ? { ...base, ...scoped } : base;
     }
-    return raw;
+    return base;
   } catch {
     return null;
   }
 }
 
+_normalizeDashboardThemeVarName_(key = '') {
+  const raw = String(key || '').trim();
+  if (!raw || raw === 'modes') return '';
+  if (raw.startsWith('--')) return raw;
+  if (/^[a-zA-Z0-9_-]+$/.test(raw)) return `--${raw}`;
+  return '';
+}
+
 _isDashboardThemeOverrideAllDesignActive_() {
-  return !!(this.dashboardThemeEnabled && this.dashboardThemeOverrideAllDesign && this.dashboardTheme);
+  return !!(this._isDashboardThemeActive_?.() && this.dashboardThemeOverrideAllDesign);
 }
 
 _getVisualRefreshSignature_() {
@@ -3086,7 +3365,7 @@ _getVisualRefreshSignature_() {
     const bg = cfg.background_image || cfg.bg_image || {};
     const particles = cfg.background_particles || {};
     const youtube = cfg.background_youtube || {};
-    const themeName = this.dashboardThemeEnabled ? String(this.dashboardTheme || '').trim() : '';
+    const themeName = this._getDashboardThemeName_?.() || '';
     const themeDefinition = themeName ? (this._getDashboardThemeDefinition_(themeName) || null) : null;
     const mode = String(
       cfg.background_mode
@@ -3096,7 +3375,7 @@ _getVisualRefreshSignature_() {
     ).toLowerCase();
 
     return JSON.stringify({
-      dashboardThemeEnabled: !!this.dashboardThemeEnabled,
+      dashboardThemeEnabled: !!themeName,
       dashboardTheme: themeName,
       dashboardThemeOverrideAllDesign: !!this.dashboardThemeOverrideAllDesign,
       effectiveThemeMode: this._getEffectiveDashboardThemeMode_?.() || 'light',
@@ -3186,16 +3465,18 @@ _applyDashboardThemeStyling_() {
     });
     this.__dashboardThemeAppliedVars = [];
 
-    const themeName = this.dashboardThemeEnabled ? String(this.dashboardTheme || '').trim() : '';
+    const themeName = this._getDashboardThemeName_?.() || '';
+    this.dashboardThemeEnabled = !!themeName;
     if (themeName) {
       const themeVars = this._getDashboardThemeDefinition_(themeName);
       if (themeVars && typeof themeVars === 'object') {
         for (const [key, value] of Object.entries(themeVars)) {
-          if (!String(key || '').startsWith('--')) continue;
+          const prop = this._normalizeDashboardThemeVarName_?.(key) || '';
+          if (!prop) continue;
           if (value == null || typeof value === 'object') continue;
           try {
-            host.style.setProperty(key, String(value));
-            this.__dashboardThemeAppliedVars.push(key);
+            host.style.setProperty(prop, String(value));
+            this.__dashboardThemeAppliedVars.push(prop);
           } catch {}
         }
       }
@@ -4212,26 +4493,9 @@ _layoutYtBackground_() {  // Fit a 16:9 iframe according to selected size
     let cw;
     let ch;
     try {
-      const modeName = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-      if (modeName === 'auto') {
-        const r = contEl.getBoundingClientRect();
-        cw = r.width;
-        // Compute scaled height based on the ratio of visible width to natural width.
-        if (natW > 0) {
-          const scale = Math.min(cw / natW, 1);
-          ch = natH * scale;
-        } else {
-          ch = r.height;
-        }
-      } else {
-        // dynamic mode: treat the canvas as having its natural size.  This
-        // will be downscaled by the CSS transform applied to the
-        // cardContainer.  Using the natural dimensions ensures the video
-        // covers the same area as in auto mode when the design is larger
-        // than the viewport.
-        cw = natW || contEl.getBoundingClientRect().width;
-        ch = natH || contEl.getBoundingClientRect().height;
-      }
+      const modeName = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+      cw = natW || contEl.getBoundingClientRect().width;
+      ch = natH || contEl.getBoundingClientRect().height;
     } catch {
       // Fallback: use the scale wrapper’s measured dimensions
       const r = contEl.getBoundingClientRect();
@@ -4412,6 +4676,7 @@ _applyVisibility_() {
       if (!wrap || !wrap.firstElementChild) continue;
       this._applyWrapDisplayState_(wrap);
     }
+    this._requestPreviewOutsideCardsSync_?.();
   } catch (e) {
     console.warn('[ddc:visibility] apply error', e);
   }
@@ -4467,17 +4732,56 @@ _applyLayerVisibilityChange_() {
     if (result.changed) changed = true;
     if (result.becameVisible) becameVisible.push(wrap);
   });
-  try { this._renderLayersBar_?.(); } catch {}
+  try {
+    if (this.__layersMenuOpen) this._syncLayerTriggerState_?.();
+    else this._renderLayersBar_?.();
+  } catch {}
   if (changed) {
     try { this._animateCards_?.(becameVisible); } catch {}
     try { this._renderConnectors_?.(); } catch {}
   }
 }
 
+_isWrapperVisibleForOverlap_(wrap) {
+  if (!wrap || wrap.dataset?.placeholder || wrap.classList?.contains?.('ddc-placeholder')) return false;
+  if (typeof this._shouldWrapDisplayForCurrentContext_ === 'function' && !this._shouldWrapDisplayForCurrentContext_(wrap)) {
+    return false;
+  }
+  if (wrap.classList?.contains?.('ddc-hidden') || wrap.style?.display === 'none' || wrap.inert === true) {
+    return false;
+  }
+  try {
+    const cs = getComputedStyle(wrap);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  } catch {}
+  return true;
+}
+
+_getOverlapCandidateWrappers_(ignoreSet = new Set()) {
+  if (!this.cardContainer) return [];
+  return Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
+    .filter((wrap) => !ignoreSet?.has?.(wrap) && this._isWrapperVisibleForOverlap_(wrap));
+}
+
 
   async _onKeyDown_(e) {
   if (!this.editMode) return;
   if (this._isTypingTarget_(e)) return;
+
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const key = String(e.key || '').toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) await this._redoLayoutHistory_?.();
+      else await this._undoLayoutHistory_?.();
+      return;
+    }
+    if (key === 'y') {
+      e.preventDefault();
+      await this._redoLayoutHistory_?.();
+      return;
+    }
+  }
 
   const gs = Number(this.gridSize || 10);
   const step = e.altKey ? 1 : (e.shiftKey ? gs * 5 : gs);
@@ -4634,9 +4938,7 @@ _syncTabsWidth_() {
     this._syncTabsPlacement_?.();
     this._syncViewportPreviewUI_?.();
     this._syncLeftRailViewportPosition_?.();
-    const mode = String(
-      (this.containerSizeMode || this.container_size_mode || 'dynamic')
-    ).toLowerCase();
+    const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
     if (mode === 'auto') {
       this._syncLeftRailViewportPosition_?.();
       return;
@@ -4644,6 +4946,14 @@ _syncTabsWidth_() {
 
     const bar = this.tabsBar;
     if (!bar) return;
+
+    if (this._isSidebarNavigationActive_?.()) {
+      bar.style.width = '';
+      bar.style.maxWidth = '';
+      bar.style.marginInline = '';
+      this._refreshTabsAlignment_?.();
+      return;
+    }
 
     if (this._isExplicitViewportPreview_?.()) {
       bar.style.width = '';
@@ -4669,8 +4979,8 @@ _syncTabsWidth_() {
       }
     } catch {}
 
-    // Left, top, and bottom placements should size naturally from their content.
-    if (this.tabsPosition === 'left' || this.tabsPosition === 'top' || this.tabsPosition === 'bottom') {
+    // Top and bottom placements should size naturally from their content.
+    if (this.tabsPosition === 'top' || this.tabsPosition === 'bottom') {
       bar.style.width = '';
       bar.style.maxWidth = '';
       bar.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
@@ -4706,20 +5016,2225 @@ _syncTabsWidth_() {
   } catch {}
 }
 
+_normalizeTabsPosition_(position = 'top') {
+  const value = String(position || 'top').trim().toLowerCase();
+  return value === 'bottom' ? 'bottom' : 'top';
+}
+
+_getDefaultBackgroundPresets_() {
+  return [
+    {
+      id: 'default-bg-01',
+      label: 'Default 1',
+      src: 'https://i.postimg.cc/QMhjRLRT/Chat-GPT-Image-May-25-2026-08-39-39-PM-(1).png',
+    },
+    {
+      id: 'default-bg-02',
+      label: 'Default 2',
+      src: 'https://i.postimg.cc/jSzsgqkh/Chat-GPT-Image-May-25-2026-08-39-39-PM-(2).png',
+    },
+    {
+      id: 'default-bg-03',
+      label: 'Default 3',
+      src: 'https://i.postimg.cc/vZWQq8Sz/Chat-GPT-Image-May-25-2026-08-39-39-PM-(3).png',
+    },
+    {
+      id: 'default-bg-04',
+      label: 'Default 4',
+      src: 'https://i.postimg.cc/bwQzCYFx/Chat-GPT-Image-May-25-2026-08-39-39-PM-(4).png',
+    },
+    {
+      id: 'default-bg-05',
+      label: 'Default 5',
+      src: 'https://i.postimg.cc/XYwVHNDp/Chat-GPT-Image-May-25-2026-08-39-39-PM-(5).png',
+    },
+    {
+      id: 'default-bg-06',
+      label: 'Default 6',
+      src: 'https://i.postimg.cc/x1K0xjFk/Chat-GPT-Image-May-25-2026-08-39-39-PM-(6).png',
+    },
+    {
+      id: 'default-bg-07',
+      label: 'Default 7',
+      src: 'https://i.postimg.cc/52wx79kt/Chat-GPT-Image-May-25-2026-08-39-39-PM-(7).png',
+    },
+    {
+      id: 'default-bg-08',
+      label: 'Default 8',
+      src: 'https://i.postimg.cc/g2vYScBx/Chat-GPT-Image-May-25-2026-08-39-39-PM-(8).png',
+    },
+  ];
+}
+
+_normalizeSidebarStyle_(style = 'glass') {
+  const value = String(style || 'glass').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return ['glass', 'neon', 'minimal'].includes(value) ? value : 'glass';
+}
+
+_normalizeSidebarDensity_(density = 'comfortable') {
+  const value = String(density || 'comfortable').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return ['compact', 'comfortable', 'spacious'].includes(value) ? value : 'comfortable';
+}
+
+_normalizeSidebarAccent_(accent = 'blue') {
+  const value = String(accent || 'blue').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return ['blue', 'cyan', 'purple', 'amber', 'green'].includes(value) ? value : 'blue';
+}
+
+_getSidebarItemDefinitions_() {
+  return [
+    { id: 'navigation', label: 'Tabs / layers', icon: 'mdi:tab' },
+    { id: 'clock', label: 'Clock', icon: 'mdi:clock-outline' },
+    { id: 'date', label: 'Date', icon: 'mdi:calendar-month-outline' },
+    { id: 'weather', label: 'Weather', icon: 'mdi:weather-partly-cloudy' },
+    { id: 'people', label: 'People home', icon: 'mdi:account-group-outline' },
+    { id: 'status', label: 'Home status', icon: 'mdi:home-analytics' },
+    { id: 'profile', label: 'Profile', icon: 'mdi:account-circle-outline' },
+  ];
+}
+
+_normalizeSidebarItems_(items = null, opts = {}) {
+  const aliases = {
+    nav: 'navigation',
+    tabs: 'navigation',
+    tab: 'navigation',
+    layers: 'navigation',
+    layer: 'navigation',
+    'tabs/layers': 'navigation',
+    tabs_layers: 'navigation',
+    time: 'clock',
+    calendar: 'date',
+    calendars: 'date',
+    people: 'people',
+    persons: 'people',
+    person: 'people',
+    presence: 'people',
+    people_home: 'people',
+    home_people: 'people',
+    home_status: 'status',
+    entities: 'status',
+    entity_status: 'status',
+    system: 'status',
+    user: 'profile',
+    account: 'profile',
+  };
+  const allowed = this._getSidebarItemDefinitions_?.().map((item) => item.id) || ['navigation', 'clock', 'date'];
+  const source = Array.isArray(items)
+    ? items
+    : String(items || '').split(',').map((item) => item.trim()).filter(Boolean);
+  const normalized = [];
+  source.forEach((item) => {
+    const raw = String(item || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    const value = aliases[raw] || raw;
+    if (allowed.includes(value) && !normalized.includes(value)) normalized.push(value);
+  });
+  if (!normalized.length && (opts.enabled || opts.legacyLeft)) normalized.push('navigation');
+  return normalized;
+}
+
+_normalizeSidebarCalendarEntities_(entities = []) {
+  const source = Array.isArray(entities)
+    ? entities
+    : String(entities || '').split(/[\n,]/);
+  const normalized = [];
+  source.forEach((entity) => {
+    const value = String(entity || '').trim();
+    if (!value || normalized.includes(value)) return;
+    normalized.push(value);
+  });
+  return normalized;
+}
+
+_normalizeSidebarHeader_(value = '') {
+  const raw = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const aliases = {
+    day: 'date_time',
+    date: 'date_time',
+    datetime: 'date_time',
+    date_time: 'date_time',
+    time: 'clock',
+    people_home: 'people',
+    presence: 'people',
+    home_status: 'home',
+    status: 'home',
+    house: 'home',
+    user: 'profile',
+    hidden: 'none',
+    off: 'none',
+  };
+  const normalized = aliases[raw] || raw;
+  return ['clock', 'date_time', 'people', 'home', 'weather', 'profile', 'none'].includes(normalized)
+    ? normalized
+    : 'clock';
+}
+
+_normalizeSidebarCanvasHeight_(value = 520) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 520;
+  return Math.max(280, Math.min(1600, Math.round(n)));
+}
+
+_normalizeSidebarCards_(entries = []) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .map((entry) => this._normalizeSavedCardEntry_(entry))
+    .filter((entry) => entry?.card && typeof entry.card === 'object' && Object.keys(entry.card).length);
+}
+
+_sidebarCardsRenderSignature_(entries = []) {
+  try {
+    return JSON.stringify(this._normalizeSidebarCards_(entries).map((entry) => ({
+      id: entry.id,
+      card: entry.card || null,
+      position: entry.position || null,
+      size: entry.size || null,
+      z: entry.z ?? null,
+    })));
+  } catch {
+    return '';
+  }
+}
+
+_isSidebarEnabled_() {
+  return false;
+}
+
+_sidebarHasItem_(item) {
+  const normalizedItem = String(item || '').trim().toLowerCase();
+  return this._isSidebarEnabled_() && this._normalizeSidebarItems_(this.sidebarItems, { enabled: true }).includes(normalizedItem);
+}
+
+_isSidebarNavigationActive_() {
+  return false;
+}
+
+_formatSidebarDate_(date = new Date()) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+  } catch {
+    return date.toLocaleDateString?.() || '';
+  }
+}
+
+_formatSidebarTime_(date = new Date()) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || '';
+  }
+}
+
+_formatSidebarMonth_(date = new Date()) {
+  try { return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date); } catch { return ''; }
+}
+
+_formatSidebarWeekday_(date = new Date()) {
+  try { return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(date); } catch { return ''; }
+}
+
+_formatSidebarLongDate_(date = new Date()) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return date.toLocaleDateString?.() || '';
+  }
+}
+
+_getSidebarWeekNumber_(date = new Date()) {
+  const current = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = current.getUTCDay() || 7;
+  current.setUTCDate(current.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(current.getUTCFullYear(), 0, 1));
+  return Math.ceil((((current - yearStart) / 86400000) + 1) / 7);
+}
+
+_formatSidebarMonthYear_(date = new Date()) {
+  try { return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date); } catch { return ''; }
+}
+
+_getSidebarWeekdayLabels_() {
+  try {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(Date.UTC(2026, 0, 5 + index)); // Monday-first reference week.
+      return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date);
+    });
+  } catch {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  }
+}
+
+_getSidebarCalendarCells_(date = new Date()) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const today = new Date();
+  const first = new Date(year, month, 1);
+  const startOffset = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  return Array.from({ length: 42 }, (_, index) => {
+    const dayInMonth = index - startOffset + 1;
+    let cellDate;
+    let muted = false;
+    if (dayInMonth < 1) {
+      cellDate = new Date(year, month - 1, daysInPrevMonth + dayInMonth);
+      muted = true;
+    } else if (dayInMonth > daysInMonth) {
+      cellDate = new Date(year, month + 1, dayInMonth - daysInMonth);
+      muted = true;
+    } else {
+      cellDate = new Date(year, month, dayInMonth);
+    }
+    const isToday = cellDate.getFullYear() === today.getFullYear()
+      && cellDate.getMonth() === today.getMonth()
+      && cellDate.getDate() === today.getDate();
+    const isSelected = cellDate.getFullYear() === date.getFullYear()
+      && cellDate.getMonth() === date.getMonth()
+      && cellDate.getDate() === date.getDate();
+    return {
+      day: cellDate.getDate(),
+      muted,
+      today: isToday,
+      selected: isSelected,
+      weekend: cellDate.getDay() === 0 || cellDate.getDay() === 6,
+      label: this._formatSidebarLongDate_(cellDate),
+    };
+  });
+}
+
+_sidebarCalendarMarkup_(date = new Date(), { detail = false } = {}) {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const weekdays = this._getSidebarWeekdayLabels_();
+  const cells = this._getSidebarCalendarCells_(date);
+  return `
+    <div class="ddc-sidebar-month ${detail ? 'ddc-sidebar-month-detail' : ''}">
+      <div class="ddc-sidebar-month-head">
+        <div>
+          <span>Calendar</span>
+          <strong>${safe(this._formatSidebarMonthYear_(date))}</strong>
+        </div>
+        <em>W${safe(this._getSidebarWeekNumber_(date))}</em>
+      </div>
+      <div class="ddc-sidebar-month-grid" role="grid" aria-label="${safe(this._formatSidebarMonthYear_(date))}">
+        ${weekdays.map((day) => `<span class="ddc-sidebar-month-dow">${safe(day)}</span>`).join('')}
+        ${cells.map((cell) => `
+          <span
+            class="ddc-sidebar-month-day ${cell.muted ? 'is-muted' : ''} ${cell.today ? 'is-today' : ''} ${cell.selected ? 'is-selected' : ''} ${cell.weekend ? 'is-weekend' : ''}"
+            role="gridcell"
+            aria-label="${safe(cell.label)}"
+          >${safe(cell.day)}</span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+_getSidebarCalendarEntityIds_() {
+  const configured = this._normalizeSidebarCalendarEntities_(
+    this.sidebarCalendarEntities ?? this._config?.sidebar_calendar_entities ?? this._config?.sidebar_calendars ?? []
+  );
+  if (configured.length) return configured;
+  const states = this._getSidebarHass_?.()?.states || {};
+  return Object.keys(states).filter((entityId) => entityId.startsWith('calendar.')).slice(0, 4);
+}
+
+_formatSidebarEventTime_(date = null, allDay = false) {
+  if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return '';
+  try {
+    if (allDay) {
+      return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(date);
+    }
+    return new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+  } catch {
+    return allDay ? this._formatSidebarDate_(date) : `${this._formatSidebarDate_(date)} ${this._formatSidebarTime_(date)}`;
+  }
+}
+
+_normalizeSidebarCalendarEvent_(raw = {}, entityId = '', calendarName = '') {
+  const readTime = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (value.dateTime) return value.dateTime;
+    if (value.date) return value.date;
+    return '';
+  };
+  const rawStart = readTime(raw.start) || raw.start_time || raw.start || raw.startTime || '';
+  const rawEnd = readTime(raw.end) || raw.end_time || raw.end || raw.endTime || '';
+  const allDay = !!(raw.all_day || raw.allDay || raw.start?.date);
+  const start = rawStart ? new Date(rawStart) : null;
+  const end = rawEnd ? new Date(rawEnd) : null;
+  const hasStart = start instanceof Date && Number.isFinite(start.getTime());
+  const message = String(raw.summary || raw.message || raw.title || raw.name || calendarName || 'Event').trim();
+  const location = String(raw.location || raw.place || '').trim();
+  return {
+    entityId,
+    calendar: calendarName || entityId,
+    message,
+    location,
+    start,
+    end,
+    allDay,
+    when: hasStart ? this._formatSidebarEventTime_(start, allDay) : '',
+  };
+}
+
+_requestSidebarCalendarEvents_(ids = []) {
+  const hass = this._getSidebarHass_?.();
+  if (!ids.length || !hass?.callWS) return;
+  const key = ids.join('|');
+  const now = Date.now();
+  if (this.__sidebarCalendarEventsCache?.key === key && (now - this.__sidebarCalendarEventsCache.fetchedAt) < 300000) return;
+  if (this.__sidebarCalendarEventsPending === key) return;
+  this.__sidebarCalendarEventsPending = key;
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 31);
+  Promise.all(ids.map((entityId) => hass.callWS({
+    type: 'calendar/list_events',
+    entity_id: entityId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  }).then((response) => ({ entityId, response })).catch(() => ({ entityId, response: null }))))
+    .then((results) => {
+      const states = hass?.states || {};
+      const events = [];
+      results.forEach(({ entityId, response }) => {
+        const list = Array.isArray(response) ? response : (Array.isArray(response?.events) ? response.events : []);
+        const calendarName = this._formatSidebarEntityName_(entityId, states[entityId]);
+        list.forEach((event) => {
+          const normalized = this._normalizeSidebarCalendarEvent_(event, entityId, calendarName);
+          if (normalized.message || normalized.when) events.push(normalized);
+        });
+      });
+      events.sort((a, b) => {
+        const aTime = a.start instanceof Date && Number.isFinite(a.start.getTime()) ? a.start.getTime() : Number.MAX_SAFE_INTEGER;
+        const bTime = b.start instanceof Date && Number.isFinite(b.start.getTime()) ? b.start.getTime() : Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      });
+      this.__sidebarCalendarEventsCache = { key, fetchedAt: Date.now(), events };
+      this._renderSidebar_?.();
+    })
+    .finally(() => {
+      if (this.__sidebarCalendarEventsPending === key) this.__sidebarCalendarEventsPending = '';
+    });
+}
+
+_getSidebarCalendarEvents_(limit = 4) {
+  const hass = this._getSidebarHass_?.();
+  const states = hass?.states || {};
+  const ids = this._getSidebarCalendarEntityIds_?.() || [];
+  const key = ids.join('|');
+  this._requestSidebarCalendarEvents_?.(ids);
+  const cached = this.__sidebarCalendarEventsCache?.key === key ? (this.__sidebarCalendarEventsCache.events || []) : [];
+  if (cached.length) return limit ? cached.slice(0, limit) : cached;
+  const events = ids.map((entityId) => {
+    const entity = states[entityId];
+    if (!entity) return null;
+    const attrs = entity.attributes || {};
+    const fallback = this._normalizeSidebarCalendarEvent_(attrs, entityId, this._formatSidebarEntityName_(entityId, entity));
+    if (!fallback.when && entity.state && !['unknown', 'unavailable', 'off'].includes(String(entity.state).toLowerCase())) {
+      fallback.when = this._formatScreenSaverState_?.(entity.state) || entity.state;
+    }
+    if (!fallback.message && !fallback.when) return null;
+    return fallback;
+  }).filter(Boolean).sort((a, b) => {
+    const aTime = a.start instanceof Date && Number.isFinite(a.start.getTime()) ? a.start.getTime() : Number.MAX_SAFE_INTEGER;
+    const bTime = b.start instanceof Date && Number.isFinite(b.start.getTime()) ? b.start.getTime() : Number.MAX_SAFE_INTEGER;
+    return aTime - bTime;
+  });
+  return limit ? events.slice(0, limit) : events;
+}
+
+_sidebarCalendarEventsMarkup_(events = [], { compact = false } = {}) {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  if (!events.length) {
+    const configured = this._getSidebarCalendarEntityIds_?.() || [];
+    return `
+      <div class="ddc-sidebar-events-empty">
+        <ha-icon icon="mdi:calendar-check-outline" aria-hidden="true"></ha-icon>
+        <span>${configured.length ? 'No visible events from selected calendars' : 'Add calendar entities in settings'}</span>
+      </div>
+    `;
+  }
+  return `
+    <div class="ddc-sidebar-events ${compact ? 'compact' : ''}">
+      ${events.map((event) => `
+        <button type="button" class="ddc-sidebar-event" data-sidebar-more-info="${safe(event.entityId)}">
+          <span>${safe(event.when || event.calendar)}</span>
+          <strong>${safe(event.message)}</strong>
+          ${event.location ? `<em>${safe(event.location)}</em>` : `<em>${safe(event.calendar)}</em>`}
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+_getSidebarClockAngles_(date = new Date()) {
+  const minutes = date.getMinutes() + (date.getSeconds() / 60);
+  const hours = (date.getHours() % 12) + (minutes / 60);
+  return {
+    hour: `${hours * 30}deg`,
+    minute: `${minutes * 6}deg`,
+    second: `${date.getSeconds() * 6}deg`,
+  };
+}
+
+_getSidebarHass_() {
+  return this.hass || this._hass || null;
+}
+
+_getSidebarWeatherEntity_() {
+  const configured = String(this._config?.sidebar_weather_entity || this.sidebarWeatherEntity || '').trim();
+  const hass = this._getSidebarHass_?.();
+  if (configured && hass?.states?.[configured]) return configured;
+  return Object.keys(hass?.states || {}).find((entityId) => entityId.startsWith('weather.')) || '';
+}
+
+_getSidebarWeatherData_() {
+  const hass = this._getSidebarHass_?.();
+  const entityId = this._getSidebarWeatherEntity_?.();
+  const entity = entityId ? hass?.states?.[entityId] : null;
+  const attrs = entity?.attributes || {};
+  const state = entity?.state || '';
+  const temp = attrs.temperature ?? attrs.apparent_temperature ?? attrs.temperature_high;
+  const unit = attrs.temperature_unit || attrs.unit_of_measurement || '°';
+  const place = attrs.friendly_name || entityId?.split('.')?.[1]?.replace(/_/g, ' ') || 'Weather';
+  const humidity = attrs.humidity ?? attrs.relative_humidity;
+  const wind = attrs.wind_speed;
+  return {
+    entityId,
+    icon: this._screenSaverWeatherIcon_?.(state) || 'mdi:weather-partly-cloudy',
+    temperature: temp !== undefined && temp !== null && temp !== '' ? `${temp}${String(unit || '').startsWith('°') ? unit : ` ${unit}`}` : '—',
+    state: this._formatScreenSaverState_?.(state) || 'Weather',
+    place,
+    humidity: humidity !== undefined && humidity !== null && humidity !== '' ? `${humidity}%` : '',
+    wind: wind !== undefined && wind !== null && wind !== '' ? `${wind} ${attrs.wind_speed_unit || ''}`.trim() : '',
+    updated: entity?.last_updated || entity?.last_changed || '',
+  };
+}
+
+_getSidebarHomeImage_() {
+  return String(
+    this.sidebarHomeImage ??
+      this._config?.sidebar_home_image ??
+      this._config?.sidebar_house_image ??
+      this._config?.sidebar_home_image_url ??
+      ''
+  ).trim();
+}
+
+_formatSidebarEntityName_(entityId = '', entity = null) {
+  const friendly = entity?.attributes?.friendly_name;
+  if (friendly) return String(friendly);
+  const [, name = entityId] = String(entityId || '').split('.');
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+_formatSidebarEntityState_(entity = null) {
+  if (!entity) return 'Unknown';
+  const state = String(entity.state ?? '').trim() || 'unknown';
+  const unit = String(entity.attributes?.unit_of_measurement || '').trim();
+  const formatted = this._formatScreenSaverState_?.(state) || state;
+  return unit && !String(formatted).includes(unit) ? `${formatted} ${unit}` : formatted;
+}
+
+_formatSidebarEntityUpdated_(entity = null) {
+  const raw = entity?.last_updated || entity?.last_changed || '';
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `${this._formatSidebarDate_(date)} ${this._formatSidebarTime_(date)}`;
+}
+
+_sidebarStatusEntityInfo_(entry = []) {
+  const [entityId, entity] = entry;
+  const domain = String(entityId || '').split('.')[0] || '';
+  return {
+    entityId,
+    entity,
+    domain,
+    icon: entity?.attributes?.icon || this._sidebarIconForDomain_(domain),
+    name: this._formatSidebarEntityName_(entityId, entity),
+    state: this._formatSidebarEntityState_(entity),
+    rawState: String(entity?.state ?? '').trim().toLowerCase(),
+    updated: this._formatSidebarEntityUpdated_(entity),
+  };
+}
+
+_sidebarIconForDomain_(domain = '') {
+  return ({
+    automation: 'mdi:robot-outline',
+    binary_sensor: 'mdi:checkbox-marked-circle-outline',
+    calendar: 'mdi:calendar-month-outline',
+    climate: 'mdi:thermostat',
+    cover: 'mdi:window-shutter',
+    light: 'mdi:lightbulb-on-outline',
+    lock: 'mdi:lock-outline',
+    person: 'mdi:account-circle-outline',
+    scene: 'mdi:palette-outline',
+    script: 'mdi:script-text-outline',
+    sensor: 'mdi:gauge',
+    switch: 'mdi:toggle-switch-outline',
+  })[String(domain || '').toLowerCase()] || 'mdi:chip';
+}
+
+_getSidebarPeople_() {
+  const states = this._getSidebarHass_?.()?.states || {};
+  const formatState = (state = '') => {
+    const raw = String(state || '').trim().toLowerCase();
+    if (raw === 'home') return 'Home';
+    if (raw === 'not_home') return 'Away';
+    return this._formatScreenSaverState_?.(raw) || raw || 'Unknown';
+  };
+  return Object.entries(states)
+    .filter(([entityId]) => entityId.startsWith('person.'))
+    .map(([entityId, entity]) => {
+      const name = this._formatSidebarEntityName_(entityId, entity);
+      const initials = name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('') || 'P';
+      const rawState = String(entity?.state || '').trim().toLowerCase();
+      return {
+        entityId,
+        entity,
+        name,
+        initials,
+        picture: entity?.attributes?.entity_picture || '',
+        rawState,
+        state: formatState(rawState),
+        isHome: rawState === 'home',
+        updated: this._formatSidebarEntityUpdated_(entity),
+      };
+    })
+    .sort((a, b) => {
+      if (a.isHome !== b.isHome) return a.isHome ? -1 : 1;
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+}
+
+_sidebarPersonAvatarMarkup_(person = {}, className = '') {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const statusClass = person.isHome ? 'is-home' : 'is-away';
+  const cls = ['ddc-sidebar-person-avatar', className, statusClass].filter(Boolean).join(' ');
+  return `
+    <span class="${safe(cls)}" aria-hidden="true">
+      ${person.picture ? `<img src="${safe(person.picture)}" alt="" loading="lazy" />` : `<b>${safe(person.initials || 'P')}</b>`}
+    </span>
+  `;
+}
+
+_openSidebarPeoplePopup_() {
+  const people = this._getSidebarPeople_?.() || [];
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  try { this.__sidebarPeopleModal?.remove?.(); } catch {}
+  const homeCount = people.filter((person) => person.isHome).length;
+  const modal = document.createElement('div');
+  modal.className = 'ddc-sidebar-status-popup-backdrop ddc-sidebar-people-popup-backdrop';
+  modal.innerHTML = `
+    <div class="ddc-sidebar-status-popup ddc-sidebar-people-popup" role="dialog" aria-modal="true" aria-labelledby="ddc-sidebar-people-popup-title">
+      <div class="ddc-sidebar-status-popup-head">
+        <div class="ddc-sidebar-status-popup-icon"><ha-icon icon="mdi:account-group-outline" aria-hidden="true"></ha-icon></div>
+        <div>
+          <span>Presence</span>
+          <strong id="ddc-sidebar-people-popup-title">People home</strong>
+          <p>People entities from Home Assistant, sorted by who is currently home.</p>
+        </div>
+        <button type="button" class="ddc-sidebar-status-popup-close" data-sidebar-people-close aria-label="Close">
+          <ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>
+        </button>
+      </div>
+      <div class="ddc-sidebar-status-popup-summary">
+        <div><span>Home</span><strong>${safe(homeCount)}</strong></div>
+        <div><span>Away</span><strong>${safe(Math.max(0, people.length - homeCount))}</strong></div>
+        <div><span>Total</span><strong>${safe(people.length)}</strong></div>
+      </div>
+      <div class="ddc-sidebar-people-list">
+        ${people.length ? people.map((person) => `
+          <div class="ddc-sidebar-person-row ${person.isHome ? 'is-home' : 'is-away'}">
+            <button type="button" class="ddc-sidebar-person-main" data-sidebar-more-info="${safe(person.entityId)}">
+              ${this._sidebarPersonAvatarMarkup_(person)}
+              <span>
+                <strong>${safe(person.name)}</strong>
+                <em>${safe(person.entityId)}</em>
+              </span>
+              <b>${safe(person.state)}</b>
+            </button>
+            <div class="ddc-sidebar-status-entity-actions">
+              ${person.updated ? `<span>${safe(person.updated)}</span>` : ''}
+              <button type="button" data-sidebar-more-info="${safe(person.entityId)}">Details</button>
+            </div>
+          </div>
+        `).join('') : `
+          <div class="ddc-sidebar-status-empty">
+            <ha-icon icon="mdi:account-off-outline" aria-hidden="true"></ha-icon>
+            <strong>No person entities found</strong>
+            <span>Add <code>person.*</code> entities in Home Assistant to populate this widget.</span>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+  const close = () => {
+    try { modal.remove(); } catch {}
+    if (this.__sidebarPeopleModal === modal) this.__sidebarPeopleModal = null;
+  };
+  modal.querySelectorAll('[data-sidebar-people-close]').forEach((button) => button.addEventListener('click', close));
+  modal.addEventListener('pointerdown', (ev) => { if (ev.target === modal) close(); });
+  modal.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') close(); });
+  modal.querySelectorAll('[data-sidebar-more-info]').forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._fireSidebarMoreInfo_(button.dataset.sidebarMoreInfo || '');
+    });
+  });
+  this.__sidebarPeopleModal = modal;
+  this.shadowRoot?.appendChild?.(modal);
+  requestAnimationFrame(() => modal.querySelector('[data-sidebar-people-close]')?.focus?.());
+}
+
+_getSidebarStatusGroups_() {
+  const states = this._getSidebarHass_?.()?.states || {};
+  const entries = Object.entries(states);
+  const total = entries.length;
+  const isUnavailable = ([, entity]) => ['unknown', 'unavailable'].includes(String(entity?.state || '').toLowerCase());
+  const isOpenLike = ([, entity]) => ['on', 'open', 'opening', 'unlocked'].includes(String(entity?.state || '').toLowerCase());
+  const deviceClass = ([, entity]) => String(entity?.attributes?.device_class || '').toLowerCase();
+  const searchable = ([entityId, entity]) => `${entityId} ${entity?.attributes?.friendly_name || ''}`.toLowerCase();
+  const hasAnyToken = (entry, tokens = []) => tokens.some((token) => searchable(entry).includes(token));
+  const sortEntries = (items) => items.slice().sort((a, b) => {
+    const aName = this._formatSidebarEntityName_(a[0], a[1]).toLowerCase();
+    const bName = this._formatSidebarEntityName_(b[0], b[1]).toLowerCase();
+    return aName.localeCompare(bName);
+  });
+  const usableEntries = sortEntries(entries.filter((entry) => !isUnavailable(entry)));
+  const unavailableEntries = sortEntries(entries.filter(isUnavailable));
+  const lightEntries = sortEntries(entries.filter(([entityId, entity]) => entityId.startsWith('light.') && entity?.state === 'on'));
+  const climateEntries = sortEntries(entries.filter(([entityId, entity]) => entityId.startsWith('climate.') && !['off', 'unknown', 'unavailable'].includes(String(entity?.state || '').toLowerCase())));
+  const lockEntries = sortEntries(entries.filter(([entityId]) => entityId.startsWith('lock.')));
+  const unlockedLockEntries = sortEntries(lockEntries.filter((entry) => !isUnavailable(entry) && String(entry[1]?.state || '').toLowerCase() !== 'locked'));
+  const lockedLockCount = lockEntries.filter((entry) => String(entry[1]?.state || '').toLowerCase() === 'locked').length;
+  const doorEntries = sortEntries(entries.filter((entry) => entry[0].startsWith('binary_sensor.') && (deviceClass(entry) === 'door' || hasAnyToken(entry, ['door', 'dør', 'dor']))));
+  const openDoorEntries = sortEntries(doorEntries.filter(isOpenLike));
+  const windowEntries = sortEntries(entries.filter((entry) => entry[0].startsWith('binary_sensor.') && (deviceClass(entry) === 'window' || hasAnyToken(entry, ['window', 'vindu']))));
+  const openWindowEntries = sortEntries(windowEntries.filter(isOpenLike));
+  const coverEntries = sortEntries(entries.filter(([entityId]) => entityId.startsWith('cover.')));
+  const openCoverEntries = sortEntries(coverEntries.filter((entry) => ['open', 'opening'].includes(String(entry[1]?.state || '').toLowerCase())));
+  const accessEntries = sortEntries([...unlockedLockEntries, ...openDoorEntries, ...openWindowEntries, ...openCoverEntries]);
+  const sensorEntries = sortEntries(entries.filter(([entityId]) => entityId.startsWith('sensor.') || entityId.startsWith('binary_sensor.')));
+  const sceneEntries = sortEntries(entries.filter(([entityId]) => entityId.startsWith('scene.')));
+  const automationEntries = sortEntries(entries.filter(([entityId]) => entityId.startsWith('automation.')));
+  const make = ({ id, icon, label, value, description, entries: groupEntries, action = null }) => ({
+    id,
+    icon,
+    label,
+    value,
+    description,
+    action,
+    entities: groupEntries.map((entry) => this._sidebarStatusEntityInfo_(entry)),
+  });
+  return [
+    make({
+      id: 'access',
+      icon: accessEntries.length ? 'mdi:shield-alert-outline' : 'mdi:shield-check-outline',
+      label: 'Open access',
+      value: `${accessEntries.length}`,
+      description: 'Unlocked locks, open doors, open windows and open covers.',
+      entries: accessEntries,
+    }),
+    make({
+      id: 'lights',
+      icon: 'mdi:lightbulb-on-outline',
+      label: 'Lights on',
+      value: `${lightEntries.length}`,
+      description: 'Lights that are currently on.',
+      entries: lightEntries,
+      action: lightEntries.length ? { type: 'turn_off_lights', label: 'Turn off all', icon: 'mdi:lightbulb-off-outline' } : null,
+    }),
+    make({
+      id: 'climate',
+      icon: 'mdi:thermostat',
+      label: 'Climate active',
+      value: `${climateEntries.length}`,
+      description: 'Climate entities that are not off.',
+      entries: climateEntries,
+    }),
+    make({
+      id: 'locks',
+      icon: unlockedLockEntries.length ? 'mdi:lock-open-variant-outline' : 'mdi:lock-check-outline',
+      label: 'Locks locked',
+      value: lockEntries.length ? `${lockedLockCount}/${lockEntries.length}` : '0',
+      description: 'Door locks and other lock entities, including whether they are locked or open.',
+      entries: lockEntries,
+      action: unlockedLockEntries.length ? { type: 'lock_all', label: 'Lock all', icon: 'mdi:lock-outline' } : null,
+    }),
+    make({
+      id: 'doors',
+      icon: openDoorEntries.length ? 'mdi:door-open' : 'mdi:door-closed',
+      label: 'Doors open',
+      value: `${openDoorEntries.length}`,
+      description: 'Binary sensor door entities that currently report open.',
+      entries: openDoorEntries.length ? openDoorEntries : doorEntries,
+    }),
+    make({
+      id: 'windows',
+      icon: openWindowEntries.length ? 'mdi:window-open-variant' : 'mdi:window-closed-variant',
+      label: 'Windows open',
+      value: `${openWindowEntries.length}`,
+      description: 'Binary sensor window entities that currently report open.',
+      entries: openWindowEntries.length ? openWindowEntries : windowEntries,
+    }),
+    make({
+      id: 'online',
+      icon: 'mdi:access-point-check',
+      label: 'Entities online',
+      value: total ? `${usableEntries.length}/${total}` : '—',
+      description: 'Entities that currently report a usable state.',
+      entries: usableEntries,
+    }),
+    make({
+      id: 'unavailable',
+      icon: 'mdi:alert-circle-outline',
+      label: 'Unavailable',
+      value: `${unavailableEntries.length}`,
+      description: 'Entities reporting unknown or unavailable state.',
+      entries: unavailableEntries,
+    }),
+    make({
+      id: 'sensors',
+      icon: 'mdi:gauge',
+      label: 'Sensors',
+      value: `${sensorEntries.length}`,
+      description: 'Sensor and binary sensor entities available to this dashboard.',
+      entries: sensorEntries,
+    }),
+    make({
+      id: 'scenes',
+      icon: 'mdi:palette-outline',
+      label: 'Scenes',
+      value: `${sceneEntries.length}`,
+      description: 'Scenes that can be opened or run from Home Assistant.',
+      entries: sceneEntries,
+    }),
+    make({
+      id: 'automations',
+      icon: 'mdi:robot-outline',
+      label: 'Automations',
+      value: `${automationEntries.length}`,
+      description: 'Automations available in this Home Assistant instance.',
+      entries: automationEntries,
+      action: { type: 'reload_automations', label: 'Reload', icon: 'mdi:reload' },
+    }),
+  ];
+}
+
+_getSidebarStatusRows_() {
+  const preferred = ['access', 'lights', 'climate', 'locks', 'doors', 'windows', 'unavailable'];
+  return (this._getSidebarStatusGroups_?.() || [])
+    .filter((group) => preferred.includes(group.id))
+    .map(({ id, icon, label, value }) => ({ id, icon, label, value }));
+}
+
+_getSidebarEntityAction_(info = {}) {
+  const domain = String(info.domain || '').toLowerCase();
+  if (domain === 'light' && info.rawState === 'on') return { type: 'turn_off', label: 'Off', icon: 'mdi:power' };
+  if (domain === 'lock') {
+    return info.rawState === 'locked'
+      ? { type: 'unlock', label: 'Unlock', icon: 'mdi:lock-open-outline' }
+      : { type: 'lock', label: 'Lock', icon: 'mdi:lock-outline' };
+  }
+  if (domain === 'cover') {
+    return ['open', 'opening'].includes(info.rawState)
+      ? { type: 'close_cover', label: 'Close', icon: 'mdi:window-shutter' }
+      : { type: 'open_cover', label: 'Open', icon: 'mdi:window-shutter-open' };
+  }
+  if (['light', 'switch', 'input_boolean', 'automation'].includes(domain)) return { type: 'toggle', label: 'Toggle', icon: 'mdi:toggle-switch-outline' };
+  if (['scene', 'script'].includes(domain)) return { type: 'turn_on', label: 'Run', icon: 'mdi:play' };
+  return null;
+}
+
+_fireSidebarMoreInfo_(entityId = '') {
+  if (!entityId) return;
+  try {
+    this.dispatchEvent(new CustomEvent('hass-more-info', {
+      detail: { entityId },
+      bubbles: true,
+      composed: true,
+    }));
+  } catch {}
+}
+
+_runSidebarEntityAction_(action = '', entityId = '') {
+  if (!action || !entityId) return;
+  const hass = this._getSidebarHass_?.();
+  const domain = String(entityId).split('.')[0] || 'homeassistant';
+  try {
+    if (action === 'toggle') hass?.callService?.('homeassistant', 'toggle', { entity_id: entityId });
+    else if (action === 'turn_off') hass?.callService?.(domain, 'turn_off', { entity_id: entityId });
+    else if (action === 'turn_on') hass?.callService?.(domain, 'turn_on', { entity_id: entityId });
+    else if (action === 'lock') hass?.callService?.('lock', 'lock', { entity_id: entityId });
+    else if (action === 'unlock') hass?.callService?.('lock', 'unlock', { entity_id: entityId });
+    else if (action === 'open_cover') hass?.callService?.('cover', 'open_cover', { entity_id: entityId });
+    else if (action === 'close_cover') hass?.callService?.('cover', 'close_cover', { entity_id: entityId });
+  } catch {}
+  setTimeout(() => this._renderSidebar_?.(), 300);
+}
+
+_runSidebarGroupAction_(action = '', group = null) {
+  const hass = this._getSidebarHass_?.();
+  const ids = (group?.entities || []).map((entity) => entity.entityId).filter(Boolean);
+  try {
+    if (action === 'turn_off_lights' && ids.length) {
+      hass?.callService?.('light', 'turn_off', { entity_id: ids });
+    } else if (action === 'lock_all' && ids.length) {
+      hass?.callService?.('lock', 'lock', { entity_id: ids });
+    } else if (action === 'reload_automations') {
+      hass?.callService?.('automation', 'reload', {});
+    } else if (action === 'refresh') {
+      this._renderSidebar_?.();
+    }
+  } catch {}
+  setTimeout(() => {
+    this._renderSidebar_?.();
+    if (group?.id && this.__sidebarStatusModal?.isConnected) this._openSidebarStatusPopup_?.(group.id);
+  }, 320);
+}
+
+_openSidebarStatusPopup_(groupId = '') {
+  const groups = this._getSidebarStatusGroups_?.() || [];
+  const group = groups.find((item) => item.id === groupId) || groups[0];
+  if (!group) return;
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const visibleEntities = (group.entities || []).slice(0, 80);
+  const remainingCount = Math.max(0, (group.entities || []).length - visibleEntities.length);
+  try { this.__sidebarStatusModal?.remove?.(); } catch {}
+
+  const modal = document.createElement('div');
+  modal.className = 'ddc-sidebar-status-popup-backdrop';
+  modal.innerHTML = `
+    <div class="ddc-sidebar-status-popup" role="dialog" aria-modal="true" aria-labelledby="ddc-sidebar-status-popup-title">
+      <div class="ddc-sidebar-status-popup-head">
+        <div class="ddc-sidebar-status-popup-icon"><ha-icon icon="${safe(group.icon)}" aria-hidden="true"></ha-icon></div>
+        <div>
+          <span>Home Status</span>
+          <strong id="ddc-sidebar-status-popup-title">${safe(group.label)}</strong>
+          <p>${safe(group.description || '')}</p>
+        </div>
+        <button type="button" class="ddc-sidebar-status-popup-close" data-sidebar-status-close aria-label="Close">
+          <ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>
+        </button>
+      </div>
+      <div class="ddc-sidebar-status-popup-summary">
+        <div><span>Total</span><strong>${safe(group.value)}</strong></div>
+        <div><span>Listed</span><strong>${safe(visibleEntities.length)}</strong></div>
+        <div><span>Updated</span><strong>${safe(this._formatSidebarTime_(new Date()))}</strong></div>
+      </div>
+      <div class="ddc-sidebar-status-popup-actions">
+        <button type="button" data-sidebar-group-action="refresh"><ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span></button>
+        ${group.action ? `<button type="button" data-sidebar-group-action="${safe(group.action.type)}"><ha-icon icon="${safe(group.action.icon)}"></ha-icon><span>${safe(group.action.label)}</span></button>` : ''}
+      </div>
+      <div class="ddc-sidebar-status-entity-list">
+        ${visibleEntities.length ? visibleEntities.map((info) => {
+          const action = this._getSidebarEntityAction_(info);
+          return `
+            <div class="ddc-sidebar-status-entity">
+              <button type="button" class="ddc-sidebar-status-entity-main" data-sidebar-more-info="${safe(info.entityId)}">
+                <ha-icon icon="${safe(info.icon)}" aria-hidden="true"></ha-icon>
+                <span>
+                  <strong>${safe(info.name)}</strong>
+                  <em>${safe(info.entityId)}</em>
+                </span>
+                <b>${safe(info.state)}</b>
+              </button>
+              <div class="ddc-sidebar-status-entity-actions">
+                ${info.updated ? `<span>${safe(info.updated)}</span>` : ''}
+                <button type="button" data-sidebar-more-info="${safe(info.entityId)}">Details</button>
+                ${action ? `<button type="button" data-sidebar-entity-action="${safe(action.type)}" data-sidebar-entity-id="${safe(info.entityId)}"><ha-icon icon="${safe(action.icon)}"></ha-icon><span>${safe(action.label)}</span></button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('') : `
+          <div class="ddc-sidebar-status-empty">
+            <ha-icon icon="mdi:check-circle-outline" aria-hidden="true"></ha-icon>
+            <strong>No entities here right now</strong>
+            <span>This group will fill automatically when matching Home Assistant entities appear.</span>
+          </div>
+        `}
+      </div>
+      ${remainingCount ? `<div class="ddc-sidebar-status-more">Showing ${safe(visibleEntities.length)} of ${safe(group.entities.length)} entities. Narrow the group or open Home Assistant for the full list.</div>` : ''}
+    </div>
+  `;
+  const close = () => {
+    try { modal.remove(); } catch {}
+    if (this.__sidebarStatusModal === modal) this.__sidebarStatusModal = null;
+  };
+  modal.querySelectorAll('[data-sidebar-status-close]').forEach((button) => button.addEventListener('click', close));
+  modal.addEventListener('pointerdown', (ev) => { if (ev.target === modal) close(); });
+  modal.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') close(); });
+  modal.querySelectorAll('[data-sidebar-more-info]').forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._fireSidebarMoreInfo_(button.dataset.sidebarMoreInfo || '');
+    });
+  });
+  modal.querySelectorAll('[data-sidebar-entity-action]').forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._runSidebarEntityAction_(button.dataset.sidebarEntityAction || '', button.dataset.sidebarEntityId || '');
+    });
+  });
+  modal.querySelectorAll('[data-sidebar-group-action]').forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._runSidebarGroupAction_(button.dataset.sidebarGroupAction || '', group);
+    });
+  });
+  this.__sidebarStatusModal = modal;
+  this.shadowRoot?.appendChild?.(modal);
+  requestAnimationFrame(() => modal.querySelector('[data-sidebar-status-close]')?.focus?.());
+}
+
+_getSidebarDetailKey_(type, payload = {}) {
+  const suffix = payload?.action || payload?.entityId || '';
+  return suffix ? `${type}:${suffix}` : String(type || '');
+}
+
+_toggleSidebarDetail_(type, payload = {}) {
+  const key = this._getSidebarDetailKey_(type, payload);
+  this.sidebarDetail = this.sidebarDetail?.key === key ? null : { key, type, payload };
+  this._renderSidebar_?.();
+}
+
+_decorateSidebarWidget_(widget, type, payload = {}) {
+  if (!widget || !type) return widget;
+  const key = this._getSidebarDetailKey_(type, payload);
+  widget.classList.toggle('is-active', this.sidebarDetail?.key === key);
+  widget.setAttribute('role', 'button');
+  widget.setAttribute('tabindex', '0');
+  widget.setAttribute('aria-expanded', this.sidebarDetail?.key === key ? 'true' : 'false');
+  const open = (ev) => {
+    ev?.stopPropagation?.();
+    this._toggleSidebarDetail_(type, payload);
+  };
+  widget.addEventListener('click', open);
+  widget.addEventListener('keydown', (ev) => {
+    if (ev.target !== widget && ev.target?.closest?.('button, a, input, select, textarea, [role="button"]')) return;
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    open(ev);
+  });
+  return widget;
+}
+
+_sidebarDetailBelongsToItem_(detail = null, item = '') {
+  if (!detail?.type) return false;
+  return detail.type === item;
+}
+
+_sidebarMetricRows_(rows = []) {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  return rows.filter((row) => row && row.value !== undefined && row.value !== null && row.value !== '').map((row) => `
+    <div class="ddc-sidebar-detail-row">
+      <span>${safe(row.label)}</span>
+      <strong>${safe(row.value)}</strong>
+    </div>
+  `).join('');
+}
+
+_createSidebarDetail_(detail = {}, now = new Date()) {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const panel = document.createElement('div');
+  panel.className = `ddc-sidebar-detail ddc-sidebar-detail-${detail.type || 'info'}`;
+  panel.dataset.sidebarDetail = detail.key || detail.type || 'info';
+
+  const weather = detail.type === 'weather' ? (this._getSidebarWeatherData_?.() || {}) : null;
+  const statusRows = detail.type === 'status' ? (this._getSidebarStatusRows_?.() || []) : [];
+  const timeZone = (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
+  })();
+  const title = ({
+    clock: 'Clock',
+    date: 'Calendar',
+    weather: 'Weather',
+    people: 'People home',
+    status: 'Home status',
+    profile: this._getSidebarUserName_?.() || 'Profile',
+  })[detail.type] || 'Sidebar';
+  const icon = ({
+    clock: 'mdi:clock-outline',
+    date: 'mdi:calendar-month-outline',
+    weather: weather?.icon || 'mdi:weather-partly-cloudy',
+    people: 'mdi:account-group-outline',
+    status: 'mdi:home-analytics',
+    profile: 'mdi:account-circle-outline',
+  })[detail.type] || 'mdi:information-outline';
+
+  let body = '';
+  if (detail.type === 'clock') {
+    const angles = this._getSidebarClockAngles_(now);
+    body = `
+      <div class="ddc-sidebar-clock-detail">
+        <div class="ddc-sidebar-clock-face ddc-sidebar-clock-face-large" style="--ddc-sidebar-hour:${angles.hour};--ddc-sidebar-minute:${angles.minute};--ddc-sidebar-second:${angles.second};" aria-hidden="true">
+          <span class="ddc-sidebar-clock-hand hour"></span>
+          <span class="ddc-sidebar-clock-hand minute"></span>
+          <span class="ddc-sidebar-clock-hand second"></span>
+        </div>
+        <div>
+          <div class="ddc-sidebar-detail-hero">${safe(this._formatSidebarTime_(now))}</div>
+          <p class="ddc-sidebar-detail-copy">${safe(this._formatSidebarWeekday_(now))}</p>
+        </div>
+      </div>
+      ${this._sidebarMetricRows_([
+        { label: 'Timezone', value: timeZone || 'Local time' },
+        { label: 'Seconds', value: String(now.getSeconds()).padStart(2, '0') },
+      ])}
+    `;
+  } else if (detail.type === 'date') {
+    const events = this._getSidebarCalendarEvents_?.(6) || [];
+    const calendarIds = this._getSidebarCalendarEntityIds_?.() || [];
+    body = `
+      <div class="ddc-sidebar-detail-hero">${safe(this._formatSidebarLongDate_(now))}</div>
+      ${this._sidebarCalendarEventsMarkup_(events)}
+      ${this._sidebarMetricRows_([
+        { label: 'Month', value: this._formatSidebarMonth_(now) },
+        { label: 'Day', value: now.getDate() },
+        { label: 'Week', value: this._getSidebarWeekNumber_(now) },
+        { label: 'Calendars', value: calendarIds.length ? calendarIds.join(', ') : 'Auto' },
+      ])}
+    `;
+  } else if (detail.type === 'weather') {
+    const updated = weather?.updated ? new Date(weather.updated) : null;
+    const updatedValue = updated && Number.isFinite(updated.getTime())
+      ? `${this._formatSidebarDate_(updated)} ${this._formatSidebarTime_(updated)}`
+      : '';
+    body = `
+      <div class="ddc-sidebar-detail-hero">${safe(weather?.temperature || '—')}</div>
+      ${this._sidebarMetricRows_([
+        { label: 'Condition', value: weather?.state },
+        { label: 'Place', value: weather?.place },
+        { label: 'Humidity', value: weather?.humidity },
+        { label: 'Wind', value: weather?.wind },
+        { label: 'Updated', value: updatedValue },
+        { label: 'Entity', value: weather?.entityId },
+      ])}
+    `;
+  } else if (detail.type === 'status') {
+    body = this._sidebarMetricRows_(statusRows);
+  } else if (detail.type === 'profile') {
+    body = this._sidebarMetricRows_([
+      { label: 'User', value: this._getSidebarUserName_?.() || 'Home' },
+      { label: 'Role', value: this._config?.sidebar_user_role || 'Home dashboard' },
+      { label: 'Dashboard', value: this._config?.title || this.storageKey || 'Current layout' },
+    ]);
+  } else {
+    body = `
+      <p class="ddc-sidebar-detail-copy">This panel can show contextual controls and information for the selected sidebar module.</p>
+    `;
+  }
+
+  panel.innerHTML = `
+    <div class="ddc-sidebar-detail-head">
+      <ha-icon icon="${safe(icon)}" aria-hidden="true"></ha-icon>
+      <strong>${safe(title)}</strong>
+      <button type="button" class="ddc-sidebar-detail-close" aria-label="Close details">
+        <ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>
+      </button>
+    </div>
+    <div class="ddc-sidebar-detail-body">${body}</div>
+  `;
+  panel.querySelector('.ddc-sidebar-detail-close')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    this.sidebarDetail = null;
+    this._renderSidebar_?.();
+  });
+  panel.querySelectorAll?.('[data-sidebar-more-info]')?.forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._fireSidebarMoreInfo_(button.dataset.sidebarMoreInfo || '');
+    });
+  });
+  return panel;
+}
+
+_getSidebarUserName_() {
+  return String(
+    this._config?.sidebar_user_name ||
+      this._getSidebarHass_?.()?.user?.name ||
+      this._getSidebarHass_?.()?.user?.id ||
+      'Home'
+  ).trim();
+}
+
+_getSidebarHeaderDefinitions_() {
+  return [
+    { id: 'clock', label: 'Clock', icon: 'mdi:clock-outline' },
+    { id: 'date_time', label: 'Date / time', icon: 'mdi:calendar-clock-outline' },
+    { id: 'people', label: 'People home', icon: 'mdi:account-group-outline' },
+    { id: 'home', label: 'Home status', icon: 'mdi:home-analytics' },
+    { id: 'weather', label: 'Weather', icon: 'mdi:weather-partly-cloudy' },
+    { id: 'profile', label: 'Profile', icon: 'mdi:account-circle-outline' },
+    { id: 'none', label: 'No header', icon: 'mdi:minus-circle-outline' },
+  ];
+}
+
+_createSidebarHeader_(now = new Date()) {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const headerType = this._normalizeSidebarHeader_(this.sidebarHeader ?? this._config?.sidebar_header ?? 'clock');
+  if (headerType === 'none') return null;
+  const title = String(
+    this._config?.sidebar_title ||
+      this._config?.title ||
+      this.storageKey ||
+      'Smart home'
+  ).trim();
+  const userName = this._getSidebarUserName_?.() || 'Home';
+  const initial = userName.trim().charAt(0).toUpperCase() || 'H';
+  const cardsCount = this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper')?.length
+    ?? this._normalizeSidebarCards_(this.sidebarCards || []).length;
+  const statusRows = this._getSidebarStatusRows_?.() || [];
+  const unavailable = statusRows.find((row) => row.id === 'unavailable');
+  const liveLabel = unavailable && Number(unavailable.value) > 0
+    ? `${unavailable.value} offline`
+    : 'Live';
+  const people = this._getSidebarPeople_?.() || [];
+  const homePeople = people.filter((person) => person.isHome);
+  const weather = this._getSidebarWeatherData_?.() || {};
+  const timeZone = (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
+  })();
+
+  const headerBodies = {
+    clock: `
+      <div class="ddc-sidebar-header-main">
+        <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:clock-outline"></ha-icon></div>
+        <div class="ddc-sidebar-header-copy">
+          <span>${safe(this._formatSidebarWeekday_(now))}</span>
+          <strong>${safe(this._formatSidebarTime_(now))}</strong>
+          <em>${safe(timeZone || this._formatSidebarDate_(now))}</em>
+        </div>
+        <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
+          <i aria-hidden="true"></i>
+          <span>${safe(liveLabel)}</span>
+        </div>
+      </div>
+      <div class="ddc-sidebar-header-stats" aria-hidden="true">
+        <span><b>${safe(now.getDate())}</b> ${safe(this._formatSidebarMonth_(now))}</span>
+        <span><b>${safe(cardsCount)}</b> cards</span>
+      </div>
+    `,
+    date_time: `
+      <div class="ddc-sidebar-header-main">
+        <div class="ddc-sidebar-header-mark ddc-sidebar-header-date-mark" aria-hidden="true">
+          <span>${safe(this._formatSidebarMonth_(now))}</span>
+          <b>${safe(now.getDate())}</b>
+        </div>
+        <div class="ddc-sidebar-header-copy">
+          <span>${safe(this._formatSidebarTime_(now))}</span>
+          <strong>${safe(this._formatSidebarWeekday_(now))}</strong>
+          <em>${safe(this._formatSidebarLongDate_(now))}</em>
+        </div>
+        <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
+          <i aria-hidden="true"></i>
+          <span>${safe(liveLabel)}</span>
+        </div>
+      </div>
+    `,
+    people: `
+      <button type="button" class="ddc-sidebar-header-main ddc-sidebar-header-button" data-sidebar-header-action="people">
+        <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:account-group-outline"></ha-icon></div>
+        <div class="ddc-sidebar-header-copy">
+          <span>Presence</span>
+          <strong>${safe(homePeople.length)} home</strong>
+          <em>${safe(Math.max(0, people.length - homePeople.length))} away / ${safe(people.length)} total</em>
+        </div>
+        <div class="ddc-sidebar-header-avatars" aria-hidden="true">
+          ${(homePeople.length ? homePeople : people).slice(0, 3).map((person) => this._sidebarPersonAvatarMarkup_(person, 'small')).join('')}
+        </div>
+      </button>
+    `,
+    home: `
+      <div class="ddc-sidebar-header-main">
+        <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:home-analytics"></ha-icon></div>
+        <div class="ddc-sidebar-header-copy">
+          <span>${safe(liveLabel)}</span>
+          <strong>${safe(title)}</strong>
+          <em>${safe(statusRows.slice(0, 2).map((row) => `${row.label}: ${row.value}`).join(' / ') || userName)}</em>
+        </div>
+        <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
+          <i aria-hidden="true"></i>
+          <span>${safe(liveLabel)}</span>
+        </div>
+      </div>
+    `,
+    weather: `
+      <button type="button" class="ddc-sidebar-header-main ddc-sidebar-header-button" data-sidebar-more-info="${safe(weather.entityId || '')}">
+        <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="${safe(weather.icon || 'mdi:weather-partly-cloudy')}"></ha-icon></div>
+        <div class="ddc-sidebar-header-copy">
+          <span>${safe(weather.place || 'Weather')}</span>
+          <strong>${safe(weather.temperature || '--')}</strong>
+          <em>${safe([weather.state, weather.humidity, weather.wind].filter(Boolean).join(' / ') || 'Current conditions')}</em>
+        </div>
+        <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+      </button>
+    `,
+    profile: `
+      <div class="ddc-sidebar-header-main">
+        <div class="ddc-sidebar-header-mark" aria-hidden="true">${safe(initial)}</div>
+        <div class="ddc-sidebar-header-copy">
+          <span>${safe(this._formatSidebarTime_(now))}</span>
+          <strong>${safe(userName)}</strong>
+          <em>${safe(this._config?.sidebar_user_role || title)}</em>
+        </div>
+        <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
+          <i aria-hidden="true"></i>
+          <span>${safe(liveLabel)}</span>
+        </div>
+      </div>
+    `,
+  };
+
+  const header = document.createElement('section');
+  header.className = `ddc-sidebar-header ddc-sidebar-header-${headerType}`;
+  header.dataset.sidebarHeader = headerType;
+  header.setAttribute('aria-label', `${headerType.replace(/_/g, ' ')} sidebar header`);
+  header.innerHTML = headerBodies[headerType] || headerBodies.clock;
+  header.querySelector('[data-sidebar-header-action="people"]')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    this._openSidebarPeoplePopup_?.();
+  });
+  header.querySelectorAll?.('[data-sidebar-more-info]').forEach((button) => {
+    button.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const entityId = button.dataset.sidebarMoreInfo || '';
+      if (entityId) this._fireSidebarMoreInfo_(entityId);
+    });
+  });
+  return header;
+}
+
+_createSidebarSectionLabel_(label = 'Overview', icon = 'mdi:view-dashboard-outline', meta = '') {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const section = document.createElement('div');
+  section.className = 'ddc-sidebar-section-label';
+  section.innerHTML = `
+    <span>
+      <ha-icon icon="${safe(icon)}" aria-hidden="true"></ha-icon>
+      ${safe(label)}
+    </span>
+    ${meta ? `<em>${safe(meta)}</em>` : ''}
+  `;
+  return section;
+}
+
+_createSidebarWidget_(type, now = new Date()) {
+  const widget = document.createElement('div');
+  widget.className = `ddc-sidebar-widget ddc-sidebar-widget-${type}`;
+  widget.dataset.sidebarItem = type;
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  if (type === 'clock') {
+    const angles = this._getSidebarClockAngles_(now);
+    const timeZone = (() => {
+      try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
+    })();
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    widget.innerHTML = `
+      <div class="ddc-sidebar-clock-card" style="--ddc-sidebar-second-value:${safe(seconds)};">
+        <div class="ddc-sidebar-clock-stage">
+          <div class="ddc-sidebar-clock-face" style="--ddc-sidebar-hour:${angles.hour};--ddc-sidebar-minute:${angles.minute};--ddc-sidebar-second:${angles.second};" aria-hidden="true">
+            <span class="ddc-sidebar-clock-hand hour"></span>
+            <span class="ddc-sidebar-clock-hand minute"></span>
+            <span class="ddc-sidebar-clock-hand second"></span>
+          </div>
+          <div class="ddc-sidebar-clock-seconds">${safe(seconds)}</div>
+        </div>
+        <div class="ddc-sidebar-clock-copy">
+          <span>${safe(this._formatSidebarWeekday_(now))}</span>
+          <strong>${safe(this._formatSidebarTime_(now))}</strong>
+          <em>${safe(timeZone || this._formatSidebarWeekday_(now))}</em>
+        </div>
+      </div>
+    `;
+    widget.setAttribute('aria-label', `Time ${this._formatSidebarTime_(now)}`);
+    return this._decorateSidebarWidget_(widget, type);
+  }
+  if (type === 'date') {
+    const events = this._getSidebarCalendarEvents_?.(3) || [];
+    widget.innerHTML = `
+      <div class="ddc-sidebar-date-card">
+        <div class="ddc-sidebar-date-top">
+          <div class="ddc-sidebar-calendar-tile" aria-hidden="true">
+            <span>${safe(this._formatSidebarMonth_(now))}</span>
+            <strong>${safe(now.getDate())}</strong>
+          </div>
+          <div class="ddc-sidebar-widget-copy">
+            <strong>${safe(this._formatSidebarWeekday_(now))}</strong>
+            <span>${safe(this._formatSidebarDate_(now))}</span>
+          </div>
+        </div>
+        ${this._sidebarCalendarMarkup_(now)}
+        ${this._sidebarCalendarEventsMarkup_(events, { compact: true })}
+      </div>
+    `;
+    widget.setAttribute('aria-label', `Date ${this._formatSidebarDate_(now)}`);
+    widget.querySelectorAll?.('[data-sidebar-more-info]')?.forEach((button) => {
+      button.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._fireSidebarMoreInfo_(button.dataset.sidebarMoreInfo || '');
+      });
+    });
+    return this._decorateSidebarWidget_(widget, type);
+  }
+  if (type === 'weather') {
+    const weather = this._getSidebarWeatherData_?.() || {};
+    widget.innerHTML = `
+      <div class="ddc-sidebar-weather-icon"><ha-icon icon="${safe(weather.icon || 'mdi:weather-partly-cloudy')}" aria-hidden="true"></ha-icon></div>
+      <div class="ddc-sidebar-widget-copy">
+        <strong>${safe(weather.temperature || '—')}</strong>
+        <span>${safe(weather.state || 'Weather')}</span>
+      </div>
+      <div class="ddc-sidebar-weather-meta">
+        ${weather.humidity ? `<span>H ${safe(weather.humidity)}</span>` : ''}
+        ${weather.wind ? `<span>W ${safe(weather.wind)}</span>` : ''}
+      </div>
+    `;
+    widget.setAttribute('aria-label', `${weather.temperature || ''} ${weather.state || 'Weather'}`.trim());
+    return this._decorateSidebarWidget_(widget, type, { entityId: weather.entityId || '' });
+  }
+  if (type === 'status') {
+    const rows = this._getSidebarStatusRows_?.() || [];
+    const homeImage = this._getSidebarHomeImage_?.() || '';
+    widget.innerHTML = `
+      <div class="ddc-sidebar-home-card">
+        <div class="ddc-sidebar-home-media ${homeImage ? 'has-image' : 'is-empty'}">
+          ${homeImage ? `<img src="${safe(homeImage)}" alt="" loading="lazy" />` : `<ha-icon icon="mdi:home-lightning-bolt-outline" aria-hidden="true"></ha-icon>`}
+        </div>
+        <div class="ddc-sidebar-home-title">
+          <span>Home status</span>
+          <strong>${safe(this._config?.title || this.storageKey || 'Smart home')}</strong>
+        </div>
+      </div>
+      <div class="ddc-sidebar-status-list">
+        ${rows.map((row) => `
+          <button type="button" class="ddc-sidebar-status-row" data-sidebar-status-group="${safe(row.id)}">
+            <span><ha-icon icon="${safe(row.icon)}" aria-hidden="true"></ha-icon>${safe(row.label)}</span>
+            <strong>${safe(row.value)}</strong>
+          </button>
+        `).join('')}
+      </div>
+    `;
+    widget.querySelectorAll?.('[data-sidebar-status-group]')?.forEach((button) => {
+      button.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._openSidebarStatusPopup_?.(button.dataset.sidebarStatusGroup || '');
+      });
+      button.addEventListener('keydown', (ev) => ev.stopPropagation());
+    });
+    return this._decorateSidebarWidget_(widget, type);
+  }
+  if (type === 'people') {
+    const people = this._getSidebarPeople_?.() || [];
+    const homePeople = people.filter((person) => person.isHome);
+    const shown = (homePeople.length ? homePeople : people).slice(0, 5);
+    widget.innerHTML = `
+      <div class="ddc-sidebar-people-card">
+        <div class="ddc-sidebar-widget-heading">People home</div>
+        <div class="ddc-sidebar-people-avatars">
+          ${shown.map((person) => this._sidebarPersonAvatarMarkup_(person, 'large')).join('')}
+          ${!shown.length ? `<span class="ddc-sidebar-person-avatar large is-empty"><ha-icon icon="mdi:account-question-outline" aria-hidden="true"></ha-icon></span>` : ''}
+        </div>
+        <div class="ddc-sidebar-people-summary">
+          <strong>${safe(homePeople.length)} home</strong>
+          <span>${safe(Math.max(0, people.length - homePeople.length))} away / ${safe(people.length)} total</span>
+        </div>
+      </div>
+    `;
+    widget.setAttribute('role', 'button');
+    widget.setAttribute('tabindex', '0');
+    widget.setAttribute('aria-label', `${homePeople.length} people home`);
+    const open = (ev) => {
+      ev?.stopPropagation?.();
+      this._openSidebarPeoplePopup_?.();
+    };
+    widget.addEventListener('click', open);
+    widget.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      open(ev);
+    });
+    return widget;
+  }
+  if (type === 'profile') {
+    const name = this._getSidebarUserName_?.() || 'Home';
+    const initial = name.trim().charAt(0).toUpperCase() || 'H';
+    widget.innerHTML = `
+      <div class="ddc-sidebar-avatar" aria-hidden="true">${safe(initial)}</div>
+      <div class="ddc-sidebar-profile-copy">
+        <strong>${safe(name)}</strong>
+        <span>${safe(this._config?.sidebar_user_role || 'Home dashboard')}</span>
+      </div>
+      <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+    `;
+    return this._decorateSidebarWidget_(widget, type);
+  }
+  return widget;
+}
+
+_createSidebarFooter_() {
+  const safe = (value) => this._safe?.(value) || String(value ?? '');
+  const version = (typeof VERSION !== 'undefined' && VERSION) ? VERSION : '';
+  const footer = document.createElement('div');
+  footer.className = 'ddc-sidebar-footer';
+  footer.title = version ? `Drag & Drop Card v${version}` : 'Drag & Drop Card';
+  footer.innerHTML = `
+    <div class="ddc-sidebar-footer-mark" aria-hidden="true">
+      <ha-icon icon="mdi:drag-variant"></ha-icon>
+    </div>
+    <div class="ddc-sidebar-footer-copy">
+      <strong>Drag & Drop Card</strong>
+      <span>${version ? `v${safe(version)}` : 'Local build'}</span>
+    </div>
+  `;
+  return footer;
+}
+
+_moveTabsBarToRoot_() {
+  try {
+    const root = this.rootEl;
+    const bar = this.tabsBar;
+    const anchor = this.__scaleOuter || this.cardContainer;
+    if (!root || !bar || !anchor || bar.parentNode === root) return;
+    if (this.tabsPosition === 'bottom') root.insertBefore(bar, anchor.nextSibling);
+    else root.insertBefore(bar, anchor);
+  } catch {}
+}
+
+_syncSidebarClockTimer_() {
+  try {
+    const header = this._normalizeSidebarHeader_(this.sidebarHeader ?? this._config?.sidebar_header ?? 'clock');
+    const needsTimer = this._isSidebarEnabled_?.() && ['clock', 'date_time', 'weather', 'home', 'people', 'profile'].includes(header);
+    const delay = 30000;
+    if (!needsTimer) {
+      if (this.__sidebarClockInterval) {
+        clearInterval(this.__sidebarClockInterval);
+        this.__sidebarClockInterval = null;
+      }
+      this.__sidebarClockIntervalDelay = 0;
+      return;
+    }
+    if (!this.__sidebarClockInterval || this.__sidebarClockIntervalDelay !== delay) {
+      if (this.__sidebarClockInterval) clearInterval(this.__sidebarClockInterval);
+      this.__sidebarClockIntervalDelay = delay;
+      this.__sidebarClockInterval = setInterval(() => this._updateSidebarHeader_?.(), delay);
+    }
+  } catch {}
+}
+
+_updateSidebarHeader_() {
+  try {
+    const slot = this.sidebarHeaderHost;
+    if (!slot) return;
+    slot.innerHTML = '';
+    const header = this._createSidebarHeader_?.(new Date());
+    slot.hidden = !header;
+    if (header) slot.appendChild(header);
+  } catch {}
+}
+
+_renderSidebar_() {
+  try {
+    const host = this.sidebarHost;
+    const root = this.rootEl;
+    const bar = this.tabsBar;
+    const anchor = this.__scaleOuter || this.cardContainer;
+    if (!host || !root || !anchor) return;
+
+    try {
+      if (bar?.parentNode === host) host.removeChild(bar);
+      Array.from(host.childNodes).forEach((node) => node.remove());
+    } catch {}
+    host.style.display = 'none';
+    host.setAttribute('aria-hidden', 'true');
+    host.style.removeProperty('--ddc-sidebar-canvas-height');
+    host.style.removeProperty('--ddc-sidebar-canvas-frame-height');
+    root.classList.remove('ddc-sidebar-layout');
+    root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
+    root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
+    root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
+    this.sidebarHeaderHost = null;
+    this.sidebarCanvas = null;
+    this._moveTabsBarToRoot_?.();
+    this._syncSidebarClockTimer_?.();
+    return;
+
+    const enabled = this._isSidebarEnabled_?.();
+    const style = this._normalizeSidebarStyle_(this.sidebarStyle);
+    const density = this._normalizeSidebarDensity_(this.sidebarDensity);
+    const accent = this._normalizeSidebarAccent_(this.sidebarAccent);
+    const header = this._normalizeSidebarHeader_(this.sidebarHeader ?? this._config?.sidebar_header ?? 'clock');
+    const canvasHeight = this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight ?? this._config?.sidebar_canvas_height ?? 520);
+    const structureSignature = [style, density, accent, header, canvasHeight].join('|');
+    const sidebarEntriesForRender = (Array.isArray(this.sidebarCards) && this.sidebarCards.length)
+      ? this.sidebarCards
+      : (this._config?.sidebar_cards || []);
+    const cardsSignature = this._sidebarCardsRenderSignature_(sidebarEntriesForRender);
+
+    try {
+      if (bar?.parentNode === host) host.removeChild(bar);
+    } catch {}
+
+    if (!enabled) {
+      Array.from(host.childNodes).forEach((node) => {
+        if (node !== bar) node.remove();
+      });
+      host.style.display = 'none';
+      host.setAttribute('aria-hidden', 'true');
+      host.style.removeProperty('--ddc-sidebar-canvas-height');
+      host.style.removeProperty('--ddc-sidebar-canvas-frame-height');
+      root.classList.remove('ddc-sidebar-layout');
+      root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
+      root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
+      root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
+      this.sidebarHeaderHost = null;
+      this.sidebarCanvas = null;
+      delete host.dataset.sidebarStructureSignature;
+      this._moveTabsBarToRoot_?.();
+      this._syncSidebarClockTimer_?.();
+      return;
+    }
+
+    if (host.parentNode !== root) root.insertBefore(host, anchor);
+    host.style.display = '';
+    host.setAttribute('aria-hidden', 'false');
+    try {
+      const rect = anchor.getBoundingClientRect?.();
+      const height = Math.round(Number(rect?.height || 0) || 0);
+      if (height > 0) host.style.setProperty('--ddc-sidebar-canvas-height', `${height}px`);
+      else host.style.removeProperty('--ddc-sidebar-canvas-height');
+    } catch {}
+    host.style.setProperty('--ddc-sidebar-canvas-frame-height', `${canvasHeight}px`);
+    root.classList.add('ddc-sidebar-layout');
+    root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
+    root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
+    root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
+    root.classList.add(`ddc-sidebar-style-${style}`, `ddc-sidebar-density-${density}`, `ddc-sidebar-accent-${accent}`);
+    host.dataset.sidebarStyle = style;
+    host.dataset.sidebarDensity = density;
+    host.dataset.sidebarAccent = accent;
+    host.dataset.sidebarHeader = header;
+    host.dataset.sidebarCanvas = 'drag-drop';
+    this.sidebarDetail = null;
+
+    if (
+      host.dataset.sidebarStructureSignature === structureSignature
+      && host.dataset.sidebarCardsSignature === cardsSignature
+      && this.sidebarCanvas?.isConnected
+      && this.sidebarHeaderHost?.isConnected
+    ) {
+      this._updateSidebarHeader_?.();
+      this._syncSidebarEditState_?.();
+      this._moveTabsBarToRoot_?.();
+      this._syncSidebarClockTimer_?.();
+      return;
+    }
+
+    Array.from(host.childNodes).forEach((node) => {
+      if (node !== bar) node.remove();
+    });
+
+    const headerSlot = document.createElement('div');
+    headerSlot.className = 'ddc-sidebar-header-slot';
+    host.appendChild(headerSlot);
+    this.sidebarHeaderHost = headerSlot;
+    this._updateSidebarHeader_?.();
+
+    const workspace = document.createElement('section');
+    workspace.className = 'ddc-sidebar-workspace';
+    workspace.setAttribute('aria-label', 'Sidebar drag and drop area');
+    workspace.innerHTML = `
+      <div class="ddc-sidebar-workspace-bar">
+        <span><ha-icon icon="mdi:cursor-move" aria-hidden="true"></ha-icon>Sidebar canvas</span>
+        <button type="button" class="ddc-sidebar-add-card" data-sidebar-action="add-card" title="Add sidebar card" aria-label="Add sidebar card">
+          <ha-icon icon="mdi:plus"></ha-icon>
+        </button>
+      </div>
+      <div class="ddc-sidebar-canvas" id="ddcSidebarCanvas">
+        <div class="ddc-sidebar-empty">
+          <ha-icon icon="mdi:card-plus-outline" aria-hidden="true"></ha-icon>
+          <span>Drag to create</span>
+        </div>
+      </div>
+    `;
+    host.appendChild(workspace);
+    host.dataset.sidebarStructureSignature = structureSignature;
+    host.dataset.sidebarCardsSignature = cardsSignature;
+    this.sidebarCanvas = workspace.querySelector('#ddcSidebarCanvas');
+    const addButton = workspace.querySelector('[data-sidebar-action="add-card"]');
+    addButton?.classList?.toggle?.('is-visible', !!this.editMode);
+    addButton?.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      if (!this.editMode) return;
+      await this._openSidebarAddCard_?.();
+    });
+    this._installSidebarCreateGesture_?.();
+    this._buildSidebarCardsFromEntries_?.(sidebarEntriesForRender);
+    this._syncSidebarEditState_?.();
+    this._moveTabsBarToRoot_?.();
+    this._syncSidebarClockTimer_?.();
+  } catch {}
+}
+
+_sidebarCanvasSize_() {
+  const canvas = this.sidebarCanvas;
+  const height = this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight ?? this._config?.sidebar_canvas_height ?? 520);
+  let width = 320;
+  try {
+    const rect = canvas?.getBoundingClientRect?.();
+    width = Math.round(Number(rect?.width || canvas?.clientWidth || 0) || width);
+  } catch {}
+  return { w: Math.max(120, width), h: Math.max(280, height) };
+}
+
+_clampSidebarRect_(x = 0, y = 0, width = 120, height = 90) {
+  const size = this._sidebarCanvasSize_();
+  const w = Math.max(48, Math.min(Number(width) || 120, size.w));
+  const h = Math.max(44, Math.min(Number(height) || 90, size.h));
+  const nx = Math.max(0, Math.min(Number(x) || 0, Math.max(0, size.w - w)));
+  const ny = Math.max(0, Math.min(Number(y) || 0, Math.max(0, size.h - h)));
+  return { x: Math.round(nx), y: Math.round(ny), width: Math.round(w), height: Math.round(h) };
+}
+
+_setSidebarCardPosition_(el, x, y) {
+  const nx = Math.round(Number(x) || 0);
+  const ny = Math.round(Math.max(0, Number(y) || 0));
+  el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+  el.setAttribute('data-x', String(nx));
+  el.setAttribute('data-y', String(ny));
+}
+
+_highestSidebarZ_() {
+  let max = 5;
+  this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper')?.forEach((wrap) => {
+    const z = parseInt(wrap.style.zIndex || '0', 10);
+    if (z > max) max = z;
+  });
+  return max;
+}
+
+_sidebarDefaultSizeForCard_(cardConfig = {}) {
+  const type = String(cardConfig?.type || '');
+  const gs = Math.max(10, Number(this.gridSize || 20) || 20);
+  if (type === 'custom:ddc-line-card') return { width: Math.max(180, gs * 10), height: Math.max(64, gs * 4) };
+  if (type === 'custom:ddc-table-card') return { width: Math.max(220, gs * 12), height: Math.max(150, gs * 8) };
+  if (type === 'custom:ddc-icon-card') return { width: Math.max(82, gs * 5), height: Math.max(82, gs * 5) };
+  if (type === 'custom:ddc-text-card') return { width: Math.max(180, gs * 10), height: Math.max(78, gs * 4) };
+  return { width: Math.max(190, gs * 11), height: Math.max(120, gs * 7) };
+}
+
+_getNextSidebarPosition_(width = 190, height = 120) {
+  const size = this._sidebarCanvasSize_();
+  const gs = Math.max(8, Number(this.gridSize || 20) || 20);
+  const existing = Array.from(this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper') || []).map((wrap) => ({
+    x: parseFloat(wrap.getAttribute('data-x')) || 0,
+    y: parseFloat(wrap.getAttribute('data-y')) || 0,
+    w: parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || width,
+    h: parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || height,
+  }));
+  const collides = (rect) => existing.some((other) => !(
+    rect.x + rect.w <= other.x ||
+    other.x + other.w <= rect.x ||
+    rect.y + rect.h <= other.y ||
+    other.y + other.h <= rect.y
+  ));
+  for (let y = 0; y <= Math.max(0, size.h - height); y += gs) {
+    for (let x = 0; x <= Math.max(0, size.w - width); x += gs) {
+      const candidate = { x, y, w: width, h: height };
+      if (!collides(candidate)) return { x, y };
+    }
+  }
+  return this._clampSidebarRect_(gs, gs, width, height);
+}
+
+_captureSidebarLayoutEntries_() {
+  if (!this._isSidebarEnabled_?.()) return [];
+  const canvas = this.sidebarCanvas;
+  if (!canvas) return this._normalizeSidebarCards_(this.sidebarCards || this._config?.sidebar_cards || []);
+  return Array.from(canvas.querySelectorAll('.ddc-sidebar-card-wrapper')).map((wrap) => {
+    const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+    const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+    const width = parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || 190;
+    const height = parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || 120;
+    const z = parseInt(wrap.style.zIndex || '6', 10);
+    const cardCfg = this._extractCardConfig(wrap.firstElementChild);
+    const overflow = (wrap.style.overflow && wrap.style.overflow !== '') ? wrap.style.overflow : null;
+    const entry = {
+      id: wrap.dataset.layoutCardId || this._genLayoutCardId_(),
+      card: cardCfg,
+      position: { x, y },
+      size: { width, height },
+      z,
+    };
+    const cardStyle = this._extractPerCardStyle_?.(wrap) || {};
+    if (Object.keys(cardStyle).length) entry.card_style = cardStyle;
+    if (overflow) entry.overflow = overflow;
+    return entry;
+  });
+}
+
+_syncSidebarLayoutToConfig_() {
+  this.sidebarCards = [];
+  if (this._config) delete this._config.sidebar_cards;
+  if (this.sidebarHost) this.sidebarHost.dataset.sidebarCardsSignature = '';
+  return [];
+}
+
+_syncSidebarEditState_() {
+  const canvas = this.sidebarCanvas;
+  const host = this.sidebarHost;
+  host?.classList?.toggle?.('is-editing', !!this.editMode);
+  canvas?.classList?.toggle?.('is-editing', !!this.editMode);
+  this._syncSidebarEmptyState_?.();
+}
+
+_syncSidebarEmptyState_() {
+  const canvas = this.sidebarCanvas;
+  if (!canvas) return;
+  const hasCards = !!canvas.querySelector('.ddc-sidebar-card-wrapper');
+  const empty = canvas.querySelector('.ddc-sidebar-empty');
+  canvas.classList.toggle('is-empty', !hasCards);
+  if (empty) {
+    empty.hidden = hasCards;
+    const icon = empty.querySelector('ha-icon');
+    const label = empty.querySelector('span');
+    if (this.editMode) {
+      icon?.setAttribute?.('icon', 'mdi:selection-drag');
+      if (label) label.textContent = 'Drag to create';
+    } else {
+      icon?.setAttribute?.('icon', 'mdi:pencil-outline');
+      if (label) label.textContent = 'Edit';
+    }
+  }
+  const addBtn = this.sidebarHost?.querySelector?.('[data-sidebar-action="add-card"]');
+  addBtn?.classList?.toggle?.('is-visible', !!this.editMode);
+}
+
+async _buildSidebarCardsFromEntries_(entries = [], ticket = 0) {
+  const canvas = this.sidebarCanvas;
+  if (!canvas) return;
+  const buildTicket = ticket || ((this.__sidebarBuildTicket || 0) + 1);
+  this.__sidebarBuildTicket = buildTicket;
+  canvas.querySelectorAll('.ddc-sidebar-card-wrapper').forEach((node) => node.remove());
+  const normalizedEntries = this._normalizeSidebarCards_(entries);
+  this.sidebarCards = this._cloneJson_(normalizedEntries);
+  if (this.sidebarHost) {
+    this.sidebarHost.dataset.sidebarCardsSignature = this._sidebarCardsRenderSignature_(normalizedEntries);
+  }
+
+  for (const conf of normalizedEntries) {
+    if (buildTicket !== this.__sidebarBuildTicket) return;
+    const normalized = this._normalizeSavedCardEntry_(conf);
+    const cardEl = await this._createCard(normalized.card);
+    if (buildTicket !== this.__sidebarBuildTicket) return;
+    const wrap = this._makeSidebarCardWrapper_(cardEl, { layoutCardId: normalized.id });
+    const fallbackSize = this._sidebarDefaultSizeForCard_(normalized.card);
+    const width = normalized.size?.width ?? fallbackSize.width;
+    const height = normalized.size?.height ?? fallbackSize.height;
+    const rect = this._clampSidebarRect_(
+      normalized.position?.x || 0,
+      normalized.position?.y || 0,
+      width,
+      height
+    );
+    this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+    wrap.style.width = `${rect.width}px`;
+    wrap.style.height = `${rect.height}px`;
+    if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
+    if (normalized.overflow) {
+      try {
+        wrap.style.overflow = normalized.overflow;
+        wrap.dataset.overflow = normalized.overflow;
+        const inner = wrap.firstElementChild;
+        if (inner) inner.style.overflow = normalized.overflow;
+      } catch {}
+    }
+    try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
+    canvas.appendChild(wrap);
+    try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+    this._initSidebarCardInteract_(wrap);
+  }
+  this._syncSidebarEmptyState_();
+}
+
+_makeSidebarCardWrapper_(cardEl, options = {}) {
+  const wrap = document.createElement('div');
+  wrap.classList.add('card-wrapper', 'ddc-sidebar-card-wrapper');
+  wrap.dataset.sidebarCard = '1';
+  wrap.dataset.layoutCardId = options.layoutCardId || cardEl?.dataset?.layoutCardId || this._genLayoutCardId_();
+  if (this.editMode) wrap.classList.add('editing');
+  wrap.style.zIndex = String(Math.max(this._highestSidebarZ_() + 1, 6));
+
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.innerHTML = `
+    <button class="mini" data-act="edit" title="Edit" aria-label="Edit">
+      <ha-icon icon="mdi:pencil"></ha-icon><span>Edit</span>
+    </button>
+    <button class="mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
+      <ha-icon icon="mdi:content-copy"></ha-icon><span>Duplicate</span>
+    </button>
+    <button class="mini pill" data-act="front-most" title="Bring to front" aria-label="Bring to front">
+      <ha-icon icon="mdi:arrange-bring-to-front"></ha-icon>
+    </button>
+    <button class="mini pill" data-act="back-most" title="Send backward" aria-label="Send backward">
+      <ha-icon icon="mdi:arrange-send-to-back"></ha-icon>
+    </button>
+  `;
+
+  const delHandle = document.createElement('div');
+  delHandle.className = 'delete-handle';
+  delHandle.innerHTML = `<ha-icon icon="mdi:close-thick"></ha-icon>`;
+  delHandle.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    wrap.remove();
+    this._syncSidebarLayoutToConfig_?.();
+    this._syncSidebarEmptyState_?.();
+    this._queueSave?.('sidebar-delete');
+  });
+
+  chip.addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    const act = ev.target?.closest('button')?.dataset?.act;
+    if (!act) return;
+    if (act === 'duplicate') {
+      const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+      const dup = await this._createCard(cfg);
+      const w2 = this._makeSidebarCardWrapper_(dup);
+      const width = parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || 190;
+      const height = parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || 120;
+      const rect = this._clampSidebarRect_(
+        (parseFloat(wrap.getAttribute('data-x')) || 0) + Math.max(8, this.gridSize || 20),
+        (parseFloat(wrap.getAttribute('data-y')) || 0) + Math.max(8, this.gridSize || 20),
+        width,
+        height
+      );
+      w2.style.width = `${rect.width}px`;
+      w2.style.height = `${rect.height}px`;
+      this._setSidebarCardPosition_(w2, rect.x, rect.y);
+      w2.style.zIndex = String(Math.max(this._highestSidebarZ_() + 1, 6));
+      this.sidebarCanvas?.appendChild(w2);
+      try { this._rebuildOnce(w2.firstElementChild); } catch {}
+      this._initSidebarCardInteract_(w2);
+      this._syncSidebarLayoutToConfig_?.();
+      this._syncSidebarEmptyState_?.();
+      this._queueSave?.('sidebar-duplicate');
+    } else if (act === 'front-most') {
+      wrap.style.zIndex = String(Math.max(this._highestSidebarZ_() + 1, 6));
+      this._syncSidebarLayoutToConfig_?.();
+      this._queueSave?.('sidebar-z-change');
+    } else if (act === 'back-most') {
+      wrap.style.zIndex = '6';
+      this._syncSidebarLayoutToConfig_?.();
+      this._queueSave?.('sidebar-z-change');
+    } else if (act === 'edit') {
+      const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
+      await this._openSmartPicker('edit', cfg, async (newCfg) => {
+        const cleanCfg = this._sanitizeCardConfigForStorage_(newCfg || {});
+        const oldEl = wrap.firstElementChild;
+        const newEl = await this._createCard(cleanCfg);
+        try {
+          wrap.dataset.cfg = JSON.stringify(cleanCfg);
+          if (this._hasCardModDeep?.(cleanCfg)) wrap.dataset.needsCardMod = 'true';
+          else delete wrap.dataset.needsCardMod;
+        } catch {}
+        wrap.replaceChild(newEl, oldEl);
+        try {
+          newEl.hass = this.hass;
+          newEl.requestUpdate?.();
+          if (newEl.updateComplete) { try { await newEl.updateComplete; } catch {} }
+        } catch {}
+        try { this._rebuildOnce(newEl); } catch {}
+        this._syncSidebarLayoutToConfig_?.();
+        this._updateSidebarHeader_?.();
+        this._queueSave?.('sidebar-edit-card');
+      });
+    }
+  });
+
+  const shield = document.createElement('div');
+  shield.className = 'shield';
+  const resizeHandle = document.createElement('div');
+  resizeHandle.classList.add('resize-handle', 'resize-handle--br');
+  if (!this.editMode) resizeHandle.style.display = 'none';
+  resizeHandle.title = 'Resize';
+  resizeHandle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
+
+  try {
+    const cfg = this._sanitizeCardConfigForStorage_(cardEl.__ddcSourceConfig || cardEl._config || cardEl.config);
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+      wrap.dataset.cfg = JSON.stringify(cfg);
+      cardEl.__ddcSourceConfig = cfg;
+      if (this._hasCardModDeep?.(cfg)) wrap.dataset.needsCardMod = 'true';
+    }
+  } catch {}
+
+  wrap.append(cardEl, shield, chip, delHandle, resizeHandle);
+  wrap.addEventListener('dblclick', (ev) => {
+    if (!this.editMode) return;
+    if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip')) return;
+    ev.stopPropagation();
+    wrap.querySelector('.chip button[data-act="edit"]')?.click?.();
+  });
+  return wrap;
+}
+
+_installSidebarCreateGesture_() {
+  const canvas = this.sidebarCanvas;
+  if (!canvas || canvas.__ddcSidebarCreateGestureBound) return;
+  canvas.__ddcSidebarCreateGestureBound = true;
+  let draft = null;
+  const toLocal = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(rect.width, ev.clientX - rect.left)),
+      y: Math.max(0, Math.min(rect.height, ev.clientY - rect.top)),
+    };
+  };
+  const paintDraft = (ev) => {
+    if (!draft) return;
+    const point = toLocal(ev);
+    const x = Math.min(draft.start.x, point.x);
+    const y = Math.min(draft.start.y, point.y);
+    const width = Math.abs(point.x - draft.start.x);
+    const height = Math.abs(point.y - draft.start.y);
+    draft.rect = { x, y, width, height };
+    Object.assign(draft.el.style, {
+      transform: `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`,
+      width: `${Math.round(width)}px`,
+      height: `${Math.round(height)}px`,
+    });
+  };
+  const stopDraft = (ev, commit = false) => {
+    if (!draft) return;
+    try { canvas.releasePointerCapture?.(draft.pointerId); } catch {}
+    paintDraft(ev);
+    const rect = draft.rect || { x: draft.start.x, y: draft.start.y, width: 0, height: 0 };
+    const el = draft.el;
+    draft = null;
+    try { el.remove(); } catch {}
+    const gs = Math.max(1, Number(this.gridSize || 20) || 20);
+    const width = Math.round(Math.max(gs * 2, rect.width) / gs) * gs;
+    const height = Math.round(Math.max(gs * 2, rect.height) / gs) * gs;
+    const x = Math.round(rect.x / gs) * gs;
+    const y = Math.round(rect.y / gs) * gs;
+    if (commit && rect.width >= 28 && rect.height >= 28) {
+      this._openSidebarAddCardAtRect_?.(this._clampSidebarRect_(x, y, width, height));
+    }
+  };
+  canvas.addEventListener('pointerdown', (ev) => {
+    if (!this.editMode) return;
+    if (typeof ev.button === 'number' && ev.button !== 0) return;
+    if (ev.target?.closest?.('.ddc-sidebar-card-wrapper, .ddc-sidebar-add-card, button, a, input, select, textarea')) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const start = toLocal(ev);
+    const el = document.createElement('div');
+    el.className = 'ddc-sidebar-drag-rect';
+    canvas.appendChild(el);
+    draft = {
+      pointerId: ev.pointerId,
+      start,
+      rect: { x: start.x, y: start.y, width: 0, height: 0 },
+      el,
+    };
+    try { canvas.setPointerCapture?.(ev.pointerId); } catch {}
+    paintDraft(ev);
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!draft || draft.pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    paintDraft(ev);
+  });
+  canvas.addEventListener('pointerup', (ev) => {
+    if (!draft || draft.pointerId !== ev.pointerId) return;
+    ev.preventDefault();
+    stopDraft(ev, true);
+  });
+  canvas.addEventListener('pointercancel', (ev) => {
+    if (!draft || draft.pointerId !== ev.pointerId) return;
+    stopDraft(ev, false);
+  });
+  canvas.addEventListener('click', (ev) => {
+    if (this.editMode || !canvas.classList.contains('is-empty')) return;
+    ev.stopPropagation();
+    this._toggleEditMode?.(true);
+  });
+}
+
+_initSidebarCardInteract_(wrap) {
+  if (!window.interact || !wrap) return;
+  const snapValue = (value) => {
+    const gs = Math.max(1, Number(this.gridSize || 20) || 20);
+    return this.dragLiveSnap ? Math.round(value / gs) * gs : value;
+  };
+  const minW = 48;
+  const minH = 44;
+  window.interact(wrap).draggable({
+    enabled: this.editMode,
+    inertia: false,
+    modifiers: [window.interact.modifiers.restrictRect({ restriction: 'parent', endOnly: true })],
+    listeners: {
+      start: () => {
+        wrap.classList.add('dragging');
+        this.__sidebarMovingCard = true;
+      },
+      move: (ev) => {
+        let x = (parseFloat(wrap.getAttribute('data-x')) || 0) + ev.dx;
+        let y = (parseFloat(wrap.getAttribute('data-y')) || 0) + ev.dy;
+        const width = parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || minW;
+        const height = parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || minH;
+        x = snapValue(x);
+        y = snapValue(y);
+        const rect = this._clampSidebarRect_(x, y, width, height);
+        this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+      },
+      end: () => {
+        const gs = Math.max(1, Number(this.gridSize || 20) || 20);
+        const width = parseFloat(wrap.style.width) || wrap.getBoundingClientRect?.().width || minW;
+        const height = parseFloat(wrap.style.height) || wrap.getBoundingClientRect?.().height || minH;
+        const x = Math.round((parseFloat(wrap.getAttribute('data-x')) || 0) / gs) * gs;
+        const y = Math.round((parseFloat(wrap.getAttribute('data-y')) || 0) / gs) * gs;
+        const rect = this._clampSidebarRect_(x, y, width, height);
+        this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+        wrap.classList.remove('dragging');
+        this.__sidebarMovingCard = false;
+        this._syncSidebarLayoutToConfig_?.();
+        this._updateSidebarHeader_?.();
+        this._queueSave?.('sidebar-drag-end');
+      },
+    },
+  });
+
+  window.interact(wrap).resizable({
+    enabled: this.editMode,
+    edges: { right: '.resize-handle--br', bottom: '.resize-handle--br' },
+    inertia: false,
+    listeners: {
+      start: () => {
+        this.__sidebarResizingCard = true;
+        wrap.classList.add('dragging');
+      },
+      move: (ev) => {
+        const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+        const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+        const width = Math.max(minW, snapValue(ev.rect.width));
+        const height = Math.max(minH, snapValue(ev.rect.height));
+        const rect = this._clampSidebarRect_(x, y, width, height);
+        wrap.style.width = `${rect.width}px`;
+        wrap.style.height = `${rect.height}px`;
+        this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+      },
+      end: () => {
+        const gs = Math.max(1, Number(this.gridSize || 20) || 20);
+        const x = parseFloat(wrap.getAttribute('data-x')) || 0;
+        const y = parseFloat(wrap.getAttribute('data-y')) || 0;
+        const width = Math.max(minW, Math.round((parseFloat(wrap.style.width) || minW) / gs) * gs);
+        const height = Math.max(minH, Math.round((parseFloat(wrap.style.height) || minH) / gs) * gs);
+        const rect = this._clampSidebarRect_(x, y, width, height);
+        wrap.style.width = `${rect.width}px`;
+        wrap.style.height = `${rect.height}px`;
+        this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+        wrap.classList.remove('dragging');
+        this.__sidebarResizingCard = false;
+        this._syncSidebarLayoutToConfig_?.();
+        this._updateSidebarHeader_?.();
+        this._queueSave?.('sidebar-resize-end');
+      },
+    },
+  });
+}
+
+async _addSidebarCard_(cardConfig = {}, options = {}) {
+  if (!this.sidebarCanvas) return;
+  const cleanCfg = this._sanitizeCardConfigForStorage_(cardConfig || {});
+  const cardEl = await this._createCard(cleanCfg);
+  const wrap = this._makeSidebarCardWrapper_(cardEl);
+  const size = this._sidebarDefaultSizeForCard_(cleanCfg);
+  const requested = options?.rect || null;
+  const requestedWidth = Number(requested?.width || 0);
+  const requestedHeight = Number(requested?.height || 0);
+  const width = requestedWidth > 0 ? requestedWidth : size.width;
+  const height = requestedHeight > 0 ? requestedHeight : size.height;
+  const pos = requested
+    ? { x: Number(requested.x || 0), y: Number(requested.y || 0) }
+    : this._getNextSidebarPosition_(width, height);
+  const rect = this._clampSidebarRect_(pos.x, pos.y, width, height);
+  wrap.style.width = `${rect.width}px`;
+  wrap.style.height = `${rect.height}px`;
+  this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+  wrap.style.zIndex = String(Math.max(this._highestSidebarZ_() + 1, 6));
+  this.sidebarCanvas.appendChild(wrap);
+  try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+  this._initSidebarCardInteract_(wrap);
+  this._syncSidebarLayoutToConfig_?.();
+  this._syncSidebarEmptyState_?.();
+  this._updateSidebarHeader_?.();
+  this._queueSave?.('sidebar-add-card');
+  this._toast?.('Card added to Sidebar.');
+}
+
+async _openSidebarAddCardAtRect_(rect = null) {
+  await this._openSmartPicker('add', null, async (cfg) => {
+    await this._addSidebarCard_(cfg, { rect });
+    this._pushRecent?.((cfg || {}).type);
+  });
+}
+
+async _openSidebarAddCard_() {
+  await this._openSmartPicker('add', null, async (cfg) => {
+    await this._addSidebarCard_(cfg);
+    this._pushRecent?.((cfg || {}).type);
+  });
+}
+
 _syncTabsPlacement_() {
   try {
     const bar = this.tabsBar;
     const root = this.rootEl;
     const anchor = this.__scaleOuter || this.cardContainer;
+    const sidebarActive = this._isSidebarEnabled_?.();
+    const sidebarNavActive = this._isSidebarNavigationActive_?.();
     if (!bar || !root || !anchor || anchor.parentNode !== root) {
-      root?.classList?.toggle?.('ddc-tabs-left-layout', this.tabsPosition === 'left');
+      root?.classList?.toggle?.('ddc-sidebar-layout', !!sidebarActive);
       root?.classList?.toggle?.('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
+      return;
+    }
+
+    if (sidebarActive) {
+      const host = this.sidebarHost;
+      if (host && host.parentNode !== root) root.insertBefore(host, anchor);
+    }
+    if (sidebarNavActive) {
+      root.classList.add('ddc-sidebar-layout');
+      root.classList.remove('ddc-tabs-bottom-layout');
       return;
     }
 
     if (this._isExplicitViewportPreview_?.()) {
       if (anchor.nextSibling !== bar) root.insertBefore(bar, anchor.nextSibling);
-      root.classList.remove('ddc-tabs-left-layout');
+      root.classList.toggle('ddc-sidebar-layout', !!sidebarActive);
       root.classList.remove('ddc-tabs-bottom-layout');
       return;
     }
@@ -4730,14 +7245,14 @@ _syncTabsPlacement_() {
       if (bar.nextSibling !== anchor) root.insertBefore(bar, anchor);
     }
 
-    root.classList.toggle('ddc-tabs-left-layout', this.tabsPosition === 'left');
+    root.classList.toggle('ddc-sidebar-layout', !!sidebarActive);
     root.classList.toggle('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
   } catch {}
 }
 
 _syncLeftRailViewportPosition_() {
   try {
-    if (this.tabsPosition !== 'left') {
+    if (!this._isSidebarNavigationActive_?.()) {
       this.style?.removeProperty?.('--ddc-left-rail-left');
       return;
     }
@@ -4776,7 +7291,7 @@ _refreshTabsAlignment_() {
     const bar = this.tabsBar;
     if (!bar) return;
     bar.style.justifyContent = '';
-    if (this.tabsPosition === 'left') {
+    if (this._isSidebarNavigationActive_?.()) {
       bar.style.justifyContent = 'flex-start';
       return;
     }
@@ -5013,12 +7528,12 @@ _refreshTabsAlignment_() {
         return;
       }
       try {
-        const mode = (this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
-        if (mode === 'dynamic') {
+        const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+        if (mode === 'auto') {
           this._resizeContainer?.(); // recompute content extents so d.h grows live
         }
       } catch {}
-      try { const __m = String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase(); (__m==='auto'?this._applyAutoFillNoScale?.():this._applyAutoScale?.()); } catch {}
+      try { this._applyAutoScale?.(); } catch {}
     });
   }
 
@@ -5035,9 +7550,8 @@ _refreshTabsAlignment_() {
       }
       try { this._resizeContainer?.(); } catch {}
       try {
-        const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-        if (mode === 'auto') this._applyAutoFillNoScale?.();
-        else this._applyAutoScale?.();
+        const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+        this._applyAutoScale?.();
       } catch {}
       try { this._requestGridButtonsUpdateSoon?.(); } catch {}
       try { this._scheduleConnectorsRender_?.({ syncAnchors }); } catch {}
@@ -5082,26 +7596,29 @@ _refreshTabsAlignment_() {
         const pending = this.__ddcDragPointer;
         if (!pending && !this.__ddcDragging) return;
         if (pending && ev.pointerId !== pending.id) return;
-        if (!this.__ddcDragging) {
-          const dx = Math.abs(Number(ev.clientX || 0) - pending.startX);
-          const dy = Math.abs(Number(ev.clientY || 0) - pending.startY);
-          if (Math.max(dx, dy) < 4) return;
-          this.__ddcDragging = true;
-          if (this.__scaleOuter) {
-            this.__prevOverflow = this.__scaleOuter.style.overflow;
-            this.__scaleOuter.style.overflow = 'visible'; // avoid "ceiling" clipping
-          }
-        }
-      } catch {}
+	        if (!this.__ddcDragging) {
+	          const dx = Math.abs(Number(ev.clientX || 0) - pending.startX);
+	          const dy = Math.abs(Number(ev.clientY || 0) - pending.startY);
+	          if (Math.max(dx, dy) < 4) return;
+	          this.__ddcDragging = true;
+	          if (this.__scaleOuter && !this._getViewportPreviewPreset_?.()) {
+	            this.__prevOverflow = this.__scaleOuter.style.overflow;
+	            this.__scaleOuter.style.overflow = 'visible'; // avoid "ceiling" clipping
+	          }
+	        }
+	      } catch {}
     };
     this.__onDDCPointerUp = (ev) => {
       try {
-        this.__ddcDragPointer = null;
-        if (!this.__ddcDragging) return;
-        this.__ddcDragging = false;
-        if (this.__scaleOuter) this.__scaleOuter.style.overflow = this.__prevOverflow || '';
-      } catch {}
-    };
+	        this.__ddcDragPointer = null;
+	        if (!this.__ddcDragging) return;
+	        this.__ddcDragging = false;
+	        if (this.__scaleOuter && this.__prevOverflow !== undefined) {
+	          this.__scaleOuter.style.overflow = this.__prevOverflow || '';
+	        }
+	        this.__prevOverflow = undefined;
+	      } catch {}
+	    };
     // Attach listeners
     try { this.addEventListener('pointerdown', this.__onDDCPointerDown, { passive: true }); } catch {}
     try { this.addEventListener('pointermove', this.__onDDCPointerMove, { passive: true }); } catch {}
@@ -5191,9 +7708,9 @@ _renderEditToolbar_() {
 async _onToolbarAction_(action, ctx = {}) {
 
 
-  
+
   switch (action) {
-    
+
     case 'add_card':
       (this._openAddCardDialog_?.() || this._addNewCard_?.() || this._openEntityPicker_?.());
       break;
@@ -5295,7 +7812,7 @@ async _onToolbarAction_(action, ctx = {}) {
 }
 
 
-  __booting = false;  
+  __booting = false;
 
   constructor() {
     super();
@@ -5309,7 +7826,20 @@ async _onToolbarAction_(action, ctx = {}) {
     this.layers = [];
     this.activeLayerIds = [];
     this.layersEnabled = false;
+    this.sidebarEnabled = false;
+    this.sidebarItems = ['navigation'];
+    this.sidebarStyle = 'glass';
+    this.sidebarDensity = 'comfortable';
+    this.sidebarAccent = 'blue';
+    this.sidebarHeader = 'clock';
+    this.sidebarCanvasHeight = 520;
+    this.sidebarCards = [];
+    this.sidebarCanvas = null;
+    this.sidebarHeaderHost = null;
+    this.sidebarDetail = null;
     this.__dashboardThemeAppliedVars = [];
+    this.__animatedCardIds = new Set();
+    this.__suppressCardAnimation = false;
     this._responsivePreviewOrientations = {
       desktop: 'landscape',
       tablet: 'landscape',
@@ -5341,7 +7871,7 @@ async _onToolbarAction_(action, ctx = {}) {
   // === GRID SELECT PATCH END (fields) ===
 
 
-  
+
   // --- DDC patch: deep card_mod detection + one-time rebuild helper ---
   _hasCardModDeep(cfg) {
     try {
@@ -5493,9 +8023,69 @@ async _onToolbarAction_(action, ctx = {}) {
     return 'custom';
   }
 
+  static normalizeContainerSizeMode(mode) {
+    const value = String(mode ?? '').trim().toLowerCase();
+    if (value === 'dynamic') return 'auto';
+    if (value === 'auto' || value === 'fixed_custom' || value === 'preset') return value;
+    return 'auto';
+  }
+
+  _normalizeContainerSizeMode_(mode) {
+    return DragAndDropCard.normalizeContainerSizeMode(mode);
+  }
+
+  _parkedSidebarOptionKeys_() {
+    return [
+      'sidebar_enabled', 'sidebar_items', 'sidebar_content', 'sidebar_style',
+      'sidebar_density', 'sidebar_accent', 'sidebar_header', 'sidebar_header_type',
+      'sidebar_canvas_height', 'sidebar_cards', 'sidebar_home_image',
+      'sidebar_house_image', 'sidebar_home_image_url', 'sidebar_calendar_entities',
+      'sidebar_calendars', 'sidebar_weather_entity', 'sidebar_title',
+      'sidebar_user_name', 'sidebar_user_role',
+      'sidebarEnabled', 'sidebarItems', 'sidebarContent', 'sidebarStyle',
+      'sidebarDensity', 'sidebarAccent', 'sidebarHeader', 'sidebarHeaderType',
+      'sidebarCanvasHeight', 'sidebarCards', 'sidebarHomeImage',
+      'sidebarHouseImage', 'sidebarCalendarEntities', 'sidebarCalendars',
+      'sidebarWeatherEntity', 'sidebarTitle', 'sidebarUserName', 'sidebarUserRole',
+    ];
+  }
+
+  _deleteParkedSidebarOptions_(target = null) {
+    if (!target || typeof target !== 'object') return target;
+    for (const key of this._parkedSidebarOptionKeys_()) delete target[key];
+    return target;
+  }
+
+  _normalizeDashboardOptions_(options = {}, { requireSizeMode = false, forceAutoResize = false } = {}) {
+    if (!options || typeof options !== 'object') return {};
+    const next = { ...options };
+    this._deleteParkedSidebarOptions_(next);
+    if (Object.prototype.hasOwnProperty.call(next, 'container_size_mode') || requireSizeMode) {
+      const rawMode = String(next.container_size_mode ?? '').trim().toLowerCase();
+      next.container_size_mode = this._normalizeContainerSizeMode_(next.container_size_mode);
+      if ((forceAutoResize || rawMode === 'dynamic' || rawMode === 'auto') && next.container_size_mode === 'auto') {
+        next.auto_resize_cards = true;
+      }
+    }
+    return next;
+  }
+
+  _normalizeDashboardPayload_(payload = {}) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const next = { ...payload };
+    if (next.options && typeof next.options === 'object') {
+      next.options = this._normalizeDashboardOptions_(next.options, { forceAutoResize: true });
+    } else if (Object.prototype.hasOwnProperty.call(next, 'container_size_mode')) {
+      const normalized = this._normalizeDashboardOptions_(next, { forceAutoResize: true });
+      Object.assign(next, normalized);
+    }
+    this._deleteParkedSidebarOptions_(next);
+    return next;
+  }
+
   static getStubConfig(/* hass, entities, entitiesFallback */) {
     // Return default configuration for a new drag‑and‑drop card.  These values
-    // initialize the card in “auto” mode with a 20px grid and no hero
+    // initialize the card in the Full HD preset with a 20px grid and no hero
     // background image.  The storage_key is generated once so each new
     // card has its own persistent layout key.
     return {
@@ -5505,7 +8095,7 @@ async _onToolbarAction_(action, ctx = {}) {
       drag_live_snap: true,
       auto_save: true,
       auto_save_debounce: 800,
-      container_size_mode: 'auto',
+      container_size_mode: 'preset',
       container_background: 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
       card_background: 'linear-gradient(135deg, #111827, #1f2937)',
       debug: false,
@@ -5530,7 +8120,7 @@ async _onToolbarAction_(action, ctx = {}) {
       edit_mode_pin: '',
       container_fixed_width: null,
       container_fixed_height: null,
-      container_preset: 'fullhd',
+      container_preset: 'fhd',
       card_shadow: true,
       hide_HA_Header: false,
       hide_HA_Sidebar: false,
@@ -5542,6 +8132,7 @@ async _onToolbarAction_(action, ctx = {}) {
         { id: 'home', label: 'Home', icon: 'mdi:home', label_mode: 'both' }
       ],
       default_tab: 'home',
+      tabs_position: 'top',
       layers_enabled: false,
       layers: [],
     };
@@ -5627,6 +8218,10 @@ static getConfigElement() {
     };
     const sanitizeConfigForEditor = (config = {}) => {
       const next = cloneForEditor(config);
+      if (Object.prototype.hasOwnProperty.call(next, 'container_size_mode')) {
+        next.container_size_mode = DragAndDropCard.normalizeContainerSizeMode(next.container_size_mode);
+        if (next.container_size_mode === 'auto') next.auto_resize_cards = true;
+      }
       const seen = new WeakSet();
       const visit = (node) => {
         if (!node || typeof node !== 'object' || seen.has(node)) return;
@@ -5704,7 +8299,7 @@ static getConfigElement() {
   };
 
   const toggleSizeControls = () => {
-    const mode = el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value ?? 'dynamic';
+    const mode = DragAndDropCard.normalizeContainerSizeMode(el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value);
     el.querySelector('#sizeCustom').style.display = mode === 'fixed_custom' ? 'inline-flex' : 'none';
     el.querySelector('#sizePresetWrap').style.display = mode === 'preset' ? 'inline-flex' : 'none';
   };
@@ -5724,6 +8319,8 @@ static getConfigElement() {
   // --- Public API: set incoming values (preserve unknown keys)
   el.setConfig = (config = {}) => {
     el._config = { type: config.type || 'custom:drag-and-drop-card', ...config };
+    el._config.container_size_mode = DragAndDropCard.normalizeContainerSizeMode(el._config.container_size_mode);
+    if (el._config.container_size_mode === 'auto') el._config.auto_resize_cards = true;
 
     // Auto-generate storage key once if not present
     if (!el._config.storage_key) {
@@ -5741,7 +8338,7 @@ static getConfigElement() {
     el.querySelector('#cardBg').value = el._config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     el.querySelector('#debug').checked = !!el._config.debug;
     el.querySelector('#noOverlap').checked = !!el._config.disable_overlap;
-    el.querySelector('#autoResize').checked = !!el._config.auto_resize_cards;
+    el.querySelector('#autoResize').checked = el._config.container_size_mode === 'auto' ? true : !!el._config.auto_resize_cards;
 
     // Set the animate cards checkbox based on the incoming config. This
     // defaults to false when not specified. When true, cards will animate
@@ -5750,7 +8347,7 @@ static getConfigElement() {
 
 
     const sizeModeEl = el.querySelector('#sizeMode') || el.querySelector('#ddc-setting-sizeMode');
-    if (sizeModeEl) sizeModeEl.value = el._config.container_size_mode || 'dynamic';
+    if (sizeModeEl) sizeModeEl.value = DragAndDropCard.normalizeContainerSizeMode(el._config.container_size_mode);
     el.querySelector('#sizeW').value = el._config.container_fixed_width ?? '';
     el.querySelector('#sizeH').value = el._config.container_fixed_height ?? '';
     el.querySelector('#sizeOrientation').value = el._config.container_preset_orientation || 'auto';
@@ -5805,7 +8402,8 @@ static getConfigElement() {
     base.card_background = el.querySelector('#cardBg').value || 'var(--ha-card-background, var(--card-background-color))';
     base.debug = !!el.querySelector('#debug').checked;
     base.disable_overlap = !!el.querySelector('#noOverlap').checked;
-    base.auto_resize_cards = !!el.querySelector('#autoResize').checked;
+    const nextSizeMode = DragAndDropCard.normalizeContainerSizeMode(el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value);
+    base.auto_resize_cards = nextSizeMode === 'auto' ? true : !!el.querySelector('#autoResize').checked;
     // === Background persistence ===
     try {
       const selBgMode        = el.querySelector('#ddc-bg-mode');
@@ -5893,7 +8491,7 @@ static getConfigElement() {
     base.animate_cards = !!el.querySelector('#animateCards').checked;
 
 
-    base.container_size_mode = el.querySelector('#sizeMode')?.value ?? el.querySelector('#ddc-setting-sizeMode')?.value ?? 'dynamic';
+    base.container_size_mode = nextSizeMode;
     base.container_fixed_width  = Number(el.querySelector('#sizeW').value || 0) || undefined;
     base.container_fixed_height = Number(el.querySelector('#sizeH').value || 0) || undefined;
     base.container_preset = el.querySelector('#sizePreset').value || undefined;
@@ -5937,7 +8535,7 @@ static getConfigElement() {
 
 
 
-  
+
     /* ---------------------------- Size helpers ---------------------------- */
   // ---- size presets (CSS pixels) ----
 static _sizePresets() {
@@ -6776,12 +9374,18 @@ _syncLayerTriggerState_() {
     trigger.setAttribute('aria-label', `Layers (${activeCount} of ${total} active)`);
     const badge = trigger.querySelector?.('.ddc-layer-count');
     if (badge) badge.textContent = String(activeCount);
+    const meta = trigger.querySelector?.('.ddc-layer-trigger-meta');
+    if (meta) meta.textContent = total ? `${activeCount} of ${total} active` : 'No layers';
   }
+  const panelMeta = this.shadowRoot.querySelector?.('.ddc-layer-menu-head span');
+  if (panelMeta) panelMeta.textContent = total ? `${activeCount} of ${total} active` : 'No layers';
   this.shadowRoot.querySelectorAll?.('.ddc-layer-option').forEach((btn) => {
     const isAll = btn.dataset.layerOption === 'all';
     const isActive = isAll ? allActive : activeSet?.has?.(btn.dataset.layerId);
     btn.classList.toggle('active', !!isActive);
     btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    const meta = btn.querySelector?.('.ddc-layer-option-meta');
+    if (meta) meta.textContent = isActive ? 'Visible' : 'Hidden';
   });
 }
 
@@ -6800,10 +9404,16 @@ _createLayerOptionButton_(option = {}) {
   icon.className = 'ddc-layer-option-icon';
   btn.appendChild(icon);
 
-  const label = document.createElement('span');
+  const copy = document.createElement('span');
+  copy.className = 'ddc-layer-option-copy';
+  const label = document.createElement('strong');
   label.className = 'ddc-layer-option-label';
   label.textContent = option.label || option.id || 'Layer';
-  btn.appendChild(label);
+  const meta = document.createElement('small');
+  meta.className = 'ddc-layer-option-meta';
+  meta.textContent = option.active ? 'Visible' : 'Hidden';
+  copy.append(label, meta);
+  btn.appendChild(copy);
 
   const check = document.createElement('ha-icon');
   check.setAttribute('icon', 'mdi:check');
@@ -6866,10 +9476,16 @@ _appendLayersMenuToTabs_(bar) {
   triggerIcon.setAttribute('icon', 'mdi:layers-triple-outline');
   trigger.appendChild(triggerIcon);
 
+  const triggerCopy = document.createElement('span');
+  triggerCopy.className = 'ddc-layer-trigger-copy';
   const triggerLabel = document.createElement('span');
   triggerLabel.className = 'ddc-layer-trigger-label';
   triggerLabel.textContent = 'Layers';
-  trigger.appendChild(triggerLabel);
+  const triggerMeta = document.createElement('small');
+  triggerMeta.className = 'ddc-layer-trigger-meta';
+  triggerMeta.textContent = layers.length ? `${activeIds.length} of ${layers.length} active` : 'No layers';
+  triggerCopy.append(triggerLabel, triggerMeta);
+  trigger.appendChild(triggerCopy);
 
   const count = document.createElement('span');
   count.className = 'ddc-layer-count';
@@ -6907,6 +9523,13 @@ _appendLayersMenuToTabs_(bar) {
     panel.setAttribute('role', 'menu');
     panel.setAttribute('aria-label', 'Layers');
     panel.addEventListener('click', (ev) => ev.stopPropagation());
+    const panelHead = document.createElement('div');
+    panelHead.className = 'ddc-layer-menu-head';
+    panelHead.innerHTML = `
+      <strong>Layers</strong>
+      <span>${activeIds.length} of ${layers.length} active</span>
+    `;
+    panel.appendChild(panelHead);
 
     panel.appendChild(this._createLayerOptionButton_({
       id: '__all__',
@@ -6958,6 +9581,7 @@ _defaultConnectorConfig_() {
     inactive_color: 'rgba(100, 116, 139, 0.5)',
     glow: true,
     rounded: true,
+    z: 5,
   };
 }
 
@@ -7577,6 +10201,12 @@ _normalizeConnectorEntry_(entry = {}, fallback = null) {
   out.thickness = Math.max(2, Math.min(28, Number(out.thickness) || defaults.thickness));
   out.arrow_size = Math.max(6, Math.min(56, Number(out.arrow_size ?? out.arrowSize) || defaults.arrow_size));
   {
+    const z = Math.round(Number(out.z ?? out.zIndex ?? out.z_index ?? defaults.z));
+    out.z = Number.isFinite(z) ? Math.max(1, Math.min(9999, z)) : defaults.z;
+    delete out.zIndex;
+    delete out.z_index;
+  }
+  {
     const speed = Number(out.animation_speed ?? defaults.animation_speed);
     out.animation_speed = Number.isFinite(speed) ? Math.max(0, Math.min(8, speed)) : defaults.animation_speed;
   }
@@ -7959,7 +10589,8 @@ _getActualResponsiveProfile_() {
 
 _getRequestedResponsiveProfile_() {
   const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
-  if (this.editMode && (previewMode === 'desktop' || previewMode === 'tablet' || previewMode === 'mobile')) {
+  const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  if (sizeMode === 'auto' && this.editMode && (previewMode === 'desktop' || previewMode === 'tablet' || previewMode === 'mobile')) {
     return previewMode;
   }
   return this._getActualResponsiveProfile_?.() || 'desktop';
@@ -7972,7 +10603,8 @@ _getRequestedResponsiveOrientation_(profile = null) {
   if (baseProfile === 'desktop') return 'landscape';
 
   const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
-  if (this.editMode && previewMode === baseProfile) {
+  const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  if (sizeMode === 'auto' && this.editMode && previewMode === baseProfile) {
     return this._getStoredResponsivePreviewOrientation_(baseProfile);
   }
 
@@ -7988,10 +10620,18 @@ _getRequestedResponsiveLayoutKey_() {
 _ensureConnectorsLayer_() {
   if (!this.cardContainer) return null;
   let layer = this.cardContainer.querySelector('#ddcConnectorsLayer');
+  if (layer && layer.namespaceURI === 'http://www.w3.org/2000/svg') {
+    const replacement = document.createElement('div');
+    replacement.id = 'ddcConnectorsLayer';
+    replacement.className = 'ddc-connectors-layer';
+    replacement.setAttribute('aria-hidden', 'true');
+    layer.replaceWith(replacement);
+    layer = replacement;
+  }
   if (!layer) {
-    layer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    layer.setAttribute('id', 'ddcConnectorsLayer');
-    layer.setAttribute('class', 'ddc-connectors-layer');
+    layer = document.createElement('div');
+    layer.id = 'ddcConnectorsLayer';
+    layer.className = 'ddc-connectors-layer';
     layer.setAttribute('aria-hidden', 'true');
     this.cardContainer.appendChild(layer);
   }
@@ -8287,6 +10927,61 @@ _insertConnectorMidpoint_(connectorId) {
 
 _getConnectorById_(connectorId) {
   return (this._getCurrentConnectorEntries_() || []).find((entry) => entry.id === connectorId) || null;
+}
+
+_getConnectorZ_(connector = {}) {
+  const z = Math.round(Number(connector.z ?? connector.zIndex ?? connector.z_index ?? this._defaultConnectorConfig_().z));
+  return Number.isFinite(z) ? Math.max(1, Math.min(9999, z)) : this._defaultConnectorConfig_().z;
+}
+
+_connectorZRange_() {
+  const entries = this._getCurrentConnectorEntries_?.() || [];
+  let min = Infinity;
+  let max = -Infinity;
+  entries.forEach((entry) => {
+    const z = this._getConnectorZ_(entry);
+    min = Math.min(min, z);
+    max = Math.max(max, z);
+  });
+  this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.forEach((wrap) => {
+    const z = Math.round(Number(wrap.style?.zIndex || 0));
+    if (!Number.isFinite(z)) return;
+    min = Math.min(min, z);
+    max = Math.max(max, z);
+  });
+  if (!Number.isFinite(min)) min = this._defaultConnectorConfig_().z;
+  if (!Number.isFinite(max)) max = this._defaultConnectorConfig_().z;
+  return { min, max };
+}
+
+_setConnectorZ_(connectorId, z, { reason = 'connector-z-change', render = true } = {}) {
+  const id = String(connectorId || '').trim();
+  const nextZ = Math.round(Number(z));
+  if (!id || !Number.isFinite(nextZ)) return false;
+  let changed = false;
+  this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    if (entry.id !== id) return entry;
+    const normalizedZ = Math.max(1, Math.min(9999, nextZ));
+    changed = normalizedZ !== this._getConnectorZ_(entry);
+    return { ...entry, z: normalizedZ };
+  }), { reason: changed ? reason : null, render });
+  if (changed) this._selectedConnectorId = id;
+  return changed;
+}
+
+_adjustConnectorZ_(connectorId, delta = 0) {
+  const connector = this._getConnectorById_(connectorId);
+  if (!connector) return false;
+  return this._setConnectorZ_(connectorId, this._getConnectorZ_(connector) + (Number(delta) || 0));
+}
+
+_moveConnectorZ_(connectorId, mode = 'front') {
+  const connector = this._getConnectorById_(connectorId);
+  if (!connector) return false;
+  const { min, max } = this._connectorZRange_();
+  if (mode === 'front') return this._setConnectorZ_(connectorId, max + 1);
+  if (mode === 'back') return this._setConnectorZ_(connectorId, min - 1);
+  return false;
 }
 
 _findConnectorEndpointAtAnchor_(cardId, anchor = 'right', { tabId = null } = {}) {
@@ -9063,6 +11758,7 @@ _openConnectorSettings_(connectorId) {
     ? `${resolved.active ? 'Currently active' : 'Currently idle'} · ${resolved.animate ? 'animated' : 'static'}`
     : `Manual connector · ${resolved.animate ? 'animated' : 'static'}`;
   const pointCount = Array.isArray(connector.points) ? connector.points.length : 0;
+  const connectorZ = this._getConnectorZ_(connector);
   const entityOptions = Object.keys(this.hass?.states || {})
     .sort((a, b) => a.localeCompare(b));
   const buildEntityOptionMarkup = () => entityOptions
@@ -9190,7 +11886,7 @@ _openConnectorSettings_(connectorId) {
         </div>
         <div class="ddc-connector-preview-copy">
           <strong>${this._safe(previewSummary)}</strong>
-          <span>${pointCount} point${pointCount === 1 ? '' : 's'} · ${this._safe(animationStyleLabel)} · ${this._safe(String(connector.arrows || 'end'))} arrow${String(connector.arrows || 'end') === 'both' ? 's' : ''} · ${Math.round(arrowSize)}px</span>
+          <span>${pointCount} point${pointCount === 1 ? '' : 's'} · z ${connectorZ} · ${this._safe(animationStyleLabel)} · ${this._safe(String(connector.arrows || 'end'))} arrow${String(connector.arrows || 'end') === 'both' ? 's' : ''} · ${Math.round(arrowSize)}px</span>
         </div>
       </div>
 
@@ -9328,7 +12024,28 @@ _openConnectorSettings_(connectorId) {
             <ha-icon icon="mdi:vector-polyline-edit"></ha-icon><span>Add bend</span>
           </button>
         </div>
-        <p class="ddc-connector-help">Anchored auto-routes hide generated routing points. Manual bends show only editable handles.</p>
+        <div class="ddc-connector-layer-order">
+          <div class="ddc-connector-section-title">Layer order</div>
+          <div class="ddc-connector-z-actions" role="group" aria-label="Line layer order">
+            <button class="btn secondary compact" id="connectorSendBackwardBtn" type="button" title="Send backward">
+              <ha-icon icon="mdi:arrange-send-backward"></ha-icon><span>Back</span>
+            </button>
+            <button class="btn secondary compact" id="connectorBringForwardBtn" type="button" title="Bring forward">
+              <ha-icon icon="mdi:arrange-bring-forward"></ha-icon><span>Forward</span>
+            </button>
+            <button class="btn secondary compact" id="connectorSendToBackBtn" type="button" title="Send to back">
+              <ha-icon icon="mdi:arrange-send-to-back"></ha-icon><span>To back</span>
+            </button>
+            <button class="btn secondary compact" id="connectorBringToFrontBtn" type="button" title="Bring to front">
+              <ha-icon icon="mdi:arrange-bring-to-front"></ha-icon><span>To front</span>
+            </button>
+          </div>
+          <label class="ddc-connector-field">
+            <span>Z-index</span>
+            <input id="connectorZIndex" class="input" type="number" min="1" max="9999" step="1" value="${connectorZ}" />
+          </label>
+        </div>
+        <p class="ddc-connector-help">Corner handles are always shown for selected routed lines. Layer order controls how lines stack against other lines.</p>
       </section>
 
       <div class="ddc-connector-footer-actions">
@@ -9503,6 +12220,13 @@ _openConnectorSettings_(connectorId) {
           patchConnector({ animation_speed: Number.isFinite(speed) ? Math.max(0, Math.min(8, speed)) : currentConnector.animation_speed });
         }
         return true;
+      case 'connectorZIndex':
+        {
+          const z = Math.round(Number(target.value));
+          if (!Number.isFinite(z)) return false;
+          patchConnector({ z: Math.max(1, Math.min(9999, z)) }, 'connector-z-change');
+        }
+        return true;
       case 'connectorActiveColor':
         patchConnector({ active_color: target.value || currentConnector.active_color });
         return true;
@@ -9573,6 +12297,27 @@ _openConnectorSettings_(connectorId) {
     this._renderConnectors_?.();
     requestAnimationFrame(() => this._openConnectorSettings_?.(connectorId));
   });
+  const syncConnectorZInput = () => {
+    currentConnector = this._getConnectorById_(connectorId) || currentConnector;
+    const zInput = $('#connectorZIndex');
+    if (zInput) zInput.value = String(this._getConnectorZ_(currentConnector));
+  };
+  $('#connectorSendBackwardBtn')?.addEventListener('click', () => {
+    this._adjustConnectorZ_?.(connectorId, -1);
+    syncConnectorZInput();
+  });
+  $('#connectorBringForwardBtn')?.addEventListener('click', () => {
+    this._adjustConnectorZ_?.(connectorId, 1);
+    syncConnectorZInput();
+  });
+  $('#connectorSendToBackBtn')?.addEventListener('click', () => {
+    this._moveConnectorZ_?.(connectorId, 'back');
+    syncConnectorZInput();
+  });
+  $('#connectorBringToFrontBtn')?.addEventListener('click', () => {
+    this._moveConnectorZ_?.(connectorId, 'front');
+    syncConnectorZInput();
+  });
 }
 
 _closeConnectorSettings_() {
@@ -9596,18 +12341,33 @@ _renderConnectors_() {
   layer.innerHTML = '';
 
   const svgNs = 'http://www.w3.org/2000/svg';
+  const createConnectorSurface = (className = 'ddc-connector-surface', z = 5) => {
+    const surface = document.createElementNS(svgNs, 'svg');
+    surface.setAttribute('class', className);
+    this._sizeConnectorsLayer_(surface, width, height);
+    const safeZ = Math.max(1, Math.min(100000, Math.round(Number(z) || 1)));
+    surface.style.zIndex = String(safeZ);
+    return surface;
+  };
 
   const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
   this._ensureConnectorScopesForCurrentLayout_?.({ render: false });
-  const connectors = (this._getCurrentConnectorEntries_() || []).filter((entry) => {
-    return this._connectorMatchesCurrentContext_(entry, currentTab);
-  });
+  const connectors = (this._getCurrentConnectorEntries_() || [])
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => this._connectorMatchesCurrentContext_(entry, currentTab))
+    .sort((a, b) => {
+      const za = this._getConnectorZ_(a.entry);
+      const zb = this._getConnectorZ_(b.entry);
+      return za === zb ? a.index - b.index : za - zb;
+    })
+    .map(({ entry }) => entry);
   if (this._selectedConnectorId && !connectors.some((entry) => entry.id === this._selectedConnectorId)) {
     this._selectedConnectorId = null;
     this._closeConnectorSettings_?.();
   }
 
   if (this.editMode && this._connectorDrawMode) {
+    const captureSurface = createConnectorSurface('ddc-connector-capture-surface', 100000);
     const capture = document.createElementNS(svgNs, 'rect');
     capture.setAttribute('x', '0');
     capture.setAttribute('y', '0');
@@ -9651,7 +12411,8 @@ _renderConnectors_() {
         this._finalizeConnectorDraft_({ openSettings: true });
       }
     });
-    layer.appendChild(capture);
+    captureSurface.appendChild(capture);
+    layer.appendChild(captureSurface);
   }
 
   const renderConnector = (connector, { draft = false } = {}) => {
@@ -9685,10 +12446,16 @@ _renderConnectors_() {
           : '');
     const d = this._buildConnectorPathData_(points);
     const selected = this._selectedConnectorId === connector.id;
+    const connectorZ = draft ? 100000 : this._getConnectorZ_(connector);
+    const surface = createConnectorSurface(
+      `ddc-connector-surface${selected ? ' is-selected' : ''}${draft ? ' is-draft' : ''}`,
+      connectorZ
+    );
 
     const group = document.createElementNS(svgNs, 'g');
     group.setAttribute('class', `ddc-connector ${state.active ? 'is-active' : 'is-idle'} ${draft ? 'is-draft' : ''} ${hasAnchors ? 'is-anchored' : ''} ${autoRoute ? 'is-auto-route' : ''} is-animation-${animationStyle} ${selected ? 'is-selected' : ''}`);
     group.setAttribute('color', color);
+    group.dataset.z = String(connectorZ);
 
     if (selected && !draft) {
       const selectionColor = String(connector.active_color || this._defaultConnectorConfig_().active_color);
@@ -9930,17 +12697,13 @@ _renderConnectors_() {
     const autoCornerIndexes = points
       .map((_, index) => index)
       .filter((index) => index > 0 && index < lastIndex && isCornerHandle(index));
-    const autoVisibleCornerIndexes = autoCornerIndexes.filter((index) => {
-      if (sourceAnchor && index === 1) return false;
-      if (targetAnchor && index === lastIndex - 1) return false;
-      return true;
-    });
+    const cornerIndexSet = new Set(autoCornerIndexes);
     const autoFallbackIndexes = points
       .map((_, index) => index)
       .filter((index) => index > 1 && index < lastIndex - 1);
     const autoRouteHandleIndexes = new Set(
-      autoVisibleCornerIndexes.length
-        ? autoVisibleCornerIndexes
+      autoCornerIndexes.length
+        ? autoCornerIndexes
         : (autoCornerIndexes.length ? autoCornerIndexes : autoFallbackIndexes)
     );
     const generatedTerminalGuard = hasAnchors && (autoRoute || points.length >= 5)
@@ -9953,8 +12716,8 @@ _renderConnectors_() {
         const isEndpoint = index === 0 || index === lastIndex;
         if (isEndpoint && ((index === 0 && sourceAnchor) || (index === lastIndex && targetAnchor))) return false;
         if (autoRoute) return autoRouteHandleIndexes.has(index);
-        if (generatedTerminalGuard && sourceAnchor && index > 0 && index <= generatedTerminalGuard) return false;
-        if (generatedTerminalGuard && targetAnchor && index < lastIndex && index >= lastIndex - generatedTerminalGuard) return false;
+        if (generatedTerminalGuard && !cornerIndexSet.has(index) && sourceAnchor && index > 0 && index <= generatedTerminalGuard) return false;
+        if (generatedTerminalGuard && !cornerIndexSet.has(index) && targetAnchor && index < lastIndex && index >= lastIndex - generatedTerminalGuard) return false;
         return true;
       });
     if (selected && this.editMode && editableHandles.length) {
@@ -10079,7 +12842,8 @@ _renderConnectors_() {
       });
     }
 
-    layer.appendChild(group);
+    surface.appendChild(group);
+    layer.appendChild(surface);
   };
 
   connectors.forEach((connector) => renderConnector(connector));
@@ -10301,19 +13065,61 @@ _clampAllCardsInside() {
   });
 }
 
-_computeHaSidebarGutters_() {
-  let left = 56; // default desktop gutter; HA collapsed is ~56–64px
+_getHaSidebarGutterCandidates_() {
+  const candidates = [];
+  const seen = new WeakSet();
+  const add = (el) => {
+    if (!el || seen.has(el)) return;
+    seen.add(el);
+    candidates.push(el);
+  };
+  const selector = 'ha-sidebar, ha-drawer, app-drawer, mwc-drawer, .drawer, .mdc-drawer, [slot="drawer"]';
+  try {
+    (this._deepQueryAll?.(selector) || []).forEach(add);
+  } catch {}
   try {
     const ha = document.querySelector('home-assistant');
-    const shadow = ha?.shadowRoot;
-    const drawer = shadow?.querySelector('ha-drawer, app-drawer, ha-sidebar, .drawer, .menu');
-    const rect = drawer?.getBoundingClientRect?.();
+    ha?.shadowRoot?.querySelectorAll?.(selector)?.forEach(add);
+  } catch {}
+  return candidates;
+}
+
+_computeHaSidebarGutters_() {
+  let left = 56; // default desktop gutter; HA collapsed is ~56-64px
+  try {
     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
     // On mobile the nav overlays; treat gutter as 0
     if (vw <= 870) {
       left = 0;
-    } else if (rect?.width) {
-      left = Math.max(0, Math.min(256, Math.round(rect.width)));
+    } else {
+      const maxDock = Math.min(420, Math.max(280, vw * 0.42));
+      let measuredLeft = 0;
+      const toPx = (value) => {
+        const n = parseFloat(String(value ?? '').trim());
+        return Number.isFinite(n) ? Math.max(0, n) : 0;
+      };
+      const candidates = this._getHaSidebarGutterCandidates_?.() || [];
+      candidates.forEach((el) => {
+        try {
+          const styles = window.getComputedStyle?.(el);
+          if (styles?.display === 'none' || styles?.visibility === 'hidden') return;
+          const rect = el.getBoundingClientRect?.();
+          if (!rect || rect.height < 120 || rect.width < 36) return;
+          const isLeftDock = rect.left <= 12 && rect.right > 40 && rect.right <= maxDock;
+          if (!isLeftDock) return;
+          measuredLeft = Math.max(measuredLeft, Math.round(rect.right));
+          measuredLeft = Math.max(
+            measuredLeft,
+            toPx(styles?.width),
+            toPx(styles?.getPropertyValue?.('--mdc-drawer-width')),
+            toPx(styles?.getPropertyValue?.('--sidebar-width')),
+            toPx(styles?.getPropertyValue?.('--ha-sidebar-width'))
+          );
+        } catch {}
+      });
+      if (measuredLeft > 0) {
+        left = Math.max(0, Math.min(420, Math.round(measuredLeft)));
+      }
     }
   } catch {}
   let right = 0; // adjust if you have a right dock; keep 0 otherwise
@@ -10383,6 +13189,8 @@ _applyGridVars() {
 
 _getViewportPreviewPreset_() {
   const mode = String(this.viewportPreviewMode || 'live').toLowerCase();
+  const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  if (sizeMode !== 'auto') return null;
   if (!this.editMode || mode === 'live') return null;
   if (!this._responsiveProfileKeys_().includes(mode)) return null;
   const orientation = this._getRequestedResponsiveOrientation_?.(mode) || 'landscape';
@@ -10398,6 +13206,69 @@ _getViewportPreviewPreset_() {
 
 _isExplicitViewportPreview_() {
   return !!this._getViewportPreviewPreset_?.();
+}
+
+_requestPreviewOutsideCardsSync_() {
+  if (this.__previewOutsideCardsRaf) return;
+  const raf = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (cb) => setTimeout(cb, 16);
+  this.__previewOutsideCardsRaf = raf(() => {
+    this.__previewOutsideCardsRaf = null;
+    this._syncPreviewOutsideCards_?.();
+  });
+}
+
+_syncPreviewOutsideCards_() {
+  try {
+    const wraps = Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)') || []);
+    const root = this.rootEl;
+    const preview = this._getViewportPreviewPreset_?.();
+    if (!this.editMode || !preview?.width || !preview?.height) {
+      wraps.forEach((wrap) => wrap.classList?.remove?.('ddc-preview-outside-active'));
+      root?.classList?.remove?.('ddc-preview-has-outside-cards');
+      return false;
+    }
+
+    const activeW = Math.max(1, Number(preview.width) || 1);
+    const activeH = Math.max(1, Number(preview.height) || 1);
+    const scale = Math.max(0.0001, Number(this.__pointerScaleX || this.__pointerScaleY || 1) || 1);
+    let hasOutside = false;
+
+    wraps.forEach((wrap) => {
+      if (!wrap) return;
+      if (!this._isWrapperVisibleForOverlap_?.(wrap)) {
+        wrap.classList?.remove?.('ddc-preview-outside-active');
+        return;
+      }
+
+      const x = parseFloat(wrap.getAttribute('data-x-raw') || wrap.getAttribute('data-x') || '0') || 0;
+      const y = parseFloat(wrap.getAttribute('data-y-raw') || wrap.getAttribute('data-y') || '0') || 0;
+      const rect = wrap.getBoundingClientRect?.();
+      const width = Math.max(
+        0,
+        parseFloat(wrap.style.width) ||
+          Number(wrap.offsetWidth || 0) ||
+          ((Number(rect?.width || 0) || 0) / scale) ||
+          0
+      );
+      const height = Math.max(
+        0,
+        parseFloat(wrap.style.height) ||
+          Number(wrap.offsetHeight || 0) ||
+          ((Number(rect?.height || 0) || 0) / scale) ||
+          0
+      );
+      const outside = x < -1 || y < -1 || (x + width) > activeW + 1 || (y + height) > activeH + 1;
+      wrap.classList?.toggle?.('ddc-preview-outside-active', outside);
+      if (outside) hasOutside = true;
+    });
+
+    root?.classList?.toggle?.('ddc-preview-has-outside-cards', hasOutside);
+    return hasOutside;
+  } catch {
+    return false;
+  }
 }
 
 _getViewportMetrics_() {
@@ -10440,6 +13311,115 @@ _getEffectivePreviewHeight_() {
   const preview = this._getViewportPreviewPreset_?.();
   if (!preview?.height) return 0;
   return Math.max(1, Number(preview.height) || 1);
+}
+
+_getAvailableAutoCanvasViewport_(measuredWidth = 1, fallbackHeight = 1) {
+  const width = Math.max(1, this._getEffectivePreviewWidth_?.(measuredWidth) || measuredWidth || 1);
+  const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
+  if (previewHeight > 0) {
+    return { width, height: previewHeight, isPreview: true };
+  }
+
+  let height = 0;
+  try {
+    const anchor = this.__scaleOuter || this.cardContainer || this;
+    const rect = anchor?.getBoundingClientRect?.();
+    const viewportHeight = Math.max(
+      1,
+      Number(window.visualViewport?.height || 0) ||
+        Number(window.innerHeight || 0) ||
+        Number(document.documentElement?.clientHeight || 0) ||
+        Number(fallbackHeight || 0) ||
+        1
+    );
+    const top = Math.max(0, Number(rect?.top || 0) || 0);
+    const remaining = viewportHeight - top - 8;
+    if (Number.isFinite(remaining) && remaining > 0) height = remaining;
+  } catch {}
+
+  return {
+    width,
+    height: Math.max(1, Number(height || fallbackHeight || 1) || 1),
+    isPreview: false,
+  };
+}
+
+_getAutoCanvasMinimumDesignSize_(opts = {}) {
+  const preview = opts?.preview || this._getViewportPreviewPreset_?.();
+  const includeEditBleed = opts?.includeEditBleed !== false;
+  const profile = String(
+    preview?.id ||
+      this._getRequestedResponsiveProfile_?.() ||
+      this._activeResponsiveProfile ||
+      this._getActualResponsiveProfile_?.() ||
+      'desktop'
+  ).toLowerCase();
+  const isMobile = profile === 'mobile';
+  const orientation =
+    preview?.orientation ||
+    this._getRequestedResponsiveOrientation_?.(profile) ||
+    (profile === 'desktop' ? 'landscape' : 'portrait');
+  let viewport = null;
+  try {
+    viewport = this._getResponsiveViewportProfile_?.(profile, orientation) || null;
+  } catch {}
+
+  let width = Number(viewport?.width || preview?.width || 0) || 0;
+  let height = Number(viewport?.height || preview?.height || 0) || 0;
+
+  if (isMobile && (!width || !height)) {
+    try {
+      const orientation = this._getRequestedResponsiveOrientation_?.('mobile') || 'portrait';
+      const viewport = this._getResponsiveViewportProfile_?.('mobile', orientation);
+      width = Math.max(1, Number(viewport?.width || width || 0) || 0);
+      height = Math.max(1, Number(viewport?.height || height || 0) || 0);
+    } catch {}
+  }
+
+  if (!width || !height) {
+    width = isMobile ? Number(preview?.width || 0) || 0 : 1280;
+    height = isMobile ? Number(preview?.height || 0) || 0 : 720;
+  }
+
+  if (!isMobile) {
+    width = Math.max(1280, width);
+    height = Math.max(720, height);
+  }
+
+  // While editing, keep some canvas outside the active preview viewport so
+  // cards can be positioned just beyond the live frame without changing the
+  // frame itself. Mobile is still exempt from the 720p baseline.
+  if (includeEditBleed && (this.editMode || this.isEditing) && preview?.width && preview?.height) {
+    const previewW = Math.max(1, Number(preview.width) || 1);
+    const previewH = Math.max(1, Number(preview.height) || 1);
+    const bleedX = Math.min(360, Math.max(160, previewW * 0.25));
+    const bleedY = Math.min(260, Math.max(120, previewH * 0.22));
+    width = Math.max(width, previewW + bleedX);
+    height = Math.max(height, previewH + bleedY);
+  }
+
+  return { width, height };
+}
+
+_getAutoCanvasMinimumScale_(designWidth = 1, designHeight = 1, viewportWidth = 0, minimumSize = null) {
+  const minimum = minimumSize || this._getAutoCanvasMinimumDesignSize_?.({ includeEditBleed: false }) || { width: 1280, height: 720 };
+  const minWidth = Math.max(0, Number(minimum.width ?? 1280) || 0);
+  const minHeight = Math.max(0, Number(minimum.height ?? 720) || 0);
+  if (minWidth <= 0 && minHeight <= 0) return 0.0001;
+  const width = Math.max(1, Number(designWidth || 1) || 1);
+  const height = Math.max(1, Number(designHeight || 1) || 1);
+  const viewportW = Math.max(0, Number(viewportWidth || 0) || 0);
+  if (viewportW > 0 && minWidth > 0) return Math.max(0.0001, Math.min(1, viewportW / minWidth));
+  return Math.max(
+    0.0001,
+    Math.min(
+      1,
+      Math.max(
+        minWidth / width,
+        minHeight / height
+      )
+    )
+  );
 }
 
 _getPreviewDeviceFrameOrientation_(deviceId = null, width = 0, height = 0, forcedOrientation = null) {
@@ -10752,22 +13732,48 @@ _applyPreviewDeviceFrame_(screenWidth = 0, screenHeight = 0, deviceId = null, op
 _syncViewportPreviewUI_() {
   try {
     const group = this.shadowRoot?.querySelector?.('#previewModeControls');
+    const section = group?.closest?.('[data-toolbar-panel="view"]') || null;
     const buttons = Array.from(this.shadowRoot?.querySelectorAll?.('[data-preview-mode]') || []);
+    const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    const canPreview = sizeMode === 'auto';
+    if (!canPreview && String(this.viewportPreviewMode || 'live').toLowerCase() !== 'live') {
+      this.viewportPreviewMode = 'live';
+    }
     const preview = this._getViewportPreviewPreset_?.();
     const active = preview?.id || 'live';
     const liveProfile = this._getActualResponsiveProfile_?.() || 'desktop';
+    const unavailableTooltip = 'Only available in Auto Mode';
 
-    if (group) group.style.display = '' ;
+    if (group) {
+      group.style.display = '';
+      group.classList.toggle('is-disabled', !canPreview);
+      group.dataset.previewAvailable = canPreview ? '1' : '0';
+      group.setAttribute('aria-hidden', 'false');
+      group.setAttribute('aria-disabled', canPreview ? 'false' : 'true');
+    }
+    if (section) {
+      section.style.display = '';
+      section.classList.toggle('is-disabled', !canPreview);
+    }
     buttons.forEach((btn) => {
-      const on = String(btn.dataset.previewMode || 'live') === active;
+      const mode = String(btn.dataset.previewMode || 'live');
+      const on = canPreview && mode === active;
       btn.classList.toggle('is-active', on);
+      btn.classList.toggle('is-disabled', !canPreview);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      if (btn.dataset.previewMode === 'live') {
+      btn.setAttribute('aria-disabled', canPreview ? 'false' : 'true');
+      btn.disabled = false;
+      if (!canPreview) {
+        btn.title = unavailableTooltip;
+        btn.setAttribute('data-tooltip', unavailableTooltip);
+      } else if (mode === 'live') {
         btn.dataset.profile = liveProfile;
         btn.title = `Live viewport (${this._getResponsiveProfileLabel_(liveProfile)})`;
+        btn.setAttribute('data-tooltip', btn.title);
       } else {
         btn.removeAttribute('data-profile');
-        btn.title = this._getResponsiveProfileLabel_(btn.dataset.previewMode || 'desktop');
+        btn.title = this._getResponsiveProfileLabel_(mode || 'desktop');
+        btn.setAttribute('data-tooltip', btn.title);
       }
     });
 
@@ -10785,22 +13791,29 @@ _syncViewportPreviewUI_() {
       this.__scaleOuter.style.maxWidth = preview ? '100%' : '';
     }
 
-    this._applyPreviewDeviceFrame_?.(
-      preview?.width || 0,
-      preview?.height || 0,
-      preview?.id || null,
-      { orientation: preview?.orientation || null }
-    );
+	    this._applyPreviewDeviceFrame_?.(
+	      preview?.width || 0,
+	      preview?.height || 0,
+	      preview?.id || null,
+	      { orientation: preview?.orientation || null }
+	    );
+	    this._requestPreviewOutsideCardsSync_?.();
 
-    if (this.tabsBar && this.tabsPosition !== 'left') {
-      this.tabsBar.style.marginInline = preview ? 'auto' : '';
-    }
+	    if (this.tabsBar && !this._isSidebarNavigationActive_?.()) {
+	      this.tabsBar.style.marginInline = preview ? 'auto' : '';
+	    }
 
     this._syncResponsiveViewportFields_?.();
   } catch {}
 }
 
 async _setViewportPreviewMode_(mode = 'live') {
+  const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  if (sizeMode !== 'auto') {
+    this.viewportPreviewMode = 'live';
+    this._syncViewportPreviewUI_?.();
+    return;
+  }
   const normalized = (mode === 'desktop' || mode === 'mobile' || mode === 'tablet') ? mode : 'live';
   this._persistCurrentResponsiveProfileToMemory_();
   this.viewportPreviewMode = normalized;
@@ -10822,6 +13835,23 @@ _syncResponsiveViewportFields_() {
     const swapButton = this.previewSwapButton;
     const meta = this.previewMeta;
     if (!widthInput || !heightInput) return;
+    const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    if (sizeMode !== 'auto') {
+      widthInput.disabled = true;
+      heightInput.disabled = true;
+      widthInput.title = 'Only available in Auto Mode';
+      heightInput.title = 'Only available in Auto Mode';
+      if (swapButton) {
+        swapButton.disabled = true;
+        swapButton.hidden = true;
+        swapButton.setAttribute('aria-hidden', 'true');
+        swapButton.title = 'Only available in Auto Mode';
+      }
+      if (meta) meta.textContent = 'Only available in Auto Mode';
+      return;
+    }
+    widthInput.removeAttribute('title');
+    heightInput.removeAttribute('title');
     const activeEl = this.shadowRoot?.activeElement;
 
     const previewMode = String(this.viewportPreviewMode || 'live').toLowerCase();
@@ -10854,6 +13884,11 @@ _syncResponsiveViewportFields_() {
 
 _commitResponsiveViewportField_(axis = 'width') {
   try {
+    const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    if (sizeMode !== 'auto') {
+      this._syncResponsiveViewportFields_?.();
+      return;
+    }
     const profile = String(this.viewportPreviewMode || 'live').toLowerCase();
     if (!this._responsiveProfileKeys_().includes(profile)) return;
     const input = axis === 'height' ? this.previewHeightInput : this.previewWidthInput;
@@ -10920,6 +13955,11 @@ _updateResponsiveViewportProfile_(profile, patch = {}, opts = {}) {
 }
 
 _swapResponsiveViewportOrientation_() {
+  const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  if (sizeMode !== 'auto') {
+    this._syncResponsiveViewportFields_?.();
+    return;
+  }
   const profile = String(this.viewportPreviewMode || 'live').toLowerCase();
   if (!this._responsiveProfileKeys_().includes(profile) || profile === 'desktop') return;
   const currentOrientation = this._getStoredResponsivePreviewOrientation_(profile);
@@ -10933,19 +13973,15 @@ _swapResponsiveViewportOrientation_() {
 }
 
 _shouldUseUnscaledPreviewCanvas_() {
-  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
-  if (mode !== 'dynamic') return false;
-  if (String(this.mobileDynamicBehavior || 'native').toLowerCase() !== 'native') return false;
-  const profile = this._getRequestedResponsiveProfile_?.() || this._activeResponsiveProfile || this._getActualResponsiveProfile_?.() || 'desktop';
-  return profile === 'mobile';
+  return false;
 }
 
 _isMobileOptimizeActive_() {
   try {
     if (!this.optimizeForMobile) return false;
     if (this._shouldUseUnscaledPreviewCanvas_?.()) return false;
-    const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
-    if (mode !== 'dynamic' || !this.autoResizeCards) return false;
+    const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    if (mode !== 'auto' || !this.autoResizeCards) return false;
     const vp = this._getViewportMetrics_?.() || { width: 0, shortEdge: 0, isPortrait: false };
     const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
     return vp.shortEdge <= 900 && (coarse || vp.width <= 820 || vp.isPortrait);
@@ -11009,7 +14045,7 @@ _getMobileTextAssistScale_() {
     const prevKey = this.storageKey;
     const providedKey = String(config?.storage_key || config?.storageKey || '').trim();
     const stableKey = providedKey || prevKey || this._deriveStorageKeyFromConfig_(config);
-    config = { ...config, storage_key: stableKey };
+    config = this._normalizeDashboardOptions_({ ...config, storage_key: stableKey }, { requireSizeMode: true, forceAutoResize: true });
     this.config = { ...config };
 
     // Store & reflect
@@ -11021,12 +14057,13 @@ _getMobileTextAssistScale_() {
     this.dragLiveSnap             = !!config.drag_live_snap;
     this.autoSave                 = config.auto_save !== false;
     this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
+    try { this._syncToolbarAutoSaveState_?.(); } catch {}
     this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
     this.containerBackground      = config.container_background ?? 'transparent';
     this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     this.applyBackgroundToPage    = !!(config.apply_background_to_page ?? config.applyBackgroundToPage ?? false);
-    this.dashboardThemeEnabled    = !!(config.dashboard_theme_enabled ?? config.theme_enabled ?? false);
     this.dashboardTheme           = String(config.dashboard_theme ?? config.theme_name ?? '').trim();
+    this.dashboardThemeEnabled    = !!this.dashboardTheme || !!(config.dashboard_theme_enabled ?? config.theme_enabled ?? false);
     this.dashboardThemeOverrideAllDesign = !!(config.dashboard_theme_override_all_design ?? config.theme_override_all_design ?? false);
     this.outerGridBuffer          = !!(config.outer_grid_buffer ?? false);
 
@@ -11039,7 +14076,7 @@ _getMobileTextAssistScale_() {
     this.editMode                 = false;
     this._backendOK               = false;
     this.disableOverlap           = !!config.disable_overlap;
-    this.containerSizeMode        = config.container_size_mode || 'dynamic';
+    this.containerSizeMode        = this._normalizeContainerSizeMode_(config.container_size_mode);
     this.doNotResizeText          = !!(config.do_not_resize_text ?? config.doNotResizeText ?? false);
     this.optimizeForMobile        = !!(config.optimize_for_mobile ?? config.optimizeForMobile ?? false);
     this.mobileDynamicBehavior    = String(config.mobile_dynamic_behavior ?? config.mobileDynamicBehavior ?? 'native').toLowerCase() === 'scale'
@@ -11057,15 +14094,13 @@ _getMobileTextAssistScale_() {
     this._connectorDraft = null;
     this._selectedConnectorId = null;
     this.__connectorPointDrag = null;
-    
 
-    const sizeModeLower           = String(this.containerSizeMode || 'dynamic').toLowerCase();
 
-    if (sizeModeLower === 'dynamic') {
-      // In dynamic mode cards should always auto-scale.
+    const sizeModeLower           = this._normalizeContainerSizeMode_(this.containerSizeMode);
+
+    if (sizeModeLower === 'auto') {
       this.autoResizeCards = true;
     } else {
-      // Other modes can still opt-out via config.auto_resize_cards: false
       this.autoResizeCards = config.auto_resize_cards !== false;
     }
 
@@ -11082,18 +14117,33 @@ _getMobileTextAssistScale_() {
     this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(config.screen_saver_style ?? config.screensaver_style ?? config.screen_saver_variant) || 'visionos_glass';
     this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(config.screen_saver_entities ?? config.screensaver_entities ?? []) || [];
 
-    if ((this.autoResizeCards || String((this.containerSizeMode||this.container_size_mode||'dynamic')).toLowerCase()==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
+    if ((this.autoResizeCards || this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode)==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();
     this._applyAutoScale?.();
     this.containerFixedWidth      = Number(config.container_fixed_width ?? 0) || null;
     this.containerFixedHeight     = Number(config.container_fixed_height ?? 0) || null;
-    this.containerPreset          = config.container_preset || 'fullhd';
+    this.containerPreset          = config.container_preset || 'fhd';
     this.containerPresetOrient    = config.container_preset_orientation || 'auto';
-    this.heroImage = config?.hero_image || "https://i.postimg.cc/CxsWQgwp/Chat-GPT-Image-Sep-5-2025-09-26-16-AM.png";
+    this.heroImage = config?.hero_image || "https://i.postimg.cc/j2bvd9Tc/Chat-GPT-Image-May-18-2026-02-33-38-PM.png";
     // Tabs options
     this.tabs               = Array.isArray(config.tabs) ? config.tabs : [];
     {
       const tabsPosition = String(config.tabs_position || 'top').toLowerCase();
-      this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
+      const hasSidebarEnabled = Object.prototype.hasOwnProperty.call(config, 'sidebar_enabled');
+      const legacyLeftRail = tabsPosition === 'left' && !hasSidebarEnabled;
+      this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
+      this.sidebarEnabled = hasSidebarEnabled ? !!config.sidebar_enabled : legacyLeftRail;
+      this.sidebarItems = this._normalizeSidebarItems_(config.sidebar_items ?? config.sidebar_content, {
+        enabled: this.sidebarEnabled,
+        legacyLeft: legacyLeftRail,
+      });
+      this.sidebarStyle = this._normalizeSidebarStyle_(config.sidebar_style ?? config.sidebarStyle);
+      this.sidebarDensity = this._normalizeSidebarDensity_(config.sidebar_density ?? config.sidebarDensity);
+      this.sidebarAccent = this._normalizeSidebarAccent_(config.sidebar_accent ?? config.sidebarAccent);
+      this.sidebarHeader = this._normalizeSidebarHeader_(config.sidebar_header ?? config.sidebarHeader ?? config.sidebar_header_type ?? this.sidebarHeader ?? 'clock');
+      this.sidebarCanvasHeight = this._normalizeSidebarCanvasHeight_(config.sidebar_canvas_height ?? config.sidebarCanvasHeight ?? this.sidebarCanvasHeight ?? 520);
+      this.sidebarCards = this._normalizeSidebarCards_(config.sidebar_cards ?? config.sidebarCards ?? this.sidebarCards ?? []);
+      this.sidebarHomeImage = String(config.sidebar_home_image ?? config.sidebar_house_image ?? config.sidebarHomeImage ?? '').trim();
+      this.sidebarCalendarEntities = this._normalizeSidebarCalendarEntities_(config.sidebar_calendar_entities ?? config.sidebar_calendars ?? config.sidebarCalendarEntities ?? []);
     }
     this.layersEnabled = !!(config.layers_enabled ?? config.enable_layers ?? false);
     this._setDashboardLayers_(config.layers || [], { refresh: false });
@@ -11117,7 +14167,7 @@ _getMobileTextAssistScale_() {
     // Grid-related
     this._applyGridVars();
 
-    
+
     try { this._applyBackgroundImageFromConfig?.(); } catch {}
 
     try { this._applyHaChromeVisibility_?.(); } catch {}
@@ -11180,34 +14230,1413 @@ _getMobileTextAssistScale_() {
   --ddc-grid-major-size: calc(var(--ddc-grid-size) + var(--ddc-grid-size) + var(--ddc-grid-size) + var(--ddc-grid-size));
   --ddc-left-rail-width: clamp(84px, 7vw, 104px);
   --ddc-left-rail-gap: clamp(18px, 2.6vw, 30px);
+  --ddc-sidebar-width: clamp(220px, 18vw, 310px);
+  --ddc-sidebar-gap: clamp(18px, 2.6vw, 30px);
 
   /* Container we query for width */
   container-type: inline-size;
   container-name: ddc-root;
 }
 
-.ddc-root.ddc-tabs-left-layout{
+.ddc-root.ddc-sidebar-density-compact{ --ddc-sidebar-width: clamp(92px, 7.5vw, 118px); --ddc-sidebar-gap: clamp(14px, 2vw, 22px); }
+.ddc-root.ddc-sidebar-density-comfortable{ --ddc-sidebar-width: clamp(220px, 18vw, 310px); }
+.ddc-root.ddc-sidebar-density-spacious{ --ddc-sidebar-width: clamp(260px, 22vw, 380px); --ddc-sidebar-gap: clamp(22px, 3vw, 38px); }
+
+.ddc-root.ddc-sidebar-layout{
+  --ddc-sidebar-accent: #3b82f6;
+  --ddc-sidebar-accent-2: #22d3ee;
+  --ddc-sidebar-panel: color-mix(in oklab, #07111f 88%, var(--ha-card-background, #10151f) 12%);
+  --ddc-sidebar-panel-soft: rgba(255,255,255,.055);
+  --ddc-sidebar-text: rgba(241,246,255,.94);
+  --ddc-sidebar-muted: rgba(203,213,225,.66);
+  --ddc-sidebar-line: rgba(148,163,184,.18);
+}
+
+.ddc-root.ddc-sidebar-accent-cyan{ --ddc-sidebar-accent:#22d3ee; --ddc-sidebar-accent-2:#60a5fa; }
+.ddc-root.ddc-sidebar-accent-purple{ --ddc-sidebar-accent:#8b5cf6; --ddc-sidebar-accent-2:#22d3ee; }
+.ddc-root.ddc-sidebar-accent-amber{ --ddc-sidebar-accent:#f59e0b; --ddc-sidebar-accent-2:#38bdf8; }
+.ddc-root.ddc-sidebar-accent-green{ --ddc-sidebar-accent:#22c55e; --ddc-sidebar-accent-2:#38bdf8; }
+
+.ddc-root.ddc-tabs-left-layout,
+.ddc-root.ddc-sidebar-layout{
   display:grid;
-  grid-template-columns: var(--ddc-left-rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--ddc-sidebar-width) minmax(0, 1fr);
   grid-template-areas:
     "toolbar toolbar"
-    "tabs canvas";
-  column-gap: var(--ddc-left-rail-gap);
+    "sidebar canvas";
+  column-gap: var(--ddc-sidebar-gap);
   align-items:start;
 }
 
-.ddc-root.ddc-tabs-left-layout > .ddc-toolbar{
+.ddc-root.ddc-tabs-left-layout > .ddc-toolbar,
+.ddc-root.ddc-sidebar-layout > .ddc-toolbar{
   grid-area: toolbar;
 }
 
-.ddc-root.ddc-tabs-left-layout > .ddc-tabs{
-  grid-area: tabs;
+.ddc-root.ddc-tabs-left-layout > .ddc-tabs,
+.ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+  grid-area: sidebar;
   justify-self: center;
   align-self: start;
 }
 
+.ddc-sidebar{
+  --ddc-sidebar-top-offset: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 14px);
+  width:100%;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  align-items:stretch;
+  position:sticky;
+  top:var(--ddc-sidebar-top-offset);
+  z-index:6;
+  box-sizing:border-box;
+  padding:16px;
+  height:max(480px, var(--ddc-sidebar-canvas-height, 0px), calc(100dvh - var(--ddc-sidebar-top-offset) - max(env(safe-area-inset-bottom, 0px), 14px)));
+  min-height:0;
+  max-height:none;
+  border-radius:32px;
+  color:var(--ddc-sidebar-text);
+  background:
+    linear-gradient(150deg, rgba(255,255,255,.075), transparent 34%),
+    radial-gradient(circle at 0% 12%, color-mix(in oklab, var(--ddc-sidebar-accent) 34%, transparent), transparent 34%),
+    var(--ddc-sidebar-panel);
+  border:1px solid rgba(148,163,184,.18);
+  box-shadow:
+    0 22px 52px rgba(2,6,23,.34),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter:blur(18px) saturate(1.12);
+  -webkit-backdrop-filter:blur(18px) saturate(1.12);
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in oklab, var(--ddc-sidebar-accent) 52%, transparent) transparent;
+}
+
+.ddc-sidebar::before{
+  content:"";
+  position:absolute;
+  inset:18px auto 18px 0;
+  width:3px;
+  border-radius:999px;
+  background:linear-gradient(180deg, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2));
+  box-shadow:0 0 24px color-mix(in oklab, var(--ddc-sidebar-accent) 72%, transparent);
+  opacity:.92;
+}
+
+.ddc-root.ddc-sidebar-style-minimal .ddc-sidebar{
+  background:color-mix(in oklab, var(--ha-card-background, #10151f) 92%, #020617 8%);
+  box-shadow:0 12px 30px rgba(2,6,23,.18);
+}
+
+.ddc-root.ddc-sidebar-style-neon .ddc-sidebar{
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 46%, rgba(255,255,255,.12));
+  box-shadow:
+    0 26px 60px rgba(2,6,23,.42),
+    0 0 0 1px color-mix(in oklab, var(--ddc-sidebar-accent) 18%, transparent),
+    inset 0 0 38px color-mix(in oklab, var(--ddc-sidebar-accent) 9%, transparent);
+}
+
+.ddc-sidebar[aria-hidden="true"]{
+  display:none !important;
+}
+
+.ddc-sidebar-widget{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:13px 14px;
+  border-radius:20px;
+  border:1px solid var(--ddc-sidebar-line);
+  background:var(--ddc-sidebar-panel-soft);
+  color:var(--ddc-sidebar-text);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+  text-align:left;
+  cursor:pointer;
+  transition:
+    transform .16s cubic-bezier(.2,.8,.2,1),
+    border-color .16s ease,
+    background .16s ease,
+    box-shadow .16s ease;
+}
+
+.ddc-sidebar-widget:hover,
+.ddc-sidebar-widget.is-active{
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 13%, rgba(255,255,255,.06));
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 42%, var(--ddc-sidebar-line));
+}
+
+.ddc-sidebar-widget:hover{
+  transform:translateY(-1px);
+}
+
+.ddc-sidebar-widget:focus-visible{
+  outline:none;
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--ddc-sidebar-accent) 62%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+.ddc-sidebar-widget ha-icon{
+  --mdc-icon-size:22px;
+  flex:0 0 auto;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 76%, white 24%);
+}
+
+.ddc-sidebar-widget span,
+.ddc-sidebar-widget strong{
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-widget strong{
+  display:block;
+  font:800 18px/1.05 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-widget span{
+  display:block;
+  margin-top:2px;
+  font:700 12px/1.2 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color:var(--ddc-sidebar-muted);
+}
+
+.ddc-sidebar-avatar{
+  width:42px;
+  height:42px;
+  border-radius:16px;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  color:white;
+  background:linear-gradient(135deg, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2));
+  box-shadow:0 12px 28px color-mix(in oklab, var(--ddc-sidebar-accent) 30%, transparent);
+}
+
+.ddc-sidebar-widget-copy,
+.ddc-sidebar-profile-copy{ min-width:0; flex:1 1 auto; }
+
+.ddc-sidebar-widget-clock,
+.ddc-sidebar-widget-date{
+  display:grid;
+  gap:12px;
+  align-items:stretch;
+}
+
+.ddc-sidebar-clock-card{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr);
+  align-items:center;
+  gap:15px;
+  width:100%;
+  min-height:92px;
+}
+
+.ddc-sidebar-clock-stage{
+  position:relative;
+  width:84px;
+  height:84px;
+  display:grid;
+  place-items:center;
+  flex:0 0 84px;
+  border-radius:28px;
+  background:
+    radial-gradient(circle at 34% 24%, color-mix(in oklab, var(--ddc-sidebar-accent-2) 22%, transparent), transparent 48%),
+    linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.018));
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 28%, rgba(255,255,255,.14));
+  box-shadow:
+    0 18px 34px color-mix(in oklab, var(--ddc-sidebar-accent) 18%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.ddc-sidebar-clock-copy{
+  min-width:0;
+  display:grid;
+  gap:5px;
+  align-content:center;
+}
+
+.ddc-sidebar-clock-copy strong{
+  font-size:32px;
+  letter-spacing:0;
+  line-height:.98;
+}
+
+.ddc-sidebar-clock-copy span{
+  margin:0;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent-2) 70%, white 30%);
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-clock-copy em{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--ddc-sidebar-muted);
+  font-size:11px;
+  font-style:normal;
+  font-weight:760;
+}
+
+.ddc-sidebar-clock-face{
+  position:relative;
+  width:68px;
+  height:68px;
+  flex:0 0 68px;
+  border-radius:999px;
+  background:
+    repeating-conic-gradient(from -1deg, rgba(255,255,255,.28) 0deg 1.4deg, transparent 1.4deg 30deg),
+    radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--ddc-sidebar-accent) 16%, transparent) 0 24%, transparent 25%),
+    linear-gradient(145deg, rgba(255,255,255,.09), rgba(255,255,255,.025));
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 48%, rgba(255,255,255,.18));
+  box-shadow:0 10px 24px color-mix(in oklab, var(--ddc-sidebar-accent) 18%, transparent);
+}
+
+.ddc-sidebar-clock-seconds{
+  position:absolute;
+  right:-5px;
+  bottom:-5px;
+  min-width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent-2) 42%, rgba(255,255,255,.18));
+  background:color-mix(in oklab, #020617 76%, var(--ddc-sidebar-accent) 24%);
+  color:color-mix(in oklab, var(--ddc-sidebar-accent-2) 76%, white 24%);
+  font-size:11px;
+  font-weight:900;
+  box-shadow:0 8px 18px rgba(0,0,0,.26);
+}
+
+.ddc-sidebar-clock-face::before{
+  content:"";
+  position:absolute;
+  inset:7px;
+  border-radius:inherit;
+  border:1px solid rgba(255,255,255,.08);
+  background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.045), transparent 62%);
+}
+
+.ddc-sidebar-clock-face::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:5px;
+  height:5px;
+  border-radius:999px;
+  transform:translate(-50%, -50%);
+  background:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-clock-hand{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  border-radius:999px;
+  transform-origin:50% 100%;
+  background:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-clock-hand.hour{
+  height:18px;
+  width:3px;
+  transform:translate(-50%, -100%) rotate(var(--ddc-sidebar-hour));
+}
+
+.ddc-sidebar-clock-hand.minute{
+  height:26px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 80%, white 20%);
+  transform:translate(-50%, -100%) rotate(var(--ddc-sidebar-minute));
+}
+
+.ddc-sidebar-clock-hand.second{
+  width:1px;
+  height:29px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent-2) 86%, white 14%);
+  box-shadow:0 0 10px color-mix(in oklab, var(--ddc-sidebar-accent-2) 44%, transparent);
+  transform:translate(-50%, -100%) rotate(var(--ddc-sidebar-second));
+  animation:ddc-sidebar-clock-second 60s linear infinite;
+}
+
+@keyframes ddc-sidebar-clock-second{
+  to{ transform:translate(-50%, -100%) rotate(calc(var(--ddc-sidebar-second) + 360deg)); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .ddc-sidebar-clock-hand.second{
+    animation:none !important;
+  }
+}
+
+.ddc-sidebar-clock-face-large{
+  width:92px;
+  height:92px;
+  flex:0 0 92px;
+}
+
+.ddc-sidebar-clock-face-large .ddc-sidebar-clock-hand.hour{ height:25px; }
+.ddc-sidebar-clock-face-large .ddc-sidebar-clock-hand.minute{ height:34px; }
+.ddc-sidebar-clock-face-large .ddc-sidebar-clock-hand.second{ height:38px; }
+
+.ddc-sidebar-clock-detail{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr);
+  align-items:center;
+  gap:16px;
+}
+
+.ddc-sidebar-date-card{
+  display:grid;
+  gap:12px;
+  width:100%;
+}
+
+.ddc-sidebar-date-top{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr);
+  align-items:center;
+  gap:12px;
+}
+
+.ddc-sidebar-calendar-tile{
+  width:46px;
+  height:50px;
+  flex:0 0 46px;
+  display:grid;
+  grid-template-rows:18px 1fr;
+  overflow:hidden;
+  border-radius:14px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 42%, rgba(255,255,255,.16));
+  background:rgba(255,255,255,.055);
+}
+
+.ddc-sidebar-calendar-tile span{
+  display:grid;
+  place-items:center;
+  margin:0;
+  font-size:10px;
+  font-weight:900;
+  color:white;
+  background:linear-gradient(135deg, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2));
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-calendar-tile strong{
+  display:grid;
+  place-items:center;
+  font-size:21px;
+  line-height:1;
+}
+
+.ddc-sidebar-month{
+  min-width:0;
+  display:grid;
+  gap:10px;
+  padding:11px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 26%, rgba(255,255,255,.12));
+  background:
+    linear-gradient(150deg, color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent), rgba(255,255,255,.026));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.ddc-sidebar-month-detail{
+  padding:12px;
+}
+
+.ddc-sidebar-month-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.ddc-sidebar-month-head div{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.ddc-sidebar-month-head span,
+.ddc-sidebar-month-head strong{
+  margin:0;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-month-head span{
+  color:var(--ddc-sidebar-muted);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-month-head strong{
+  color:var(--ddc-sidebar-text);
+  font-size:14px;
+  line-height:1.1;
+}
+
+.ddc-sidebar-month-head em{
+  flex:0 0 auto;
+  padding:5px 8px;
+  border-radius:999px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 18%, rgba(255,255,255,.04));
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 78%, white 22%);
+  font-style:normal;
+  font-size:10px;
+  font-weight:900;
+}
+
+.ddc-sidebar-month-grid{
+  display:grid;
+  grid-template-columns:repeat(7, minmax(0, 1fr));
+  gap:4px;
+}
+
+.ddc-sidebar-month-dow,
+.ddc-sidebar-month-day{
+  display:grid !important;
+  place-items:center;
+  margin:0 !important;
+  min-width:0;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  white-space:normal !important;
+}
+
+.ddc-sidebar-month-dow{
+  height:18px;
+  color:var(--ddc-sidebar-muted) !important;
+  font-size:9px !important;
+  font-weight:850 !important;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-month-day{
+  aspect-ratio:1;
+  min-height:22px;
+  border-radius:9px;
+  color:color-mix(in oklab, var(--ddc-sidebar-text) 88%, transparent) !important;
+  font-size:11px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+}
+
+.ddc-sidebar-month-day.is-muted{
+  opacity:.34;
+}
+
+.ddc-sidebar-month-day.is-weekend:not(.is-selected){
+  color:color-mix(in oklab, var(--ddc-sidebar-accent-2) 72%, white 28%) !important;
+}
+
+.ddc-sidebar-month-day.is-today,
+.ddc-sidebar-month-day.is-selected{
+  background:linear-gradient(135deg, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2));
+  color:white !important;
+  box-shadow:0 8px 18px color-mix(in oklab, var(--ddc-sidebar-accent) 30%, transparent);
+}
+
+.ddc-sidebar-events{
+  display:grid;
+  gap:8px;
+}
+
+.ddc-sidebar-event{
+  appearance:none;
+  -webkit-appearance:none;
+  display:grid;
+  grid-template-columns:minmax(54px, .42fr) minmax(0, 1fr);
+  grid-template-areas:
+    "time title"
+    "time meta";
+  align-items:center;
+  column-gap:10px;
+  width:100%;
+  min-height:46px;
+  padding:8px 10px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 24%, rgba(255,255,255,.1));
+  border-radius:15px;
+  background:linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent), rgba(255,255,255,.026));
+  color:var(--ddc-sidebar-text);
+  text-align:left;
+  cursor:pointer;
+}
+
+.ddc-sidebar-event span,
+.ddc-sidebar-event strong,
+.ddc-sidebar-event em{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-event span{
+  grid-area:time;
+  margin:0;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent-2) 72%, white 28%);
+  font-size:10px;
+  font-weight:900;
+  line-height:1.2;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-event strong{
+  grid-area:title;
+  font-size:12px;
+  line-height:1.15;
+}
+
+.ddc-sidebar-event em{
+  grid-area:meta;
+  color:var(--ddc-sidebar-muted);
+  font-style:normal;
+  font-size:11px;
+  font-weight:750;
+}
+
+.ddc-sidebar-events.compact .ddc-sidebar-event{
+  min-height:40px;
+  padding:7px 9px;
+}
+
+.ddc-sidebar-events-empty{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:8px 10px;
+  border-radius:14px;
+  color:var(--ddc-sidebar-muted);
+  background:rgba(255,255,255,.03);
+}
+
+.ddc-sidebar-events-empty ha-icon{ --mdc-icon-size:17px; }
+
+.ddc-sidebar-weather-icon{
+  width:52px;
+  height:52px;
+  flex:0 0 52px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 42% 34%, color-mix(in oklab, var(--ddc-sidebar-accent-2) 24%, transparent), transparent 54%),
+    rgba(255,255,255,.052);
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 32%, rgba(255,255,255,.12));
+}
+
+.ddc-sidebar-weather-icon ha-icon{
+  --mdc-icon-size:32px;
+  filter:drop-shadow(0 0 12px color-mix(in oklab, var(--ddc-sidebar-accent) 46%, transparent));
+}
+
+.ddc-sidebar-weather-meta{
+  flex:0 0 auto;
+  display:grid;
+  gap:4px;
+  text-align:right;
+}
+
+.ddc-sidebar-weather-meta span{
+  margin:0;
+  font-size:10px;
+  font-weight:850;
+  color:color-mix(in oklab, var(--ddc-sidebar-muted) 90%, white 10%);
+}
+
+.ddc-sidebar-widget-heading{
+  width:100%;
+  color:var(--ddc-sidebar-muted);
+  font-size:11px;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-widget-status{
+  display:grid;
+  gap:12px;
+}
+
+.ddc-sidebar-home-card{
+  display:grid;
+  gap:11px;
+  width:100%;
+}
+
+.ddc-sidebar-home-media{
+  position:relative;
+  min-height:116px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  border-radius:20px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 28%, rgba(255,255,255,.14));
+  background:
+    radial-gradient(circle at 18% 18%, color-mix(in oklab, var(--ddc-sidebar-accent-2) 22%, transparent), transparent 42%),
+    linear-gradient(145deg, color-mix(in oklab, var(--ddc-sidebar-accent) 12%, transparent), rgba(255,255,255,.03));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+.ddc-sidebar-home-media::after{
+  content:"";
+  position:absolute;
+  inset:auto 0 0;
+  height:48%;
+  background:linear-gradient(180deg, transparent, rgba(2,6,23,.58));
+  pointer-events:none;
+}
+
+.ddc-sidebar-home-media img{
+  width:100%;
+  height:100%;
+  min-height:116px;
+  object-fit:cover;
+  display:block;
+}
+
+.ddc-sidebar-home-media ha-icon{
+  --mdc-icon-size:42px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 74%, white 26%);
+  filter:drop-shadow(0 0 16px color-mix(in oklab, var(--ddc-sidebar-accent) 44%, transparent));
+}
+
+.ddc-sidebar-home-title{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.ddc-sidebar-home-title span{
+  margin:0;
+  color:var(--ddc-sidebar-muted);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-home-title strong{
+  font-size:18px;
+  line-height:1.05;
+}
+
+.ddc-sidebar-status-list{
+  display:grid;
+  gap:9px;
+  width:100%;
+}
+
+.ddc-sidebar-status-row{
+  appearance:none;
+  -webkit-appearance:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  width:100%;
+  min-height:34px;
+  padding:6px 8px;
+  border:1px solid transparent;
+  border-radius:12px;
+  background:transparent;
+  color:var(--ddc-sidebar-muted);
+  font-size:12px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+  transition:background .16s ease, border-color .16s ease, transform .16s ease, color .16s ease;
+}
+
+.ddc-sidebar-status-row span{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin:0;
+}
+
+.ddc-sidebar-status-row ha-icon{ --mdc-icon-size:15px; color:var(--ddc-sidebar-muted); }
+.ddc-sidebar-status-row strong{ font-size:13px; color:var(--ddc-sidebar-text); }
+
+.ddc-sidebar-status-row:hover,
+.ddc-sidebar-status-row:focus-visible{
+  outline:none;
+  transform:translateX(2px);
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 24%, transparent);
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 12%, rgba(255,255,255,.035));
+  color:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-status-row:hover ha-icon,
+.ddc-sidebar-status-row:focus-visible ha-icon{
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 78%, white 22%);
+}
+
+.ddc-sidebar-widget-people{
+  display:grid;
+  gap:11px;
+  align-items:stretch;
+}
+
+.ddc-sidebar-people-card{
+  display:grid;
+  gap:10px;
+  width:100%;
+}
+
+.ddc-sidebar-people-avatars{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.ddc-sidebar-person-avatar{
+  position:relative;
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 28%, rgba(255,255,255,.18));
+  background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.025));
+  color:var(--ddc-sidebar-text);
+  font-weight:900;
+  box-shadow:0 10px 20px rgba(0,0,0,.2);
+}
+
+.ddc-sidebar-person-avatar.large{
+  width:48px;
+  height:48px;
+  flex-basis:48px;
+}
+
+.ddc-sidebar-person-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.ddc-sidebar-person-avatar::after{
+  content:"";
+  position:absolute;
+  right:1px;
+  bottom:1px;
+  width:11px;
+  height:11px;
+  border-radius:999px;
+  border:2px solid color-mix(in oklab, var(--ddc-sidebar-panel) 86%, #020617 14%);
+  background:#94a3b8;
+}
+
+.ddc-sidebar-person-avatar.is-home::after{
+  background:#22c55e;
+  box-shadow:0 0 12px rgba(34,197,94,.58);
+}
+
+.ddc-sidebar-person-avatar.is-empty::after{
+  display:none;
+}
+
+.ddc-sidebar-people-summary{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.ddc-sidebar-people-summary strong{
+  font-size:17px;
+  line-height:1.1;
+}
+
+.ddc-sidebar-people-summary span{
+  margin:0;
+  color:var(--ddc-sidebar-muted);
+  font-size:12px;
+  font-weight:800;
+}
+
+.ddc-sidebar-status-popup-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:100002;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(4,8,16,.54);
+  backdrop-filter:blur(13px) saturate(1.06);
+  -webkit-backdrop-filter:blur(13px) saturate(1.06);
+}
+
+.ddc-sidebar-status-popup{
+  width:min(760px, calc(100vw - 36px));
+  max-height:min(88vh, 860px);
+  display:grid;
+  grid-template-rows:auto auto auto minmax(0, 1fr) auto;
+  gap:14px;
+  overflow:hidden;
+  padding:20px;
+  border-radius:26px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 26%, rgba(255,255,255,.16));
+  background:
+    linear-gradient(155deg, color-mix(in oklab, var(--ddc-sidebar-accent, #3b82f6) 12%, transparent), transparent 42%),
+    color-mix(in oklab, var(--card-background-color, #111827) 92%, rgba(7,10,18,.9));
+  color:var(--primary-text-color, #f5f5f5);
+  box-shadow:
+    0 30px 92px rgba(0,0,0,.46),
+    0 10px 28px rgba(0,0,0,.26),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.ddc-sidebar-status-popup-head{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr) auto;
+  align-items:start;
+  gap:14px;
+}
+
+.ddc-sidebar-status-popup-icon{
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:17px;
+  background:linear-gradient(135deg, var(--ddc-sidebar-accent, #3b82f6), var(--ddc-sidebar-accent-2, #22d3ee));
+  color:white;
+  box-shadow:0 14px 30px color-mix(in oklab, var(--ddc-sidebar-accent, #3b82f6) 26%, transparent);
+}
+
+.ddc-sidebar-status-popup-icon ha-icon{ --mdc-icon-size:25px; }
+
+.ddc-sidebar-status-popup-head span{
+  display:block;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:.72rem;
+  font-weight:850;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-status-popup-head strong{
+  display:block;
+  margin-top:3px;
+  font-size:1.32rem;
+  line-height:1.12;
+  font-weight:850;
+}
+
+.ddc-sidebar-status-popup-head p{
+  margin:7px 0 0;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:.92rem;
+  line-height:1.42;
+}
+
+.ddc-sidebar-status-popup-close{
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.14)) 80%, transparent);
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:var(--primary-text-color, #f5f5f5);
+  cursor:pointer;
+}
+
+.ddc-sidebar-status-popup-close ha-icon{ --mdc-icon-size:18px; }
+
+.ddc-sidebar-status-popup-summary{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+}
+
+.ddc-sidebar-status-popup-summary div{
+  min-width:0;
+  padding:12px;
+  border-radius:16px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.14)) 78%, transparent);
+  background:rgba(255,255,255,.035);
+}
+
+.ddc-sidebar-status-popup-summary span{
+  display:block;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:.72rem;
+  font-weight:800;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-status-popup-summary strong{
+  display:block;
+  margin-top:4px;
+  font-size:1.18rem;
+  line-height:1;
+}
+
+.ddc-sidebar-status-popup-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:9px;
+}
+
+.ddc-sidebar-status-popup-actions button,
+.ddc-sidebar-status-entity-actions button{
+  appearance:none;
+  -webkit-appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:34px;
+  padding:0 11px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 28%, rgba(255,255,255,.12));
+  border-radius:999px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 13%, rgba(255,255,255,.04));
+  color:var(--primary-text-color, #f5f5f5);
+  font:750 12px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  cursor:pointer;
+}
+
+.ddc-sidebar-status-popup-actions ha-icon,
+.ddc-sidebar-status-entity-actions ha-icon{ --mdc-icon-size:16px; }
+
+.ddc-sidebar-status-entity-list{
+  min-height:0;
+  overflow:auto;
+  display:grid;
+  gap:10px;
+  padding-right:4px;
+}
+
+.ddc-sidebar-status-entity{
+  display:grid;
+  gap:8px;
+  padding:10px;
+  border-radius:17px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.14)) 76%, transparent);
+  background:rgba(255,255,255,.032);
+}
+
+.ddc-sidebar-status-entity-main{
+  appearance:none;
+  -webkit-appearance:none;
+  display:grid;
+  grid-template-columns:34px minmax(0, 1fr) auto;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+
+.ddc-sidebar-status-entity-main ha-icon{
+  --mdc-icon-size:21px;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 74%, white 26%);
+  background:color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 12%, transparent);
+}
+
+.ddc-sidebar-status-entity-main span{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.ddc-sidebar-status-entity-main strong,
+.ddc-sidebar-status-entity-main em,
+.ddc-sidebar-status-entity-main b{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-status-entity-main strong{
+  font-size:.92rem;
+  line-height:1.1;
+}
+
+.ddc-sidebar-status-entity-main em{
+  color:var(--secondary-text-color, #9ca3af);
+  font-style:normal;
+  font-size:.74rem;
+}
+
+.ddc-sidebar-status-entity-main b{
+  justify-self:end;
+  max-width:150px;
+  padding:6px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:var(--primary-text-color, #f5f5f5);
+  font-size:.75rem;
+}
+
+.ddc-sidebar-status-entity-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.ddc-sidebar-status-entity-actions > span{
+  margin-right:auto;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:.73rem;
+  font-weight:700;
+}
+
+.ddc-sidebar-status-empty{
+  min-height:180px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:7px;
+  color:var(--secondary-text-color, #9ca3af);
+  text-align:center;
+}
+
+.ddc-sidebar-status-empty ha-icon{
+  --mdc-icon-size:34px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent, var(--primary-color, #03a9f4)) 68%, white 32%);
+}
+
+.ddc-sidebar-status-empty strong{
+  color:var(--primary-text-color, #f5f5f5);
+}
+
+.ddc-sidebar-status-more{
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:.78rem;
+  line-height:1.35;
+}
+
+.ddc-sidebar-people-popup{
+  max-width:min(680px, calc(100vw - 36px));
+}
+
+.ddc-sidebar-people-list{
+  min-height:0;
+  overflow:auto;
+  display:grid;
+  gap:10px;
+  padding-right:4px;
+}
+
+.ddc-sidebar-person-row{
+  display:grid;
+  gap:8px;
+  padding:10px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.14)) 76%, transparent);
+  background:rgba(255,255,255,.032);
+}
+
+.ddc-sidebar-person-row.is-home{
+  border-color:rgba(34,197,94,.24);
+  background:linear-gradient(135deg, rgba(34,197,94,.1), rgba(255,255,255,.03));
+}
+
+.ddc-sidebar-person-main{
+  appearance:none;
+  -webkit-appearance:none;
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr) auto;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+
+.ddc-sidebar-person-main span{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.ddc-sidebar-person-main strong,
+.ddc-sidebar-person-main em,
+.ddc-sidebar-person-main b{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-person-main strong{
+  color:var(--primary-text-color, #f5f5f5);
+  font-size:.96rem;
+  line-height:1.1;
+}
+
+.ddc-sidebar-person-main em{
+  color:var(--secondary-text-color, #9ca3af);
+  font-style:normal;
+  font-size:.74rem;
+}
+
+.ddc-sidebar-person-main b{
+  justify-self:end;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:var(--primary-text-color, #f5f5f5);
+  font-size:.76rem;
+}
+
+.ddc-sidebar-person-row.is-home .ddc-sidebar-person-main b{
+  background:rgba(34,197,94,.16);
+  color:#86efac;
+}
+
+.ddc-sidebar-avatar{
+  border-radius:999px;
+  font-weight:900;
+  font-size:18px;
+}
+
+.ddc-sidebar-widget-profile > ha-icon:last-child{
+  --mdc-icon-size:20px;
+  color:var(--ddc-sidebar-muted);
+}
+
+.ddc-sidebar-detail{
+  display:grid;
+  gap:12px;
+  min-width:0;
+  padding:14px;
+  border-radius:20px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 34%, var(--ddc-sidebar-line));
+  background:
+    linear-gradient(145deg, color-mix(in oklab, var(--ddc-sidebar-accent) 12%, transparent), rgba(255,255,255,.045));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+.ddc-sidebar-detail-head{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+
+.ddc-sidebar-detail-head ha-icon{
+  --mdc-icon-size:20px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 76%, white 24%);
+}
+
+.ddc-sidebar-detail-head strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:14px;
+  color:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-detail-close{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--ddc-sidebar-line);
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:var(--ddc-sidebar-muted);
+  cursor:pointer;
+}
+
+.ddc-sidebar-detail-close ha-icon{ --mdc-icon-size:16px; }
+
+.ddc-sidebar-detail-body{
+  display:grid;
+  gap:8px;
+}
+
+.ddc-sidebar-detail-hero{
+  font-size:28px;
+  line-height:1.05;
+  font-weight:850;
+  letter-spacing:0;
+  color:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-detail-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+
+.ddc-sidebar-detail-row span{
+  min-width:0;
+  color:var(--ddc-sidebar-muted);
+  font-size:12px;
+  font-weight:750;
+}
+
+.ddc-sidebar-detail-row strong{
+  min-width:0;
+  max-width:58%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--ddc-sidebar-text);
+  font-size:12px;
+  text-align:right;
+}
+
+.ddc-sidebar-detail-copy{
+  margin:0;
+  color:var(--ddc-sidebar-muted);
+  font-size:12px;
+  line-height:1.45;
+}
+
+.ddc-sidebar-detail-copy code{
+  color:var(--ddc-sidebar-text);
+}
+
+.ddc-sidebar-footer{
+  min-width:0;
+  margin-top:auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 13px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-line) 86%, transparent);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.018)),
+    color-mix(in oklab, var(--ddc-sidebar-accent) 6%, transparent);
+  color:var(--ddc-sidebar-muted);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.ddc-sidebar-footer-mark{
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 16%, rgba(255,255,255,.045));
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 30%, rgba(255,255,255,.12));
+}
+
+.ddc-sidebar-footer-mark ha-icon{
+  --mdc-icon-size:19px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 78%, white 22%);
+}
+
+.ddc-sidebar-footer-copy{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.ddc-sidebar-footer-copy strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--ddc-sidebar-text);
+  font-size:12px;
+  line-height:1.15;
+}
+
+.ddc-sidebar-footer-copy span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--ddc-sidebar-muted);
+  font-size:11px;
+  font-weight:750;
+  line-height:1.15;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar{
+  padding:12px 9px;
+  border-radius:28px;
+  gap:10px;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-widget{
+  justify-content:center;
+  padding:12px 8px;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-widget strong,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-widget span,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-profile-copy,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-widget-profile > ha-icon:last-child,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-widget-heading,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-footer-copy{
+  display:none;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-clock-card,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-date-top{
+  display:flex;
+  justify-content:center;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-clock-copy,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-month,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-status-list{
+  display:none;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-calendar-tile span,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-calendar-tile strong{
+  display:grid;
+}
+
 .ddc-root.ddc-tabs-left-layout > .ddc-scale-outer,
-.ddc-root.ddc-tabs-left-layout > .card-container{
+.ddc-root.ddc-tabs-left-layout > .card-container,
+.ddc-root.ddc-sidebar-layout > .ddc-scale-outer,
+.ddc-root.ddc-sidebar-layout > .card-container{
   grid-area: canvas;
   min-width: 0;
 }
@@ -11218,17 +15647,596 @@ _getMobileTextAssistScale_() {
 }
 
 @container ddc-root (max-width: 980px){
-  .ddc-root.ddc-tabs-left-layout{
+  .ddc-root.ddc-tabs-left-layout,
+  .ddc-root.ddc-sidebar-layout{
     grid-template-columns: 1fr;
     grid-template-areas:
       "toolbar"
-      "tabs"
+      "sidebar"
       "canvas";
     row-gap: 12px;
   }
 
-  .ddc-root.ddc-tabs-left-layout > .ddc-tabs{
+  .ddc-root.ddc-tabs-left-layout > .ddc-tabs,
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
     align-self: start;
+    justify-self: stretch;
+    position:sticky;
+    top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px));
+    height:auto;
+    min-height:0;
+    max-height:none;
+  }
+}
+
+/* Premium smart-home sidebar redesign */
+.ddc-root{
+  --ddc-sidebar-width: clamp(248px, 17vw, 334px);
+  --ddc-sidebar-gap: clamp(18px, 2.2vw, 32px);
+  --ddc-sidebar-radius: 22px;
+  --ddc-sidebar-widget-radius: 14px;
+}
+
+.ddc-root.ddc-sidebar-density-compact{
+  --ddc-sidebar-width: clamp(86px, 7vw, 106px);
+  --ddc-sidebar-gap: clamp(12px, 1.7vw, 20px);
+}
+
+.ddc-root.ddc-sidebar-density-comfortable{
+  --ddc-sidebar-width: clamp(248px, 17vw, 334px);
+}
+
+.ddc-root.ddc-sidebar-density-spacious{
+  --ddc-sidebar-width: clamp(292px, 22vw, 398px);
+  --ddc-sidebar-gap: clamp(22px, 2.8vw, 40px);
+}
+
+.ddc-root.ddc-sidebar-layout{
+  --ddc-sidebar-accent: var(--primary-color, #3b82f6);
+  --ddc-sidebar-accent-2: #2dd4bf;
+  --ddc-sidebar-panel: color-mix(in oklab, var(--ha-card-background, #10151f) 92%, #0b111d 8%);
+  --ddc-sidebar-panel-raised: color-mix(in oklab, var(--ha-card-background, #10151f) 86%, var(--primary-text-color, #f8fafc) 4%);
+  --ddc-sidebar-panel-soft: color-mix(in oklab, var(--ha-card-background, #10151f) 82%, transparent);
+  --ddc-sidebar-text: var(--primary-text-color, #f8fafc);
+  --ddc-sidebar-muted: color-mix(in oklab, var(--secondary-text-color, #94a3b8) 86%, var(--primary-text-color, #f8fafc) 14%);
+  --ddc-sidebar-line: color-mix(in oklab, var(--divider-color, rgba(148,163,184,.2)) 78%, transparent);
+  --ddc-sidebar-shadow: 0 24px 54px rgba(8, 12, 20, .22), 0 4px 14px rgba(8, 12, 20, .12);
+}
+
+.ddc-root.ddc-sidebar-layout{
+  grid-template-columns: var(--ddc-sidebar-width) minmax(0, 1fr);
+  column-gap: var(--ddc-sidebar-gap);
+}
+
+.ddc-sidebar{
+  --ddc-sidebar-top-offset: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 12px);
+  gap:10px;
+  padding:12px;
+  border-radius:var(--ddc-sidebar-radius);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.028)),
+    var(--ddc-sidebar-panel);
+  border:1px solid var(--ddc-sidebar-line);
+  box-shadow:var(--ddc-sidebar-shadow), inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter:blur(20px) saturate(1.05);
+  -webkit-backdrop-filter:blur(20px) saturate(1.05);
+  scrollbar-color:color-mix(in oklab, var(--ddc-sidebar-accent) 40%, var(--ddc-sidebar-line)) transparent;
+}
+
+.ddc-sidebar::before{
+  inset:12px auto 12px 7px;
+  width:2px;
+  background:linear-gradient(180deg, transparent, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2), transparent);
+  box-shadow:none;
+  opacity:.82;
+}
+
+.ddc-sidebar::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:calc(var(--ddc-sidebar-radius) - 1px);
+  pointer-events:none;
+  border:1px solid rgba(255,255,255,.045);
+}
+
+.ddc-root.ddc-sidebar-style-minimal .ddc-sidebar{
+  background:var(--ddc-sidebar-panel);
+  box-shadow:0 14px 34px rgba(8,12,20,.14), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.ddc-root.ddc-sidebar-style-neon .ddc-sidebar{
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 36%, var(--ddc-sidebar-line));
+  box-shadow:
+    0 26px 60px rgba(8,12,20,.28),
+    0 0 0 1px color-mix(in oklab, var(--ddc-sidebar-accent) 14%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.ddc-sidebar-header{
+  min-width:0;
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-line) 88%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent), transparent 56%),
+    var(--ddc-sidebar-panel-raised);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.ddc-sidebar-header-main{
+  min-width:0;
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+
+.ddc-sidebar-header-mark{
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  color:white;
+  background:linear-gradient(135deg, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2));
+  font-size:15px;
+  font-weight:900;
+  box-shadow:0 12px 24px color-mix(in oklab, var(--ddc-sidebar-accent) 22%, transparent);
+}
+
+.ddc-sidebar-header-copy{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.ddc-sidebar-header-copy span,
+.ddc-sidebar-header-copy strong,
+.ddc-sidebar-header-copy em{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-header-copy span{
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 68%, var(--ddc-sidebar-text) 32%);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.12em;
+  line-height:1;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-header-copy strong{
+  color:var(--ddc-sidebar-text);
+  font-size:16px;
+  line-height:1.08;
+  font-weight:850;
+}
+
+.ddc-sidebar-header-copy em{
+  color:var(--ddc-sidebar-muted);
+  font-size:11px;
+  line-height:1.2;
+  font-style:normal;
+  font-weight:760;
+}
+
+.ddc-sidebar-live-pill{
+  min-width:54px;
+  height:28px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:0 8px;
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 28%, var(--ddc-sidebar-line));
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent);
+  color:var(--ddc-sidebar-text);
+  font-size:10px;
+  font-weight:850;
+}
+
+.ddc-sidebar-live-pill i{
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.12);
+}
+
+.ddc-sidebar-header-stats{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:7px;
+}
+
+.ddc-sidebar-header-stats span{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  padding:7px 8px;
+  border-radius:12px;
+  background:rgba(255,255,255,.04);
+  color:var(--ddc-sidebar-muted);
+  font-size:10px;
+  font-weight:780;
+}
+
+.ddc-sidebar-header-stats b{
+  color:var(--ddc-sidebar-text);
+  font-size:12px;
+}
+
+.ddc-sidebar-section-label{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 5px 4px 10px;
+  color:var(--ddc-sidebar-muted);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.11em;
+  line-height:1;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-section-label span{
+  min-width:0;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-section-label ha-icon{
+  --mdc-icon-size:14px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 68%, var(--ddc-sidebar-muted) 32%);
+}
+
+.ddc-sidebar-section-label em{
+  min-width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:var(--ddc-sidebar-text);
+  font-style:normal;
+  letter-spacing:0;
+}
+
+.ddc-sidebar-widget{
+  min-height:58px;
+  padding:12px;
+  border-radius:var(--ddc-sidebar-widget-radius);
+  border-color:color-mix(in oklab, var(--ddc-sidebar-line) 86%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.018)),
+    var(--ddc-sidebar-panel-soft);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+.ddc-sidebar-widget:hover,
+.ddc-sidebar-widget.is-active{
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 12%, transparent), transparent 58%),
+    var(--ddc-sidebar-panel-raised);
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 34%, var(--ddc-sidebar-line));
+  box-shadow:
+    0 12px 26px rgba(8,12,20,.16),
+    inset 0 1px 0 rgba(255,255,255,.075);
+}
+
+.ddc-sidebar-widget > .ddc-sidebar-widget-copy strong,
+.ddc-sidebar-widget > .ddc-sidebar-profile-copy strong,
+.ddc-sidebar-clock-copy strong,
+.ddc-sidebar-home-title strong,
+.ddc-sidebar-people-summary strong{
+  font-size:16px;
+  font-weight:850;
+  line-height:1.08;
+}
+
+.ddc-sidebar-widget > .ddc-sidebar-widget-copy span,
+.ddc-sidebar-widget > .ddc-sidebar-profile-copy span,
+.ddc-sidebar-clock-copy span,
+.ddc-sidebar-home-title span,
+.ddc-sidebar-people-summary span{
+  font-size:11px;
+  font-weight:760;
+  line-height:1.2;
+}
+
+.ddc-sidebar-widget ha-icon{
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 70%, var(--ddc-sidebar-text) 30%);
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left{
+  display:grid;
+  gap:7px;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  min-height:48px;
+  padding:0 12px;
+  border-radius:14px;
+  color:var(--ddc-sidebar-muted);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.036), rgba(255,255,255,.012)),
+    transparent;
+  border:1px solid transparent;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab:hover{
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 8%, rgba(255,255,255,.04));
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 22%, var(--ddc-sidebar-line));
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab.active{
+  color:white;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 88%, #111827 12%), color-mix(in oklab, var(--ddc-sidebar-accent-2) 70%, #111827 30%));
+  box-shadow:
+    0 12px 24px color-mix(in oklab, var(--ddc-sidebar-accent) 24%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.ddc-sidebar-clock-card{
+  min-height:82px;
+  gap:12px;
+}
+
+.ddc-sidebar-clock-stage{
+  width:70px;
+  height:70px;
+  flex-basis:70px;
+  border-radius:18px;
+  background:
+    linear-gradient(145deg, color-mix(in oklab, var(--ddc-sidebar-accent) 12%, transparent), rgba(255,255,255,.045));
+  border-color:color-mix(in oklab, var(--ddc-sidebar-accent) 24%, var(--ddc-sidebar-line));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.ddc-sidebar-clock-face{
+  width:54px;
+  height:54px;
+  flex-basis:54px;
+  background:
+    repeating-conic-gradient(from -1deg, rgba(255,255,255,.22) 0deg 1.2deg, transparent 1.2deg 30deg),
+    linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  box-shadow:none;
+}
+
+.ddc-sidebar-clock-copy strong{
+  font-size:30px;
+  font-weight:860;
+  line-height:.96;
+}
+
+.ddc-sidebar-clock-copy span{
+  color:color-mix(in oklab, var(--ddc-sidebar-accent-2) 64%, var(--ddc-sidebar-text) 36%);
+}
+
+.ddc-sidebar-clock-seconds{
+  right:-4px;
+  bottom:-4px;
+  background:var(--ddc-sidebar-panel);
+}
+
+.ddc-sidebar-date-card,
+.ddc-sidebar-home-card,
+.ddc-sidebar-people-card{
+  gap:10px;
+}
+
+.ddc-sidebar-calendar-tile,
+.ddc-sidebar-weather-icon,
+.ddc-sidebar-footer-mark{
+  border-radius:14px;
+}
+
+.ddc-sidebar-month,
+.ddc-sidebar-event,
+.ddc-sidebar-status-row,
+.ddc-sidebar-detail,
+.ddc-sidebar-footer{
+  border-radius:14px;
+}
+
+.ddc-sidebar-month{
+  background:color-mix(in oklab, var(--ddc-sidebar-panel-raised) 82%, transparent);
+}
+
+.ddc-sidebar-weather-icon{
+  width:48px;
+  height:48px;
+  flex-basis:48px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 9%, rgba(255,255,255,.035));
+}
+
+.ddc-sidebar-weather-meta{
+  gap:5px;
+}
+
+.ddc-sidebar-weather-meta span{
+  padding:4px 6px;
+  border-radius:999px;
+  background:rgba(255,255,255,.04);
+}
+
+.ddc-sidebar-home-media{
+  min-height:104px;
+  border-radius:16px;
+  background:
+    linear-gradient(145deg, color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent), rgba(255,255,255,.035));
+}
+
+.ddc-sidebar-home-media img{
+  min-height:104px;
+}
+
+.ddc-sidebar-status-row{
+  min-height:36px;
+  padding:7px 9px;
+  background:rgba(255,255,255,.026);
+}
+
+.ddc-sidebar-person-avatar{
+  border-radius:13px;
+}
+
+.ddc-sidebar-person-avatar.large{
+  width:44px;
+  height:44px;
+  flex-basis:44px;
+}
+
+.ddc-sidebar-detail{
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 10%, transparent), transparent 54%),
+    var(--ddc-sidebar-panel-raised);
+}
+
+.ddc-sidebar-footer{
+  padding:11px 12px;
+  background:rgba(255,255,255,.03);
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-header{
+  padding:9px 7px;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-header-main{
+  grid-template-columns:1fr;
+  justify-items:center;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-header-copy,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-live-pill,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-header-stats,
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-section-label{
+  display:none;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar-header-mark{
+  width:40px;
+  height:40px;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  width:54px;
+  min-width:54px;
+  min-height:54px;
+  border-radius:15px;
+}
+
+@container ddc-root (max-width: 980px){
+  .ddc-root.ddc-sidebar-layout{
+    row-gap:12px;
+  }
+
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:minmax(176px, 236px);
+    align-items:stretch;
+    gap:10px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    height:auto;
+    max-height:none;
+    padding:10px;
+    border-radius:18px;
+  }
+
+  .ddc-sidebar::before{
+    inset:auto 12px 7px 12px;
+    width:auto;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--ddc-sidebar-accent), var(--ddc-sidebar-accent-2), transparent);
+  }
+
+  .ddc-sidebar-header,
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left,
+  .ddc-sidebar-widget,
+  .ddc-sidebar-detail,
+  .ddc-sidebar-footer{
+    min-width:0;
+  }
+
+  .ddc-sidebar-section-label{
+    align-self:center;
+    writing-mode:vertical-rl;
+    transform:rotate(180deg);
+    padding:0 4px;
+    justify-content:center;
+  }
+
+  .ddc-sidebar-section-label em{
+    display:none;
+  }
+
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left{
+    min-width:188px;
+    max-height:190px;
+    overflow:auto;
+  }
+
+  .ddc-sidebar-month,
+  .ddc-sidebar-events.compact{
+    display:none;
+  }
+
+  .ddc-sidebar-home-media{
+    min-height:78px;
+  }
+
+  .ddc-sidebar-home-media img{
+    min-height:78px;
+  }
+}
+
+@container ddc-root (max-width: 640px){
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+    grid-auto-columns:minmax(156px, 210px);
+    border-radius:16px;
+  }
+
+  .ddc-sidebar-header-stats,
+  .ddc-sidebar-footer-copy{
+    display:none;
+  }
+
+  .ddc-sidebar-clock-stage{
+    width:58px;
+    height:58px;
+    flex-basis:58px;
+  }
+
+  .ddc-sidebar-clock-face{
+    width:44px;
+    height:44px;
+    flex-basis:44px;
+  }
+
+  .ddc-sidebar-clock-copy strong{
+    font-size:24px;
+  }
+
+  .ddc-sidebar-weather-meta{
+    display:none;
   }
 }
 
@@ -11568,9 +16576,15 @@ _getMobileTextAssistScale_() {
 .ddc-toolbar.streamlined.v3.is-collapsed .btn.cta-add,
 .ddc-toolbar.streamlined.v2.is-collapsed #applyLayoutBtn,
 .ddc-toolbar.streamlined.v3.is-collapsed #applyLayoutBtn,
+.ddc-toolbar.streamlined.v2.is-collapsed #toolbarAutoSaveBtn,
+.ddc-toolbar.streamlined.v3.is-collapsed #toolbarAutoSaveBtn,
 .ddc-toolbar.streamlined.v2.is-collapsed #settingsBtn,
 .ddc-toolbar.streamlined.v3.is-collapsed #settingsBtn{
   grid-column:auto;
+}
+.ddc-toolbar.streamlined.v2.is-collapsed #toolbarAutoSaveBtn .ddc-autosave-state,
+.ddc-toolbar.streamlined.v3.is-collapsed #toolbarAutoSaveBtn .ddc-autosave-state{
+  display:none !important;
 }
 .ddc-toolbar.streamlined.v2.is-collapsed .btn.cta-add::after,
 .ddc-toolbar.streamlined.v3.is-collapsed .btn.cta-add::after{
@@ -11736,8 +16750,39 @@ _getMobileTextAssistScale_() {
 }
 
 .ddc-toolbar.streamlined.v2 #applyLayoutBtn,
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn,
 .ddc-toolbar.streamlined.v2 #settingsBtn{
   grid-column: 1 / -1;
+}
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn{
+  justify-content:space-between;
+}
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn .label{
+  flex:1 1 auto;
+  text-align:left;
+}
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn .ddc-autosave-state{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:38px;
+  height:22px;
+  padding:0 8px;
+  border-radius:999px;
+  font-size:.74rem;
+  font-weight:900;
+  background:rgba(148,163,184,.18);
+  color:var(--secondary-text-color, rgba(255,255,255,.78));
+}
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn[aria-pressed="true"]{
+  border-color:color-mix(in oklab, #22c55e 42%, rgba(255,255,255,.14));
+  background:
+    linear-gradient(180deg, rgba(34,197,94,.16), rgba(34,197,94,.045)),
+    transparent;
+}
+.ddc-toolbar.streamlined.v2 #toolbarAutoSaveBtn[aria-pressed="true"] .ddc-autosave-state{
+  background:color-mix(in oklab, #22c55e 82%, rgba(255,255,255,.12));
+  color:#052e16;
 }
 
 /* status: dot above text, HIGH-CONTRAST text */
@@ -11947,6 +16992,30 @@ _getMobileTextAssistScale_() {
   opacity:.5;
   cursor:not-allowed;
   transform:none;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip[aria-disabled="true"],
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip.is-disabled,
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip.is-active.is-disabled{
+  opacity:.48;
+  cursor:not-allowed;
+  transform:none;
+  color: color-mix(in oklab, var(--primary-text-color, #e5e7eb) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.026), rgba(255,255,255,.01)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 12%, transparent);
+  border-color: color-mix(in oklab, #ffffff 8%, transparent);
+  box-shadow:none;
+}
+
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip[aria-disabled="true"]:hover,
+.ddc-toolbar.streamlined.v2 .ddc-preview-chip.is-disabled:hover{
+  transform:none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.026), rgba(255,255,255,.01)),
+    color-mix(in oklab, var(--primary-background-color, #0e1116) 12%, transparent);
+  border-color: color-mix(in oklab, #ffffff 8%, transparent);
+  box-shadow:none;
 }
 
 .ddc-toolbar.streamlined.v2 .ddc-preview-dimensions{
@@ -13132,7 +18201,7 @@ _getMobileTextAssistScale_() {
   grid-template-columns:repeat(4, minmax(0, 1fr));
 }
 
-@container ddc-root (max-width: 980px){
+@container ddc-root (max-width: 640px){
   .ddc-toolbar-segment,
   .ddc-toolbar-settings-main{
     padding-inline:9px;
@@ -13261,6 +18330,33 @@ _getMobileTextAssistScale_() {
   .ddc-toolbar-settings-main,
   .ddc-toolbar-settings-main::after{
     transition:none !important;
+  }
+}
+
+:host([ddc-toolbar-follow]) .ddc-root.ddc-edit-mode-active{
+  padding-top:var(--ddc-toolbar-height, 0px);
+}
+
+:host([ddc-toolbar-follow]) .ddc-toolbar.streamlined.v2,
+:host([ddc-toolbar-follow]) .ddc-toolbar.streamlined.v3{
+  --ddc-toolbar-follow-pad: clamp(20px, 1.6vw, 32px);
+  position:fixed;
+  top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px));
+  left:calc(var(--ddc-left-gutter, 0px) + max(env(safe-area-inset-left, 0px), 0px) + var(--ddc-toolbar-follow-pad));
+  right:calc(var(--ddc-right-gutter, 0px) + max(env(safe-area-inset-right, 0px), 0px) + var(--ddc-toolbar-follow-pad));
+  width:auto;
+  max-width:none;
+  margin:0;
+  box-sizing:border-box;
+  z-index:10040;
+}
+
+@media (max-width: 768px){
+  :host([ddc-toolbar-follow]) .ddc-toolbar.streamlined.v2,
+  :host([ddc-toolbar-follow]) .ddc-toolbar.streamlined.v3{
+    --ddc-toolbar-follow-pad:12px;
+    left:calc(max(env(safe-area-inset-left, 0px), 0px) + var(--ddc-toolbar-follow-pad));
+    right:calc(max(env(safe-area-inset-right, 0px), 0px) + var(--ddc-toolbar-follow-pad));
   }
 }
 
@@ -13513,17 +18609,36 @@ _getMobileTextAssistScale_() {
       }
       .chip .mini.pill{ padding:0; }
 
-      /* Edit highlight */
-      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; overflow: hidden; }
-      .card-wrapper.editing::after{
-        content:""; position:absolute; inset:0; border:1px dashed var(--primary-color,#03a9f4);
-        border-radius:12px; pointer-events:none; opacity:.35; z-index:5; box-sizing:border-box;
-      }
+	      /* Edit highlight */
+	      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; overflow: hidden; }
+	      .card-wrapper.editing::after{
+	        content:""; position:absolute; inset:0; border:1px dashed var(--primary-color,#03a9f4);
+	        border-radius:12px; pointer-events:none; opacity:.35; z-index:5; box-sizing:border-box;
+	      }
 
-      .card-wrapper{
-        --ddc-anchor-offset:14px;
-        --ddc-anchor-size:24px;
-      }
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active:not(.selected):not(.dragging){
+	        opacity:.58;
+	        border-color:rgba(102, 225, 255, .54);
+	        box-shadow:
+	          var(--ddc-card-local-shadow, var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18)))),
+	          0 0 0 1px rgba(102, 225, 255, .42),
+	          0 0 0 9px rgba(102, 225, 255, .07);
+	      }
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active:not(.selected):not(.dragging).editing::after{
+	        border-color:rgba(102, 225, 255, .86);
+	        opacity:.62;
+	      }
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active:hover,
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active:focus-within,
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active.selected,
+	      .ddc-root.ddc-edit-mode-active.ddc-preview-active .card-wrapper.ddc-preview-outside-active.dragging{
+	        opacity:1;
+	      }
+
+	      .card-wrapper{
+	        --ddc-anchor-offset:14px;
+	        --ddc-anchor-size:24px;
+	      }
       .ddc-card-anchors{
         position:absolute;
         inset:0;
@@ -14358,53 +19473,349 @@ _getMobileTextAssistScale_() {
             pointer-events:none; z-index:50;
           }
 
-          /* placeholder tile */
-          .ddc-placeholder-inner{
-            position: relative;
-            display:flex; align-items:center; justify-content:center;
-            width:100%; height:100%;
-            border-radius:16px;
-            overflow: hidden;
-            /* cool gradient derived from HA primary color */
-            background:
-              radial-gradient(120% 120% at 100% 0%,
-                color-mix(in srgb, var(--primary-color) 18%, #000 0%) 0%,
-                transparent 60%),
-              linear-gradient(135deg,
-                color-mix(in srgb, var(--primary-color) 70%, #000 0%) 0%,
-                color-mix(in srgb, var(--primary-color) 35%, #000 0%) 100%);
+          /* empty dashboard welcome */
+          .card-wrapper.ddc-placeholder{
+            border:0;
+            background:transparent;
+            box-shadow:none;
+            overflow:visible;
+            cursor:default;
+            container-type:inline-size;
+            --ddc-empty-accent: color-mix(in oklab, var(--primary-color, #03a9f4) 78%, #00e0ff 22%);
+            --ddc-empty-panel: color-mix(in oklab, var(--card-background-color, #111827) 88%, #07111f 12%);
+            --ddc-empty-line: color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 74%, var(--ddc-empty-accent) 26%);
           }
-
-          /* subtle shine */
+          .card-wrapper.ddc-placeholder.editing{
+            border-color:transparent;
+          }
+          .card-wrapper.ddc-placeholder.editing::after{
+            display:none;
+          }
+          .card-wrapper.ddc-placeholder .shield{
+            display:none !important;
+          }
+          .card-wrapper.ddc-placeholder > .ddc-placeholder-inner{
+            position:relative;
+            width:100%;
+            height:100%;
+            border-radius:30px;
+            overflow:hidden;
+            color:var(--primary-text-color, #f8fafc);
+            background:
+              linear-gradient(145deg, color-mix(in oklab, var(--ddc-empty-panel) 96%, #ffffff 4%), color-mix(in oklab, var(--primary-background-color, #050812) 92%, var(--ddc-empty-accent) 8%)) !important;
+            border:1px solid var(--ddc-empty-line);
+            box-shadow:
+              0 28px 90px rgba(0,0,0,.34),
+              0 8px 24px rgba(0,0,0,.18),
+              inset 0 1px 0 rgba(255,255,255,.08);
+            pointer-events:auto;
+            isolation:isolate;
+          }
+          .ddc-placeholder-inner::before{
+            content:"";
+            position:absolute;
+            inset:0;
+            z-index:0;
+            pointer-events:none;
+            opacity:.52;
+            background:
+              linear-gradient(rgba(80,210,255,.11) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(80,210,255,.1) 1px, transparent 1px),
+              radial-gradient(760px 420px at 16% 18%, color-mix(in oklab, var(--ddc-empty-accent) 26%, transparent), transparent 66%),
+              radial-gradient(640px 360px at 86% 18%, rgba(255,255,255,.12), transparent 68%);
+            background-size:44px 44px, 44px 44px, auto, auto;
+          }
           .ddc-placeholder-inner::after{
             content:"";
-            position:absolute; inset:0;
-            background: radial-gradient(120% 90% at 0% 100%, rgba(255,255,255,.15), transparent 60%);
+            position:absolute;
+            inset:0;
+            z-index:1;
             pointer-events:none;
+            background:
+              linear-gradient(90deg, color-mix(in oklab, var(--ddc-empty-panel) 86%, transparent), transparent 44%, color-mix(in oklab, var(--ddc-empty-panel) 72%, transparent)),
+              linear-gradient(180deg, rgba(255,255,255,.08), transparent 20%, rgba(0,0,0,.16));
           }
-
-          /* empty-dashboard hero */
-          .ddc-hero{
-            position:absolute; inset:0;
-            display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
-            gap:10px; text-align:left; padding:24px clamp(24px, 7vw, 72px);
-            color:rgba(255,255,255,.98);
-            text-shadow:0 1px 2px rgba(0,0,0,.35);
-            user-select:none; pointer-events:none; /* click goes to shield below */
+          .ddc-empty-shell{
+            position:relative;
+            z-index:2;
+            display:grid;
+            grid-template-columns:minmax(260px, .88fr) minmax(360px, 1.12fr);
+            gap:clamp(26px, 4vw, 56px);
+            align-items:center;
+            width:100%;
+            height:100%;
+            box-sizing:border-box;
+            padding:clamp(34px, 4vw, 64px);
           }
-
-          .ddc-hero img{
-            width:128px; height:128px; object-fit:contain; opacity:.95; filter: drop-shadow(0 4px 14px rgba(0,0,0,.25));
+          .ddc-empty-visual{
+            position:relative;
+            min-height:280px;
+            height:100%;
+            border-radius:24px;
+            overflow:hidden;
+            border:1px solid color-mix(in oklab, var(--ddc-empty-accent) 28%, rgba(255,255,255,.14));
+            background:rgba(255,255,255,.035);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
           }
-
-          .ddc-hero .ddc-title{
-            max-width:min(560px, 100%);
-            font-weight:800; font-size:1.25rem; letter-spacing:.2px;
+          .ddc-empty-visual img{
+            position:absolute;
+            inset:0;
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            opacity:.9;
+            filter:saturate(.96) contrast(1.03);
           }
-
-          .ddc-hero .ddc-sub{
-            max-width:min(560px, 100%);
-            font-weight:600; opacity:.95;
+          .ddc-empty-visual::after{
+            content:"";
+            position:absolute;
+            inset:0;
+            background:
+              linear-gradient(180deg, transparent 56%, rgba(4,9,18,.72)),
+              radial-gradient(420px 220px at 15% 12%, rgba(255,255,255,.22), transparent 70%);
+          }
+          .ddc-empty-content{
+            display:flex;
+            flex-direction:column;
+            align-items:flex-start;
+            min-width:0;
+          }
+          .ddc-empty-kicker{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            margin-bottom:14px;
+            padding:7px 10px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--ddc-empty-accent) 34%, transparent);
+            color:color-mix(in oklab, var(--ddc-empty-accent) 78%, var(--primary-text-color, #fff) 22%);
+            background:color-mix(in oklab, var(--ddc-empty-accent) 11%, transparent);
+            font-size:.74rem;
+            font-weight:800;
+            letter-spacing:.1em;
+            text-transform:uppercase;
+          }
+          .ddc-empty-kicker ha-icon{
+            --mdc-icon-size:17px;
+          }
+          .ddc-empty-title{
+            margin:0;
+            max-width:760px;
+            font-size:3.45rem;
+            line-height:.96;
+            font-weight:860;
+            letter-spacing:0;
+            color:var(--primary-text-color, #f8fafc);
+          }
+          .ddc-empty-sub{
+            margin:18px 0 0;
+            max-width:650px;
+            color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 78%, transparent);
+            font-size:1.08rem;
+            line-height:1.55;
+          }
+          .ddc-empty-steps{
+            display:grid;
+            grid-template-columns:repeat(3, minmax(0, 1fr));
+            gap:10px;
+            width:100%;
+            margin:24px 0 0;
+          }
+          .ddc-empty-step{
+            min-width:0;
+            padding:13px 14px;
+            border-radius:16px;
+            border:1px solid color-mix(in oklab, var(--ddc-empty-line) 78%, transparent);
+            background:color-mix(in oklab, var(--card-background-color, #111827) 76%, transparent);
+          }
+          .ddc-empty-step strong{
+            display:block;
+            margin-bottom:5px;
+            font-size:.88rem;
+            color:var(--primary-text-color, #fff);
+          }
+          .ddc-empty-step span{
+            display:block;
+            font-size:.8rem;
+            line-height:1.42;
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 66%, transparent);
+          }
+          .ddc-empty-actions{
+            display:flex;
+            flex-wrap:wrap;
+            gap:10px;
+            margin-top:24px;
+          }
+          .ddc-empty-btn{
+            appearance:none;
+            -webkit-appearance:none;
+            min-height:44px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:9px;
+            padding:0 15px;
+            border-radius:14px;
+            border:1px solid color-mix(in oklab, var(--ddc-empty-line) 82%, rgba(255,255,255,.12));
+            background:rgba(255,255,255,.045);
+            color:var(--primary-text-color, #fff);
+            font:inherit;
+            font-weight:780;
+            cursor:pointer;
+            transition:background .18s ease, border-color .18s ease, box-shadow .18s ease;
+          }
+          .ddc-empty-btn ha-icon{
+            --mdc-icon-size:19px;
+          }
+          .ddc-empty-btn:hover{
+            background:rgba(255,255,255,.075);
+            border-color:color-mix(in oklab, var(--ddc-empty-accent) 38%, rgba(255,255,255,.14));
+            box-shadow:0 10px 22px rgba(0,0,0,.18);
+          }
+          .ddc-empty-btn:focus-visible{
+            outline:none;
+            box-shadow:0 0 0 3px color-mix(in oklab, var(--ddc-empty-accent) 26%, transparent);
+          }
+          .ddc-empty-btn.primary{
+            border-color:color-mix(in oklab, var(--ddc-empty-accent) 64%, rgba(255,255,255,.14));
+            background:
+              linear-gradient(180deg, color-mix(in oklab, var(--ddc-empty-accent) 92%, #fff 8%), color-mix(in oklab, var(--ddc-empty-accent) 78%, #022033 22%));
+            color:#04121c;
+            box-shadow:0 16px 30px color-mix(in oklab, var(--ddc-empty-accent) 24%, transparent);
+          }
+          .ddc-empty-presets{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:10px;
+            margin-top:14px;
+            width:min(100%, 620px);
+          }
+          .ddc-empty-preset{
+            min-height:64px;
+            justify-content:flex-start;
+            padding:10px 13px;
+            border-radius:16px;
+            font-size:.88rem;
+            text-align:left;
+          }
+          .ddc-empty-preset ha-icon{
+            flex:0 0 auto;
+            --mdc-icon-size:20px;
+            color:var(--ddc-empty-accent);
+          }
+          .ddc-empty-size-copy{
+            display:flex;
+            flex-direction:column;
+            min-width:0;
+            gap:3px;
+          }
+          .ddc-empty-size-copy span,
+          .ddc-empty-size-copy small{
+            display:block;
+            overflow-wrap:anywhere;
+          }
+          .ddc-empty-size-copy small{
+            opacity:.72;
+            font-size:.75rem;
+            line-height:1.28;
+            font-weight:700;
+          }
+          .ddc-empty-links{
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:12px;
+            margin-top:18px;
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 64%, transparent);
+            font-size:.9rem;
+          }
+          .ddc-empty-link{
+            appearance:none;
+            -webkit-appearance:none;
+            border:0;
+            padding:0;
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            background:transparent;
+            color:color-mix(in oklab, var(--ddc-empty-accent) 78%, var(--primary-text-color, #fff) 22%);
+            font:inherit;
+            font-weight:780;
+            cursor:pointer;
+          }
+          .ddc-empty-link:hover{
+            text-decoration:underline;
+            text-underline-offset:3px;
+          }
+          .ddc-empty-link ha-icon{
+            --mdc-icon-size:17px;
+          }
+          @container (max-width: 820px){
+            .ddc-empty-shell{
+              grid-template-columns:1fr;
+              gap:22px;
+              padding:28px;
+            }
+            .ddc-empty-visual{
+              min-height:210px;
+            }
+            .ddc-empty-title{
+              font-size:2.35rem;
+            }
+            .ddc-empty-sub{
+              font-size:1rem;
+            }
+            .ddc-empty-steps{
+              grid-template-columns:1fr;
+            }
+            .ddc-empty-presets{
+              grid-template-columns:1fr;
+            }
+          }
+          @container (max-width: 560px){
+            .ddc-empty-shell{
+              padding:20px;
+              gap:14px;
+            }
+            .ddc-empty-visual{
+              min-height:150px;
+            }
+            .ddc-empty-title{
+              font-size:1.9rem;
+            }
+            .ddc-empty-steps{
+              display:none;
+            }
+            .ddc-empty-links > span{
+              display:none;
+            }
+          }
+          @media (max-width: 920px){
+            .ddc-empty-shell{
+              grid-template-columns:1fr;
+              gap:22px;
+              padding:28px;
+            }
+            .ddc-empty-visual{
+              min-height:210px;
+            }
+            .ddc-empty-title{
+              font-size:2.35rem;
+            }
+            .ddc-empty-sub{
+              font-size:1rem;
+            }
+            .ddc-empty-steps{
+              grid-template-columns:1fr;
+            }
+          }
+          @media (max-width: 560px){
+            .ddc-empty-title{
+              font-size:1.9rem;
+            }
+            .ddc-empty-shell{
+              padding:22px;
+            }
           }
 
           /* --- hold-to-edit ring (cursor progress) --- */
@@ -14683,6 +20094,86 @@ _getMobileTextAssistScale_() {
   display:none;
 }
 
+.ddc-sidebar .ddc-tabs.ddc-tabs-left{
+  position:static;
+  left:auto;
+  top:auto;
+  transform:none;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+  z-index:auto;
+  display:grid;
+  gap:7px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+
+:host([ddc-fixed-ui]) .ddc-sidebar .ddc-tabs.ddc-tabs-left{
+  position:static;
+  left:auto;
+  top:auto;
+  transform:none;
+  width:100%;
+  max-width:100%;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  min-height:48px;
+  height:auto;
+  justify-content:flex-start;
+  padding:0 12px;
+  border-radius:14px;
+  border:1px solid transparent;
+  color:var(--ddc-sidebar-muted);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.036), rgba(255,255,255,.012)),
+    transparent;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
+  width:100%;
+  min-width:0;
+  align-self:stretch;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon .ddc-tab-label{
+  display:block;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab ha-icon{
+  --mdc-icon-size:23px;
+  color:currentColor;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab.active{
+  color:white;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-sidebar-accent) 88%, #111827 12%), color-mix(in oklab, var(--ddc-sidebar-accent-2) 70%, #111827 30%));
+  box-shadow:
+    0 12px 24px color-mix(in oklab, var(--ddc-sidebar-accent) 24%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  width:54px;
+  min-width:54px;
+  min-height:54px;
+  justify-content:center;
+  padding:0;
+  border-radius:15px;
+}
+
+.ddc-root.ddc-sidebar-density-compact .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab .ddc-tab-label{
+  display:none;
+}
+
 .ddc-tabs.ddc-tabs-left .ddc-tab{
   width: 100%;
   max-width: none;
@@ -14732,7 +20223,283 @@ _getMobileTextAssistScale_() {
   padding-block: 12px;
 }
 
+/* Sidebar as a bounded drag-and-drop canvas */
+.ddc-root.ddc-sidebar-density-compact{
+  --ddc-sidebar-width: clamp(236px, 16vw, 300px);
+}
+
+.ddc-root.ddc-sidebar-density-comfortable{
+  --ddc-sidebar-width: clamp(292px, 20vw, 360px);
+}
+
+.ddc-root.ddc-sidebar-density-spacious{
+  --ddc-sidebar-width: clamp(340px, 24vw, 430px);
+}
+
+.ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+  display:grid;
+  grid-template-rows:auto minmax(0, 1fr);
+  align-content:start;
+  gap:12px;
+  min-width:0;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+}
+
+.ddc-sidebar-header-slot[hidden]{
+  display:none;
+}
+
+.ddc-sidebar-header-button{
+  width:100%;
+  appearance:none;
+  border:0;
+  padding:0;
+  margin:0;
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  background:transparent;
+  cursor:pointer;
+}
+
+.ddc-sidebar-header-mark ha-icon{
+  --mdc-icon-size:22px;
+}
+
+.ddc-sidebar-header-date-mark{
+  gap:0;
+  line-height:1;
+  text-transform:uppercase;
+}
+
+.ddc-sidebar-header-date-mark span{
+  font-size:9px;
+  font-weight:900;
+}
+
+.ddc-sidebar-header-date-mark b{
+  font-size:18px;
+  font-weight:950;
+}
+
+.ddc-sidebar-header-avatars{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  min-width:54px;
+}
+
+.ddc-sidebar-header-avatars .ddc-sidebar-person-avatar{
+  width:28px;
+  height:28px;
+  margin-left:-8px;
+  border:2px solid var(--ddc-sidebar-panel);
+}
+
+.ddc-sidebar-workspace{
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-rows:auto minmax(0, 1fr);
+  gap:9px;
+}
+
+.ddc-sidebar-workspace-bar{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:0 2px 0 8px;
+  color:var(--ddc-sidebar-muted);
+  font-size:11px;
+  font-weight:850;
+}
+
+.ddc-sidebar:not(.is-editing) .ddc-sidebar-workspace-bar{
+  display:none;
+}
+
+.ddc-sidebar:not(.is-editing) .ddc-sidebar-workspace{
+  gap:0;
+}
+
+.ddc-sidebar-workspace-bar span{
+  min-width:0;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ddc-sidebar-workspace-bar ha-icon{
+  --mdc-icon-size:16px;
+}
+
+.ddc-sidebar-add-card{
+  width:34px;
+  height:34px;
+  display:none;
+  place-items:center;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 30%, var(--ddc-sidebar-line));
+  border-radius:12px;
+  color:var(--ddc-sidebar-text);
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 14%, var(--ddc-sidebar-panel-raised));
+  cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.ddc-sidebar-add-card.is-visible{
+  display:grid;
+}
+
+.ddc-sidebar-add-card ha-icon{
+  --mdc-icon-size:20px;
+}
+
+.ddc-sidebar-canvas{
+  position:relative;
+  min-width:0;
+  width:100%;
+  height:var(--ddc-sidebar-canvas-frame-height, 520px);
+  min-height:280px;
+  overflow:hidden;
+  border-radius:18px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-line) 86%, transparent);
+  background:color-mix(in oklab, var(--ddc-sidebar-panel-raised) 52%, transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  touch-action:auto;
+}
+
+.ddc-sidebar-canvas.is-editing{
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px),
+    color-mix(in oklab, var(--ddc-sidebar-panel-raised) 76%, transparent);
+  background-size:
+    max(20px, var(--grid-size, 20px)) max(20px, var(--grid-size, 20px)),
+    max(20px, var(--grid-size, 20px)) max(20px, var(--grid-size, 20px)),
+    auto;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.025);
+  touch-action:none;
+  cursor:crosshair;
+}
+
+.ddc-sidebar-canvas.is-empty:not(.is-editing){
+  height:96px;
+  min-height:96px;
+  border-style:dashed;
+  background:transparent;
+  box-shadow:none;
+}
+
+.ddc-sidebar-empty{
+  position:absolute;
+  inset:12px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:8px;
+  border:1px dashed color-mix(in oklab, var(--ddc-sidebar-accent) 30%, var(--ddc-sidebar-line));
+  border-radius:14px;
+  color:var(--ddc-sidebar-muted);
+  font-size:12px;
+  font-weight:800;
+  pointer-events:none;
+}
+
+.ddc-sidebar-canvas:not(.is-editing) .ddc-sidebar-empty{
+  inset:0;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  pointer-events:auto;
+}
+
+.ddc-sidebar-empty[hidden]{
+  display:none;
+}
+
+.ddc-sidebar-empty ha-icon{
+  --mdc-icon-size:28px;
+  color:color-mix(in oklab, var(--ddc-sidebar-accent) 68%, var(--ddc-sidebar-muted) 32%);
+}
+
+.ddc-sidebar-drag-rect{
+  position:absolute;
+  left:0;
+  top:0;
+  z-index:20;
+  min-width:1px;
+  min-height:1px;
+  border:1px solid color-mix(in oklab, var(--ddc-sidebar-accent) 68%, white 12%);
+  border-radius:12px;
+  background:color-mix(in oklab, var(--ddc-sidebar-accent) 18%, transparent);
+  box-shadow:0 10px 24px color-mix(in oklab, var(--ddc-sidebar-accent) 16%, transparent);
+  pointer-events:none;
+}
+
+.ddc-sidebar-card-wrapper{
+  position:absolute;
+  left:0;
+  top:0;
+  min-width:48px;
+  min-height:44px;
+  margin:0;
+  box-sizing:border-box;
+  overflow:visible;
+  transform-origin:0 0;
+  border-radius:14px;
+  touch-action:auto;
+}
+
+.ddc-sidebar-card-wrapper.editing{
+  touch-action:none;
+}
+
+.ddc-sidebar-card-wrapper.dragging{
+  z-index:9999 !important;
+}
+
+.ddc-sidebar-card-wrapper > :first-child{
+  width:100%;
+  height:100%;
+  display:block;
+}
+
+.ddc-sidebar-card-wrapper .chip{
+  top:8px;
+  left:50%;
+  max-width:calc(100% - 16px);
+  padding:6px;
+  transform:translateX(-50%) scale(var(--ddc-edit-ui-scale, 1));
+}
+
+.ddc-sidebar-card-wrapper .resize-handle{
+  right:-10px;
+  bottom:-10px;
+}
+
 @container ddc-root (max-width: 980px){
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+    position:relative;
+    top:auto;
+    height:auto;
+    max-height:none;
+    overflow:visible;
+  }
+
+  .ddc-sidebar-canvas{
+    height:min(var(--ddc-sidebar-canvas-frame-height, 520px), 70vh);
+  }
+}
+
+@container ddc-root (max-width: 640px){
   .ddc-tabs.ddc-tabs-left{
     position: sticky;
     left: auto;
@@ -14777,6 +20544,42 @@ _getMobileTextAssistScale_() {
   }
 }
 
+@container ddc-root (max-width: 640px){
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left{
+    position:static;
+    left:auto;
+    top:auto;
+    transform:none;
+    display:grid;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:start;
+    width:100%;
+    min-width:188px;
+    max-width:100%;
+    margin:0;
+    padding:0;
+    overflow:auto;
+    background:transparent;
+    border:0;
+    box-shadow:none;
+  }
+
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+    width:100%;
+    min-width:0;
+    min-height:48px;
+    height:auto;
+    justify-content:flex-start;
+    padding:0 12px;
+  }
+
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
+    width:100%;
+    min-width:0;
+  }
+}
+
 @media (max-width: 768px) {
   :host([ddc-fixed-ui]) .ddc-tabs,
   .ddc-tabs{
@@ -14797,6 +20600,21 @@ _getMobileTextAssistScale_() {
     min-width: 56px;
     height: 54px;
     padding-inline: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ddc-sidebar .ddc-tabs.ddc-tabs-left{
+    position:static !important;
+    left:auto !important;
+    top:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    transform:none !important;
+    width:100% !important;
+    max-width:100% !important;
+    margin:0 !important;
+    padding:0 !important;
   }
 }
 
@@ -14918,6 +20736,14 @@ _getMobileTextAssistScale_() {
   clip-path:none;
 }
 
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-trigger-copy{
+  position:static;
+  inline-size:auto;
+  block-size:auto;
+  overflow:visible;
+  clip-path:none;
+}
+
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-count{
   position:static;
   min-width:24px;
@@ -14945,22 +20771,25 @@ _getMobileTextAssistScale_() {
 }
 
 .ddc-layer-trigger{
-  --ddc-layer-accent: var(--primary-color, #8b5cf6);
+  --ddc-layer-accent: var(--ddc-sidebar-accent, var(--primary-color, #8b5cf6));
   position:relative;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:10px;
-  min-width:132px;
-  min-height:46px;
-  padding:0 14px 0 16px;
-  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, transparent);
-  border-radius:999px;
+  gap:11px;
+  min-width:186px;
+  min-height:58px;
+  padding:0 13px 0 16px;
+  overflow:hidden;
+  border:1px solid color-mix(in oklab, var(--ddc-layer-accent) 34%, rgba(255,255,255,.14));
+  border-radius:20px;
   background:
+    radial-gradient(circle at 8% 0%, color-mix(in oklab, var(--ddc-layer-accent) 32%, transparent), transparent 46%),
+    linear-gradient(135deg, color-mix(in oklab, var(--ddc-layer-accent) 14%, transparent), transparent 58%),
     linear-gradient(
       180deg,
-      color-mix(in oklab, var(--card-background-color, #111827) 88%, var(--ddc-layer-accent) 12%),
-      color-mix(in oklab, var(--primary-background-color, #0b1220) 92%, var(--ddc-layer-accent) 8%)
+      color-mix(in oklab, var(--card-background-color, #111827) 90%, var(--ddc-layer-accent) 10%),
+      color-mix(in oklab, var(--primary-background-color, #0b1220) 93%, var(--ddc-layer-accent) 7%)
     );
   color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 88%, var(--ddc-layer-accent) 12%);
   font:700 14px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
@@ -14977,9 +20806,46 @@ _getMobileTextAssistScale_() {
     box-shadow .18s ease;
 }
 
+.ddc-layer-trigger::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:10px;
+  bottom:10px;
+  width:3px;
+  border-radius:999px;
+  background:linear-gradient(180deg, var(--ddc-layer-accent), color-mix(in oklab, var(--ddc-layer-accent) 42%, #22d3ee 58%));
+  box-shadow:0 0 18px color-mix(in oklab, var(--ddc-layer-accent) 62%, transparent);
+  opacity:.82;
+}
+
 .ddc-layer-trigger ha-icon{
   --mdc-icon-size:24px;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  background:color-mix(in oklab, var(--ddc-layer-accent) 14%, rgba(255,255,255,.04));
   color:color-mix(in oklab, var(--ddc-layer-accent) 72%, var(--primary-text-color, #f8fafc) 28%);
+}
+
+.ddc-layer-trigger-copy{
+  min-width:0;
+  display:grid;
+  gap:3px;
+  text-align:left;
+}
+
+.ddc-layer-trigger-meta{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:10px;
+  font-weight:760;
+  line-height:1;
 }
 
 .ddc-layer-trigger:hover,
@@ -15020,6 +20886,7 @@ _getMobileTextAssistScale_() {
   color:#fff;
   font-size:13px;
   line-height:1;
+  font-weight:900;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.2),
     0 8px 18px color-mix(in oklab, var(--ddc-layer-accent) 28%, transparent);
@@ -15032,12 +20899,16 @@ _getMobileTextAssistScale_() {
   right:0;
   z-index:40;
   display:grid;
-  gap:4px;
-  min-width:220px;
-  padding:10px;
-  border-radius:16px;
-  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 70%, transparent);
+  gap:10px;
+  min-width:320px;
+  max-width:min(380px, calc(100vw - 32px));
+  max-height:min(70vh, 620px);
+  overflow:auto;
+  padding:14px;
+  border-radius:24px;
+  border:1px solid color-mix(in oklab, var(--ddc-layer-accent, var(--primary-color, #8b5cf6)) 32%, rgba(255,255,255,.14));
   background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--ddc-layer-accent, var(--primary-color, #8b5cf6)) 18%, transparent), transparent 48%),
     linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
     var(--ddc-menu-bg);
   box-shadow:
@@ -15049,6 +20920,27 @@ _getMobileTextAssistScale_() {
   animation:ddc-layer-menu-in .16s ease-out both;
 }
 
+.ddc-layer-menu-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:4px 4px 8px;
+  border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.14)) 72%, transparent);
+}
+
+.ddc-layer-menu-head strong{
+  color:var(--primary-text-color, #f8fafc);
+  font-size:14px;
+  font-weight:850;
+}
+
+.ddc-layer-menu-head span{
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:11px;
+  font-weight:760;
+}
+
 .ddc-tabs-bottom .ddc-layer-menu-panel{
   top:auto;
   bottom:calc(100% + 10px);
@@ -15056,17 +20948,21 @@ _getMobileTextAssistScale_() {
 }
 
 .ddc-layer-option{
-  --ddc-layer-accent: var(--primary-color, #8b5cf6);
+  --ddc-layer-accent: var(--ddc-sidebar-accent, var(--primary-color, #8b5cf6));
+  position:relative;
   display:grid;
-  grid-template-columns:26px minmax(0, 1fr) 24px;
+  grid-template-columns:40px minmax(0, 1fr) 28px;
   align-items:center;
-  gap:10px;
+  gap:12px;
   width:100%;
-  min-height:42px;
-  padding:0 8px;
-  border:0;
-  border-radius:10px;
-  background:transparent;
+  min-height:62px;
+  padding:0 12px;
+  overflow:hidden;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 60%, transparent);
+  border-radius:18px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.042), rgba(255,255,255,.016)),
+    color-mix(in oklab, var(--card-background-color, #111827) 72%, transparent);
   color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 86%, transparent);
   font:650 13px/1.2 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   letter-spacing:0;
@@ -15075,19 +20971,45 @@ _getMobileTextAssistScale_() {
   transition:
     color .16s ease,
     background .16s ease,
-    box-shadow .16s ease;
+    box-shadow .16s ease,
+    transform .16s ease;
 }
 
 .ddc-layer-option-icon{
   --mdc-icon-size:23px;
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:15px;
+  background:color-mix(in oklab, var(--ddc-layer-accent) 10%, rgba(255,255,255,.035));
   color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 74%, transparent);
 }
 
+.ddc-layer-option-copy{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
 .ddc-layer-option-label{
+  display:block;
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+  font-size:13px;
+  line-height:1.1;
+}
+
+.ddc-layer-option-meta{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--secondary-text-color, #9ca3af);
+  font-size:10px;
+  font-weight:760;
 }
 
 .ddc-layer-option-check{
@@ -15103,14 +21025,19 @@ _getMobileTextAssistScale_() {
 .ddc-layer-option:focus-visible,
 .ddc-layer-option.active{
   outline:none;
+  transform:translateY(-1px);
   color:color-mix(in oklab, var(--ddc-layer-accent) 78%, #fff 22%);
   background:
     linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--ddc-layer-accent) 18%, transparent),
-      color-mix(in oklab, var(--ddc-layer-accent) 7%, transparent)
-    );
-  box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--ddc-layer-accent) 16%, transparent);
+      135deg,
+      color-mix(in oklab, var(--ddc-layer-accent) 24%, transparent),
+      color-mix(in oklab, var(--ddc-layer-accent) 8%, transparent)
+    ),
+    rgba(255,255,255,.035);
+  border-color:color-mix(in oklab, var(--ddc-layer-accent) 36%, transparent);
+  box-shadow:
+    0 12px 24px color-mix(in oklab, var(--ddc-layer-accent) 12%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--ddc-layer-accent) 14%, transparent);
 }
 
 .ddc-layer-option:hover .ddc-layer-option-icon,
@@ -15137,6 +21064,7 @@ _getMobileTextAssistScale_() {
   border-radius:18px;
 }
 
+.ddc-tabs-left .ddc-layer-trigger-copy,
 .ddc-tabs-left .ddc-layer-trigger-label{
   position:absolute;
   inline-size:1px;
@@ -15186,7 +21114,7 @@ _getMobileTextAssistScale_() {
   }
 }
 
-@container ddc-root (max-width: 980px){
+@container ddc-root (max-width: 640px){
   .ddc-tabs-left .ddc-layer-menu{
     width:auto;
   }
@@ -15199,6 +21127,13 @@ _getMobileTextAssistScale_() {
     border-radius:999px;
   }
   .ddc-tabs-left .ddc-layer-trigger-label{
+    position:static;
+    inline-size:auto;
+    block-size:auto;
+    overflow:visible;
+    clip-path:none;
+  }
+  .ddc-tabs-left .ddc-layer-trigger-copy{
     position:static;
     inline-size:auto;
     block-size:auto;
@@ -15228,6 +21163,14 @@ _getMobileTextAssistScale_() {
     padding:0 11px;
   }
   .ddc-layer-trigger-label{
+    position:absolute;
+    inline-size:1px;
+    block-size:1px;
+    overflow:hidden;
+    clip-path:inset(50%);
+    white-space:nowrap;
+  }
+  .ddc-layer-trigger-copy{
     position:absolute;
     inline-size:1px;
     block-size:1px;
@@ -15385,7 +21328,7 @@ _getMobileTextAssistScale_() {
   top:0;
   width:var(--ddc-connectors-width, 100%);
   height:var(--ddc-connectors-height, 100%);
-  z-index:5;
+  z-index:auto;
   overflow:visible;
   pointer-events:none;
   color:var(--primary-color, #ff9800);
@@ -15394,7 +21337,21 @@ _getMobileTextAssistScale_() {
 .card-container.ddc-editing-connectors .ddc-connectors-layer,
 .card-container.ddc-connector-draw-mode .ddc-connectors-layer,
 .card-container.ddc-connector-anchor-dragging .ddc-connectors-layer{
+  z-index:auto;
+}
+.ddc-connectors-layer .ddc-connector-surface,
+.ddc-connectors-layer .ddc-connector-capture-surface{
+  position:absolute;
+  left:0;
+  top:0;
+  width:var(--ddc-connectors-width, 100%);
+  height:var(--ddc-connectors-height, 100%);
+  overflow:visible;
+  pointer-events:none;
+}
+.ddc-connectors-layer .ddc-connector-capture-surface{
   z-index:100000;
+  pointer-events:all;
 }
 .ddc-connectors-layer .ddc-connector-track,
 .ddc-connectors-layer .ddc-connector-selection,
@@ -15859,6 +21816,22 @@ _getMobileTextAssistScale_() {
   grid-template-columns:1fr;
   gap:8px;
 }
+.ddc-connector-layer-order{
+  display:grid;
+  gap:9px;
+  margin-top:2px;
+}
+.ddc-connector-z-actions{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+}
+.ddc-connector-z-actions .btn{
+  min-width:0;
+}
+.ddc-connector-layer-order .ddc-connector-field{
+  max-width:180px;
+}
 .ddc-connector-footer-actions{
   display:grid;
   gap:8px;
@@ -16048,6 +22021,9 @@ _getMobileTextAssistScale_() {
       <button class="btn secondary" id="applyLayoutBtn" style="display:none" data-tooltip="Save">
         <ha-icon icon="mdi:content-save"></ha-icon><span class="label">Save</span>
       </button>
+      <button class="btn secondary ddc-autosave-toggle" id="toolbarAutoSaveBtn" style="display:none" data-tooltip="Toggle auto-save" aria-pressed="false">
+        <ha-icon icon="mdi:content-save-clock-outline"></ha-icon><span class="label">Auto-save</span><span class="ddc-autosave-state">Off</span>
+      </button>
     </div>
   </section>
 
@@ -16063,6 +22039,12 @@ _getMobileTextAssistScale_() {
       </button>
       <button class="btn secondary" id="pasteBtn" style="display:none" data-tooltip="Paste">
         <ha-icon icon="mdi:content-paste"></ha-icon><span class="label">Paste</span>
+      </button>
+      <button class="btn secondary" id="undoBtn" style="display:none" data-tooltip="Undo (Ctrl+Z)" disabled>
+        <ha-icon icon="mdi:undo"></ha-icon><span class="label">Undo</span>
+      </button>
+      <button class="btn secondary" id="redoBtn" style="display:none" data-tooltip="Redo (Ctrl+Y)" disabled>
+        <ha-icon icon="mdi:redo"></ha-icon><span class="label">Redo</span>
       </button>
     </div>
   </section>
@@ -16132,7 +22114,7 @@ _getMobileTextAssistScale_() {
         <div class="ddc-preview-meta" id="previewModeMeta">Auto: Desktop</div>
       </div>
       <div class="ddc-preview-modes" role="group" aria-label="Viewport preview">
-        <button type="button" class="ddc-preview-chip" data-preview-mode="live">Live</button>
+        <button type="button" class="ddc-preview-chip" data-preview-mode="live" aria-label="Live View">Live View</button>
         <button type="button" class="ddc-preview-chip" data-preview-mode="desktop">Desktop</button>
         <button type="button" class="ddc-preview-chip" data-preview-mode="tablet">Tablet</button>
         <button type="button" class="ddc-preview-chip" data-preview-mode="mobile">Mobile</button>
@@ -16157,6 +22139,7 @@ _getMobileTextAssistScale_() {
 
 
           <!-- Tabs & card container -->
+          <aside class="ddc-sidebar" id="ddcSidebar" style="display:none" aria-label="Sidebar" aria-hidden="true"></aside>
           <div class="ddc-tabs" id="tabsBar" style="display:none"></div>
           <div class="ddc-layers" id="layersBar" style="display:none"></div>
           <div class="card-container" id="cardContainer">
@@ -16183,14 +22166,18 @@ _getMobileTextAssistScale_() {
       this.importBtn     = this.shadowRoot.querySelector('#importBtn');
       this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn'); 
       this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
+      this.toolbarAutoSaveBtn = this.shadowRoot.querySelector('#toolbarAutoSaveBtn');
       this.toolbarToggleBtn = this.shadowRoot.querySelector('#toolbarToggleBtn');
       // Copy and Paste buttons (for edit mode)
       this.copyBtn      = this.shadowRoot.querySelector('#copyBtn');
       this.pasteBtn     = this.shadowRoot.querySelector('#pasteBtn');
+      this.undoBtn      = this.shadowRoot.querySelector('#undoBtn');
+      this.redoBtn      = this.shadowRoot.querySelector('#redoBtn');
       this.lineModeBtn  = this.shadowRoot.querySelector('#lineModeBtn');
       this.settingsBtn  = this.shadowRoot.querySelector('#settingsBtn');
       this.tabsBar      = this.shadowRoot.querySelector('#tabsBar');
       this.layersBar    = this.shadowRoot.querySelector('#layersBar');
+      this.sidebarHost  = this.shadowRoot.querySelector('#ddcSidebar');
       this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
       this.previewModeControls = this.shadowRoot.querySelector('#previewModeControls');
       this.previewModeButtons = Array.from(this.shadowRoot.querySelectorAll('[data-preview-mode]'));
@@ -16204,6 +22191,7 @@ _getMobileTextAssistScale_() {
           if (text && !node.getAttribute('title')) node.setAttribute('title', text);
         } catch {}
       });
+      try { this._syncToolbarAutoSaveState_?.(); } catch {}
       const toolbarSegmentButtons = Array.from(this.shadowRoot.querySelectorAll('[data-toolbar-segment]'));
       toolbarSegmentButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -16227,7 +22215,10 @@ _getMobileTextAssistScale_() {
       });
       try { this._ensureStreamlinedToolbarObserver_?.(); } catch {}
       this.previewModeButtons.forEach((btn) => {
-        btn.addEventListener('click', () => this._setViewportPreviewMode_(btn.dataset.previewMode || 'live'));
+        btn.addEventListener('click', () => {
+          if (btn.getAttribute('aria-disabled') === 'true') return;
+          this._setViewportPreviewMode_(btn.dataset.previewMode || 'live');
+        });
       });
       const commitPreviewWidth = () => this._commitResponsiveViewportField_?.('width');
       const commitPreviewHeight = () => this._commitResponsiveViewportField_?.('height');
@@ -16276,8 +22267,11 @@ _getMobileTextAssistScale_() {
         this.exportBtn?.addEventListener('click', () => this._exportDesign());
         this.importBtn?.addEventListener('click', () => this._importDesign());
         this.applyLayoutBtn?.addEventListener('click', () => this._saveLayout(false));
+        this.toolbarAutoSaveBtn?.addEventListener('click', () => this._setToolbarAutoSave_?.(!this.autoSave));
         this.copyBtn?.addEventListener('click', () => this._copySelection());
         this.pasteBtn?.addEventListener('click', () => this._pasteClipboard());
+        this.undoBtn?.addEventListener('click', () => this._undoLayoutHistory_?.());
+        this.redoBtn?.addEventListener('click', () => this._redoLayoutHistory_?.());
         this.lineModeBtn?.addEventListener('click', () => this._toggleConnectorDrawMode_?.());
         this.settingsBtn?.addEventListener('click', () => {
           this._closeToolbarDropdown_?.();
@@ -16422,7 +22416,7 @@ _startInitialAutosize() {
     try { document.fonts?.ready?.then(apply); } catch {}
 
     // Scope the MutationObserver: when auto-resize is OFF, avoid attribute churn
-    const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+    const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
     const inner = this.cardContainer || this.querySelector('#cardContainer');
     if (!inner) return;
 
@@ -16457,8 +22451,8 @@ connectedCallback() {
 
     if (!this.__autoFillAfterDragHandler) {
       this.__autoFillAfterDragHandler = () => {
-        const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-        if (mode === 'auto') requestAnimationFrame(() => this._applyAutoFillNoScale?.());
+        const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+        if (mode === 'auto') requestAnimationFrame(() => this._applyAutoScale?.());
       };
     }
     this.removeEventListener('ddc:dragend', this.__autoFillAfterDragHandler);
@@ -16513,7 +22507,7 @@ connectedCallback() {
     });
 
     try {
-      const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
       if (this.autoResizeCards || mode === 'auto') {
         window.addEventListener('resize', this.__ddcOnWinResize);
       } else {
@@ -16567,6 +22561,7 @@ connectedCallback() {
     try {
       if (this._screensaverTimer) { clearTimeout(this._screensaverTimer); this._screensaverTimer = null; }
       if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+      if (this.__sidebarClockInterval) { clearInterval(this.__sidebarClockInterval); this.__sidebarClockInterval = null; }
       if (this._screensaverActivityHandler) {
         const _evs = this._screensaverEvents || [];
         _evs.forEach((ev) => {
@@ -16591,6 +22586,7 @@ connectedCallback() {
     try { this.__streamlinedToolbarRO?.disconnect(); } catch {}
     this.__streamlinedToolbarRO = null;
     this.__streamlinedToolbarROTarget = null;
+    try { this._removeToolbarFollowListeners_?.(); } catch {}
 
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
@@ -16650,6 +22646,14 @@ connectedCallback() {
         // Don't reprocess card_mod here - it will be handled by _processCardModOnce
       }
     }
+    const sidebarWraps = this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper') || [];
+    for (const wrap of sidebarWraps) {
+      const c = wrap.firstElementChild;
+      if (c && c.hass !== hass) {
+        c.hass = hass;
+      }
+    }
+    this._updateSidebarHeader_?.();
 
     // After updating hass on all cards, re‑evaluate visibility so that state
     // conditions are applied when not editing. Visibility is not applied during
@@ -16698,7 +22702,7 @@ connectedCallback() {
 
       if (this.storageKey) {
         try {
-          local = JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null');
+          local = this._normalizeDashboardPayload_(JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'));
         } catch {}
       }
 
@@ -16710,7 +22714,7 @@ connectedCallback() {
           saved = local;
           if (this._backendOK) {
             try {
-              await this._saveLayoutToBackend(this.storageKey, local);
+              await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
               this._dbgPush('boot', 'Repaired backend from newer local snapshot');
             } catch (e) {
               this._dbgPush('boot', 'Backend repair from local failed', { error: String(e) });
@@ -16726,7 +22730,7 @@ connectedCallback() {
 
           if (this._backendOK) {
             try {
-              await this._saveLayoutToBackend(this.storageKey, local);
+              await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
               this._dbgPush('boot', 'Migrated local -> backend');
               saved = local;
             } catch (e) {
@@ -16788,6 +22792,7 @@ connectedCallback() {
         || yamlCfg?.responsive_viewports
         || this.responsiveViewportProfiles
       );
+      this.sidebarCards = [];
       this._responsiveLayouts = this._normalizeResponsiveLayouts_(saved?.cards || [], saved?.responsive_layouts || null);
       try {
         const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || saved?.cards || [];
@@ -16837,6 +22842,7 @@ connectedCallback() {
       this.__booting = false;
       this.__dirty = false;
       this._updateApplyBtn?.();
+      this._resetLayoutHistory_?.('load');
       try { this._renderTabs(); this._renderLayersBar_?.(); this._applyActiveTab(); } catch {}
       // Reevaluate visibility after the layout has been built. Cards with
       // visibility conditions will hide themselves when not in edit mode.
@@ -16860,6 +22866,7 @@ connectedCallback() {
     const bar = this.tabsBar; if (!bar) return;
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
     const hasLayerMenu = !!this._hasLayerMenu_?.();
+    const sidebarNavActive = !!this._isSidebarNavigationActive_?.();
     const shouldRenderTabs = !!tabs.length && !(tabs.length === 1 && this.hideTabsWhenSingle);
     this._syncTabsPlacement_?.();
     if (!shouldRenderTabs && !hasLayerMenu) {
@@ -16867,12 +22874,13 @@ connectedCallback() {
       bar.style.display = 'none';
       this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
       this.rootEl?.classList?.remove?.('ddc-tabs-bottom-layout');
+      this._renderSidebar_?.();
       return;
     }
     bar.style.display = '';
     const classes = ['ddc-tabs'];
-    if (this.tabsPosition === 'left') classes.push('ddc-tabs-left');
-    if (this.tabsPosition === 'bottom') classes.push('ddc-tabs-bottom');
+    if (sidebarNavActive) classes.push('ddc-tabs-left', 'ddc-tabs-sidebar');
+    if (!sidebarNavActive && this.tabsPosition === 'bottom') classes.push('ddc-tabs-bottom');
     if (hasLayerMenu) classes.push('ddc-tabs-has-layers');
     if (this.__layersMenuOpen) classes.push('ddc-layer-menu-open');
     this.__renderingTabs = true;
@@ -16920,6 +22928,7 @@ connectedCallback() {
     this._appendLayersMenuToTabs_?.(bar);
     this.__renderingTabs = false;
     this._syncTabsPlacement_?.();
+    this._renderSidebar_?.();
   
     try { this._updateTabsA11y_?.(); } catch {}
 
@@ -16956,12 +22965,8 @@ connectedCallback() {
 
     // After switching tabs, reapply sizing based on the current container mode.
     try {
-      const __m = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-      if (__m === 'auto') {
-        this._applyAutoFillNoScale?.();
-      } else {
-        this._applyAutoScale?.();
-      }
+      const __m = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+      this._applyAutoScale?.();
     } catch {}
 
     try { this._clearSelection(); } catch {}
@@ -16970,16 +22975,27 @@ connectedCallback() {
     try { this._renderConnectors_?.(); } catch {}
   }
 
+  _cardAnimationId_(wrap) {
+    if (!wrap) return '';
+    return String(
+      wrap.dataset?.layoutCardId
+      || wrap.dataset?.historyId
+      || wrap.id
+      || ''
+    ).trim();
+  }
+
   /**
    * Animate all visible card wrappers. When the animateCards flag is true
-   * this method is invoked after switching tabs or on initial load. It
-   * iterates over each wrapper that is currently displayed and applies
-   * a CSS class that triggers a short fly‑in animation. The class is
-   * removed once the animation completes so subsequent tab switches can
-   * retrigger the animation. Hidden wrappers (display: none) are skipped.
+   * this method is invoked after switching tabs or on initial load. Each
+   * card is animated once per mounted dashboard instance so switching tabs,
+   * undo/redo, or rebuilding the same layout does not replay the entrance
+   * effect over and over. Hidden wrappers (display: none) are skipped.
    */
 _animateCards(targetWraps = null) {
   try {
+    if (this.__suppressCardAnimation || this.__historyRestoring) return;
+    if (!this.__animatedCardIds) this.__animatedCardIds = new Set();
     const wraps = Array.isArray(targetWraps)
       ? targetWraps
       : Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper') || []);
@@ -17008,6 +23024,10 @@ _animateCards(targetWraps = null) {
       const animatePref = String(cardStyle.animate_cards || '').toLowerCase();
       const shouldAnimate = animatePref === 'on' || (animatePref !== 'off' && this.animateCards);
       if (!shouldAnimate) return;
+
+      const animationId = this._cardAnimationId_(w);
+      if (animationId && this.__animatedCardIds.has(animationId)) return;
+      if (animationId) this.__animatedCardIds.add(animationId);
 
       // Preserve any existing transform from layout
       const base = (cs && cs.transform && cs.transform !== 'none') ? cs.transform : '';
@@ -17977,6 +23997,9 @@ _toggleEditMode(force = null) {
   // Find toolbar in a robust way (no early return)
   const host = this.renderRoot || this.shadowRoot || this;
   const toolbar = host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+  if (entering) {
+    try { this._setToolbarFollowMode_?.(true); } catch {}
+  }
 
   // Helpers that are null-safe
   const setDisplay = (el, val) => { try { if (el) el.style.display = val; } catch {} };
@@ -17993,11 +24016,15 @@ _toggleEditMode(force = null) {
     setDisplay(this.exploreBtn, on);
     setDisplay(this.storeBadge, on);
     setDisplay(this.applyLayoutBtn, on);
+    setDisplay(this.toolbarAutoSaveBtn, on);
     setDisplay(this.copyBtn, on);
     setDisplay(this.pasteBtn, on);
+    setDisplay(this.undoBtn, on);
+    setDisplay(this.redoBtn, on);
     setDisplay(this.lineModeBtn, on);
     setDisplay(this.settingsBtn, on);
     setDisplay(this.toolbarToggleBtn, off);
+    this._syncHistoryButtons_?.();
   };
 
   const hideButtons = () => {
@@ -18010,8 +24037,11 @@ _toggleEditMode(force = null) {
     setDisplay(this.exploreBtn, off);
     setDisplay(this.storeBadge, off);
     setDisplay(this.applyLayoutBtn, off);
+    setDisplay(this.toolbarAutoSaveBtn, off);
     setDisplay(this.copyBtn, off);
     setDisplay(this.pasteBtn, off);
+    setDisplay(this.undoBtn, off);
+    setDisplay(this.redoBtn, off);
     setDisplay(this.lineModeBtn, off);
     setDisplay(this.settingsBtn, off);
     setDisplay(this.toolbarToggleBtn, off);
@@ -18068,12 +24098,18 @@ _toggleEditMode(force = null) {
         this._closeToolbarDropdown_?.({ toolbar });
         hideButtons();
         toolbar.removeAttribute('data-force-open');
+        if (!this.editMode) {
+          try { this._setToolbarFollowMode_?.(false); } catch {}
+        }
         // Let your existing CSS take over (display:none when not in edit)
       }, DUR);
     }
   } else {
     // No toolbar found; still flip mode & show/hide buttons so app logic continues
     entering ? showButtons() : hideButtons();
+    if (!entering) {
+      try { this._setToolbarFollowMode_?.(false); } catch {}
+    }
   }
 
   // === Your existing non-visual logic unchanged ===
@@ -18111,11 +24147,26 @@ _toggleEditMode(force = null) {
     }
     w.style.touchAction = this.editMode ? 'none' : 'auto';
   });
+  const sidebarWraps = this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper') || [];
+  sidebarWraps.forEach((w) => {
+    w.classList.toggle('editing', this.editMode);
+    try { w.firstElementChild?.__ddcSetEditPreviewMode?.(this.editMode); } catch {}
+    w.querySelectorAll('.resize-handle').forEach((handle) => {
+      handle.style.display = this.editMode ? 'flex' : 'none';
+    });
+    if (window.interact) {
+      try { window.interact(w).draggable(this.editMode).resizable(this.editMode); } catch {}
+    }
+    w.style.touchAction = this.editMode ? 'none' : 'auto';
+  });
+  this._syncSidebarEmptyState_?.();
   if (!this.editMode) this._clearSelection?.();
 
   if (!this.editMode) {
     this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
       .forEach(w => w.classList.remove('dragging'));
+    this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper.dragging')
+      ?.forEach?.(w => w.classList.remove('dragging'));
   }
   this._syncConnectorUiState_?.();
 
@@ -18147,7 +24198,8 @@ _toggleEditMode(force = null) {
       // by the height of the toolbar so the draggable area does not sit
       // underneath the toolbar.  Clear the margin when exiting edit mode.
       if (!this.autoResizeCards && this.cardContainer) {
-        if (entering && toolbar) {
+        const toolbarFollowsViewport = this.hasAttribute?.('ddc-toolbar-follow');
+        if (entering && toolbar && !toolbarFollowsViewport) {
           this.cardContainer.style.marginTop = h + 'px';
         } else {
           this.cardContainer.style.marginTop = '';
@@ -18365,11 +24417,260 @@ _syncEmptyStateUI() {
   toggle(this.exploreBtn);
   toggle(this.storeBadge);
   toggle(this.applyLayoutBtn);
+  toggle(this.toolbarAutoSaveBtn);
+  toggle(this.undoBtn);
+  toggle(this.redoBtn);
   toggle(this.lineModeBtn);
+  this._syncHistoryButtons_?.();
+  }
+
+  _historyStacks_() {
+    if (!Array.isArray(this.__undoStack)) this.__undoStack = [];
+    if (!Array.isArray(this.__redoStack)) this.__redoStack = [];
+    return { undo: this.__undoStack, redo: this.__redoStack };
+  }
+
+  _historyMaxDepth_() {
+    return 60;
+  }
+
+  _historySnapshotSignature_(snapshot = null) {
+    if (!snapshot || typeof snapshot !== 'object') return '';
+    try {
+      return JSON.stringify({
+        activeLayoutKey: snapshot.activeLayoutKey || '',
+        activeTab: snapshot.activeTab || '',
+        cards: snapshot.cards || [],
+        responsive_layouts: snapshot.responsive_layouts || null,
+        connectors: snapshot.connectors || [],
+        responsive_connectors: snapshot.responsive_connectors || null,
+      });
+    } catch {
+      return '';
+    }
+  }
+
+  _captureLayoutHistorySnapshot_(reason = '') {
+    if (!this.cardContainer) return null;
+    try { this._persistCurrentResponsiveProfileToMemory_?.(); } catch {}
+    try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
+
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const activeKey = this._activeResponsiveLayoutKey
+      || this._getRequestedResponsiveLayoutKey_?.()
+      || primaryKey;
+    const primaryCards = this._responsiveLayouts?.[primaryKey] || this._captureCurrentLayoutEntries_?.() || [];
+    const responsiveLayouts = this._serializeResponsiveLayouts_
+      ? this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards))
+      : null;
+    const activeConnectors = this._getCurrentConnectorEntries_
+      ? this._cloneJson_(this._getCurrentConnectorEntries_())
+      : this._cloneJson_(this._config?.connectors || []);
+    const responsiveConnectors = this._serializeResponsiveConnectorLayouts_
+      ? this._cloneJson_(this._serializeResponsiveConnectorLayouts_(this._responsiveConnectors, activeConnectors))
+      : null;
+
+    const snapshot = {
+      reason,
+      activeLayoutKey: activeKey,
+      activeTab: this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.activeTab || this.defaultTab || 'default',
+      cards: this._cloneJson_(primaryCards),
+      responsive_layouts: responsiveLayouts,
+      connectors: activeConnectors || [],
+      responsive_connectors: responsiveConnectors,
+    };
+    snapshot.signature = this._historySnapshotSignature_(snapshot);
+    return snapshot;
+  }
+
+  _syncHistoryButtons_() {
+    const { undo, redo } = this._historyStacks_();
+    if (this.undoBtn) {
+      this.undoBtn.disabled = !undo.length;
+      this.undoBtn.setAttribute('aria-disabled', undo.length ? 'false' : 'true');
+      this.undoBtn.title = undo.length ? 'Undo (Ctrl+Z)' : 'Nothing to undo';
+    }
+    if (this.redoBtn) {
+      this.redoBtn.disabled = !redo.length;
+      this.redoBtn.setAttribute('aria-disabled', redo.length ? 'false' : 'true');
+      this.redoBtn.title = redo.length ? 'Redo (Ctrl+Y)' : 'Nothing to redo';
+    }
+  }
+
+  _trimHistoryStack_(stack = []) {
+    const max = this._historyMaxDepth_();
+    while (stack.length > max) stack.shift();
+  }
+
+  _resetLayoutHistory_(reason = 'reset') {
+    this.__undoStack = [];
+    this.__redoStack = [];
+    this.__historyCurrentSnapshot = this._captureLayoutHistorySnapshot_(reason);
+    this._syncHistoryButtons_?.();
+  }
+
+  _recordLayoutHistoryCheckpoint_(reason = 'change') {
+    if (this.__historyRestoring || this._loading || !this.cardContainer) return;
+    const next = this._captureLayoutHistorySnapshot_(reason);
+    if (!next) return;
+
+    const nextSig = next.signature || this._historySnapshotSignature_(next);
+    const current = this.__historyCurrentSnapshot;
+    const currentSig = current?.signature || this._historySnapshotSignature_(current);
+
+    if (!current) {
+      this.__historyCurrentSnapshot = next;
+      this._syncHistoryButtons_?.();
+      return;
+    }
+
+    if (nextSig === currentSig) {
+      this.__historyCurrentSnapshot = next;
+      this._syncHistoryButtons_?.();
+      return;
+    }
+
+    const { undo, redo } = this._historyStacks_();
+    undo.push(this._cloneJson_(current));
+    this._trimHistoryStack_(undo);
+    redo.length = 0;
+    this.__historyCurrentSnapshot = next;
+    this._syncHistoryButtons_?.();
+  }
+
+  _scheduleHistoryPersist_(reason = 'history') {
+    this._markDirty?.(reason);
+    if (!this.autoSave || !this.editMode || this._loading) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce);
+  }
+
+  async _applyLayoutHistorySnapshot_(snapshot = null, reason = 'history') {
+    if (!snapshot) return false;
+    const prevSuppressCardAnimation = !!this.__suppressCardAnimation;
+    this.__historyRestoring = true;
+    this.__suppressCardAnimation = true;
+    try {
+      const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+      this._responsiveLayouts = this._normalizeResponsiveLayouts_(snapshot.cards || [], snapshot.responsive_layouts || null);
+      this.sidebarCards = [];
+      this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(snapshot.connectors || [], snapshot.responsive_connectors || null);
+      this._syncConnectorLayoutsToConfig_?.();
+
+      const variants = this._responsiveLayoutVariantKeys_?.() || Object.keys(this._responsiveLayouts || {});
+      const targetKey = variants.includes(snapshot.activeLayoutKey) ? snapshot.activeLayoutKey : (this._activeResponsiveLayoutKey || primaryKey);
+      const split = this._splitResponsiveLayoutKey_?.(targetKey) || {};
+      this._activeResponsiveLayoutKey = targetKey;
+      this._activeResponsiveProfile = split.profile || this._activeResponsiveProfile || 'desktop';
+      this.activeTab = this._normalizeTabId?.(snapshot.activeTab || this.activeTab || this.defaultTab) || this.activeTab || this.defaultTab;
+
+      const entries = this._responsiveLayouts?.[targetKey] || this._responsiveLayouts?.[primaryKey] || [];
+      await this._buildCardsFromEntries_(entries);
+      this._renderSidebar_?.();
+
+      try {
+        const primaryCards = this._responsiveLayouts?.[primaryKey] || snapshot.cards || [];
+        this._config = {
+          ...(this._config || {}),
+          cards: this._cloneJson_(primaryCards),
+          responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards)),
+        };
+      } catch {}
+
+      try { this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); } catch {}
+      try { this._applyVisibility_?.(); } catch {}
+      try { this._renderConnectors_?.(); } catch {}
+      this._resizeContainer?.();
+      this._applyAutoScale?.();
+      this._syncEmptyStateUI?.();
+      this.__historyCurrentSnapshot = this._cloneJson_(snapshot);
+      this.__historyCurrentSnapshot.signature = snapshot.signature || this._historySnapshotSignature_(snapshot);
+      this._scheduleHistoryPersist_(reason);
+      return true;
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Failed to apply layout history snapshot', err);
+      this._toast?.('Could not restore layout history.');
+      return false;
+    } finally {
+      this.__suppressCardAnimation = prevSuppressCardAnimation;
+      this.__historyRestoring = false;
+      this._syncHistoryButtons_?.();
+    }
+  }
+
+  async _undoLayoutHistory_() {
+    const { undo, redo } = this._historyStacks_();
+    if (!undo.length) {
+      this._syncHistoryButtons_?.();
+      this._toast?.('Nothing to undo.');
+      return false;
+    }
+
+    const current = this._captureLayoutHistorySnapshot_('redo-point') || this.__historyCurrentSnapshot;
+    const target = undo.pop();
+    if (current) {
+      redo.push(this._cloneJson_(current));
+      this._trimHistoryStack_(redo);
+    }
+    const ok = await this._applyLayoutHistorySnapshot_(target, 'undo');
+    if (ok) this._toast?.('Undo applied.');
+    return ok;
+  }
+
+  async _redoLayoutHistory_() {
+    const { undo, redo } = this._historyStacks_();
+    if (!redo.length) {
+      this._syncHistoryButtons_?.();
+      this._toast?.('Nothing to redo.');
+      return false;
+    }
+
+    const current = this._captureLayoutHistorySnapshot_('undo-point') || this.__historyCurrentSnapshot;
+    const target = redo.pop();
+    if (current) {
+      undo.push(this._cloneJson_(current));
+      this._trimHistoryStack_(undo);
+    }
+    const ok = await this._applyLayoutHistorySnapshot_(target, 'redo');
+    if (ok) this._toast?.('Redo applied.');
+    return ok;
   }
 
     _updateApplyBtn() {
     if (this.applyLayoutBtn) this.applyLayoutBtn.disabled = !this.__dirty;
+  }
+  _syncToolbarAutoSaveState_() {
+    const btn = this.toolbarAutoSaveBtn || this.shadowRoot?.querySelector?.('#toolbarAutoSaveBtn');
+    if (!btn) return;
+    const enabled = this.autoSave !== false;
+    btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    btn.title = enabled ? 'Auto-save is on' : 'Auto-save is off';
+    btn.dataset.tooltip = enabled ? 'Auto-save is on' : 'Auto-save is off';
+    const state = btn.querySelector?.('.ddc-autosave-state');
+    if (state) state.textContent = enabled ? 'On' : 'Off';
+  }
+  _setToolbarAutoSave_(enabled = true) {
+    const next = !!enabled;
+    this.autoSave = next;
+    this._config = {
+      ...(this._config || {}),
+      auto_save: next,
+      auto_save_debounce: this.autoSaveDebounce ?? 800,
+    };
+    if (!next) clearTimeout(this._saveTimer);
+    this._syncToolbarAutoSaveState_?.();
+    this._markDirty?.('toolbar-autosave');
+    try {
+      this.dispatchEvent(new CustomEvent('config-changed', {
+        detail: { config: { type: 'custom:drag-and-drop-card', ...(this._config || {}) } },
+        bubbles: true,
+        composed: true,
+      }));
+    } catch {}
+    if (next && this.editMode && !this._loading) {
+      clearTimeout(this._saveTimer);
+      this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce || 800);
+    }
   }
   _markDirty(reason='') {
     this.__dirty = true;
@@ -18398,6 +24699,7 @@ _syncEmptyStateUI() {
   _initInteract() {
     const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
     wraps.forEach((w) => this._initCardInteract(w));
+    this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper')?.forEach((w) => this._initSidebarCardInteract_(w));
   }
   _initCardInteract(wrap) {
     if (!window.interact || wrap.dataset.placeholder) return;
@@ -18452,15 +24754,20 @@ _syncEmptyStateUI() {
           if (this.__reflowRAF) {
             try { cancelAnimationFrame(this.__reflowRAF); } catch {}
             this.__reflowRAF = null;
-          }
-          try {
-            this.__prevMoveContainerOverflow = this.cardContainer?.style?.overflow || '';
-            if (this.cardContainer) this.cardContainer.style.overflow = 'visible';
-          } catch {}
+	          }
+	          try {
+	            this.__prevMoveContainerOverflow = this.cardContainer?.style?.overflow || '';
+	            this.__keepPreviewDragClipped = !!this._getViewportPreviewPreset_?.();
+	            if (this.cardContainer) {
+	              this.cardContainer.style.overflow = this.__keepPreviewDragClipped ? 'hidden' : 'visible';
+	            }
+	          } catch {}
 
           // Capture original raw positions of all cards (non‑placeholders) so we can restore them
           this.__collisionOriginals = new Map();
-          const allCardsStart = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
+          const selectedAtStart = new Set(group);
+          const allCardsStart = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
+            .filter((c) => selectedAtStart.has(c) || this._isWrapperVisibleForOverlap_?.(c));
           allCardsStart.forEach(c => {
             const rawX = parseFloat(c.getAttribute('data-x-raw')) || parseFloat(c.getAttribute('data-x')) || 0;
             const rawY = parseFloat(c.getAttribute('data-y-raw')) || parseFloat(c.getAttribute('data-y')) || 0;
@@ -18563,11 +24870,16 @@ _syncEmptyStateUI() {
           // Cleanup
           for (const m of this.__groupDrag.members) m.classList.remove('dragging');
           this.__ddcMovingCard = false;
-          this.__ddcScaleAfterCardMove = false;
-          try {
-            if (this.cardContainer) this.cardContainer.style.overflow = this.__prevMoveContainerOverflow || 'hidden';
-          } catch {}
-          this.__prevMoveContainerOverflow = undefined;
+	          this.__ddcScaleAfterCardMove = false;
+	          try {
+	            if (this.cardContainer) {
+	              this.cardContainer.style.overflow = this.__keepPreviewDragClipped
+	                ? 'hidden'
+	                : (this.__prevMoveContainerOverflow || 'hidden');
+	            }
+	          } catch {}
+	          this.__prevMoveContainerOverflow = undefined;
+	          this.__keepPreviewDragClipped = false;
           if (this._isContainerFixed()) this._clampAllCardsInside();
           this._settleLayoutAfterCardMove_?.({ syncAnchors: true });
           this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
@@ -18705,9 +25017,8 @@ _syncEmptyStateUI() {
           this.__ddcResizeFromLeft = false;
           this.cardContainer?.classList?.remove?.('ddc-card-resizing');
           try {
-            const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-            if (mode === 'auto') this._applyAutoFillNoScale?.();
-            else if (this.autoResizeCards || needsFinalScale) this._applyAutoScale?.();
+            const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+            if (mode === 'auto' || this.autoResizeCards || needsFinalScale) this._applyAutoScale?.();
           } catch {}
           this._scheduleConnectorsRender_?.({ syncAnchors: true });
           this._queueSave('resize-end');
@@ -19145,10 +25456,94 @@ _syncEmptyStateUI() {
     return wrap;
   }
 
+  async _applyEmptyDashboardPreset_(presetKey) {
+    const preset = DragAndDropCard._sizePresets().find((item) => item.key === presetKey)
+      || DragAndDropCard._sizePresets().find((item) => item.key === 'fhd');
+    if (!preset) return;
+
+    const patch = {
+      container_size_mode: 'preset',
+      container_preset: preset.key,
+      container_preset_orientation: 'auto',
+      container_fixed_width: null,
+      container_fixed_height: null,
+      auto_resize_cards: true,
+    };
+
+    try {
+      if (typeof this._setDashboardApiSettings_ === 'function') {
+        await this._setDashboardApiSettings_(patch, { persist: true });
+      } else {
+        this._applyImportedOptions?.(patch, true);
+        this._markDirty?.('empty-preset');
+      }
+      this._config = { ...(this._config || {}), ...patch };
+      if (this._isLayoutEmpty?.()) {
+        this._hideEmptyPlaceholder?.();
+        this._showEmptyPlaceholder?.();
+      } else {
+        this._resizeContainer?.();
+      }
+      this._applyAutoScale?.();
+      this._syncViewportPreviewUI_?.();
+      this._toast?.(`${preset.label} canvas applied (${preset.w} x ${preset.h}).`);
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Failed to apply empty-state preset', err);
+      this._toast?.('Could not apply canvas preset.');
+    }
+  }
+
+  async _applyEmptyDashboardSizeMode_(sizeMode = 'fixed-fhd') {
+    const normalized = String(sizeMode || '').trim().toLowerCase();
+    const useAuto = normalized === 'auto';
+    const patch = useAuto
+      ? {
+          container_size_mode: 'auto',
+          container_preset: 'fhd',
+          container_preset_orientation: 'auto',
+          container_fixed_width: null,
+          container_fixed_height: null,
+          auto_resize_cards: true,
+        }
+      : {
+          container_size_mode: 'preset',
+          container_preset: 'fhd',
+          container_preset_orientation: 'auto',
+          container_fixed_width: null,
+          container_fixed_height: null,
+          auto_resize_cards: false,
+        };
+
+    try {
+      if (typeof this._setDashboardApiSettings_ === 'function') {
+        await this._setDashboardApiSettings_(patch, { persist: true });
+      } else {
+        this._applyImportedOptions?.(patch, true);
+        this._markDirty?.('empty-size-mode');
+      }
+      this._config = { ...(this._config || {}), ...patch };
+      if (this._isLayoutEmpty?.()) {
+        this._hideEmptyPlaceholder?.();
+        this._showEmptyPlaceholder?.();
+      } else {
+        this._resizeContainer?.();
+      }
+      this._applyContainerSizingFromConfig?.(false);
+      this._applyAutoScale?.();
+      this._syncViewportPreviewUI_?.();
+      this._toast?.(useAuto ? 'Auto canvas enabled.' : 'Fixed Size (Full HD) canvas applied.');
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Failed to apply empty-state size mode', err);
+      this._toast?.('Could not apply canvas size.');
+    }
+  }
+
   _makePlaceholderAt(x=0,y=0,w=400,h=400) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
+    wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', 'Drag and Drop Card getting started');
     if (this.editMode) wrap.classList.add('editing');
     this._setCardPosition(wrap, x, y);
     wrap.style.width = `${w}px`;
@@ -19157,33 +25552,89 @@ _syncEmptyStateUI() {
   
     const inner = document.createElement('div');
     inner.className = 'ddc-placeholder-inner';
-    // purely decorative; nothing clickable
-    inner.setAttribute('aria-hidden','true');
+    inner.setAttribute('role', 'group');
+    inner.setAttribute('aria-label', 'Getting started actions');
 
-    // --- Hero UI (image + text) ---
-    const hero = document.createElement('div');
-    hero.className = 'ddc-hero';
+    const shell = document.createElement('div');
+    shell.className = 'ddc-empty-shell';
 
-    // Optional image: from config.hero_image (e.g. /local/dragdrop-hero.png)
-    // If not provided, this block simply won’t render an <img>.
+    const visual = document.createElement('div');
+    visual.className = 'ddc-empty-visual';
     const heroImgUrl = this.heroImage; // already set to default or config override
     if (heroImgUrl) {
       const img = document.createElement('img');
       img.src = heroImgUrl;
       img.alt = "";
-      hero.appendChild(img);
+      img.loading = 'lazy';
+      visual.appendChild(img);
     }
+    const content = document.createElement('div');
+    content.className = 'ddc-empty-content';
+    content.innerHTML = `
+      <div class="ddc-empty-kicker"><ha-icon icon="mdi:creation-outline"></ha-icon><span>Start here</span></div>
+      <h2 class="ddc-empty-title">Build your first dashboard canvas.</h2>
+      <p class="ddc-empty-sub">Choose how the canvas should behave, add your first card, then shape the dashboard visually on the grid.</p>
+      <div class="ddc-empty-steps" aria-label="Getting started steps">
+        <div class="ddc-empty-step"><strong>1. Pick a mode</strong><span>Use a fixed Full HD canvas or let Auto scale to the viewport.</span></div>
+        <div class="ddc-empty-step"><strong>2. Add cards</strong><span>Open the card picker and place Home Assistant or Drag & Drop cards.</span></div>
+        <div class="ddc-empty-step"><strong>3. Play around</strong><span>Drag, resize, layer, test ideas, and save when the dashboard feels right.</span></div>
+      </div>
+      <div class="ddc-empty-actions">
+        <button type="button" class="ddc-empty-btn primary" data-ddc-empty-action="add">
+          <ha-icon icon="mdi:plus-circle-outline"></ha-icon><span>Add first card</span>
+        </button>
+        <button type="button" class="ddc-empty-btn" data-ddc-empty-action="settings">
+          <ha-icon icon="mdi:tune-variant"></ha-icon><span>Dashboard settings</span>
+        </button>
+      </div>
+      <div class="ddc-empty-presets" aria-label="Canvas size mode">
+        <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="fixed-fhd">
+          <ha-icon icon="mdi:monitor-screenshot"></ha-icon>
+          <span class="ddc-empty-size-copy"><span>Fixed Size (Full HD)</span><small>1920 x 1080 canvas</small></span>
+        </button>
+        <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="auto">
+          <ha-icon icon="mdi:fit-to-screen-outline"></ha-icon>
+          <span class="ddc-empty-size-copy"><span>Auto</span><small>Scales to the current viewport</small></span>
+        </button>
+      </div>
+      <div class="ddc-empty-links">
+        <button type="button" class="ddc-empty-link" data-ddc-empty-action="docs">
+          <ha-icon icon="mdi:help-circle-outline"></ha-icon><span>Read the start guide</span>
+        </button>
+        <span>Double-click empty space to enter Edit Mode.</span>
+      </div>
+    `;
 
-    // Title + subtitle
-    const title = document.createElement('div');
-    title.className = 'ddc-title';
-    title.textContent = 'Drag & Drop Card';
-    const sub = document.createElement('div');
-    sub.className   = 'ddc-sub';
-    sub.textContent = 'Hold me / double click me to enter Edit mode';
+    const handleEmptyAction = async (e) => {
+      const btn = e.target?.closest?.('[data-ddc-empty-action]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const action = btn.dataset.ddcEmptyAction;
+      if (action === 'add') {
+        if (!this.editMode) this._toggleEditMode(true);
+        this._openCardManager?.();
+      } else if (action === 'settings') {
+        if (!this.editMode) this._toggleEditMode(true);
+        this._openDashboardSettings?.();
+      } else if (action === 'docs') {
+        window.open('https://hads.smarti.dev/wiki/start-here', '_blank', 'noopener,noreferrer');
+      } else if (action === 'size-mode') {
+        await this._applyEmptyDashboardSizeMode_(btn.dataset.sizeMode || 'fixed-fhd');
+      } else if (action === 'preset') {
+        await this._applyEmptyDashboardPreset_(btn.dataset.preset || 'fhd');
+      }
+    };
+    shell.addEventListener('click', handleEmptyAction);
+    shell.addEventListener('pointerdown', (e) => {
+      if (e.target?.closest?.('button')) e.stopPropagation();
+    });
+    shell.addEventListener('dblclick', (e) => {
+      if (e.target?.closest?.('button')) e.stopPropagation();
+    });
 
-    hero.append(title, sub);
-    inner.appendChild(hero);
+    shell.append(visual, content);
+    inner.appendChild(shell);
 
     // Let users double-click anywhere on the placeholder to enter edit
     wrap.addEventListener('dblclick', (e) => {
@@ -19240,10 +25691,17 @@ _syncEmptyStateUI() {
   _showEmptyPlaceholder() {
     // Avoid creating multiple placeholders
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    // Define placeholder dimensions.  These values mirror the original
-    // implementation and can be adjusted if the default size changes.
-    const phW = 200;
-    const phH = 200;
+    // Keep the welcome panel large enough to be useful, but let it respect
+    // smaller canvas presets such as tablet and mobile.
+    let canvasW = 1920;
+    let canvasH = 1080;
+    try {
+      const size = this._getContainerSize?.();
+      canvasW = Math.max(320, Number(size?.w || canvasW) || canvasW);
+      canvasH = Math.max(420, Number(size?.h || canvasH) || canvasH);
+    } catch {}
+    const phW = Math.round(Math.max(320, Math.min(1280, canvasW - Math.min(160, canvasW * .12))));
+    const phH = Math.round(Math.max(420, Math.min(680, canvasH - Math.min(160, canvasH * .12))));
     // Initially create the placeholder at (0,0) so that the resize logic can
     // compute an appropriate container size.  We will center it after the
     // container dimensions have been updated.
@@ -19314,15 +25772,16 @@ _syncEmptyStateUI() {
     return max;
   }
 
-  _setCardPosition(el, x, y) {
-    const nx = Math.round(x);
-    const ny = Math.max(0, Math.round(y));
-    el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
-    el.setAttribute('data-x', String(nx));
-    el.setAttribute('data-y', String(ny));
-    this._scheduleConnectorsRender_?.();
-    // Do NOT touch data-*-raw here; drag/resize 
-  }
+	  _setCardPosition(el, x, y) {
+	    const nx = Math.round(x);
+	    const ny = Math.max(0, Math.round(y));
+	    el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+	    el.setAttribute('data-x', String(nx));
+	    el.setAttribute('data-y', String(ny));
+	    this._scheduleConnectorsRender_?.();
+	    this._requestPreviewOutsideCardsSync_?.();
+	    // Do NOT touch data-*-raw here; drag/resize
+	  }
 
   _clampYToCanvasTop_(value = 0) {
     const n = Number(value);
@@ -19396,33 +25855,45 @@ _startScaleWatch() {
       return;
     }
 
-    // Safely measure host width
+    // Safely measure the host width and the available canvas height. Auto mode
+    // must react to both axes so the drop area fills the current view.
     let w = 1;
+    let h = 1;
     try {
       const rect = this.getBoundingClientRect?.();
       w = Math.max(1, (rect && rect.width) || this.offsetWidth || 1);
     } catch {
       w = Math.max(1, this.offsetWidth || 1);
     }
+    try {
+      const anchorRect = (this.__scaleOuter || this)?.getBoundingClientRect?.();
+      const viewportHeight = Math.max(
+        1,
+        Number(window.visualViewport?.height || 0) ||
+          Number(window.innerHeight || 0) ||
+          Number(document.documentElement?.clientHeight || 0) ||
+          1
+      );
+      h = Math.max(1, viewportHeight - Math.max(0, Number(anchorRect?.top || 0) || 0) - 8);
+    } catch {
+      h = 1;
+    }
 
     const last  = this.__lastScaleW || 0;
+    const lastH = this.__lastScaleH || 0;
     const delta = Math.abs(w - last);
+    const deltaH = Math.abs(h - lastH);
 
     // Hysteresis: ignore tiny width changes (scrollbar, rounding, etc.)
     const MIN_DELTA = 20; // px – adjust if you want it more/less sensitive
 
-    if (!last || delta >= MIN_DELTA) {
+    if (!last || delta >= MIN_DELTA || !lastH || deltaH >= MIN_DELTA) {
       this.__lastScaleW = w;
+      this.__lastScaleH = h;
 
-      const mode = String(
-        this.containerSizeMode || this.container_size_mode || 'dynamic'
-      ).toLowerCase();
+      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
 
-      if (mode === 'auto') {
-        this._applyAutoFillNoScale?.();
-      } else {
-        this._applyAutoScale?.();
-      }
+      this._applyAutoScale?.();
     }
 
     this.__scaleRAF = requestAnimationFrame(tick);
@@ -19582,6 +26053,82 @@ _setToolbarExpanded_(expanded = false, opts = {}) {
   } catch {}
 }
 
+_setToolbarFollowMode_(enabled = false) {
+  try {
+    const next = !!enabled;
+    this.toggleAttribute?.('ddc-toolbar-follow', next);
+    if (!next) {
+      this._removeToolbarFollowListeners_?.();
+      this._refreshToolbarOpenHeight_?.();
+      return;
+    }
+    try { this._computeHaSidebarGutters_?.(); } catch {}
+    try { this._computeHaTopGutter_?.(); } catch {}
+    this._installToolbarFollowListeners_?.();
+    this._refreshToolbarOpenHeight_?.();
+  } catch {}
+}
+
+_installToolbarFollowListeners_() {
+  try {
+    if (this.__toolbarFollowListeners || typeof window === 'undefined') return;
+    const watched = new WeakSet();
+    const sync = () => {
+      try { this._computeHaSidebarGutters_?.(); } catch {}
+      try { this._computeHaTopGutter_?.(); } catch {}
+      try { this._refreshToolbarOpenHeight_?.(); } catch {}
+      try { this._positionToolbarDropdown_?.(); } catch {}
+    };
+    const schedule = () => {
+      if (this.__toolbarFollowRAF) return;
+      this.__toolbarFollowRAF = requestAnimationFrame(() => {
+        this.__toolbarFollowRAF = 0;
+        sync();
+      });
+    };
+    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule, { passive: true });
+    let resizeObserver = null;
+    let discoveryTimer = 0;
+    try {
+      resizeObserver = new ResizeObserver(schedule);
+      const watchChrome = () => {
+        try {
+          (this._getHaSidebarGutterCandidates_?.() || []).forEach((el) => {
+            if (!el || watched.has(el)) return;
+            watched.add(el);
+            try { resizeObserver.observe(el); } catch {}
+          });
+        } catch {}
+      };
+      watchChrome();
+      discoveryTimer = window.setInterval(watchChrome, 1500);
+    } catch {}
+    this.__toolbarFollowListeners = { schedule, resizeObserver, discoveryTimer };
+    schedule();
+  } catch {}
+}
+
+_removeToolbarFollowListeners_() {
+  try {
+    const listeners = this.__toolbarFollowListeners;
+    if (listeners?.schedule && typeof window !== 'undefined') {
+      window.removeEventListener('scroll', listeners.schedule, true);
+      window.removeEventListener('resize', listeners.schedule);
+    }
+    try { listeners?.resizeObserver?.disconnect?.(); } catch {}
+    if (listeners?.discoveryTimer && typeof window !== 'undefined') {
+      try { window.clearInterval(listeners.discoveryTimer); } catch {}
+    }
+    this.__toolbarFollowListeners = null;
+    if (this.__toolbarFollowRAF) {
+      try { cancelAnimationFrame(this.__toolbarFollowRAF); } catch {}
+      this.__toolbarFollowRAF = 0;
+    }
+    this.removeAttribute?.('ddc-toolbar-follow');
+  } catch {}
+}
+
 _refreshToolbarOpenHeight_() {
   try {
     const host = this.shadowRoot || this.renderRoot || this;
@@ -19606,7 +26153,8 @@ _refreshToolbarOpenHeight_() {
         this._positionToolbarDropdown_?.(toolbar);
         if (root) root.style.setProperty('--ddc-toolbar-height', `${h}px`);
         if (!this.autoResizeCards && this.cardContainer) {
-          this.cardContainer.style.marginTop = h > 0 ? `${h}px` : '';
+          const toolbarFollowsViewport = this.hasAttribute?.('ddc-toolbar-follow');
+          this.cardContainer.style.marginTop = h > 0 && !toolbarFollowsViewport ? `${h}px` : '';
         }
       } catch {}
     });
@@ -19661,8 +26209,8 @@ _clearTextResizeLock_() {
 
 _ensureTextResizeObserver_() {
   const container = this.cardContainer;
-  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
-  const active = !!this.doNotResizeText || (mode === 'dynamic' && this._isMobileOptimizeActive_?.());
+  const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  const active = !!this.doNotResizeText || (mode === 'auto' && this._isMobileOptimizeActive_?.());
   if (!container || !active) {
     if (this.__ddcTextLockObserver) {
       try { this.__ddcTextLockObserver.disconnect(); } catch {}
@@ -19750,8 +26298,8 @@ _collectTextResizeTargets_(root, out = []) {
 
 _applyTextResizeLock_(force = false) {
   const container = this.cardContainer;
-  const mode = String(this.containerSizeMode || this.container_size_mode || 'dynamic').toLowerCase();
-  const supportedMode = (mode === 'dynamic' || mode === 'auto');
+  const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+  const supportedMode = mode === 'auto';
   const mobileAssist = supportedMode && this._isMobileOptimizeActive_?.();
   const enabled = supportedMode && (!!this.doNotResizeText || mobileAssist);
   const scale = Math.max(0.0001, Number(this.__pointerScaleX || this.__pointerScaleY || 1) || 1);
@@ -19841,51 +26389,35 @@ _applyAutoScale() {
     this.__ddcScaleAfterCardResize = true;
     return;
   }
-  // 1) Early path: "auto" mode (no proportional scaling)
-  let mode = 'dynamic';
+
+  let mode = 'auto';
   try {
-    mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
-    if (mode === 'auto') {
-      this._applyAutoFillNoScale?.();
-      this.removeAttribute('ddc-fixed-ui');
-      this.style?.removeProperty?.('--ddc-ui-width');
-      return;
-    }
+    mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    this.containerSizeMode = mode;
   } catch {}
 
   const c = this.cardContainer;
   if (!c) return;
 
-  // 2) Only ensure scale wrapper when actually scaling
+  const preview = mode === 'auto' ? this._getViewportPreviewPreset_?.() : null;
+  const previewActive = !!(preview?.width && preview?.height);
+
   try {
-    if (this.autoResizeCards || mode === 'auto' || this._getViewportPreviewPreset_?.()) {
+    if (this.autoResizeCards || mode === 'auto' || previewActive) {
       if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
     }
   } catch {}
 
-  // 3) Auto-resize OFF: lock to scale(1) but do not force a fixed UI.  In
-  // dynamic mode, the toolbar and tabs should remain in the normal flow
-  // (similar to auto mode) rather than being centered with a fixed width.
-  if (!this.autoResizeCards) {
+  if (!this.autoResizeCards && mode !== 'auto') {
     const d = (typeof this._computeDesignSize === 'function')
       ? this._computeDesignSize()
       : { w: c.offsetWidth || 1, h: c.offsetHeight || 1 };
     const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
-    const previewActive = previewHeight > 0;
+    const isPreview = previewHeight > 0;
 
-    if (mode === 'dynamic') {
-      try { this._computeHaSidebarGutters_?.(); } catch {}
-      // Remove any fixed UI attributes and widths so the toolbar and tabs
-      // behave like they do in auto mode.  Without this the UI is centered
-      // via CSS (:host[ddc-fixed-ui]) which causes inconsistent styling.
-      this.removeAttribute('ddc-fixed-ui');
-      this.style?.removeProperty?.('--ddc-ui-width');
-    } else {
-      this.removeAttribute('ddc-fixed-ui');
-      this.style?.removeProperty?.('--ddc-ui-width');
-    }
+    this.removeAttribute('ddc-fixed-ui');
+    this.style?.removeProperty?.('--ddc-ui-width');
 
-    // Avoid write→observer loops
     const wantW = `${d.w}px`;
     const wantH = `${d.h}px`;
     const sameW = c.style.width === wantW;
@@ -19905,33 +26437,34 @@ _applyAutoScale() {
       this.__pointerScaleY = 1;
       this._setEditControlScale_?.(1);
 
-      if (this.__scaleOuter) {
-        const pw =
-          (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
-          (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
-          (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+	      if (this.__scaleOuter) {
+	        const pw =
+	          (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+	          (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+	          (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
           this.offsetWidth || d.w;
         const outerW = this._getEffectivePreviewWidth_?.(pw) || pw;
         const wantOuterW = `${Math.max(1, outerW)}px`;
-        const wantOuterH = `${Math.max(1, previewActive ? previewHeight : d.h)}px`;
-        if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
-        if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
-        this.__scaleOuter.style.overflowX = d.w > outerW ? 'auto' : 'hidden';
-        this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
-        this.__scaleOuter.style.webkitOverflowScrolling = previewActive ? 'touch' : '';
-        this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+	        const wantOuterH = `${Math.max(1, isPreview ? previewHeight : d.h)}px`;
+	        if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
+	        if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
+	        if (isPreview) this.__scaleOuter.style.overflow = '';
+	        this.__scaleOuter.style.overflowX = d.w > outerW ? 'auto' : 'hidden';
+	        this.__scaleOuter.style.overflowY = isPreview ? 'auto' : 'hidden';
+	        this.__scaleOuter.style.webkitOverflowScrolling = isPreview ? 'touch' : '';
+        this.__scaleOuter.style.overscrollBehavior = isPreview ? 'contain' : '';
         this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
         this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
-        this._applyPreviewDeviceFrame_?.(outerW, previewActive ? previewHeight : d.h);
+        this._applyPreviewDeviceFrame_?.(outerW, isPreview ? previewHeight : d.h);
       }
     }
 
     try { this._syncTabsWidth_?.(); } catch {}
     try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
+    try { this._syncPreviewOutsideCards_?.(); } catch {}
     return;
   }
 
-  // 4) Auto-resize ON (dynamic scaling path)
   this.removeAttribute('ddc-fixed-ui');
   this.style?.removeProperty?.('--ddc-ui-width');
 
@@ -19944,76 +26477,111 @@ _applyAutoScale() {
     (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
     (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
     this.offsetWidth || d.w;
-  const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
-  const previewActive = previewHeight > 0;
 
-  const availableW = Math.max(1, this._getEffectivePreviewWidth_?.(pw) || pw);
+  const autoViewport = this._getAvailableAutoCanvasViewport_?.(pw, d.h) || {
+    width: Math.max(1, this._getEffectivePreviewWidth_?.(pw) || pw),
+    height: Math.max(1, d.h || 1),
+    isPreview: false,
+  };
+  const availableW = Math.max(1, Number(autoViewport.width || 1) || 1);
+  const availableH = Math.max(1, Number(autoViewport.height || d.h || 1) || 1);
+  const hasPreview = !!autoViewport.isPreview;
+  const profile = String(
+    preview?.id ||
+      this._getRequestedResponsiveProfile_?.() ||
+      this._activeResponsiveProfile ||
+      this._getActualResponsiveProfile_?.() ||
+      'desktop'
+  ).toLowerCase();
+  const isMobileAutoContext = profile === 'mobile';
+  const minimumCanvas = this._getAutoCanvasMinimumDesignSize_?.({ preview, includeEditBleed: true }) || { width: 1280, height: 720 };
+  const scaleCanvas = this._getAutoCanvasMinimumDesignSize_?.({ preview, includeEditBleed: false }) || minimumCanvas;
+  const minimumW = Math.max(1, Number(minimumCanvas.width ?? 1280) || 1);
+  const minimumH = Math.max(1, Number(minimumCanvas.height ?? 720) || 1);
+  const scaleMinimumW = Math.max(1, Number(scaleCanvas.width ?? minimumW) || minimumW);
+  const scaleMinimumH = Math.max(1, Number(scaleCanvas.height ?? minimumH) || minimumH);
+
   const unscaledPreview = this._shouldUseUnscaledPreviewCanvas_?.();
-  if (unscaledPreview) {
-    if (this.__scaleOuter) {
-      this.__scaleOuter.style.width = `${availableW}px`;
-      this.__scaleOuter.style.height = `${Math.max(1, previewActive ? previewHeight : d.h)}px`;
-      this.__scaleOuter.style.overflowX = 'auto';
-      this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
-      this.__scaleOuter.style.webkitOverflowScrolling = 'touch';
-      this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+	  if (unscaledPreview) {
+	    const targetW = Math.max(1, d.w, minimumW, availableW);
+	    const targetH = Math.max(1, d.h, minimumH, availableH);
+	    if (this.__scaleOuter) {
+	      this.__scaleOuter.style.width = `${availableW}px`;
+	      this.__scaleOuter.style.height = `${availableH}px`;
+	      if (hasPreview) this.__scaleOuter.style.overflow = '';
+	      this.__scaleOuter.style.overflowX = 'auto';
+	      this.__scaleOuter.style.overflowY = hasPreview ? 'auto' : 'hidden';
+	      this.__scaleOuter.style.webkitOverflowScrolling = 'touch';
+      this.__scaleOuter.style.overscrollBehavior = hasPreview ? 'contain' : '';
       this.__scaleOuter.style.marginInline = 'auto';
       this.__scaleOuter.style.maxWidth = '100%';
-      this._applyPreviewDeviceFrame_?.(availableW, previewActive ? previewHeight : d.h);
+      this._applyPreviewDeviceFrame_?.(availableW, availableH);
     }
 
-    c.style.width = `${d.w}px`;
-    c.style.height = `${d.h}px`;
+    c.style.width = `${targetW}px`;
+    c.style.height = `${targetH}px`;
     c.style.transform = 'scale(1)';
     c.style.transformOrigin = 'top left';
     c.style.position = 'absolute';
     c.style.top = '0';
     c.style.left = '0';
-
+    c.style.setProperty('--ddc-scale', '1');
     this.__pointerScaleX = 1;
     this.__pointerScaleY = 1;
     this._setEditControlScale_?.(1);
-
-    try { this._syncTabsWidth_?.(); } catch {}
-    try { this._layoutYtBackground_?.(); } catch {}
+    this._applyMobileTextAssist_?.(1);
+    this._syncTabsWidth_?.();
+    this._syncLeftRailViewportPosition_?.();
     try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
     try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+    try { this._syncPreviewOutsideCards_?.(); } catch {}
     return;
   }
-  // Compute the scale factor relative to the design width.  Previously the
-  // factor was clamped to ≤1, meaning the layout would only shrink but
-  // never grow.  This resulted in the “auto‑resize cards” option having
-  // no visible effect in dynamic mode when the design was narrower than
-  // the viewport.  Remove the clamp so that smaller layouts can grow to
-  // fill the available space.  If desired a maximum cap could be
-  // introduced here; for now allow the layout to scale up as needed.
-  const baseScale = availableW / Math.max(1, d.w);
-  const mobilePlan = this._isMobileOptimizeActive_?.()
-    ? this._getMobileScalePlan_?.(d.w, baseScale)
-    : null;
-  const scale = Math.max(0.0001, Number(mobilePlan?.scale || baseScale) || baseScale || 1);
 
-  if (this.__scaleOuter) {
-    this.__scaleOuter.style.width  = `${availableW}px`;
-    this.__scaleOuter.style.height = `${Math.max(1, previewActive ? previewHeight : (d.h * scale))}px`;
-    this.__scaleOuter.style.overflowX = mobilePlan?.allowPanX ? 'auto' : 'hidden';
-    this.__scaleOuter.style.overflowY = previewActive ? 'auto' : 'hidden';
-    this.__scaleOuter.style.webkitOverflowScrolling = (previewActive || mobilePlan?.allowPanX) ? 'touch' : '';
-    this.__scaleOuter.style.overscrollBehavior = previewActive ? 'contain' : '';
+  const scaleBasisW = isMobileAutoContext
+    ? scaleMinimumW
+    : Math.max(1, d.w, scaleMinimumW);
+  const scaleBasisH = isMobileAutoContext
+    ? scaleMinimumH
+    : Math.max(1, d.h, scaleMinimumH);
+  const baseScale = availableW / scaleBasisW;
+  const minimumScale = this._getAutoCanvasMinimumScale_?.(scaleBasisW, scaleBasisH, availableW, scaleCanvas) || 0.0001;
+  const mobilePlan = (!hasPreview && !isMobileAutoContext && this._isMobileOptimizeActive_?.())
+    ? this._getMobileScalePlan_?.(scaleBasisW, baseScale)
+    : null;
+  const preferredScale = Math.max(
+    minimumScale,
+    Number(baseScale) || 0,
+    Number(mobilePlan?.scale || 0) || 0
+  );
+  const maxScale = isMobileAutoContext ? 1.2 : Number.POSITIVE_INFINITY;
+  const scale = Math.max(0.0001, Math.min(maxScale, preferredScale || 1));
+  const targetDesignW = Math.max(1, d.w, minimumW, availableW / scale);
+  const targetDesignH = Math.max(1, d.h, minimumH, availableH / scale);
+  const visualW = Math.max(availableW, targetDesignW * scale);
+  const visualH = Math.max(availableH, targetDesignH * scale);
+
+	  if (this.__scaleOuter) {
+	    this.__scaleOuter.style.width  = `${availableW}px`;
+	    this.__scaleOuter.style.height = `${Math.max(1, hasPreview ? availableH : visualH)}px`;
+	    if (hasPreview) this.__scaleOuter.style.overflow = '';
+	    this.__scaleOuter.style.overflowX = (mobilePlan?.allowPanX || visualW > availableW + 1) ? 'auto' : 'hidden';
+	    this.__scaleOuter.style.overflowY = hasPreview ? 'auto' : 'hidden';
+    this.__scaleOuter.style.webkitOverflowScrolling = (hasPreview || mobilePlan?.allowPanX) ? 'touch' : '';
+    this.__scaleOuter.style.overscrollBehavior = hasPreview ? 'contain' : '';
     this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
     this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
-    this._applyPreviewDeviceFrame_?.(availableW, previewActive ? previewHeight : (d.h * scale));
+    this._applyPreviewDeviceFrame_?.(availableW, hasPreview ? availableH : visualH);
   }
 
-  c.style.width = `${d.w}px`;
-  c.style.height = `${d.h}px`;
+  c.style.width = `${targetDesignW}px`;
+  c.style.height = `${targetDesignH}px`;
   c.style.transform = `scale(${scale})`;
   c.style.transformOrigin = 'top left';
   c.style.position = 'absolute';
   c.style.top = '0';
   c.style.left = '0';
 
-  // pointer → design scale
   this.__pointerScaleX = scale || 1;
   this.__pointerScaleY = scale || 1;
   this._setEditControlScale_?.(scale || 1);
@@ -20021,10 +26589,8 @@ _applyAutoScale() {
   try { this._syncTabsWidth_?.(); } catch {}
   try { this._layoutYtBackground_?.(); } catch {}
   try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
-  // After applying a new scale, refresh the grid overlay dimensions so that
-  // the selectable squares cover the scaled content area.  Without this
-  // update the overlay may not extend across the resized canvas.
   try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+  try { this._syncPreviewOutsideCards_?.(); } catch {}
 }
 
 
@@ -20072,7 +26638,13 @@ _applyAutoFillNoScale() {
       this.offsetWidth ||
       this.cardContainer?.offsetWidth ||
       1;
-    const previewWidth = this._getEffectivePreviewWidth_?.(hostW) || hostW;
+    const autoViewport = this._getAvailableAutoCanvasViewport_?.(hostW, inner?.offsetHeight || 1) || {
+      width: this._getEffectivePreviewWidth_?.(hostW) || hostW,
+      height: previewHeight || inner?.offsetHeight || 1,
+      isPreview: previewActive,
+    };
+    const previewWidth = Math.max(1, Number(autoViewport.width || 1) || 1);
+    const availableScreenH = Math.max(1, Number(autoViewport.height || previewHeight || 1) || 1);
     outer.style.overflow = 'hidden';
     outer.style.overflowX = 'auto';
     outer.style.overflowY = previewActive ? 'auto' : 'hidden';
@@ -20083,7 +26655,7 @@ _applyAutoFillNoScale() {
     // If HA gives us a tiny height, expand to remaining viewport height (not to trigger loops).
     let vb = outer.getBoundingClientRect();
     let availW = Math.max(1, Math.round(vb.width  || 0));
-    let availH = Math.max(1, Math.round(vb.height || 0));
+    let availH = Math.max(1, Math.round(availableScreenH || vb.height || 0));
     if (availH < 150) {
       const top = Math.max(0, Math.round(vb.top || 0));
       const viewportH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 0);
@@ -20118,6 +26690,9 @@ _applyAutoFillNoScale() {
 
     const gs = Number(this.gridSize || 1) || 1;
     const outerBuffer = this._getOuterGridBufferPx_?.() || 0;
+    const minimumCanvas = this._getAutoCanvasMinimumDesignSize_?.() || { width: 1280, height: 720 };
+    const minimumW = Math.max(1, Number(minimumCanvas.width ?? 1280) || 1);
+    const minimumH = Math.max(1, Number(minimumCanvas.height ?? 720) || 1);
     const natW = Math.max(1, Math.round(Math.ceil(maxX/gs) * gs) + outerBuffer);
     const natH = Math.max(1, Math.round(Math.ceil(maxY/gs) * gs) + outerBuffer);
 
@@ -20125,9 +26700,9 @@ _applyAutoFillNoScale() {
     // - If viewport > natural size, expand inner to viewport (fills space).
     // - Else, inner stays at natural size (so user can scroll to reach overflow).
     const screenAvailW = previewActive ? Math.max(1, previewWidth) : availW;
-    const screenAvailH = previewActive ? Math.max(1, previewHeight) : availH;
-    const targetW = (screenAvailW > natW) ? screenAvailW : natW;
-    const targetH = (screenAvailH > natH) ? screenAvailH : natH;
+    const screenAvailH = Math.max(1, availableScreenH || (previewActive ? previewHeight : availH));
+    const targetW = Math.max(minimumW, screenAvailW, natW);
+    const targetH = Math.max(minimumH, screenAvailH, natH);
 
     // Apply: NO SCALE. Keep 1:1 pixels so positions are exact.
     inner.style.transform = 'none';
@@ -20162,7 +26737,7 @@ _applyAutoFillNoScale() {
 
     // In auto mode, the tabs bar should span the viewport width (not the full card width).
     const tb = this.tabsBar;
-    if (tb && this.tabsPosition !== 'left') {
+    if (tb && !this._isSidebarNavigationActive_?.()) {
       tb.style.width = '100%';
       tb.style.maxWidth = '100%';
     }
@@ -20209,8 +26784,33 @@ _applyAutoFillNoScale() {
     });
     const gs = Math.max(1, Number(this.gridSize || 1) || 1);
     const outerBuffer = this._getOuterGridBufferPx_?.() || 0;
-    c.style.width  = `${Math.max(100, Math.ceil(maxX / gs) * gs + outerBuffer)}px`;
-    c.style.height = `${Math.max(100, Math.ceil(maxY / gs) * gs + outerBuffer)}px`;
+    let nextW = Math.max(100, Math.ceil(maxX / gs) * gs + outerBuffer);
+    let nextH = Math.max(100, Math.ceil(maxY / gs) * gs + outerBuffer);
+    try {
+      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+      if (mode === 'auto') {
+        const minimumCanvas = this._getAutoCanvasMinimumDesignSize_?.() || { width: 1280, height: 720 };
+        const minimumW = Math.max(1, Number(minimumCanvas.width ?? 1280) || 1);
+        const minimumH = Math.max(1, Number(minimumCanvas.height ?? 720) || 1);
+        const hostW =
+          (this.__scaleOuter && this.__scaleOuter.getBoundingClientRect?.().width) ||
+          (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+          (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+          (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+          this.offsetWidth ||
+          nextW;
+        const autoViewport = this._getAvailableAutoCanvasViewport_?.(hostW, nextH);
+        const { sx = 1, sy = 1 } = this._getContainerScale_?.() || {};
+        const safeSx = Math.max(0.0001, Number(sx) || 1);
+        const safeSy = Math.max(0.0001, Number(sy) || 1);
+        const minW = Math.ceil((Math.max(minimumW, Number(autoViewport?.width || 0) || 0) / safeSx) / gs) * gs;
+        const minH = Math.ceil((Math.max(minimumH, Number(autoViewport?.height || 0) || 0) / safeSy) / gs) * gs;
+        nextW = Math.max(nextW, minW);
+        nextH = Math.max(nextH, minH);
+      }
+    } catch {}
+    c.style.width  = `${nextW}px`;
+    c.style.height = `${nextH}px`;
 
     // Whenever the container size changes in dynamic mode, update the tabs bar
     // width so it remains aligned with the container. If the scale wrapper
@@ -20222,9 +26822,10 @@ _applyAutoFillNoScale() {
     // selectable overlay stretches to the new dimensions.  Without this call
     // the overlay can remain clipped until the next edit toggle or page
     // refresh.
-    try { this._requestGridButtonsUpdateSoon?.(); } catch {}
-    try { this._renderConnectors_?.(); } catch {}
-  }
+	    try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+	    try { this._renderConnectors_?.(); } catch {}
+	    try { this._requestPreviewOutsideCardsSync_?.(); } catch {}
+	  }
   
   /**
   /**
@@ -20240,8 +26841,8 @@ _applyAutoFillNoScale() {
     if (!this.__collisionOriginals) return;
 
     const selectedSet = new Set(proposedRects.map(pr => pr.el));
-    const allCards = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
-      .filter(w => !w.dataset.placeholder);
+    const allCards = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
+      .filter((w) => selectedSet.has(w) || this._isWrapperVisibleForOverlap_(w));
 
     // Determine container bounds (for fixed modes)
     const isFixed = this._isContainerFixed();
@@ -20388,8 +26989,7 @@ _applyAutoFillNoScale() {
              a.y + a.h <= b.y + eps || b.y + b.h <= a.y + eps);
   }
   _anyCollisionFor(proposedRects, ignoreSet) {
-    const others = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'))
-      .filter(w => !ignoreSet.has(w) && !w.dataset.placeholder);
+    const others = this._getOverlapCandidateWrappers_(ignoreSet);
     if (!others.length) return false;
     const otherRects = others.map(w => this._rectFor(w));
     for (const pr of proposedRects) for (const or of otherRects) {
@@ -23595,7 +30195,7 @@ _applyAutoFillNoScale() {
         }
       } catch {}
       const finalCfg = this._shapeBySchema(currentType, currentConfig);
-      if (mode === 'edit' && typeof onCommit === 'function') {
+      if (typeof onCommit === 'function') {
         await onCommit(finalCfg);
       } else {
         await this._addPickedCardToLayout(finalCfg);
@@ -24203,9 +30803,9 @@ async _getStubConfigForType(type) {
             return;
           }
           this._setDashboardPackages_(json.packages || []);
-          const importedOptions = json.options
+          const importedOptions = this._normalizeDashboardOptions_(json.options
             ? { ...json.options }
-            : (typeof json.grid === 'number' ? { grid: json.grid } : {});
+            : (typeof json.grid === 'number' ? { grid: json.grid } : {}), { forceAutoResize: true });
           if (json.connectors && !('connectors' in importedOptions)) importedOptions.connectors = json.connectors;
           if (json.responsive_connectors && !('responsive_connectors' in importedOptions)) {
             importedOptions.responsive_connectors = json.responsive_connectors;
@@ -24355,7 +30955,7 @@ modal.innerHTML = `
             <button class="chip" data-w="2560" data-h="1440">WQHD (2560×1440)</button>
           </div>
         </div>
-        <div class="hint">Use these as starting points for common displays. You can still switch to Dynamic, Auto, or a custom size below.</div>
+        <div class="hint">Use these as starting points for common displays. You can still switch to Auto, a custom size, or a preset below.</div>
       </div>
 
       <!-- LIVE SNAP -->
@@ -24397,14 +30997,13 @@ modal.innerHTML = `
           </div>
           <div class="control">
             <select id="ddc-setting-sizeMode">
-              <option value="dynamic">Dynamic</option>
-              <option value="preset">Preset</option>
               <option value="auto">Auto</option>
               <option value="fixed_custom">Fixed (custom)</option>
+              <option value="preset">Preset</option>
             </select>
           </div>
         </div>
-        <div class="hint">Choose whether the canvas adapts to the view, scales as one surface, uses a preset, or keeps exact dimensions.</div>
+        <div class="hint">Choose whether the canvas scales as one surface, uses exact custom dimensions, or follows a preset.</div>
       </div>
 
       <!-- SIZE EXTRAS (injected) -->
@@ -24446,19 +31045,6 @@ modal.innerHTML = `
         <h4 id="appearance-head">Appearance</h4>
       </div>
       <p class="tab-intro" id="ddc-settings-intro-appearance"><strong>Appearance sets the visual language.</strong> Tune themes, background media, card surfaces, shadows, and dashboard-wide effects.</p>
-      <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme-enabled">
-        <div class="row">
-          <div class="title">
-            <ha-icon icon="mdi:theme-light-dark" aria-hidden="true"></ha-icon>
-            <label id="lbl-dashboard-theme-enabled" for="ddc-setting-dashboardThemeEnabled">Enable dashboard theme styling</label>
-          </div>
-          <div class="control">
-            <ha-switch id="ddc-setting-dashboardThemeEnabled"></ha-switch>
-          </div>
-        </div>
-        <div class="hint" id="ddc-setting-dashboardThemeEnabledHint">Lets this dashboard inherit colors, text styles, buttons, and surfaces from a Home Assistant theme.</div>
-      </div>
-
       <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme">
         <div class="row">
           <div class="title">
@@ -24478,13 +31064,13 @@ modal.innerHTML = `
         <div class="row">
           <div class="title">
             <ha-icon icon="mdi:invert-colors" aria-hidden="true"></ha-icon>
-            <label id="lbl-dashboard-theme-override" for="ddc-setting-dashboardThemeOverrideAllDesign">Theme overrides all design</label>
+            <label id="lbl-dashboard-theme-override" for="ddc-setting-dashboardThemeOverrideAllDesign">Prioritize theme colors</label>
           </div>
           <div class="control">
             <ha-switch id="ddc-setting-dashboardThemeOverrideAllDesign"></ha-switch>
           </div>
         </div>
-        <div class="hint" id="ddc-setting-dashboardThemeOverrideAllDesignHint">When enabled, the selected theme takes priority over dashboard colors, card shadows, and per-card design overrides.</div>
+        <div class="hint" id="ddc-setting-dashboardThemeOverrideAllDesignHint">Optional: let the selected theme win over dashboard colors, card shadows, and per-card design overrides.</div>
       </div>
       <div class="section-actions">
         <button type="button" class="mini-action primary" id="ddc-randomize-allStyle">
@@ -24637,10 +31223,29 @@ modal.innerHTML = `
           <div class="control">
             <div class="stack">
               <div class="input-file">
-                <!-- Only a thumbnail + delete button, no upload -->
                 <div class="thumb" id="ddc-bg-thumb"></div>
+                <label class="file-btn" for="ddc-bg-upload">Upload</label>
+                <input type="file" id="ddc-bg-upload" accept="image/*" />
                 <button type="button" class="btn secondary" id="ddc-browse-media-library">Browse Media</button>
                 <button type="button" class="btn secondary" id="ddc-clear-bg">Delete</button>
+              </div>
+
+              <div class="default-bg-gallery" aria-label="Default background images">
+                <div class="default-bg-gallery-head">
+                  <div class="default-bg-gallery-title">
+                    <ha-icon icon="mdi:image-multiple-outline" aria-hidden="true"></ha-icon>
+                    <span>Default backgrounds</span>
+                  </div>
+                  <div class="default-bg-gallery-actions">
+                    <button type="button" class="icon-btn" id="ddc-default-bg-prev" title="Previous background" aria-label="Previous background">
+                      <ha-icon icon="mdi:chevron-left"></ha-icon>
+                    </button>
+                    <button type="button" class="icon-btn" id="ddc-default-bg-next" title="Next background" aria-label="Next background">
+                      <ha-icon icon="mdi:chevron-right"></ha-icon>
+                    </button>
+                  </div>
+                </div>
+                <div class="default-bg-track" id="ddc-default-bg-track" tabindex="0"></div>
               </div>
 
               <div class="row">
@@ -25067,11 +31672,10 @@ modal.innerHTML = `
             <select id="ddc-setting-tabsPosition">
               <option value="top">Top</option>
               <option value="bottom">Bottom</option>
-              <option value="left">Left rail</option>
             </select>
           </div>
         </div>
-        <div class="hint">Place the tab navigation where it feels most natural for the screen you are designing for.</div>
+        <div class="hint">Controls where the regular tabs bar sits around the dashboard.</div>
       </div>
 
       <!-- Current tabs list -->
@@ -25322,8 +31926,6 @@ modal.innerHTML = `
     const chkOuterGridBuffer = modal.querySelector('#ddc-setting-outerGridBuffer');
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
-    const chkDashboardThemeEnabled = modal.querySelector('#ddc-setting-dashboardThemeEnabled');
-    const txtDashboardThemeEnabledHint = modal.querySelector('#ddc-setting-dashboardThemeEnabledHint');
     const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
     const txtDashboardThemeHint = modal.querySelector('#ddc-setting-dashboardThemeHint');
     const chkDashboardThemeOverrideAllDesign = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesign');
@@ -25337,7 +31939,11 @@ modal.innerHTML = `
     const btnRandomParticles   = modal.querySelector('#ddc-randomize-particles');
     const chkShadow  = modal.querySelector('#ddc-setting-cardShadow');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
+    const inpBgUpload = modal.querySelector('#ddc-bg-upload');
     const btnBrowseMediaLibrary = modal.querySelector('#ddc-browse-media-library');
+    const defaultBgTrack = modal.querySelector('#ddc-default-bg-track');
+    const btnDefaultBgPrev = modal.querySelector('#ddc-default-bg-prev');
+    const btnDefaultBgNext = modal.querySelector('#ddc-default-bg-next');
     const selBgRepeat     = modal.querySelector('#ddc-bg-repeat');
     const selBgSize       = modal.querySelector('#ddc-bg-size');
     const selBgPosition   = modal.querySelector('#ddc-bg-position');
@@ -25376,6 +31982,16 @@ modal.innerHTML = `
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    const chkSidebarEnabled  = modal.querySelector('#ddc-setting-sidebarEnabled');
+    const inpSidebarCanvasHeight = modal.querySelector('#ddc-setting-sidebarCanvasHeight');
+    const sidebarItemInputs = Array.from(modal.querySelectorAll('[id^="ddc-setting-sidebarItem"]'));
+    const sidebarHeaderInputs = Array.from(modal.querySelectorAll('input[name="ddc-sidebar-header"]'));
+    const sidebarOrderListEl = modal.querySelector('#ddc-sidebar-order-list');
+    const inpSidebarHomeImage = modal.querySelector('#ddc-setting-sidebarHomeImage');
+    const inpSidebarHomeImageFile = modal.querySelector('#ddc-setting-sidebarHomeImageFile');
+    const btnSidebarHomeImageClear = modal.querySelector('#ddc-setting-sidebarHomeImageClear');
+    const sidebarHomeImagePreview = modal.querySelector('#ddc-setting-sidebarHomeImagePreview');
+    const inpSidebarCalendarEntities = modal.querySelector('#ddc-setting-sidebarCalendarEntities');
     const chkLayersEnabled   = modal.querySelector('#ddc-setting-layersEnabled');
     const layersListEl       = modal.querySelector('#ddc-layers-list');
     const newLayerNameInput  = modal.querySelector('#ddc-new-layer-name');
@@ -25578,7 +32194,13 @@ modal.innerHTML = `
         opt.textContent = name;
         selDashboardTheme.appendChild(opt);
       });
-      if (prevValue && themeNames.includes(prevValue)) {
+      if (prevValue && !themeNames.includes(prevValue)) {
+        const retainedOpt = document.createElement('option');
+        retainedOpt.value = prevValue;
+        retainedOpt.textContent = `${prevValue} (saved)`;
+        selDashboardTheme.appendChild(retainedOpt);
+      }
+      if (prevValue) {
         selDashboardTheme.value = prevValue;
       } else {
         selDashboardTheme.value = '';
@@ -25703,38 +32325,36 @@ modal.innerHTML = `
       attachSettingsDocLinks(layersListEl);
     };
     const updateDashboardThemeState = () => {
-      const enabled = !!chkDashboardThemeEnabled?.checked;
       const themeNames = this._getAvailableDashboardThemeNames_?.() || [];
       const hasThemes = themeNames.length > 0;
+      const selectedTheme = String(selDashboardTheme?.value || '').trim();
       if (selDashboardTheme) {
-        selDashboardTheme.disabled = !enabled || !hasThemes;
+        selDashboardTheme.disabled = !hasThemes && !selectedTheme;
       }
       if (chkDashboardThemeOverrideAllDesign) {
-        chkDashboardThemeOverrideAllDesign.disabled = !enabled || !String(selDashboardTheme?.value || '').trim();
-      }
-      if (txtDashboardThemeEnabledHint) {
-        txtDashboardThemeEnabledHint.textContent = hasThemes
-          ? 'Lets this dashboard inherit colors, text styles, buttons, and surfaces from a Home Assistant theme.'
-          : 'No Home Assistant themes were detected yet. The toggle is stored, but you need available HA themes before you can pick one.';
+        chkDashboardThemeOverrideAllDesign.disabled = !selectedTheme;
+        if (!selectedTheme) chkDashboardThemeOverrideAllDesign.checked = false;
       }
       if (txtDashboardThemeHint) {
         txtDashboardThemeHint.textContent = !hasThemes
-          ? 'No themes were found from Home Assistant.'
-          : (!enabled
-              ? 'Turn on dashboard theme styling before choosing a theme.'
-              : 'Pick the Home Assistant theme this dashboard should inherit from.');
+          ? (selectedTheme
+              ? 'Using the saved theme name. Home Assistant has not exposed the theme list yet.'
+              : 'No themes were found from Home Assistant.')
+          : (selectedTheme
+              ? 'This dashboard is now inheriting colors, text styles, buttons, and surfaces from the selected Home Assistant theme.'
+              : 'Pick a Home Assistant theme to activate theme styling for this dashboard.');
       }
       if (txtDashboardThemeOverrideAllDesignHint) {
-        txtDashboardThemeOverrideAllDesignHint.textContent = (!enabled || !String(selDashboardTheme?.value || '').trim())
-          ? 'Select and enable a dashboard theme before override mode can take control.'
-          : 'When enabled, the selected theme takes priority over dashboard colors, card shadows, and per-card design overrides.';
+        txtDashboardThemeOverrideAllDesignHint.textContent = !selectedTheme
+          ? 'Select a dashboard theme before override mode can take control.'
+          : 'Optional: let the selected theme win over dashboard colors, card shadows, and per-card design overrides.';
       }
     };
     const applyLiveDashboardThemePreview = () => {
       try {
-        this.dashboardThemeEnabled = !!chkDashboardThemeEnabled?.checked;
         this.dashboardTheme = String(selDashboardTheme?.value || '').trim();
-        this.dashboardThemeOverrideAllDesign = !!chkDashboardThemeOverrideAllDesign?.checked;
+        this.dashboardThemeEnabled = !!this.dashboardTheme;
+        this.dashboardThemeOverrideAllDesign = !!this.dashboardTheme && !!chkDashboardThemeOverrideAllDesign?.checked;
         this._applyDashboardThemeStyling_?.();
       } catch {}
     };
@@ -26091,7 +32711,119 @@ modal.innerHTML = `
     let particlesLiveConfig = cloneData(pCfg.config);
     if (inpParticlesUrl)     inpParticlesUrl.value = pCfg.config_url || '';
     if (chkParticlesPointer) chkParticlesPointer.checked = !!pCfg.pointer_events;
-    if (selTabsPosition) selTabsPosition.value = String(this.tabsPosition || 'top');
+    if (selTabsPosition) selTabsPosition.value = this._normalizeTabsPosition_(this.tabsPosition || 'top');
+    const sidebarItemsForSettings = this._normalizeSidebarItems_(this.sidebarItems, { enabled: !!this.sidebarEnabled });
+    if (chkSidebarEnabled) chkSidebarEnabled.checked = !!this.sidebarEnabled;
+    const sidebarHeaderForSettings = this._normalizeSidebarHeader_(this.sidebarHeader);
+    sidebarHeaderInputs.forEach((input) => {
+      input.checked = input.value === sidebarHeaderForSettings;
+    });
+    if (inpSidebarCanvasHeight) {
+      inpSidebarCanvasHeight.value = String(this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight));
+    }
+    sidebarItemInputs.forEach((input) => {
+      input.checked = sidebarItemsForSettings.includes(input.value);
+    });
+    const sidebarDefinitions = this._getSidebarItemDefinitions_?.() || [];
+    const sidebarDefinitionById = new Map(sidebarDefinitions.map((item) => [item.id, item]));
+    let sidebarOrderDraft = this._normalizeSidebarItems_(sidebarItemsForSettings, { enabled: !!this.sidebarEnabled });
+    const renderSidebarOrderList = () => {
+      if (!sidebarOrderListEl) return;
+      const safe = (value) => this._safe?.(value) || String(value ?? '');
+      sidebarOrderListEl.innerHTML = '';
+      const checked = sidebarItemInputs.filter((input) => input.checked).map((input) => input.value);
+      sidebarOrderDraft = sidebarOrderDraft.filter((item) => checked.includes(item));
+      checked.forEach((item) => {
+        if (!sidebarOrderDraft.includes(item)) sidebarOrderDraft.push(item);
+      });
+      if (!sidebarOrderDraft.length) {
+        sidebarOrderListEl.innerHTML = `
+          <div class="sidebar-order-empty">
+            <ha-icon icon="mdi:sort-variant-off" aria-hidden="true"></ha-icon>
+            <span>Select modules above to arrange the Sidebar.</span>
+          </div>
+        `;
+        return;
+      }
+      sidebarOrderDraft.forEach((item, index) => {
+        const def = sidebarDefinitionById.get(item) || { id: item, label: item, icon: 'mdi:drag' };
+        const row = document.createElement('div');
+        row.className = 'sidebar-order-row';
+        row.dataset.sidebarOrderItem = item;
+        row.innerHTML = `
+          <div class="sidebar-order-row-main">
+            <span class="sidebar-order-handle"><ha-icon icon="mdi:drag" aria-hidden="true"></ha-icon></span>
+            <span class="sidebar-order-icon"><ha-icon icon="${safe(def.icon)}" aria-hidden="true"></ha-icon></span>
+            <strong>${safe(def.label)}</strong>
+          </div>
+          <div class="sidebar-order-actions">
+            <button type="button" class="icon-btn" data-sidebar-order-move="-1" aria-label="Move ${safe(def.label)} up" ${index === 0 ? 'disabled' : ''}>
+              <ha-icon icon="mdi:chevron-up"></ha-icon>
+            </button>
+            <button type="button" class="icon-btn" data-sidebar-order-move="1" aria-label="Move ${safe(def.label)} down" ${index === sidebarOrderDraft.length - 1 ? 'disabled' : ''}>
+              <ha-icon icon="mdi:chevron-down"></ha-icon>
+            </button>
+          </div>
+        `;
+        row.querySelectorAll('[data-sidebar-order-move]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const direction = Number(button.dataset.sidebarOrderMove || 0);
+            const nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= sidebarOrderDraft.length) return;
+            const [moved] = sidebarOrderDraft.splice(index, 1);
+            sidebarOrderDraft.splice(nextIndex, 0, moved);
+            renderSidebarOrderList();
+          });
+        });
+        sidebarOrderListEl.appendChild(row);
+      });
+    };
+    const syncSidebarOrderDraft = () => renderSidebarOrderList();
+    sidebarItemInputs.forEach((input) => input.addEventListener('change', syncSidebarOrderDraft));
+    syncSidebarOrderDraft();
+
+    const updateSidebarHomeImagePreview = () => {
+      if (!sidebarHomeImagePreview) return;
+      const src = String(inpSidebarHomeImage?.value || '').trim();
+      sidebarHomeImagePreview.classList.toggle('has-image', !!src);
+      sidebarHomeImagePreview.innerHTML = src
+        ? `<img src="${this._safe(src)}" alt="" loading="lazy" />`
+        : `<ha-icon icon="mdi:image-outline" aria-hidden="true"></ha-icon><span>No house image selected</span>`;
+    };
+    if (inpSidebarHomeImage) {
+      inpSidebarHomeImage.value = this._getSidebarHomeImage_?.() || '';
+      inpSidebarHomeImage.addEventListener('input', updateSidebarHomeImagePreview);
+    }
+    updateSidebarHomeImagePreview();
+    inpSidebarHomeImageFile?.addEventListener('change', () => {
+      const file = inpSidebarHomeImageFile.files?.[0];
+      if (!file || !inpSidebarHomeImage) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        inpSidebarHomeImage.value = String(reader.result || '');
+        updateSidebarHomeImagePreview();
+      };
+      reader.readAsDataURL(file);
+    });
+    btnSidebarHomeImageClear?.addEventListener('click', () => {
+      if (inpSidebarHomeImage) inpSidebarHomeImage.value = '';
+      if (inpSidebarHomeImageFile) inpSidebarHomeImageFile.value = '';
+      updateSidebarHomeImagePreview();
+    });
+    if (inpSidebarCalendarEntities) {
+      inpSidebarCalendarEntities.value = this._normalizeSidebarCalendarEntities_(
+        this.sidebarCalendarEntities ?? this._config?.sidebar_calendar_entities ?? this._config?.sidebar_calendars ?? []
+      ).join(', ');
+    }
+    const sidebarStyleForSettings = this._normalizeSidebarStyle_(this.sidebarStyle);
+    const sidebarDensityForSettings = this._normalizeSidebarDensity_(this.sidebarDensity);
+    const sidebarAccentForSettings = this._normalizeSidebarAccent_(this.sidebarAccent);
+    const styleInput = modal.querySelector(`input[name="ddc-sidebar-style"][value="${sidebarStyleForSettings}"]`);
+    const densityInput = modal.querySelector(`input[name="ddc-sidebar-density"][value="${sidebarDensityForSettings}"]`);
+    const accentInput = modal.querySelector(`input[name="ddc-sidebar-accent"][value="${sidebarAccentForSettings}"]`);
+    if (styleInput) styleInput.checked = true;
+    if (densityInput) densityInput.checked = true;
+    if (accentInput) accentInput.checked = true;
     renderDashboardThemeOptions();
 
     const yCfg = this._config?.background_youtube || {};
@@ -26124,19 +32856,17 @@ modal.innerHTML = `
     };
     selBgMode?.addEventListener('change', showBgSections);
     showBgSections();
-    // Hide auto-resize setting when the container size mode is not dynamic
     const secAutoResize = modal.querySelector('[aria-labelledby="lbl-auto-resize"]');
     const updateAutoResizeVisibility = () => {
-      const mode = selSize?.value || 'dynamic';
-      if (secAutoResize) secAutoResize.style.display = (mode === 'dynamic') ? '' : 'none';
+      if (secAutoResize) secAutoResize.style.display = 'none';
     };
     const updateDoNotResizeTextState = () => {
-      const mode = selSize?.value || 'dynamic';
-      const supported = (mode === 'dynamic' || mode === 'auto');
+      const mode = this._normalizeContainerSizeMode_(selSize?.value);
+      const supported = mode === 'auto';
       if (txtDoNotResizeTextHint) {
         txtDoNotResizeTextHint.textContent = supported
-          ? 'Keeps text at its design size when the canvas scale changes. Best suited for Dynamic and Auto.'
-          : 'Stored, but only used while the container size mode is Dynamic or Auto.';
+          ? 'Keeps text at its design size when the Auto canvas scale changes.'
+          : 'Stored, but only used while the container size mode is Auto.';
       }
     };
     updateAutoResizeVisibility();
@@ -26152,13 +32882,12 @@ modal.innerHTML = `
     if (chkSnap)    chkSnap.checked    = !!this.dragLiveSnap;
     if (chkASave)   chkASave.checked   = !!this.autoSave;
     if (inpDeb)     inpDeb.value       = String(this.autoSaveDebounce ?? 800);
-    if (selSize)    selSize.value      = String(this.containerSizeMode || 'dynamic');
+    if (selSize)    selSize.value      = this._normalizeContainerSizeMode_(this.containerSizeMode);
     updateAutoResizeVisibility();
     updateDoNotResizeTextState();
     if (chkDoNotResizeText) chkDoNotResizeText.checked = !!this.doNotResizeText;
     if (chkOuterGridBuffer) chkOuterGridBuffer.checked = !!this.outerGridBuffer;
     if (chkOverlap) chkOverlap.checked = !!this.disableOverlap;
-    if (chkDashboardThemeEnabled) chkDashboardThemeEnabled.checked = !!this.dashboardThemeEnabled;
     if (selDashboardTheme) selDashboardTheme.value = String(this.dashboardTheme || '');
     if (chkDashboardThemeOverrideAllDesign) chkDashboardThemeOverrideAllDesign.checked = !!this.dashboardThemeOverrideAllDesign;
     updateDashboardThemeState();
@@ -26197,10 +32926,6 @@ modal.innerHTML = `
         } catch {}
       });
     }
-    chkDashboardThemeEnabled?.addEventListener('change', () => {
-      updateDashboardThemeState();
-      applyLiveDashboardThemePreview();
-    });
     selDashboardTheme?.addEventListener('change', () => {
       updateDashboardThemeState();
       applyLiveDashboardThemePreview();
@@ -26629,7 +33354,7 @@ modal.innerHTML = `
     const urlInput  = modal.querySelector('#ddc-setting-bgImg');
     const thumb     = modal.querySelector('#ddc-bg-thumb');
     const updateThumb = (src) => {
-      if (thumb) thumb.style.backgroundImage = src ? `url(${src})` : 'none';
+      if (thumb) thumb.style.backgroundImage = src ? `url("${String(src).replace(/"/g, '\\"')}")` : 'none';
     };
     const applyLiveImageSettingsPreview = () => {
       try {
@@ -26657,18 +33382,100 @@ modal.innerHTML = `
         this._applyBackgroundFromConfig?.();
       } catch {}
     };
+    const syncDefaultBackgroundSelection = () => {
+      if (!defaultBgTrack || !urlInput) return;
+      const activeSrc = String(urlInput.value || '').trim();
+      const buttons = Array.from(defaultBgTrack.querySelectorAll('[data-bg-src]'));
+      let hasSelected = false;
+      buttons.forEach((button) => {
+        const selected = String(button.dataset.bgSrc || '') === activeSrc;
+        if (selected) hasSelected = true;
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+      });
+      if (!hasSelected && buttons[0]) buttons[0].tabIndex = 0;
+    };
+    const showImageBackgroundControls = () => {
+      if (selBgMode && selBgMode.value !== 'image') {
+        selBgMode.value = 'image';
+        showBgSections();
+      }
+    };
+    const setBackgroundImageSource = (src = '') => {
+      if (!urlInput) return;
+      const nextSrc = String(src || '').trim();
+      urlInput.value = nextSrc;
+      if (nextSrc) showImageBackgroundControls();
+      updateThumb(nextSrc);
+      applyLiveImageSettingsPreview();
+      syncDefaultBackgroundSelection();
+      try {
+        urlInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        urlInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      } catch {}
+    };
+    const defaultBackgrounds = this._getDefaultBackgroundPresets_?.() || [];
+    if (defaultBgTrack) {
+      defaultBgTrack.innerHTML = '';
+      defaultBackgrounds.forEach((preset, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'default-bg-card';
+        button.dataset.bgSrc = preset.src || '';
+        button.setAttribute('aria-pressed', 'false');
+        button.tabIndex = index === 0 ? 0 : -1;
+        button.innerHTML = `
+          <span class="default-bg-preview" style="background-image:url('${String(preset.src || '').replace(/'/g, "\\'")}')"></span>
+          <span>${this._safe(preset.label || `Default ${index + 1}`)}</span>
+        `;
+        button.addEventListener('click', () => setBackgroundImageSource(preset.src));
+        button.addEventListener('keydown', (ev) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(ev.key)) return;
+          ev.preventDefault();
+          const cards = Array.from(defaultBgTrack.querySelectorAll('.default-bg-card'));
+          const currentIndex = Math.max(0, cards.indexOf(button));
+          let nextIndex = currentIndex;
+          if (ev.key === 'ArrowRight') nextIndex = (currentIndex + 1) % cards.length;
+          if (ev.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + cards.length) % cards.length;
+          if (ev.key === 'Home') nextIndex = 0;
+          if (ev.key === 'End') nextIndex = cards.length - 1;
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            setBackgroundImageSource(button.dataset.bgSrc);
+            return;
+          }
+          cards[nextIndex]?.focus?.({ preventScroll: true });
+        });
+        defaultBgTrack.appendChild(button);
+      });
+    }
+    const scrollDefaultBackgrounds = (direction = 1) => {
+      if (!defaultBgTrack) return;
+      const amount = Math.max(160, Math.round((defaultBgTrack.clientWidth || 320) * 0.72));
+      try { defaultBgTrack.scrollBy({ left: direction * amount, behavior: 'smooth' }); }
+      catch { defaultBgTrack.scrollLeft += direction * amount; }
+    };
+    btnDefaultBgPrev?.addEventListener('click', () => scrollDefaultBackgrounds(-1));
+    btnDefaultBgNext?.addEventListener('click', () => scrollDefaultBackgrounds(1));
+    inpBgUpload?.addEventListener('change', () => {
+      const file = inpBgUpload.files?.[0];
+      if (!file) return;
+      if (!String(file.type || '').startsWith('image/')) {
+        this._toast?.('Only image files can be used as backgrounds.');
+        inpBgUpload.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setBackgroundImageSource(String(reader.result || ''));
+        inpBgUpload.value = '';
+      };
+      reader.readAsDataURL(file);
+    });
     if (btnBrowseMediaLibrary) {
       btnBrowseMediaLibrary.disabled = !(this.hass && typeof this.hass.callWS === 'function');
       btnBrowseMediaLibrary.addEventListener('click', async () => {
         await this._openMediaLibraryBrowser_(async (selectedUrl) => {
-          if (!urlInput) return;
-          urlInput.value = selectedUrl;
-          updateThumb(selectedUrl);
-          applyLiveImageSettingsPreview();
-          try {
-            urlInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-            urlInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-          } catch {}
+          setBackgroundImageSource(selectedUrl);
         });
       });
     }
@@ -26677,11 +33484,13 @@ modal.innerHTML = `
     if (urlInput?.value) {
       updateThumb(urlInput.value);
     }
+    syncDefaultBackgroundSelection();
 
     // Live preview whenever the URL changes
     urlInput?.addEventListener('input', () => {
       const v = (urlInput.value || '').trim();
       updateThumb(v || '');
+      syncDefaultBackgroundSelection();
       if ((selBgMode?.value || 'none') === 'image') applyLiveImageSettingsPreview();
     });
     urlInput?.addEventListener('change', applyLiveImageSettingsPreview);
@@ -26695,6 +33504,7 @@ modal.innerHTML = `
     modal.querySelector('#ddc-clear-bg')?.addEventListener('click', () => {
       if (urlInput) urlInput.value = '';
       updateThumb('');
+      syncDefaultBackgroundSelection();
       // clear config & live preview
       const { background_image, ...rest } = this._config || {};
       this._config = rest;
@@ -26721,7 +33531,7 @@ modal.innerHTML = `
       const updateSizeExtras = () => {
         if (!extrasDiv) return;
         extrasDiv.innerHTML = '';
-        const modeVal = selSize?.value || 'dynamic';
+        const modeVal = this._normalizeContainerSizeMode_(selSize?.value);
         extrasDiv.hidden = !(modeVal === 'fixed_custom' || modeVal === 'preset');
         if (modeVal === 'fixed_custom') {
           // Custom width and height inputs
@@ -27255,12 +34065,8 @@ modal.innerHTML = `
     modal.querySelector('#ddc-settings-save')?.addEventListener('click', async (e) => {
       e.stopPropagation();
       // Read values
-      const newSize      = selSize?.value || 'dynamic';
-      // Dynamic mode always scales; if the explicit toggle is not present,
-      // keep the dynamic behavior instead of silently turning scaling off.
-      const newAuto      = (newSize === 'dynamic')
-        ? (chkAuto ? !!chkAuto.checked : true)
-        : !!chkAuto?.checked;
+      const newSize      = this._normalizeContainerSizeMode_(selSize?.value);
+      const newAuto      = newSize === 'auto' ? true : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
       const newHideHdr   = !!chkHdr?.checked;
@@ -27278,9 +34084,9 @@ modal.innerHTML = `
       const newDoNotResizeText = !!chkDoNotResizeText?.checked;
       const newOuterGridBuffer = !!chkOuterGridBuffer?.checked;
       const newOverlap   = !!chkOverlap?.checked;
-      const newDashboardThemeEnabled = !!chkDashboardThemeEnabled?.checked;
       const newDashboardTheme = String(selDashboardTheme?.value || '').trim();
-      const newDashboardThemeOverrideAllDesign = !!chkDashboardThemeOverrideAllDesign?.checked;
+      const newDashboardThemeEnabled = !!newDashboardTheme;
+      const newDashboardThemeOverrideAllDesign = !!newDashboardTheme && !!chkDashboardThemeOverrideAllDesign?.checked;
       const newCBg       = (inpCBg?.value || '').trim();
       const newApplyPageBg = !!chkApplyPageBg?.checked;
       const newCardBg    = (inpCardBg?.value || '').trim();
@@ -27300,7 +34106,7 @@ modal.innerHTML = `
       const newYtOpacity  = rngYtOpacity ? Math.max(0, Math.min(100, parseInt(rngYtOpacity.value || '100', 10))) / 100 : 1;
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
-      const newTabsPosition = (newTabsPositionRaw === 'left' || newTabsPositionRaw === 'bottom') ? newTabsPositionRaw : 'top';
+      const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
       const newLayersEnabled = !!chkLayersEnabled?.checked;
       const normalizedLayers = normalizeLayerDrafts(
         newLayersEnabled
@@ -27368,7 +34174,7 @@ modal.innerHTML = `
         // Start/stop any rAF scale watcher depending on mode
         if (
           this.autoResizeCards ||
-          String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase() === 'auto'
+          this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode) === 'auto'
         ) {
           this._startScaleWatch?.();
         } else {
@@ -27401,6 +34207,7 @@ modal.innerHTML = `
         this.autoSave = newASave;
         // Auto save debounce
         if (!isNaN(newDeb) && newDeb > 0) this.autoSaveDebounce = newDeb;
+        this._syncToolbarAutoSaveState_?.();
         // Container size mode
         const sizeChanged = newSize !== this.containerSizeMode;
         const outerBufferChanged = newOuterGridBuffer !== !!this.outerGridBuffer;
@@ -27439,6 +34246,9 @@ modal.innerHTML = `
         }
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
+        this.sidebarEnabled = false;
+        this.sidebarItems = [];
+        this.sidebarCards = [];
         this._config = this._config || {};
         if (this._config.options) {
           this._config.options = {
@@ -27447,8 +34257,10 @@ modal.innerHTML = `
             layers_enabled: !!this.layersEnabled,
             layers: this._cloneJson_(normalizedLayers),
           };
+          this._deleteParkedSidebarOptions_(this._config.options);
         }
         this._config.tabs_position = this.tabsPosition;
+        this._deleteParkedSidebarOptions_(this._config);
         this._config.layers_enabled = !!this.layersEnabled;
         this._config.layers = this._cloneJson_(normalizedLayers);
         this._setDashboardLayers_(normalizedLayers, { refresh: true, persist: true });
@@ -27485,9 +34297,11 @@ modal.innerHTML = `
           this._config = this._config || {};
           this._config.card_background = this.cardBackground;
         }
-        this._config.dashboard_theme_enabled = !!this.dashboardThemeEnabled;
-        this._config.dashboard_theme = this.dashboardTheme || '';
-        this._config.dashboard_theme_override_all_design = !!this.dashboardThemeOverrideAllDesign;
+        this._config.dashboard_theme_enabled = undefined;
+        this._config.theme_enabled = undefined;
+        this._config.dashboard_theme = this.dashboardTheme || undefined;
+        this._config.theme_name = undefined;
+        this._config.dashboard_theme_override_all_design = this.dashboardTheme ? !!this.dashboardThemeOverrideAllDesign : undefined;
         this._applyDashboardThemeStyling_?.();
         // Background image (only src)
         // Background image (only src) — immutable update (avoids "read-only" error)
@@ -27589,19 +34403,21 @@ modal.innerHTML = `
           this._config.grid                    = this.gridSize;
           if (this.connectorGridSize) this._config.connector_grid_size = this.connectorGridSize;
           else delete this._config.connector_grid_size;
-          this._config.auto_resize_cards       = !!this.autoResizeCards;
+          this._config.auto_resize_cards       = this.containerSizeMode === 'auto' ? true : !!this.autoResizeCards;
           this._config.drag_live_snap          = !!this.dragLiveSnap;
           this._config.auto_save               = !!this.autoSave;
           this._config.auto_save_debounce      = this.autoSaveDebounce;
-          this._config.container_size_mode     = this.containerSizeMode;
+          this._config.container_size_mode     = this._normalizeContainerSizeMode_(this.containerSizeMode);
           this._config.container_preset_orientation = this.containerPresetOrient;
           this._config.optimize_for_mobile     = !!this.optimizeForMobile;
           this._config.mobile_dynamic_behavior = this.mobileDynamicBehavior || 'native';
           this._config.do_not_resize_text      = !!this.doNotResizeText;
           this._config.outer_grid_buffer       = !!this.outerGridBuffer;
-          this._config.dashboard_theme_enabled = !!this.dashboardThemeEnabled;
-          this._config.dashboard_theme = this.dashboardTheme || '';
-          this._config.dashboard_theme_override_all_design = !!this.dashboardThemeOverrideAllDesign;
+          this._config.dashboard_theme_enabled = undefined;
+          this._config.theme_enabled = undefined;
+          this._config.dashboard_theme = this.dashboardTheme || undefined;
+          this._config.theme_name = undefined;
+          this._config.dashboard_theme_override_all_design = this.dashboardTheme ? !!this.dashboardThemeOverrideAllDesign : undefined;
           this._config.container_fixed_width   = this.containerFixedWidth;
           this._config.container_fixed_height  = this.containerFixedHeight;
           this._config.container_preset        = this.containerPreset;
@@ -27713,12 +34529,12 @@ modal.innerHTML = `
       edit_mode_pin: (this.editModePin || undefined),
 
       // Size & layout
-      container_size_mode: this.containerSizeMode,
+      container_size_mode: this._normalizeContainerSizeMode_(this.containerSizeMode || cfg.container_size_mode),
       container_preset_orientation: this.containerPresetOrient,
       container_fixed_width: this.containerFixedWidth ?? undefined,
       container_fixed_height: this.containerFixedHeight ?? undefined,
       container_preset: this.containerPreset,
-      auto_resize_cards: !!this.autoResizeCards,
+      auto_resize_cards: this._normalizeContainerSizeMode_(this.containerSizeMode || cfg.container_size_mode) === 'auto' ? true : !!this.autoResizeCards,
       optimize_for_mobile: !!this.optimizeForMobile,
       mobile_dynamic_behavior: this.mobileDynamicBehavior || 'native',
       do_not_resize_text: !!this.doNotResizeText,
@@ -27732,9 +34548,8 @@ modal.innerHTML = `
       apply_background_to_page: !!this.applyBackgroundToPage,
       card_background: this.cardBackground,
       card_shadow: !!this.cardShadowEnabled,
-      dashboard_theme_enabled: !!this.dashboardThemeEnabled,
       dashboard_theme: this.dashboardTheme || undefined,
-      dashboard_theme_override_all_design: !!this.dashboardThemeOverrideAllDesign,
+      dashboard_theme_override_all_design: this.dashboardTheme ? !!this.dashboardThemeOverrideAllDesign : undefined,
       animate_cards: !!this.animateCards,
 
       // HA chrome visibility
@@ -27743,7 +34558,7 @@ modal.innerHTML = `
 
       // Tabs (from the modal section)
       tabs: this.tabs,
-      tabs_position: this.tabsPosition,
+      tabs_position: this._normalizeTabsPosition_(this.tabsPosition),
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
       layers_enabled: !!this.layersEnabled,
@@ -27780,6 +34595,7 @@ modal.innerHTML = `
 
   /** Apply options WITHOUT triggering a full rebuild */
   _applyImportedOptions(opts = {}, recalc = true) {
+    opts = this._normalizeDashboardOptions_(opts, { forceAutoResize: true });
     if (opts && Object.prototype.hasOwnProperty.call(opts, 'storage_key')) {
     // If storage_key changed, push it into HA editor immediately
      if (this._isInHaEditorPreview()) {
@@ -27796,6 +34612,7 @@ modal.innerHTML = `
 
     // keep the original config around, but merge options into live props
     this._config = { ...(this._config || {}), ...opts };
+    this._deleteParkedSidebarOptions_(this._config);
 
     if ('storage_key' in opts)        this.storageKey = opts.storage_key || undefined;
     this._syncEditorsStorageKey();
@@ -27806,6 +34623,7 @@ modal.innerHTML = `
     if ('drag_live_snap' in opts)     this.dragLiveSnap = !!opts.drag_live_snap;
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
     if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
+    if ('auto_save' in opts || 'auto_save_debounce' in opts) this._syncToolbarAutoSaveState_?.();
     if ('edit_mode_pin' in opts || 'editModePin' in opts) this.editModePin = String(opts.edit_mode_pin ?? opts.editModePin ?? '');
     if ('do_not_resize_text' in opts) this.doNotResizeText = !!opts.do_not_resize_text;
     if ('optimize_for_mobile' in opts) this.optimizeForMobile = !!opts.optimize_for_mobile;
@@ -27835,14 +34653,15 @@ modal.innerHTML = `
     if ('hide_HA_Sidebar' in opts || 'hide_ha_sidebar' in opts) {
       this.hideHaSidebar = !!(opts.hide_HA_Sidebar ?? opts.hide_ha_sidebar);
     }
-    if ('dashboard_theme_enabled' in opts || 'theme_enabled' in opts) {
-      this.dashboardThemeEnabled = !!(opts.dashboard_theme_enabled ?? opts.theme_enabled);
-    }
     if ('dashboard_theme' in opts || 'theme_name' in opts) {
       this.dashboardTheme = String(opts.dashboard_theme ?? opts.theme_name ?? '').trim();
     }
+    if ('dashboard_theme_enabled' in opts || 'theme_enabled' in opts) {
+      this.dashboardThemeEnabled = !!(opts.dashboard_theme_enabled ?? opts.theme_enabled);
+    }
+    this.dashboardThemeEnabled = !!this._getDashboardThemeName_?.();
     if ('dashboard_theme_override_all_design' in opts || 'theme_override_all_design' in opts) {
-      this.dashboardThemeOverrideAllDesign = !!(opts.dashboard_theme_override_all_design ?? opts.theme_override_all_design);
+      this.dashboardThemeOverrideAllDesign = !!this.dashboardTheme && !!(opts.dashboard_theme_override_all_design ?? opts.theme_override_all_design);
     }
     if ('layers_enabled' in opts || 'enable_layers' in opts) {
       this.layersEnabled = !!(opts.layers_enabled ?? opts.enable_layers);
@@ -27855,17 +34674,15 @@ modal.innerHTML = `
     if ('debug' in opts)              this.debug = !!opts.debug;
     if ('disable_overlap' in opts)    this.disableOverlap = !!opts.disable_overlap;
 
-        if ('container_size_mode' in opts) {
-      this.containerSizeMode = opts.container_size_mode || 'dynamic';
-
-      const modeLower = String(this.containerSizeMode || 'dynamic').toLowerCase();
-
-      // In dynamic mode we always force auto-resize ON.
-      if (modeLower === 'dynamic') {
-        this.autoResizeCards = true;
+    if ('container_size_mode' in opts) {
+      this.containerSizeMode = this._normalizeContainerSizeMode_(opts.container_size_mode);
+      const modeLower = this.containerSizeMode;
+      if (modeLower === 'auto') this.autoResizeCards = true;
+      if (this._config) {
+        this._config.container_size_mode = modeLower;
+        if (modeLower === 'auto') this._config.auto_resize_cards = true;
       }
 
-      // Keep the scale watcher in sync when the size mode changes.
       if (this.autoResizeCards || modeLower === 'auto') {
         this._startScaleWatch?.();
       } else {
@@ -27882,16 +34699,9 @@ modal.innerHTML = `
     if ('container_preset_orientation' in opts) this.containerPresetOrient = opts.container_preset_orientation || 'auto';
     
     if ('auto_resize_cards' in opts) {
-      const modeLower = String(
-        (this.containerSizeMode || this.container_size_mode || 'dynamic')
-      ).toLowerCase();
-
-      if (modeLower === 'dynamic') {
-        // Ignore manual toggles in dynamic mode – always ON.
-        this.autoResizeCards = true;
-      } else {
-        this.autoResizeCards = !!opts.auto_resize_cards;
-      }
+      const modeLower = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+      this.autoResizeCards = modeLower === 'auto' ? true : !!opts.auto_resize_cards;
+      if (this._config) this._config.auto_resize_cards = !!this.autoResizeCards;
 
       if (this.autoResizeCards || modeLower === 'auto') {
         this._startScaleWatch?.();
@@ -27936,9 +34746,46 @@ modal.innerHTML = `
     if ('hide_tabs_when_single' in opts) {
       this.hideTabsWhenSingle = opts.hide_tabs_when_single !== false;
     }
+    if ('sidebar_enabled' in opts) {
+      this.sidebarEnabled = !!opts.sidebar_enabled;
+    }
+    if ('sidebar_items' in opts || 'sidebar_content' in opts) {
+      this.sidebarItems = this._normalizeSidebarItems_(opts.sidebar_items ?? opts.sidebar_content, { enabled: !!this.sidebarEnabled });
+    } else if ('sidebar_enabled' in opts) {
+      this.sidebarItems = this._normalizeSidebarItems_(this.sidebarItems, { enabled: !!this.sidebarEnabled });
+    }
+    if ('sidebar_style' in opts) {
+      this.sidebarStyle = this._normalizeSidebarStyle_(opts.sidebar_style);
+    }
+    if ('sidebar_density' in opts) {
+      this.sidebarDensity = this._normalizeSidebarDensity_(opts.sidebar_density);
+    }
+    if ('sidebar_accent' in opts) {
+      this.sidebarAccent = this._normalizeSidebarAccent_(opts.sidebar_accent);
+    }
+    if ('sidebar_header' in opts || 'sidebar_header_type' in opts) {
+      this.sidebarHeader = this._normalizeSidebarHeader_(opts.sidebar_header ?? opts.sidebar_header_type);
+    }
+    if ('sidebar_canvas_height' in opts) {
+      this.sidebarCanvasHeight = this._normalizeSidebarCanvasHeight_(opts.sidebar_canvas_height);
+    }
+    if ('sidebar_cards' in opts) {
+      this.sidebarCards = this._normalizeSidebarCards_(opts.sidebar_cards);
+      this._config.sidebar_cards = this._cloneJson_(this.sidebarCards);
+    }
+    if ('sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts) {
+      this.sidebarHomeImage = String(opts.sidebar_home_image ?? opts.sidebar_house_image ?? opts.sidebar_home_image_url ?? '').trim();
+    }
+    if ('sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
+      this.sidebarCalendarEntities = this._normalizeSidebarCalendarEntities_(opts.sidebar_calendar_entities ?? opts.sidebar_calendars ?? []);
+    }
     if ('tabs_position' in opts) {
       const tabsPosition = String(opts.tabs_position || 'top').toLowerCase();
-      this.tabsPosition = (tabsPosition === 'left' || tabsPosition === 'bottom') ? tabsPosition : 'top';
+      if (tabsPosition === 'left' && !('sidebar_enabled' in opts)) {
+        this.sidebarEnabled = true;
+        this.sidebarItems = this._normalizeSidebarItems_(this.sidebarItems, { enabled: true, legacyLeft: true });
+      }
+      this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
       this._syncTabsPlacement_?.();
     }
     if (Array.isArray(this.tabs) && this.tabs.length) {
@@ -27964,8 +34811,9 @@ modal.innerHTML = `
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts) {
+    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'sidebar_enabled' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
       this._renderTabs?.();
+      this._renderSidebar_?.();
       this._applyActiveTab?.();
       this._syncTabsWidth_?.();
     }
@@ -28001,7 +34849,6 @@ modal.innerHTML = `
       apply_background_to_page: { type: 'boolean' },
       card_background: { type: 'string' },
       card_shadow: { type: 'boolean' },
-      dashboard_theme_enabled: { type: 'boolean' },
       dashboard_theme: { type: 'string' },
       dashboard_theme_override_all_design: { type: 'boolean' },
       container_size_mode: { type: 'string' },
@@ -28050,7 +34897,6 @@ modal.innerHTML = `
       applyBackgroundToPage: 'apply_background_to_page',
       cardBackground: 'card_background',
       cardShadow: 'card_shadow',
-      dashboardThemeEnabled: 'dashboard_theme_enabled',
       dashboardTheme: 'dashboard_theme',
       dashboardThemeOverrideAllDesign: 'dashboard_theme_override_all_design',
       containerSizeMode: 'container_size_mode',
@@ -28603,7 +35449,7 @@ _importDesign() {
     'container_preset','container_preset_orientation',
 
     // Tabs
-    'tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled',
+    'tabs','tabs_position','default_tab','hide_tabs_when_single','sidebar_enabled','sidebar_items','sidebar_style','sidebar_density','sidebar_accent','sidebar_header','sidebar_canvas_height','sidebar_cards','sidebar_home_image','sidebar_calendar_entities','layers_enabled',
     'layers',
 
     // HA chrome
@@ -28662,9 +35508,9 @@ _importDesign() {
           ? !!json.options.hide_tabs_when_single
           : true;
       // -------------------------------------------------------------------------
-      const runtimeImportedOptions = json.options
+      const runtimeImportedOptions = this._normalizeDashboardOptions_(json.options
         ? { ...json.options }
-        : (typeof json.grid === 'number' ? { grid: json.grid } : {});
+        : (typeof json.grid === 'number' ? { grid: json.grid } : {}), { forceAutoResize: true });
       if (json.connectors && !('connectors' in runtimeImportedOptions)) {
         runtimeImportedOptions.connectors = json.connectors;
       }
@@ -28805,7 +35651,7 @@ _importDesign() {
 
       // Ensure instance tab options exist even for old files (after options applied)
       if (!Array.isArray(this.tabs) || !this.tabs.length) this.tabs = compatTabs;
-      if (!this.tabsPosition) this.tabsPosition = compatTabsPosition;
+      if (!this.tabsPosition) this.tabsPosition = this._normalizeTabsPosition_(compatTabsPosition);
       if (!this.defaultTab) this.defaultTab = compatDefaultTab;
       if (this.hideTabsWhenSingle === undefined) this.hideTabsWhenSingle = compatHideSingle;
       this._syncTabsPlacement_?.();
@@ -28821,7 +35667,7 @@ _importDesign() {
         const persistOptions = {
           ...importedOptions,
           tabs: importedOptions.tabs ?? this.tabs ?? [],
-          tabs_position: importedOptions.tabs_position ?? this.tabsPosition ?? 'top',
+          tabs_position: this._normalizeTabsPosition_(importedOptions.tabs_position ?? this.tabsPosition ?? 'top'),
           default_tab: importedOptions.default_tab
             ?? this.defaultTab
             ?? ((importedOptions.tabs?.[0]?.id) || (this.tabs?.[0]?.id) || 'default'),
@@ -28852,6 +35698,7 @@ _importDesign() {
           cfg.tabs_position = persistOptions.tabs_position;
           cfg.default_tab = persistOptions.default_tab;
           cfg.hide_tabs_when_single = !!persistOptions.hide_tabs_when_single;
+          this._deleteParkedSidebarOptions_(cfg);
 
           this.dispatchEvent(new CustomEvent('config-changed', {
             detail: { config: cfg },
@@ -28948,6 +35795,7 @@ _importDesign() {
   }
 
   async _persistOptionsToYaml(opts, { prevKey = null, patchAllInCurrentViewIfNoKey = false } = {}) {
+    opts = this._normalizeDashboardOptions_(opts || {}, { forceAutoResize: true });
     try {
       const ll = this._getLovelace();
       if (!ll) { console.debug('[ddc:import] persist: no lovelace root'); return false; }
@@ -29038,6 +35886,7 @@ _importDesign() {
   }
 /* ----------------------------- Save / load ----------------------------- */
   _queueSave(reason='auto') {
+    this._recordLayoutHistoryCheckpoint_?.(reason);
     // Always mark dirty so Apply becomes enabled
     this._markDirty(reason);
     // only queue save when autosave is enabled, not loading, and in edit mode
@@ -29058,6 +35907,7 @@ _importDesign() {
   async _saveLayout(silent = true) {
     this._persistCurrentResponsiveProfileToMemory_();
     try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
+    this._recordLayoutHistoryCheckpoint_?.('save');
     const desktopCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
     const savedAt = new Date().toISOString();
     const payload = {
@@ -29074,6 +35924,7 @@ _importDesign() {
         cards: this._cloneJson_(desktopCards),
         responsive_layouts: this._cloneJson_(payload.responsive_layouts),
       };
+      this._deleteParkedSidebarOptions_(this._config);
     } catch {}
 
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
@@ -29120,7 +35971,7 @@ _importDesign() {
     const t0 = performance.now();
     try {
       this._dbgPush('load', `GET /api/${url}`);
-      const data = await this.hass.callApi('get', url);
+      const data = this._normalizeDashboardPayload_(await this.hass.callApi('get', url));
       const ms = Math.round(performance.now() - t0);
       this._dbgPush('load', `OK (${ms} ms)`, { bytes: JSON.stringify(data||'').length });
       return data;
@@ -29132,6 +35983,7 @@ _importDesign() {
   }
 
   async _saveLayoutToBackend(key, data) {
+    data = this._normalizeDashboardPayload_(data);
     const url = `dragdrop_storage/${encodeURIComponent(key)}`;
     const size = JSON.stringify(data).length;
     const hasPackagePayload = Array.isArray(data?.packages) && data.packages.some((pkg) => {
@@ -29168,7 +36020,7 @@ _importDesign() {
     try {
       const cur = await this._loadLayoutFromBackend(key);
       let local = null;
-      try { local = JSON.parse(localStorage.getItem(`ddc_local_${key || 'default'}`) || 'null'); } catch {}
+      try { local = this._normalizeDashboardPayload_(JSON.parse(localStorage.getItem(`ddc_local_${key || 'default'}`) || 'null')); } catch {}
       try {
         this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true });
         this._syncLiveCardConfigsIntoResponsiveLayouts_?.();
@@ -29185,11 +36037,12 @@ _importDesign() {
       const liveResponsiveLayouts = this._serializeResponsiveLayouts_
         ? this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, liveCards))
         : null;
+      const normalizedOptions = this._normalizeDashboardOptions_(newOptions || this._exportableOptions?.() || {}, { requireSizeMode: true, forceAutoResize: true });
       const merged = {
         version: 3,
-        ...base,
+        ...this._normalizeDashboardPayload_(base),
         updated_at: new Date().toISOString(),
-        options: newOptions || this._exportableOptions?.() || {}
+        options: normalizedOptions
       };
       if (Array.isArray(liveCards) && liveCards.length) merged.cards = this._cloneJson_(liveCards);
       else if (base && Array.isArray(base.cards)) merged.cards = base.cards;
@@ -29518,6 +36371,7 @@ _importDesign() {
     const stateObj = hass?.states?.[entityId];
     const domain = entityId.split('.')[0];
     const fallbackIcon = item.icon || this._defaultScreenSaverIconForEntity_(entityId);
+    const customLabel = String(item.label || item.name || '').trim();
     if (!stateObj) {
       return {
         key: item.key || entityId,
@@ -29525,27 +36379,28 @@ _importDesign() {
         entity: entityId,
         icon: fallbackIcon,
         value: 'Unavailable',
-        label: item.label || this._screenSaverCleanLabel_(entityId, entityId),
+        label: customLabel || this._screenSaverCleanLabel_(entityId, entityId),
         detail: 'Entity not found',
+        customLabel: !!customLabel,
         tone: 'warn',
       };
     }
 
     const attrs = stateObj.attributes || {};
     const friendlyName = attrs.friendly_name || entityId;
-    const label = item.label || this._screenSaverCleanLabel_(friendlyName, entityId);
+    const label = customLabel || this._screenSaverCleanLabel_(friendlyName, entityId);
     const unit = attrs.unit_of_measurement || '';
     const rawState = stateObj.state;
     const numericValue = this._getScreenSaverNumericValue_(rawState);
     const unavailable = ['unknown', 'unavailable'].includes(String(rawState || '').toLowerCase());
     let value = this._formatScreenSaverState_(rawState) || 'Unavailable';
-    let detail = friendlyName;
+    let detail = customLabel ? '' : friendlyName;
     let sparklinePoints = '';
     let sparklineSamples = [];
 
     if (unavailable) {
       value = 'Unavailable';
-      detail = friendlyName;
+      detail = customLabel ? '' : friendlyName;
     } else if (domain === 'weather' && attrs.temperature !== undefined && attrs.temperature !== null) {
       value = `${attrs.temperature}${attrs.temperature_unit || unit || ''}`;
       detail = this._formatScreenSaverState_(rawState);
@@ -29569,6 +36424,7 @@ _importDesign() {
       value,
       label,
       detail,
+      customLabel: !!customLabel,
       meta: richInfo.meta || [],
       sparklinePoints,
       tone: unavailable ? 'warn' : (item.tone || 'blue'),
@@ -29615,15 +36471,18 @@ _importDesign() {
 
   _renderScreenSaverIntelligenceRows_(items = []) {
     const esc = (value) => this._escapeScreenSaverHtml_(value);
-    return items.map((item) => `
-      <div class="ss-intel-row ss-status-${esc(item.tone || 'blue')}" title="${esc(item.entity || '')}">
-        <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}" aria-hidden="true"></ha-icon>
-        <div>
-          <strong>${esc(item.value || '')} ${esc(item.label || '')}</strong>
-          <span>${esc(item.detail || item.entity || '')}</span>
+    return items.map((item) => {
+      const secondary = item.detail || (item.customLabel ? '' : item.entity || '');
+      return `
+        <div class="ss-intel-row ss-status-${esc(item.tone || 'blue')}" title="${esc(item.entity || '')}">
+          <ha-icon icon="${esc(item.icon || 'mdi:circle-outline')}" aria-hidden="true"></ha-icon>
+          <div>
+            <strong>${esc(item.value || '')} ${esc(item.label || '')}</strong>
+            ${secondary ? `<span>${esc(secondary)}</span>` : ''}
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   _getScreenSaverStatusSummary_(items = []) {
@@ -32034,7 +38893,7 @@ if (!customElements.get('drag-and-drop-card')) {
         // snapped values directly.
         let mapped;
         try {
-          const mode = String((this.containerSizeMode || this.container_size_mode || 'dynamic')).toLowerCase();
+          const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
           if (mode === 'auto' && typeof this._canvasRectToContainerRect_ === 'function') {
             mapped = this._canvasRectToContainerRect_({ x: sx, y: sy, w: sw, h: sh });
           } else if (typeof this._gridRectToCardRect_ === 'function') {
@@ -32061,7 +38920,6 @@ if (!customElements.get('drag-and-drop-card')) {
               cont.querySelectorAll('.card-wrapper:not(.ddc-placeholder)')
             );
 
-            const currentTab = this._normalizeTabId(this.activeTab || this.defaultTab);
             const intersects = (r1, r2) => !(
               r2.x >= r1.x + r1.w ||
               r2.x + r2.w <= r1.x ||
@@ -32072,15 +38930,8 @@ if (!customElements.get('drag-and-drop-card')) {
             let hitCount = 0;
 
             for (const wEl of wraps) {
-              // Only consider cards on the active tab
-              const tabId = wEl.dataset.tabId
-                ? this._normalizeTabId(wEl.dataset.tabId)
-                : currentTab;
-              if (tabId !== currentTab) continue;
-
-              // Skip hidden cards
-              const cs = getComputedStyle(wEl);
-              if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+              // Only consider cards that are visible in the current tab/layer context.
+              if (!this._isWrapperVisibleForOverlap_?.(wEl)) continue;
 
               const wx = parseFloat(wEl.getAttribute('data-x')) || 0;
               const wy = parseFloat(wEl.getAttribute('data-y')) || 0;
@@ -32134,12 +38985,7 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       const wrap   = this._makeWrapper(cardEl);
 
       // Determine mode: auto vs everything else
-      const mode = String(
-        this.containerSizeMode ||
-        this.container_size_mode ||
-        this._config?.container_size_mode ||
-        'dynamic'
-      ).toLowerCase();
+      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode || this._config?.container_size_mode);
 
       // In auto mode we use 0 offset; otherwise 11 px up/left
       const isAuto = mode === 'auto';
@@ -32173,16 +39019,9 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       // Keep your existing auto-resize / grid refresh behaviour
       requestAnimationFrame(() => {
         try {
-          const modeNow = String(
-            this.containerSizeMode ||
-            this.container_size_mode ||
-            this._config?.container_size_mode ||
-            'dynamic'
-          ).toLowerCase();
+          const modeNow = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode || this._config?.container_size_mode);
 
-          if (modeNow === 'auto') {
-            this._applyAutoFillNoScale?.();
-          } else if (this.autoResizeCards) {
+          if (modeNow === 'auto' || this.autoResizeCards) {
             this._applyAutoScale?.();
           }
           this._requestGridButtonsUpdateSoon?.();
@@ -38601,7 +45440,8 @@ async function _persistOptionsToYaml(opts, {
     const prevKey = this.storageKey || this._config?.storage_key || null;
     try { this._dbgInit?.(); this._dbgPush?.('import', 'Begin import (programmatic)', { source, newKey }); } catch {}
     if (json.options) {
-      const { storage_key, ...optsNoKey } = json.options;
+      const { storage_key, ...optsNoKeyRaw } = json.options;
+      const optsNoKey = this._normalizeDashboardOptions_?.(optsNoKeyRaw, { forceAutoResize: true }) || optsNoKeyRaw;
       this._applyImportedOptions?.(optsNoKey, true);
     } else if (typeof json.grid === 'number') {
       this._applyImportedOptions?.({ grid: json.grid }, true);
@@ -38613,7 +45453,7 @@ async function _persistOptionsToYaml(opts, {
       try { this._syncEditorsStorageKey?.(); } catch {}
     }
     try {
-      const toPersist = json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {});
+      const toPersist = this._normalizeDashboardOptions_?.(json.options ?? (typeof json.grid === 'number' ? { grid: json.grid } : {}), { forceAutoResize: true }) || {};
       await (this._persistOptionsToYaml?.call(this, { ...toPersist, storage_key: key }, { prevKey, noDownload: (source==='switcher') }));
     } catch(e) { console.warn('[ddc:apply] persist failed', e); }
     try {

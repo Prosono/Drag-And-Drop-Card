@@ -32,9 +32,9 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 - **Auto-save** (configurable debounce) or manual “Apply layout”.
 - **Export / Import** designs as JSON (positions, sizes, z-order, options).
 - **Device size presets** (phones, tablets, desktops) + flexible container sizing.
-- **Multiple tabs per canvas** (top or left tab bar, per-layout last-tab memory).
+- **Multiple tabs per canvas** (top/bottom tabs, optional configurable Sidebar, per-layout last-tab memory).
 - **Optional card auto-resize**:
-  - In `dynamic` mode, cards always auto-scale.
+  - In `auto` mode, cards scale as one responsive surface.
   - In other modes you can opt in/out via `auto_resize_cards`.
 - **Rich backgrounds**:
   - Static image
@@ -94,7 +94,7 @@ grid: 20                               # pixel grid size (default editor stub)
 drag_live_snap: true                   # snap while dragging/resizing
 auto_save: true                        # auto-save after edits
 auto_save_debounce: 800                # ms debounce
-container_size_mode: auto              # auto | dynamic | fixed_custom | preset
+container_size_mode: auto              # auto | fixed_custom | preset
 container_background: transparent      # canvas background
 card_background: var(--ha-card-background, var(--card-background-color))
 disable_overlap: false                 # prevent overlapping when true
@@ -212,7 +212,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `drag_live_snap`               | boolean   | `false`                    | Snap while dragging/resizing (live feedback). |
 | `auto_save`                    | boolean   | `true`                     | Automatically save changes. |
 | `auto_save_debounce`           | number    | `800`                      | Debounce window (ms) for auto-save. |
-| `container_size_mode`          | string    | `dynamic`                  | `dynamic` (natural size, always auto-resize), `auto` (fit container), `fixed_custom`, or `preset`. |
+| `container_size_mode`          | string    | `auto`                     | `auto` (responsive scaled canvas), `fixed_custom`, or `preset`. Legacy `dynamic` configs are automatically migrated to `auto`. |
 | `container_fixed_width`        | number    | `null`                     | Fixed width (px) when `fixed_custom`. |
 | `container_fixed_height`       | number    | `null`                     | Fixed height (px) when `fixed_custom`. |
 | `container_preset`             | string    | `fhd` / `fullhd`           | Device/display preset key (see below) when `preset`. |
@@ -308,7 +308,7 @@ An importable dashboard JSON should follow this structure:
   "options": {
     "grid": 20,
     "auto_save": true,
-    "container_size_mode": "dynamic",
+    "container_size_mode": "auto",
     "tabs": [
       { "id": "overview", "label": "Overview", "icon": "mdi:view-dashboard" }
     ],
@@ -433,13 +433,18 @@ These are the most important option keys for an LLM to know:
 | `drag_live_snap` | boolean | Snap during drag/resize |
 | `auto_save` | boolean | Save automatically |
 | `auto_save_debounce` | number | Auto-save delay in ms |
-| `container_size_mode` | string | `dynamic`, `auto`, `fixed_custom`, `preset` |
+| `container_size_mode` | string | `auto`, `fixed_custom`, `preset` |
 | `container_background` | string | Dashboard background color or gradient |
 | `card_background` | string | Default wrapped card background |
 | `card_shadow` | boolean | Enable default card shadows |
 | `animate_cards` | boolean | Animate cards on tab/layer entry |
 | `tabs` | array | Tab definitions |
-| `tabs_position` | string | `top`, `bottom`, `left` |
+| `tabs_position` | string | `top`, `bottom` |
+| `sidebar_enabled` | boolean | Enable the independent Sidebar rail |
+| `sidebar_items` | array | Sidebar content/order, e.g. `navigation`, `weather`, `status`, `clock`, `date`, `profile` |
+| `sidebar_style` | string | `glass`, `neon`, `minimal` |
+| `sidebar_density` | string | `compact`, `comfortable`, `spacious` |
+| `sidebar_accent` | string | `blue`, `cyan`, `purple`, `amber`, `green` |
 | `default_tab` | string | Default active tab id |
 | `hide_tabs_when_single` | boolean | Hide tabs if only one exists |
 | `layers_enabled` | boolean | Enable layer-based visibility |
