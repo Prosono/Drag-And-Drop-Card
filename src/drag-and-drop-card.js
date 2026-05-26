@@ -3383,6 +3383,7 @@ _getVisualRefreshSignature_() {
       containerBackground: String(this.containerBackground ?? ''),
       cardBackground: String(this.cardBackground ?? ''),
       cardShadowEnabled: !!this.cardShadowEnabled,
+      cardShadowIntensity: this._normalizeCardShadowIntensity_?.(this.cardShadowIntensity) || 5,
       applyBackgroundToPage: !!this.applyBackgroundToPage,
       backgroundMode: mode,
       backgroundImage: mode === 'image'
@@ -3456,6 +3457,21 @@ _refreshAllPerCardStyles_() {
   } catch {}
 }
 
+_normalizeCardShadowIntensity_(value = 5) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+
+_cardShadowCssValue_(value = this.cardShadowIntensity) {
+  const intensity = this._normalizeCardShadowIntensity_(value);
+  const y = 3 + intensity;
+  const blur = 9 + (intensity * 3);
+  const spread = intensity >= 8 ? 1 : 0;
+  const alpha = Math.min(0.56, 0.14 + (intensity * 0.042));
+  return `0 ${y}px ${blur}px ${spread}px rgba(0,0,0,${alpha.toFixed(2)})`;
+}
+
 _applyDashboardThemeStyling_() {
   try {
     const host = this;
@@ -3499,7 +3515,7 @@ _applyDashboardThemeStyling_() {
     if (themeOwnsDesign) {
       host.style.setProperty('--ddc-card-shadow', 'var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,.18))');
     } else if (this.cardShadowEnabled) {
-      host.style.setProperty('--ddc-card-shadow', '0 8px 24px rgba(0,0,0,.35)');
+      host.style.setProperty('--ddc-card-shadow', this._cardShadowCssValue_());
     } else {
       host.style.removeProperty('--ddc-card-shadow');
     }
@@ -8150,6 +8166,7 @@ async _onToolbarAction_(action, ctx = {}) {
       container_fixed_height: null,
       container_preset: 'fhd',
       card_shadow: true,
+      card_shadow_intensity: 5,
       hide_HA_Header: false,
       hide_HA_Sidebar: false,
       screen_saver_enabled: true,
@@ -13067,9 +13084,14 @@ _getOuterGridBufferPx_() {
   return Math.max(0, Number(this.gridSize || this._config?.grid || 0) || 0);
 }
 
+_getCanvasEdgeBufferPx_() {
+  return Math.max(0, Number(this._getOuterGridBufferPx_?.() || 0) || 0);
+}
+
 _clampAllCardsInside() {
   if (!this._isContainerFixed()) return;
   const { w: cw, h: ch } = this._getContainerSize();
+  const edgeBuffer = this._getCanvasEdgeBufferPx_?.() || 0;
   const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
   wraps.forEach(w => {
     const x = parseFloat(w.getAttribute('data-x')) || 0;
@@ -13077,18 +13099,22 @@ _clampAllCardsInside() {
     const ww = parseFloat(w.style.width)  || w.getBoundingClientRect().width;
     const hh = parseFloat(w.style.height) || w.getBoundingClientRect().height;
 
-    const nx = Math.max(0, Math.min(x, Math.max(0, cw - ww)));
-    const ny = Math.max(0, Math.min(y, Math.max(0, ch - hh)));
-    let nw = Math.min(ww, cw);
-    let nh = Math.min(hh, ch);
+    const minX = edgeBuffer;
+    const minY = edgeBuffer;
+    const maxX = Math.max(minX, cw - edgeBuffer - ww);
+    const maxY = Math.max(minY, ch - edgeBuffer - hh);
+    const nx = Math.max(minX, Math.min(x, maxX));
+    const ny = Math.max(minY, Math.min(y, maxY));
+    let nw = Math.min(ww, Math.max(this.gridSize || 1, cw - (edgeBuffer * 2)));
+    let nh = Math.min(hh, Math.max(this.gridSize || 1, ch - (edgeBuffer * 2)));
 
     // if width/height exceed box, shrink then re-clamp pos
     if (nw !== ww || nh !== hh) {
       w.style.width  = `${nw}px`;
       w.style.height = `${nh}px`;
     }
-    const nx2 = Math.max(0, Math.min(nx, Math.max(0, cw - nw)));
-    const ny2 = Math.max(0, Math.min(ny, Math.max(0, ch - nh)));
+    const nx2 = Math.max(minX, Math.min(nx, Math.max(minX, cw - edgeBuffer - nw)));
+    const ny2 = Math.max(minY, Math.min(ny, Math.max(minY, ch - edgeBuffer - nh)));
     this._setCardPosition(w, nx2, ny2);
   });
 }
@@ -13404,7 +13430,7 @@ _computeHaSidebarGutters_() {
 }
 
 _computeHaTopGutter_() {
-  let top = 0;
+  let chromeTop = 0;
   const toPx = (value) => {
     const n = parseFloat(String(value ?? '').trim());
     return Number.isFinite(n) ? Math.max(0, n) : 0;
@@ -13418,8 +13444,8 @@ _computeHaTopGutter_() {
     roots.forEach((node) => {
       try {
         const cs = getComputedStyle(node);
-        top = Math.max(
-          top,
+        chromeTop = Math.max(
+          chromeTop,
           toPx(cs.getPropertyValue('--header-height')),
           toPx(cs.getPropertyValue('--ha-header-height')),
           toPx(cs.getPropertyValue('--app-header-height')),
@@ -13442,19 +13468,29 @@ _computeHaTopGutter_() {
         if (!rect || rect.height < 8 || rect.width < 120) return;
         if (rect.bottom <= 0) return;
         if (rect.top >= Math.max(window.innerHeight || 0, 1)) return;
-        top = Math.max(top, Math.round(rect.bottom));
+        chromeTop = Math.max(chromeTop, Math.round(rect.bottom));
       } catch {}
     });
   } catch {}
+  let top = chromeTop;
   let editorChrome = { active: false, bottom: 0 };
   try {
     editorChrome = this._getHaEditorChromeTopBottom_?.() || editorChrome;
     const visibleTopChromeBottom = this._measureVisibleHaTopChromeBottom_?.() || 0;
+    const visibleLooksLikeNativeEditor = !!(
+      this.editMode &&
+      visibleTopChromeBottom >= Math.min(96, Math.max(72, (window.innerHeight || 720) * 0.08))
+    );
+    const useHaEditorChrome = !!(editorChrome.active || visibleLooksLikeNativeEditor);
     const measuredBottom = Math.max(editorChrome.bottom || 0, visibleTopChromeBottom || 0);
-    if (measuredBottom > 0) {
-      top = Math.max(top, Math.round(measuredBottom + (this.editMode ? 12 : 0)));
-      if (visibleTopChromeBottom > 0) editorChrome.active = editorChrome.active || !!this.editMode;
-      editorChrome.bottom = Math.max(editorChrome.bottom || 0, measuredBottom);
+    const activeBottom = measuredBottom > 0 ? measuredBottom : chromeTop;
+    if (useHaEditorChrome && activeBottom > 0) {
+      top = Math.max(chromeTop, Math.round(activeBottom + (this.editMode ? 12 : 0)));
+      if (visibleTopChromeBottom > 0) editorChrome.active = true;
+      editorChrome.bottom = Math.max(editorChrome.bottom || 0, activeBottom);
+    } else {
+      editorChrome.active = false;
+      editorChrome.bottom = 0;
     }
   } catch {}
   try {
@@ -14368,6 +14404,9 @@ _getMobileTextAssistScale_() {
 
     // Whether to apply a drop shadow to card wrappers (defaults to false)
     this.cardShadowEnabled        = !!config.card_shadow;
+    this.cardShadowIntensity      = this._normalizeCardShadowIntensity_(
+      config.card_shadow_intensity ?? config.cardShadowIntensity ?? config.shadow_intensity ?? config.shadowIntensity ?? this.cardShadowIntensity ?? 5
+    );
 
     this.hideHaHeader            = !!(config.hide_HA_Header ?? config.hide_ha_header ?? false);
     this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
@@ -18795,10 +18834,10 @@ _getMobileTextAssistScale_() {
         so the wrapper’s gradient is the only background shown. */
       /*
        * Make the inner card and its header fully transparent so the wrapper’s gradient is the only
-       * background shown. However, exclude the card settings popup (.ddc-card-settings), the
-       * resize handle, and the delete handle so those elements can define their own backgrounds.
+       * background shown. However, exclude edit-only overlay UI so those
+       * layers do not accidentally paint above the actual card contents.
        */
-      .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle):not(.ddc-card-anchors) {
+      .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle):not(.ddc-card-anchors):not(.shield):not(.chip) {
         /* Critical: do NOT give the card a background via this variable.
           Some headers read --ha-card-background when header-color is unset. */
         --ha-card-background: var(--ddc-card-inner-bg, transparent) !important;
@@ -19034,7 +19073,7 @@ _getMobileTextAssistScale_() {
           0 0 0 8px color-mix(in oklab, currentColor 20%, transparent);
       }
 
-      .shield{position:absolute; inset:0; z-index:10; background:transparent; pointer-events:none}
+      .shield{position:absolute; inset:0; z-index:10; background:transparent!important; pointer-events:none}
       .card-wrapper.editing .shield, .card-wrapper.dragging .shield{pointer-events:auto; cursor:grab}
 
       .resize-handle{
@@ -19163,54 +19202,61 @@ _getMobileTextAssistScale_() {
         align-items:center;
         justify-content:center;
         padding:18px;
-        background:rgba(4,8,16,.46);
-        backdrop-filter:blur(10px) saturate(1.04);
-        -webkit-backdrop-filter:blur(10px) saturate(1.04);
+        background:rgba(4,8,16,.38);
+        backdrop-filter:blur(12px) saturate(1.05);
+        -webkit-backdrop-filter:blur(12px) saturate(1.05);
       }
       .ddc-card-settings{
-        width:min(760px, calc(100vw - 36px));
+        --ddc-popup-accent:var(--primary-color, #ff9800);
+        --ddc-popup-surface:color-mix(in oklab, var(--card-background-color, #111827) 88%, var(--primary-background-color, #050811) 12%);
+        --ddc-popup-elevated:color-mix(in oklab, var(--card-background-color, #111827) 82%, var(--ddc-popup-accent) 6%);
+        --ddc-popup-line:color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 72%, transparent);
+        --ddc-popup-field:color-mix(in oklab, var(--primary-background-color, #050811) 34%, var(--card-background-color, #111827));
+        --ddc-popup-shadow:0 20px 44px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.08);
+        width:min(720px, calc(100vw - 36px));
         max-height:min(88vh, 860px);
         display:flex;
         flex-direction:column;
-        gap:14px;
+        gap:12px;
         overflow:auto;
-        padding:20px 22px 22px;
-        border-radius:24px;
-        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 76%, rgba(255,255,255,.12));
+        padding:16px;
+        border-radius:18px;
+        border:1px solid color-mix(in oklab, var(--ddc-popup-accent) 24%, var(--ddc-popup-line));
         background:
-          linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.01)),
-          color-mix(in oklab, var(--card-background-color, #111827) 92%, rgba(7,10,18,.9));
-        box-shadow:
-          0 28px 90px rgba(0,0,0,.44),
-          0 8px 24px rgba(0,0,0,.26),
-          inset 0 1px 0 rgba(255,255,255,.04);
+          radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--ddc-popup-accent) 14%, transparent), transparent 48%),
+          linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
+          var(--ddc-popup-surface);
+        box-shadow:var(--ddc-popup-shadow);
         color:var(--primary-text-color, #f5f5f5);
+        backdrop-filter:blur(18px) saturate(1.08);
+        -webkit-backdrop-filter:blur(18px) saturate(1.08);
       }
       .ddc-card-settings-header{
         display:flex;
         align-items:flex-start;
         justify-content:space-between;
         gap:14px;
-        padding-bottom:8px;
-        border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, rgba(255,255,255,.08));
+        padding:2px 2px 10px;
+        border-bottom:1px solid var(--ddc-popup-line);
       }
       .ddc-card-settings-kicker{
-        font-size:.73rem;
-        letter-spacing:.18em;
+        font-size:.7rem;
+        letter-spacing:.16em;
         text-transform:uppercase;
         color:var(--secondary-text-color, #9ca3af);
-        font-weight:700;
+        font-weight:800;
       }
       .ddc-card-settings-title{
         margin:4px 0 0;
-        font-size:1.32rem;
-        font-weight:760;
-        letter-spacing:-.02em;
+        font-size:1.18rem;
+        font-weight:820;
+        letter-spacing:0;
       }
       .ddc-card-settings-subtitle{
-        margin:8px 0 0;
+        margin:7px 0 0;
         color:var(--secondary-text-color, #9ca3af);
-        line-height:1.55;
+        font-size:.9rem;
+        line-height:1.45;
       }
       .ddc-pin-gate-backdrop{
         position:fixed;
@@ -19363,41 +19409,109 @@ _getMobileTextAssistScale_() {
       }
       .ddc-card-settings-close{
         flex:0 0 auto;
-        width:42px;
-        height:42px;
+        width:40px;
+        height:40px;
         border-radius:14px;
-        border:1px solid rgba(255,255,255,.14);
-        background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+        border:1px solid var(--ddc-popup-line);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+          var(--ddc-popup-field);
         color:var(--primary-text-color, #f5f5f5);
         display:flex;
         align-items:center;
         justify-content:center;
         cursor:pointer;
-        box-shadow:0 8px 20px rgba(0,0,0,.18);
+        box-shadow:0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.05);
       }
       .ddc-card-settings-close:hover{
         transform:translateY(-1px);
-        background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 36%, var(--ddc-popup-line));
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--ddc-popup-accent) 10%, transparent), rgba(255,255,255,.02)),
+          var(--ddc-popup-field);
       }
       .ddc-card-settings .section-card{
         display:flex;
         flex-direction:column;
         gap:12px;
-        padding:16px;
-        border-radius:20px;
-        background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
-        border:1px solid rgba(255,255,255,.08);
-        box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+        padding:14px;
+        border-radius:16px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)),
+          var(--ddc-popup-elevated);
+        border:1px solid var(--ddc-popup-line);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
       }
       .ddc-card-settings .section-card h4{
         margin:0;
-        font-size:1rem;
-        font-weight:700;
+        font-size:.95rem;
+        font-weight:820;
       }
       .ddc-card-settings .section-card p{
         margin:0;
         color:var(--secondary-text-color, #9ca3af);
-        line-height:1.55;
+        font-size:.86rem;
+        line-height:1.45;
+      }
+      .ddc-card-settings input[type="text"],
+      .ddc-card-settings select{
+        min-height:44px!important;
+        border:1px solid var(--ddc-popup-line)!important;
+        border-radius:12px!important;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+          var(--ddc-popup-field)!important;
+        color:var(--primary-text-color, #f5f5f5)!important;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+        outline:none;
+      }
+      .ddc-card-settings input[type="text"]:focus,
+      .ddc-card-settings select:focus{
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 58%, var(--ddc-popup-line))!important;
+        box-shadow:
+          0 0 0 3px color-mix(in oklab, var(--ddc-popup-accent) 17%, transparent),
+          inset 0 1px 0 rgba(255,255,255,.05)!important;
+      }
+      .ddc-card-settings input[type="color"]{
+        border-radius:12px!important;
+        border:1px solid var(--ddc-popup-line)!important;
+        background:var(--ddc-popup-field)!important;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+      }
+      .ddc-card-settings .layer-chip,
+      .ddc-card-settings .btn.secondary,
+      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]){
+        min-height:38px;
+        border:1px solid var(--ddc-popup-line);
+        border-radius:13px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.014)),
+          var(--ddc-popup-field);
+        color:var(--primary-text-color, #f5f5f5);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+      }
+      .ddc-card-settings .layer-chip:hover,
+      .ddc-card-settings .btn.secondary:hover,
+      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]):hover{
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 34%, var(--ddc-popup-line));
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--ddc-popup-accent) 10%, transparent), rgba(255,255,255,.014)),
+          var(--ddc-popup-field);
+      }
+      .ddc-card-settings [data-card-style-value]{
+        border-color:color-mix(in oklab, var(--ddc-popup-line) 78%, rgba(255,255,255,.18))!important;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 6px 14px rgba(0,0,0,.16);
+      }
+      @media (max-width: 640px){
+        .ddc-card-settings-backdrop{
+          padding:10px;
+          align-items:stretch;
+        }
+        .ddc-card-settings{
+          width:100%;
+          max-height:calc(100dvh - 20px);
+          border-radius:18px;
+        }
       }
       .picker-search-wrap{
         display:flex;
@@ -19755,6 +19869,562 @@ _getMobileTextAssistScale_() {
           #yamlHost, #yamlHost * { touch-action: auto; }
           ha-code-editor, ha-code-editor * { touch-action: auto; }
           ha-code-editor{ display:block; height:260px; z-index:6; }
+
+          @media (max-width: 760px), (pointer: coarse) and (max-width: 900px) {
+            .smart-picker-modal{
+              align-items:stretch;
+              justify-content:stretch;
+              padding:0;
+              background:rgba(4,8,15,.76);
+              backdrop-filter:blur(18px) saturate(1.04);
+              -webkit-backdrop-filter:blur(18px) saturate(1.04);
+            }
+            .smart-picker-dialog{
+              width:100vw;
+              max-width:none;
+              height:100vh;
+              height:100dvh;
+              min-height:100svh;
+              max-height:none;
+              border-radius:0;
+              border:0;
+              box-shadow:none;
+              display:flex;
+              flex-direction:column;
+              overflow:hidden;
+            }
+            .smart-picker-dialog .dlg-head{
+              position:relative;
+              z-index:30;
+              display:grid;
+              grid-template-columns:minmax(0, 1fr) auto;
+              grid-template-areas:
+                "title actions"
+                "search search";
+              align-items:center;
+              gap:10px 12px;
+              padding:calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+              background:
+                radial-gradient(640px 150px at 12% -80px, rgba(255,157,0,.22), transparent 64%),
+                radial-gradient(560px 130px at 92% -70px, rgba(3,169,244,.16), transparent 66%),
+                color-mix(in oklab, var(--card-background-color, #111827) 94%, rgba(5,10,18,.9));
+            }
+            .smart-picker-dialog .dlg-head h3{
+              grid-area:title;
+              min-width:0;
+              overflow:hidden;
+              text-overflow:ellipsis;
+              font-size:1.04rem;
+              line-height:1.18;
+            }
+            .smart-picker-dialog .picker-search-wrap{
+              grid-area:search;
+              width:100%;
+            }
+            .smart-picker-dialog .picker-search{
+              height:46px;
+              border-radius:14px;
+              padding:0 14px;
+              font-size:16px;
+            }
+            .smart-picker-dialog .picker-actions{
+              grid-area:actions;
+              gap:8px;
+              justify-content:flex-end;
+            }
+            .smart-picker-dialog .picker-actions .picker-btn{
+              min-width:44px;
+              min-height:44px;
+              padding:0 12px;
+              border-radius:14px;
+            }
+            .smart-picker-dialog .picker-actions .picker-btn.secondary span{
+              position:absolute !important;
+              width:1px;
+              height:1px;
+              padding:0;
+              margin:-1px;
+              overflow:hidden;
+              clip:rect(0, 0, 0, 0);
+              white-space:nowrap;
+              border:0;
+            }
+            .smart-picker-dialog .layout{
+              flex:1 1 auto;
+              min-height:0;
+              height:auto;
+              display:grid;
+              grid-template-columns:1fr;
+              grid-template-rows:auto minmax(0, 1fr);
+              overflow:hidden;
+            }
+            .smart-picker-dialog #leftPane{
+              display:grid;
+              grid-auto-flow:column;
+              grid-auto-columns:minmax(178px, 72vw);
+              gap:10px;
+              max-height:min(34dvh, 260px);
+              padding:10px 12px 12px;
+              border-right:0;
+              border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.1));
+              overflow-x:auto;
+              overflow-y:hidden;
+              scroll-snap-type:x proximity;
+              -webkit-overflow-scrolling:touch;
+              overscroll-behavior-x:contain;
+              background:
+                linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01)),
+                var(--primary-background-color);
+            }
+            .smart-picker-dialog .picker-category{
+              min-width:0;
+              max-height:100%;
+              padding:10px;
+              border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 76%, rgba(255,255,255,.08));
+              border-radius:16px;
+              background:color-mix(in oklab, var(--card-background-color, #111827) 88%, rgba(255,255,255,.02));
+              overflow-y:auto;
+              scroll-snap-align:start;
+              -webkit-overflow-scrolling:touch;
+            }
+            .smart-picker-dialog .picker-category-title{
+              position:sticky;
+              top:0;
+              z-index:1;
+              margin:0 0 8px;
+              padding:0 0 7px;
+              background:linear-gradient(180deg, color-mix(in oklab, var(--card-background-color, #111827) 96%, rgba(255,255,255,.03)) 70%, transparent);
+              font-size:.82rem;
+            }
+            .smart-picker-dialog .picker-category-note{
+              padding:10px;
+              font-size:.82rem;
+            }
+            .smart-picker-dialog .picker-item{
+              min-height:44px;
+              padding:9px 10px;
+              border-radius:12px;
+              touch-action:manipulation;
+            }
+            .smart-picker-dialog .picker-item:hover{
+              transform:none;
+            }
+            .smart-picker-dialog .picker-item ha-icon{
+              flex:0 0 auto;
+              --mdc-icon-size:20px;
+            }
+            .smart-picker-dialog .picker-item-name{
+              font-size:.91rem;
+            }
+            .smart-picker-dialog .picker-item-subtitle{
+              display:none;
+            }
+            .smart-picker-dialog #rightPane{
+              min-height:0;
+              overflow-y:auto;
+              overflow-x:hidden;
+              -webkit-overflow-scrolling:touch;
+              overscroll-behavior:contain;
+            }
+            .smart-picker-dialog .rightGrid{
+              grid-template-columns:1fr;
+              grid-template-rows:none;
+              gap:10px;
+              height:auto;
+              min-height:100%;
+              padding:10px 12px 14px;
+            }
+            .smart-picker-dialog .rightGrid > .sec{
+              grid-column:1 !important;
+              grid-row:auto !important;
+            }
+            .smart-picker-dialog .sec{
+              border-radius:14px;
+            }
+            .smart-picker-dialog .sec .hd{
+              gap:8px;
+              align-items:flex-start;
+              flex-wrap:wrap;
+              padding:10px 11px;
+              font-size:.9rem;
+            }
+            .smart-picker-dialog .sec .bd{
+              padding:10px;
+            }
+            .smart-picker-dialog .picker-preview-sec{
+              max-height:clamp(158px, 28dvh, 240px);
+            }
+            .smart-picker-dialog .picker-preview-sec .bd{
+              max-height:calc(clamp(158px, 28dvh, 240px) - 42px);
+              overflow:auto;
+            }
+            .smart-picker-dialog #cardHost{
+              min-height:132px;
+            }
+            .smart-picker-dialog #cardHost.has-ddc-table-preview,
+            .smart-picker-dialog #cardHost > .ddc-picker-preview-card.ddc-picker-table-preview{
+              min-height:180px;
+            }
+            .smart-picker-dialog #optionsSec,
+            .smart-picker-dialog #yamlSec,
+            .smart-picker-dialog #visSec{
+              overflow:visible;
+            }
+            .smart-picker-dialog #optionsSec .bd,
+            .smart-picker-dialog #yamlSec .bd,
+            .smart-picker-dialog #visSec .bd{
+              height:auto;
+              overflow:visible;
+            }
+            .smart-picker-dialog #optionsSec .hd .sel-info{
+              min-width:0;
+              overflow:hidden;
+              text-overflow:ellipsis;
+              white-space:nowrap;
+            }
+            .smart-picker-dialog .tabs{
+              width:100%;
+              margin-left:0;
+              gap:6px;
+              overflow-x:auto;
+              padding-bottom:1px;
+              -webkit-overflow-scrolling:touch;
+            }
+            .smart-picker-dialog .tab{
+              flex:1 0 auto;
+              min-height:40px;
+              padding:7px 10px;
+              font-size:.84rem;
+              touch-action:manipulation;
+            }
+            .smart-picker-dialog ha-code-editor,
+            .smart-picker-dialog .CodeMirror{
+              min-height:220px;
+            }
+            .smart-picker-dialog .dlg-foot{
+              position:relative;
+              z-index:30;
+              gap:10px;
+              padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+              background:
+                linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.012)),
+                color-mix(in oklab, var(--primary-background-color, #0f172a) 96%, rgba(0,0,0,.12));
+            }
+            .smart-picker-dialog .picker-footnote{
+              display:none;
+            }
+            .smart-picker-dialog .dlg-foot .picker-btn{
+              flex:1 1 0;
+              min-width:0;
+              min-height:48px;
+              border-radius:15px;
+            }
+          }
+
+          @media (max-width: 900px) and (max-height: 560px) {
+            .smart-picker-dialog #leftPane{
+              grid-auto-columns:minmax(160px, 44vw);
+              max-height:136px;
+              padding-block:8px;
+            }
+            .smart-picker-dialog .picker-category{
+              padding:8px;
+            }
+            .smart-picker-dialog .picker-category-title{
+              font-size:.76rem;
+              margin-bottom:6px;
+            }
+            .smart-picker-dialog .picker-item{
+              min-height:40px;
+              padding:7px 8px;
+            }
+            .smart-picker-dialog .picker-preview-sec{
+              max-height:150px;
+            }
+            .smart-picker-dialog .picker-preview-sec .bd{
+              max-height:108px;
+            }
+          }
+
+          .smart-picker-modal.smart-picker-mobile{
+            align-items:stretch;
+            justify-content:stretch;
+            padding:0;
+            background:rgba(4,8,15,.78);
+            backdrop-filter:blur(18px) saturate(1.04);
+            -webkit-backdrop-filter:blur(18px) saturate(1.04);
+          }
+          .smart-picker-modal.smart-picker-mobile .smart-picker-dialog{
+            width:100vw;
+            max-width:none;
+            height:100vh;
+            height:100dvh;
+            min-height:100svh;
+            max-height:none;
+            border-radius:0;
+            border:0;
+            box-shadow:none;
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+          }
+          .smart-picker-modal.smart-picker-mobile .smart-picker-dialog .dlg-head{
+            position:relative;
+            z-index:30;
+            display:grid;
+            grid-template-columns:minmax(0, 1fr) auto;
+            grid-template-areas:
+              "title actions"
+              "search search";
+            align-items:center;
+            gap:10px 12px;
+            padding:calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+            background:
+              radial-gradient(640px 150px at 12% -80px, rgba(255,157,0,.22), transparent 64%),
+              radial-gradient(560px 130px at 92% -70px, rgba(3,169,244,.16), transparent 66%),
+              color-mix(in oklab, var(--card-background-color, #111827) 94%, rgba(5,10,18,.9));
+          }
+          .smart-picker-modal.smart-picker-mobile .smart-picker-dialog .dlg-head h3{
+            grid-area:title;
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-size:1.04rem;
+            line-height:1.18;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-search-wrap{
+            grid-area:search;
+            width:100%;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-search{
+            height:46px;
+            border-radius:14px;
+            padding:0 14px;
+            font-size:16px;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-actions{
+            grid-area:actions;
+            gap:8px;
+            justify-content:flex-end;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-actions .picker-btn{
+            min-width:44px;
+            min-height:44px;
+            padding:0 12px;
+            border-radius:14px;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-actions .picker-btn.secondary span{
+            position:absolute !important;
+            width:1px;
+            height:1px;
+            padding:0;
+            margin:-1px;
+            overflow:hidden;
+            clip:rect(0, 0, 0, 0);
+            white-space:nowrap;
+            border:0;
+          }
+          .smart-picker-modal.smart-picker-mobile .layout{
+            flex:1 1 auto;
+            min-height:0;
+            height:auto;
+            display:block;
+            overflow-y:auto;
+            overflow-x:hidden;
+            -webkit-overflow-scrolling:touch;
+            overscroll-behavior:contain;
+            background:var(--primary-background-color);
+          }
+          .smart-picker-modal.smart-picker-mobile #leftPane{
+            display:block;
+            width:100%;
+            max-height:min(42dvh, 340px);
+            padding:10px 12px 12px;
+            box-sizing:border-box;
+            border-right:0;
+            border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.1));
+            overflow-y:auto;
+            overflow-x:hidden;
+            -webkit-overflow-scrolling:touch;
+            background:
+              linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01)),
+              var(--primary-background-color);
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-category{
+            max-height:none;
+            padding:10px 0 12px;
+            border:0;
+            border-radius:0;
+            background:transparent;
+            overflow:visible;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-category + .picker-category{
+            border-top:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 58%, transparent);
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-category-title{
+            position:sticky;
+            top:0;
+            z-index:1;
+            margin:0 0 8px;
+            padding:2px 0 7px;
+            background:linear-gradient(180deg, var(--primary-background-color) 74%, transparent);
+            font-size:.83rem;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-category-note{
+            padding:11px 12px;
+            border-radius:13px;
+            font-size:.84rem;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-item{
+            min-height:48px;
+            padding:10px 10px;
+            border-radius:12px;
+            touch-action:manipulation;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-item:hover{
+            transform:none;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-item ha-icon{
+            flex:0 0 auto;
+            --mdc-icon-size:21px;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-item-name{
+            font-size:.94rem;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-item-subtitle{
+            font-size:.76rem;
+          }
+          .smart-picker-modal.smart-picker-mobile #rightPane{
+            width:100%;
+            min-height:0;
+            overflow:visible;
+            background:var(--primary-background-color);
+          }
+          .smart-picker-modal.smart-picker-mobile .rightGrid{
+            display:grid;
+            grid-template-columns:1fr;
+            grid-template-rows:none;
+            gap:10px;
+            height:auto;
+            min-height:0;
+            padding:12px 12px 16px;
+            box-sizing:border-box;
+          }
+          .smart-picker-modal.smart-picker-mobile .rightGrid > .sec{
+            grid-column:1 !important;
+            grid-row:auto !important;
+          }
+          .smart-picker-modal.smart-picker-mobile #optionsSec{
+            order:1;
+          }
+          .smart-picker-modal.smart-picker-mobile #yamlSec,
+          .smart-picker-modal.smart-picker-mobile #visSec{
+            order:2;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-preview-sec{
+            order:3;
+          }
+          .smart-picker-modal.smart-picker-mobile .sec{
+            border-radius:14px;
+          }
+          .smart-picker-modal.smart-picker-mobile .sec .hd{
+            gap:8px;
+            align-items:flex-start;
+            flex-wrap:wrap;
+            padding:10px 11px;
+            font-size:.9rem;
+          }
+          .smart-picker-modal.smart-picker-mobile .sec .bd{
+            padding:10px;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-preview-sec{
+            max-height:none;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-preview-sec .bd{
+            max-height:min(34dvh, 260px);
+            overflow:auto;
+          }
+          .smart-picker-modal.smart-picker-mobile #cardHost{
+            min-height:132px;
+          }
+          .smart-picker-modal.smart-picker-mobile #cardHost.has-ddc-table-preview,
+          .smart-picker-modal.smart-picker-mobile #cardHost > .ddc-picker-preview-card.ddc-picker-table-preview{
+            min-height:180px;
+          }
+          .smart-picker-modal.smart-picker-mobile #optionsSec,
+          .smart-picker-modal.smart-picker-mobile #yamlSec,
+          .smart-picker-modal.smart-picker-mobile #visSec{
+            overflow:visible;
+          }
+          .smart-picker-modal.smart-picker-mobile #optionsSec .bd,
+          .smart-picker-modal.smart-picker-mobile #yamlSec .bd,
+          .smart-picker-modal.smart-picker-mobile #visSec .bd{
+            height:auto;
+            overflow:visible;
+          }
+          .smart-picker-modal.smart-picker-mobile #optionsSec .hd .sel-info{
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+          }
+          .smart-picker-modal.smart-picker-mobile .tabs{
+            width:100%;
+            margin-left:0;
+            gap:6px;
+            overflow-x:auto;
+            padding-bottom:1px;
+            -webkit-overflow-scrolling:touch;
+          }
+          .smart-picker-modal.smart-picker-mobile .tab{
+            flex:1 0 auto;
+            min-height:40px;
+            padding:7px 10px;
+            font-size:.84rem;
+            touch-action:manipulation;
+          }
+          .smart-picker-modal.smart-picker-mobile ha-code-editor,
+          .smart-picker-modal.smart-picker-mobile .CodeMirror{
+            min-height:220px;
+          }
+          .smart-picker-modal.smart-picker-mobile .smart-picker-dialog .dlg-foot{
+            position:relative;
+            z-index:30;
+            gap:10px;
+            padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+            background:
+              linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.012)),
+              color-mix(in oklab, var(--primary-background-color, #0f172a) 96%, rgba(0,0,0,.12));
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-footnote{
+            display:none;
+          }
+          .smart-picker-modal.smart-picker-mobile .dlg-foot .picker-btn{
+            flex:1 1 0;
+            min-width:0;
+            min-height:48px;
+            border-radius:15px;
+          }
+          @media (max-height: 560px) {
+            .smart-picker-modal.smart-picker-mobile #leftPane{
+              max-height:148px;
+              padding-block:8px;
+            }
+            .smart-picker-modal.smart-picker-mobile .picker-category{
+              padding-block:8px;
+            }
+            .smart-picker-modal.smart-picker-mobile .picker-category-title{
+              font-size:.76rem;
+              margin-bottom:6px;
+            }
+            .smart-picker-modal.smart-picker-mobile .picker-item{
+              min-height:42px;
+              padding:8px;
+            }
+            .smart-picker-modal.smart-picker-mobile .picker-preview-sec .bd{
+              max-height:136px;
+            }
+          }
 
           /* loading spinners */
           .spin-center{
@@ -23015,7 +23685,7 @@ connectedCallback() {
       // 2) Overlay explicit YAML options (take precedence)
       const overrideKeys = [
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
-        'container_background','card_background','card_shadow','debug','disable_overlap',
+        'container_background','card_background','card_shadow','card_shadow_intensity','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
         'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
         // Ensure screen saver settings from YAML override persisted options on reload. Without
@@ -23445,7 +24115,7 @@ _animateCards(targetWraps = null) {
     } else if (next.card_shadow === 'off') {
       wrap.style.setProperty('--ddc-card-local-shadow', 'none');
     } else if (next.card_shadow === 'on') {
-      wrap.style.setProperty('--ddc-card-local-shadow', '0 8px 24px rgba(0,0,0,.35)');
+      wrap.style.setProperty('--ddc-card-local-shadow', this._cardShadowCssValue_());
     } else {
       wrap.style.removeProperty('--ddc-card-local-shadow');
     }
@@ -23542,7 +24212,8 @@ _animateCards(targetWraps = null) {
       }
       return '#1f2329';
     };
-    const popupFieldSurface = resolveSolidSurface('--secondary-background-color', '--card-background-color', '--primary-background-color');
+    const fallbackPopupFieldSurface = resolveSolidSurface('--secondary-background-color', '--card-background-color', '--primary-background-color');
+    const popupFieldSurface = `var(--ddc-popup-field, ${fallbackPopupFieldSurface})`;
     Object.assign(menu.style, {
       pointerEvents: 'auto',
       fontSize: '.92rem'
@@ -23748,7 +24419,7 @@ _animateCards(targetWraps = null) {
         border: '1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.08))',
         borderRadius: '999px',
         padding: '6px 12px',
-        background: 'rgba(255,255,255,.03)',
+        background: popupFieldSurface,
         color: 'var(--primary-text-color, #f5f5f5)',
         cursor: 'pointer',
         font: 'inherit'
@@ -23786,7 +24457,7 @@ _animateCards(targetWraps = null) {
         padding: '10px 12px',
         border: '1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, rgba(255,255,255,.08))',
         borderRadius: '12px',
-        background: 'var(--ha-card-background, var(--card-background-color, #111827))',
+        background: popupFieldSurface,
         color: 'var(--primary-text-color, #f5f5f5)',
         font: 'inherit'
       });
@@ -24020,13 +24691,6 @@ _animateCards(targetWraps = null) {
     });
     visibilitySection.appendChild(ovHint);
 
-    styleSection.appendChild(makeStyleField(
-      'Container background',
-      'container_background',
-      'transparent · #123456 · var(--ha-card-background)',
-      'Sets the inner card surface for this card only.',
-      { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
-    ));
     styleSection.appendChild(makeStyleField(
       'Card background',
       'background',
@@ -25307,26 +25971,10 @@ _syncEmptyStateUI() {
     const gs = this.gridSize, live = !!this.dragLiveSnap;
 
     // DRAG (supports multi‑select move with optional live snap)
-    const restrictMod = window.interact.modifiers.restrictRect({
-      restriction: 'parent',
-      endOnly: true
-    });
-    const mods = [restrictMod];
+    const mods = [];
 
-    // When dragLiveSnap is true, use Interact’s built‑in snap modifier so the pointer
-    // (and therefore the element) is snapped to the grid before your handler runs.
-    const autoscaled =
-      (this.__pointerScaleX && Math.abs(this.__pointerScaleX - 1) > 1e-6) ||
-      (this.__pointerScaleY && Math.abs(this.__pointerScaleY - 1) > 1e-6);
-
-    if (this.dragLiveSnap && !autoscaled) {
-      const gridSnap = window.interact.snappers.grid({ x: this.gridSize, y: this.gridSize });
-      mods.push(window.interact.modifiers.snap({
-        targets: [gridSnap],
-        range: Infinity,
-        offset: 'startCoords'
-      }));
-    }
+    // Snapping is handled in our own canvas-space math below. Letting Interact
+    // rewrite deltas near fixed edges can make cards drift sideways at bounds.
 
     window.interact(wrap).draggable({
       enabled: this.editMode,
@@ -26551,6 +27199,7 @@ _syncEmptyStateUI() {
     const items = Array.isArray(proposed) ? proposed : [];
     if (!items.length) return items;
     const gs = Math.max(1, Number(gridSize || this.gridSize || 1) || 1);
+    const edgeBuffer = this._getCanvasEdgeBufferPx_?.() || 0;
     const numberOr = (value, fallback = 0) => {
       const n = Number(value);
       return Number.isFinite(n) ? n : fallback;
@@ -26581,8 +27230,8 @@ _syncEmptyStateUI() {
       });
     };
     let bounds = readBounds();
-    if (Number.isFinite(bounds.minX) && bounds.minX < 0) shift(-bounds.minX, 0);
-    if (Number.isFinite(bounds.minY) && bounds.minY < 0) shift(0, -bounds.minY);
+    if (Number.isFinite(bounds.minX) && bounds.minX < edgeBuffer) shift(edgeBuffer - bounds.minX, 0);
+    if (Number.isFinite(bounds.minY) && bounds.minY < edgeBuffer) shift(0, edgeBuffer - bounds.minY);
     let fixedContainerW = 0;
     let fixedContainerH = 0;
     if (this._isContainerFixed?.()) {
@@ -26593,25 +27242,33 @@ _syncEmptyStateUI() {
         fixedContainerW = containerW;
         fixedContainerH = containerH;
         bounds = readBounds();
-        if (containerW > 0 && Number.isFinite(bounds.maxX) && bounds.maxX > containerW) {
+        const maxRight = Math.max(edgeBuffer, containerW - edgeBuffer);
+        const maxBottom = Math.max(edgeBuffer, containerH - edgeBuffer);
+        if (containerW > 0 && Number.isFinite(bounds.maxX) && bounds.maxX > maxRight) {
           const groupWidth = bounds.maxX - bounds.minX;
-          shift(groupWidth <= containerW ? containerW - bounds.maxX : -bounds.minX, 0);
+          const availableWidth = Math.max(0, maxRight - edgeBuffer);
+          shift(groupWidth <= availableWidth ? maxRight - bounds.maxX : edgeBuffer - bounds.minX, 0);
         }
         bounds = readBounds();
-        if (containerH > 0 && Number.isFinite(bounds.maxY) && bounds.maxY > containerH) {
+        if (containerH > 0 && Number.isFinite(bounds.maxY) && bounds.maxY > maxBottom) {
           const groupHeight = bounds.maxY - bounds.minY;
-          shift(groupHeight <= containerH ? containerH - bounds.maxY : -bounds.minY, 0);
+          const availableHeight = Math.max(0, maxBottom - edgeBuffer);
+          shift(groupHeight <= availableHeight ? maxBottom - bounds.maxY : edgeBuffer - bounds.minY, 0);
         }
       } catch {}
     }
     items.forEach((item) => {
       if (!item) return;
-      item.rawX = Math.max(0, numberOr(item.rawX, 0));
-      item.rawY = this._clampYToCanvasTop_(numberOr(item.rawY, 0));
-      let snapX = Math.max(0, snap(item.rawX));
-      let snapY = this._clampYToCanvasTop_(snap(item.rawY));
-      if (fixedContainerW > 0) snapX = Math.max(0, Math.min(snapX, Math.max(0, fixedContainerW - numberOr(item.w, 0))));
-      if (fixedContainerH > 0) snapY = Math.max(0, Math.min(snapY, Math.max(0, fixedContainerH - numberOr(item.h, 0))));
+      const maxRawX = fixedContainerW > 0
+        ? Math.max(edgeBuffer, fixedContainerW - edgeBuffer - numberOr(item.w, 0))
+        : Number.POSITIVE_INFINITY;
+      const maxRawY = fixedContainerH > 0
+        ? Math.max(edgeBuffer, fixedContainerH - edgeBuffer - numberOr(item.h, 0))
+        : Number.POSITIVE_INFINITY;
+      item.rawX = Math.min(Math.max(edgeBuffer, numberOr(item.rawX, edgeBuffer)), maxRawX);
+      item.rawY = Math.min(Math.max(edgeBuffer, this._clampYToCanvasTop_(numberOr(item.rawY, edgeBuffer))), maxRawY);
+      let snapX = Math.min(Math.max(edgeBuffer, snap(item.rawX)), maxRawX);
+      let snapY = Math.min(Math.max(edgeBuffer, this._clampYToCanvasTop_(snap(item.rawY))), maxRawY);
       item.snapX = snapX;
       item.snapY = snapY;
     });
@@ -29048,7 +29705,18 @@ _applyAutoFillNoScale() {
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
 
     
-    const close = () => modal.remove();
+    let mobilePickerResizeObserver = null;
+    let updateSmartPickerMobileMode = null;
+    const close = () => {
+      try { mobilePickerResizeObserver?.disconnect(); } catch {}
+      try {
+        if (updateSmartPickerMobileMode) {
+          window.removeEventListener('resize', updateSmartPickerMobileMode);
+          window.visualViewport?.removeEventListener?.('resize', updateSmartPickerMobileMode);
+        }
+      } catch {}
+      modal.remove();
+    };
     const modal = document.createElement('div'); modal.className='modal smart-picker-modal';
     modal.innerHTML = `
       <div class="dialog smart-picker-dialog" role="dialog" aria-modal="true">
@@ -29130,6 +29798,35 @@ _applyAutoFillNoScale() {
         </div>
       </div>`;
     this.shadowRoot.appendChild(modal);
+
+    const dialog = modal.querySelector('.smart-picker-dialog');
+    updateSmartPickerMobileMode = () => {
+      try {
+        const rect = dialog?.getBoundingClientRect?.();
+        const viewportW = Number(window.visualViewport?.width || window.innerWidth || document.documentElement?.clientWidth || 0);
+        const dialogW = Number(rect?.width || modal.clientWidth || viewportW || 0);
+        const coarse = !!window.matchMedia?.('(pointer: coarse)')?.matches;
+        const smallestW = Math.min(
+          viewportW || Number.POSITIVE_INFINITY,
+          dialogW || Number.POSITIVE_INFINITY
+        );
+        const mobile = smallestW <= 760 || (coarse && smallestW <= 980);
+        modal.classList.toggle('smart-picker-mobile', !!mobile);
+      } catch {
+        modal.classList.toggle('smart-picker-mobile', (window.innerWidth || 0) <= 760);
+      }
+    };
+    updateSmartPickerMobileMode();
+    requestAnimationFrame(updateSmartPickerMobileMode);
+    try { window.addEventListener('resize', updateSmartPickerMobileMode, { passive:true }); } catch {}
+    try { window.visualViewport?.addEventListener?.('resize', updateSmartPickerMobileMode, { passive:true }); } catch {}
+    try {
+      if (typeof ResizeObserver !== 'undefined' && dialog) {
+        mobilePickerResizeObserver = new ResizeObserver(updateSmartPickerMobileMode);
+        mobilePickerResizeObserver.observe(dialog);
+        mobilePickerResizeObserver.observe(modal);
+      }
+    } catch {}
 
     const left = modal.querySelector('#leftPane');
     const addTop = modal.querySelector('#addBtn');
@@ -29378,7 +30075,7 @@ _applyAutoFillNoScale() {
                 <span class="picker-item-name">${item.name}</span>
                 <span class="picker-item-subtitle">${cat.name}</span>
               </span>`;
-            b.addEventListener('click', async () => { highlight(b); await selectType(item.type); });
+            b.addEventListener('click', async () => { highlight(b); await selectType(item.type, { fromUser: true }); });
             div.appendChild(b);
           });
         }
@@ -30963,7 +31660,7 @@ _applyAutoFillNoScale() {
       return { ...cfg };
     };
 
-    const selectType = async (type) => {
+    const selectType = async (type, opts = {}) => {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
@@ -31024,6 +31721,16 @@ _applyAutoFillNoScale() {
       }
       void yamlReady;
       enableCommit(true);
+      if (opts.fromUser && modal.classList.contains('smart-picker-mobile')) {
+        requestAnimationFrame(() => {
+          try {
+            (modal.querySelector('#optionsSec') || modal.querySelector('#rightPane'))?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          } catch {}
+        });
+      }
 
     };
     const commit = async () => {
@@ -31297,6 +32004,7 @@ async _getStubConfigForType(type) {
     const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
     const occupied = new Set();
     const gs = this.gridSize;
+    const edgeBuffer = this._getCanvasEdgeBufferPx_?.() || 0;
     wraps.forEach((w) => {
       const x = (parseFloat(w.getAttribute('data-x')) || 0);
       const y = (parseFloat(w.getAttribute('data-y')) || 0);
@@ -31306,8 +32014,9 @@ async _getStubConfigForType(type) {
       const xEnd   = Math.floor((x+width)/gs), yEnd = Math.floor((y+height)/gs);
       for (let xi=xStart; xi<xEnd; xi++) for (let yi=yStart; yi<yEnd; yi++) occupied.add(`${xi}-${yi}`);
     });
-    let xi=0, yi=0;
-    while (occupied.has(`${xi}-${yi}`)) { xi+=6; if (xi>60) { xi=0; yi+=6; } }
+    let xi=Math.max(0, Math.ceil(edgeBuffer / gs)), yi=Math.max(0, Math.ceil(edgeBuffer / gs));
+    const startXi = xi;
+    while (occupied.has(`${xi}-${yi}`)) { xi+=6; if (xi>60) { xi=startXi; yi+=6; } }
     return { x: xi*gs, y: yi*gs };
   }
 
@@ -31433,10 +32142,11 @@ async _getStubConfigForType(type) {
       // group starting at one grid unit from the origin and slide further
       // down/right until no overlap occurs.
       let shift = 1;
+      const baseOffset = Math.max(this.gridSize, this._getCanvasEdgeBufferPx_?.() || 0);
       let proposedRects;
       do {
-        const baseX = this.gridSize * shift;
-        const baseY = this.gridSize * shift;
+        const baseX = baseOffset + (this.gridSize * (shift - 1));
+        const baseY = baseOffset + (this.gridSize * (shift - 1));
         proposedRects = items.map((it) => {
           const w = parseFloat(it.width) || 0;
           const h = parseFloat(it.height) || 0;
@@ -31446,8 +32156,8 @@ async _getStubConfigForType(type) {
         // Break if no collision; ignore nothing (empty set) so all existing cards count
       } while (this._anyCollisionFor(proposedRects, new Set()));
       // Use the final baseX/baseY from the previous iteration
-      const baseX = this.gridSize * (shift - 1);
-      const baseY = this.gridSize * (shift - 1);
+      const baseX = baseOffset + (this.gridSize * (shift - 2));
+      const baseY = baseOffset + (this.gridSize * (shift - 2));
       // Create each card, apply sizing and position, and attach to the DOM
       for (const it of items) {
         const cfg = it.cfg || {};
@@ -32046,6 +32756,22 @@ modal.innerHTML = `
           </div>
         </div>
         <div class="hint">Adds depth to card containers so they separate more clearly from the canvas.</div>
+      </div>
+
+      <div class="setting" data-shadow-intensity-setting role="group" aria-labelledby="lbl-card-shadow-intensity">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:blur" aria-hidden="true"></ha-icon>
+            <label id="lbl-card-shadow-intensity" for="ddc-setting-cardShadowIntensity">Shadow intensity</label>
+          </div>
+          <div class="control">
+            <div class="range-wrap">
+              <input type="range" id="ddc-setting-cardShadowIntensity" min="1" max="10" step="1" />
+              <output id="ddc-cardShadowIntensityOut" for="ddc-setting-cardShadowIntensity">5</output>
+            </div>
+          </div>
+        </div>
+        <div class="hint">Controls how subtle or deep dashboard card shadows should feel.</div>
       </div>
 
       <div class="divider" role="separator" aria-hidden="true"></div>
@@ -32794,6 +33520,9 @@ modal.innerHTML = `
     const btnRandomCardBg      = modal.querySelector('#ddc-randomize-cardBg');
     const btnRandomParticles   = modal.querySelector('#ddc-randomize-particles');
     const chkShadow  = modal.querySelector('#ddc-setting-cardShadow');
+    const rngShadowIntensity = modal.querySelector('#ddc-setting-cardShadowIntensity');
+    const outShadowIntensity = modal.querySelector('#ddc-cardShadowIntensityOut');
+    const shadowIntensitySetting = modal.querySelector('[data-shadow-intensity-setting]');
     const inpBgImg   = modal.querySelector('#ddc-setting-bgImg');
     const inpBgUpload = modal.querySelector('#ddc-bg-upload');
     const btnBrowseMediaLibrary = modal.querySelector('#ddc-browse-media-library');
@@ -33755,8 +34484,33 @@ modal.innerHTML = `
       inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
     }
     if (chkDebug)   chkDebug.checked   = !!this.debug;
+    const normalizeShadowIntensity = (value) => this._normalizeCardShadowIntensity_?.(value) || 5;
+    const syncShadowIntensityControl = () => {
+      const value = normalizeShadowIntensity(rngShadowIntensity?.value ?? this.cardShadowIntensity ?? 5);
+      if (rngShadowIntensity) {
+        rngShadowIntensity.value = String(value);
+        rngShadowIntensity.disabled = !this.cardShadowEnabled;
+      }
+      if (outShadowIntensity) outShadowIntensity.textContent = String(value);
+      if (shadowIntensitySetting) {
+        shadowIntensitySetting.style.opacity = this.cardShadowEnabled ? '1' : '.62';
+      }
+    };
     // Initialize the drop shadow toggle
     if (chkShadow)  chkShadow.checked  = !!this.cardShadowEnabled;
+    if (rngShadowIntensity) {
+      rngShadowIntensity.value = String(normalizeShadowIntensity(this.cardShadowIntensity));
+      syncShadowIntensityControl();
+      rngShadowIntensity.addEventListener('input', () => {
+        try {
+          this.cardShadowIntensity = normalizeShadowIntensity(rngShadowIntensity.value);
+          syncShadowIntensityControl();
+          this._applyDashboardThemeStyling_?.();
+        } catch {}
+      });
+    } else {
+      syncShadowIntensityControl();
+    }
     if (selBgRepeat)     selBgRepeat.value     = String(bgCfg.repeat     || 'no-repeat');
     if (selBgSize)       selBgSize.value       = String(bgCfg.size       || 'cover');
     if (selBgPosition)   selBgPosition.value   = String(bgCfg.position   || 'center center');
@@ -33778,6 +34532,7 @@ modal.innerHTML = `
       chkShadow.addEventListener('change', () => {
         try {
           this.cardShadowEnabled = !!chkShadow.checked;
+          syncShadowIntensityControl();
           this._applyDashboardThemeStyling_?.();
         } catch {}
       });
@@ -34992,6 +35747,7 @@ modal.innerHTML = `
 
       // Card shadow toggle
       const newShadow = !!chkShadow?.checked;
+      const newShadowIntensity = normalizeShadowIntensity(rngShadowIntensity?.value ?? this.cardShadowIntensity ?? 5);
 
       // Screen saver values
       const newScreenSaverEnabled   = !!chkScreenSaver?.checked;
@@ -35048,6 +35804,7 @@ modal.innerHTML = `
         }
         // Apply card drop shadow
         this.cardShadowEnabled = newShadow;
+        this.cardShadowIntensity = newShadowIntensity;
         // Edit mode PIN
         this.editModePin = newEditPin;
         // make sure the persisted config also carries it
@@ -35295,6 +36052,7 @@ modal.innerHTML = `
           }
           // Persist card shadow setting
           this._config.card_shadow            = !!this.cardShadowEnabled;
+          this._config.card_shadow_intensity  = this._normalizeCardShadowIntensity_(this.cardShadowIntensity);
           this._config.debug                   = !!this.debug;
           this._config.animate_cards           = !!this.animateCards;
           this._config.hide_HA_Header          = !!this.hideHaHeader;
@@ -35404,6 +36162,7 @@ modal.innerHTML = `
       apply_background_to_page: !!this.applyBackgroundToPage,
       card_background: this.cardBackground,
       card_shadow: !!this.cardShadowEnabled,
+      card_shadow_intensity: this._normalizeCardShadowIntensity_(this.cardShadowIntensity),
       dashboard_theme: this.dashboardTheme || undefined,
       dashboard_theme_override_all_design: this.dashboardTheme ? !!this.dashboardThemeOverrideAllDesign : undefined,
       animate_cards: !!this.animateCards,
@@ -35502,6 +36261,11 @@ modal.innerHTML = `
     if ('apply_background_to_page' in opts) this.applyBackgroundToPage = !!opts.apply_background_to_page;
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
     if ('card_shadow' in opts)          this.cardShadowEnabled = !!opts.card_shadow;
+    if ('card_shadow_intensity' in opts || 'cardShadowIntensity' in opts || 'shadow_intensity' in opts || 'shadowIntensity' in opts) {
+      this.cardShadowIntensity = this._normalizeCardShadowIntensity_(
+        opts.card_shadow_intensity ?? opts.cardShadowIntensity ?? opts.shadow_intensity ?? opts.shadowIntensity ?? this.cardShadowIntensity ?? 5
+      );
+    }
     if ('animate_cards' in opts)        this.animateCards = !!opts.animate_cards;
     if ('hide_HA_Header' in opts || 'hide_ha_header' in opts) {
       this.hideHaHeader = !!(opts.hide_HA_Header ?? opts.hide_ha_header);
@@ -35705,6 +36469,7 @@ modal.innerHTML = `
       apply_background_to_page: { type: 'boolean' },
       card_background: { type: 'string' },
       card_shadow: { type: 'boolean' },
+      card_shadow_intensity: { type: 'number' },
       dashboard_theme: { type: 'string' },
       dashboard_theme_override_all_design: { type: 'boolean' },
       container_size_mode: { type: 'string' },
@@ -35753,6 +36518,8 @@ modal.innerHTML = `
       applyBackgroundToPage: 'apply_background_to_page',
       cardBackground: 'card_background',
       cardShadow: 'card_shadow',
+      cardShadowIntensity: 'card_shadow_intensity',
+      shadowIntensity: 'card_shadow_intensity',
       dashboardTheme: 'dashboard_theme',
       dashboardThemeOverrideAllDesign: 'dashboard_theme_override_all_design',
       containerSizeMode: 'container_size_mode',
@@ -36029,6 +36796,7 @@ modal.innerHTML = `
 
   _findNextAvailablePositionForEntries_(entries = [], size = {}, bounds = null) {
     const gs = Math.max(1, Number(this.gridSize || 10) || 10);
+    const edgeBuffer = this._getCanvasEdgeBufferPx_?.() || 0;
     const width = Math.max(1, Number(size?.width) || (14 * gs));
     const height = Math.max(1, Number(size?.height) || (10 * gs));
     const boundWidth = Number(bounds?.width);
@@ -36042,20 +36810,22 @@ modal.innerHTML = `
     }));
     const maxX = existingRects.reduce((max, rect) => Math.max(max, rect.x + rect.w), 0);
     const searchCols = hasBounds
-      ? Math.max(1, Math.floor(Math.max(0, boundWidth - width) / gs) + 1)
+      ? Math.max(1, Math.floor(Math.max(0, boundWidth - edgeBuffer - width) / gs) + 1)
       : Math.max(24, Math.ceil((maxX + width + gs * 12) / gs));
     const searchRows = hasBounds
-      ? Math.max(1, Math.floor(Math.max(0, boundHeight - height) / gs) + 1)
+      ? Math.max(1, Math.floor(Math.max(0, boundHeight - edgeBuffer - height) / gs) + 1)
       : 400;
     const candidateRect = { x: 0, y: 0, w: width, h: height };
+    const startCol = Math.max(0, Math.ceil(edgeBuffer / gs));
+    const startRow = Math.max(0, Math.ceil(edgeBuffer / gs));
 
-    for (let yi = 0; yi < searchRows; yi += 1) {
-      for (let xi = 0; xi < searchCols; xi += 1) {
+    for (let yi = startRow; yi < searchRows; yi += 1) {
+      for (let xi = startCol; xi < searchCols; xi += 1) {
         candidateRect.x = xi * gs;
         candidateRect.y = this._clampYToCanvasTop_(yi * gs);
         if (hasBounds) {
-          if ((candidateRect.x + candidateRect.w) > boundWidth) continue;
-          if ((candidateRect.y + candidateRect.h) > boundHeight) continue;
+          if ((candidateRect.x + candidateRect.w) > (boundWidth - edgeBuffer)) continue;
+          if ((candidateRect.y + candidateRect.h) > (boundHeight - edgeBuffer)) continue;
         }
         const collision = existingRects.some((rect) => this._rectsOverlap(candidateRect, rect));
         if (!collision) {
@@ -36063,7 +36833,7 @@ modal.innerHTML = `
         }
       }
     }
-    return { x: 0, y: 0 };
+    return { x: startCol * gs, y: startRow * gs };
   }
 
   _captureSingleCardExportPayload_(wrap) {
@@ -36297,7 +37067,7 @@ _importDesign() {
     'connectors','responsive_connectors',
 
     // Visuals
-    'container_background','apply_background_to_page','card_background','card_shadow',
+    'container_background','apply_background_to_page','card_background','card_shadow','card_shadow_intensity',
     'dashboard_theme_enabled','dashboard_theme','dashboard_theme_override_all_design',
 
     // Size / layout
