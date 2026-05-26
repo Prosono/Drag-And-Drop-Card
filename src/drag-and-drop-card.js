@@ -4124,42 +4124,15 @@ _attachParticlesBackground_(cfg = {}, mountHost = null) {
   el.style.inset = '0';
   host.appendChild(el);
 
-  const DEFAULTS = {
-    particles: {
-      number: { value: 30, density: { enable: true, value_area: 1200 } },
-      color: { value: '#ffffff' },
-      shape: { type: 'circle' },
-      opacity: { value: 0.35 },
-      size: { value: 2.5, random: true },
-      line_linked: {
-        enable: false,          // disable connecting lines (big perf win)
-        distance: 150,
-        color: '#ffffff',
-        opacity: 0.3,
-        width: 1
-      },
-      move: { enable: true, speed: 0.7, out_mode: 'out' }
-    },
-    interactivity: {
-      detect_on: 'canvas',
-      events: {
-        onhover: { enable: false },
-        onclick: { enable: false },
-        resize: true
-      },
-      modes: {
-        repulse: { distance: 100 },
-        push: { particles_nb: 3 }
-      }
-    },
-    retina_detect: false        // don’t render at 2x/3x DPR; keeps CPU down
-  };
-
-
   const allowPointer = !!cfg.pointer_events;
-  const conf = cfg.config || JSON.parse(JSON.stringify(DEFAULTS)); // clone defaults
+  const sourceConf = (cfg.config && typeof cfg.config === 'object')
+    ? cfg.config
+    : DragAndDropCard._defaultParticlesBackgroundConfig_();
+  const conf = JSON.parse(JSON.stringify(sourceConf));
 
   if (allowPointer) {
+    conf.interactivity = conf.interactivity || {};
+    conf.interactivity.events = conf.interactivity.events || {};
     conf.interactivity.events.onhover = { enable: true, mode: 'repulse' };
     conf.interactivity.events.onclick = { enable: true, mode: 'push' };
     host.style.pointerEvents = 'auto';
@@ -8083,10 +8056,61 @@ async _onToolbarAction_(action, ctx = {}) {
     return next;
   }
 
+  static _defaultParticlesBackgroundConfig_() {
+    return {
+      particles: {
+        number: { value: 52, density: { enable: true, value_area: 1150 } },
+        color: { value: ['#dff7ff', '#79d8ff', '#31c7f5'] },
+        shape: { type: 'circle' },
+        opacity: {
+          value: 0.42,
+          random: true,
+          anim: { enable: true, speed: 0.28, opacity_min: 0.12, sync: false }
+        },
+        size: {
+          value: 2.15,
+          random: true,
+          anim: { enable: true, speed: 0.85, size_min: 0.65, sync: false }
+        },
+        line_linked: {
+          enable: true,
+          distance: 155,
+          color: '#7ddcff',
+          opacity: 0.18,
+          width: 1
+        },
+        move: {
+          enable: true,
+          speed: 0.42,
+          direction: 'none',
+          random: true,
+          straight: false,
+          out_mode: 'out',
+          bounce: false,
+          attract: { enable: true, rotateX: 900, rotateY: 1350 }
+        }
+      },
+      interactivity: {
+        detect_on: 'canvas',
+        events: {
+          onhover: { enable: false },
+          onclick: { enable: false },
+          resize: true
+        },
+        modes: {
+          grab: { distance: 145, line_linked: { opacity: 0.26 } },
+          repulse: { distance: 110, duration: 0.4 },
+          push: { particles_nb: 3 }
+        }
+      },
+      retina_detect: false
+    };
+  }
+
   static getStubConfig(/* hass, entities, entitiesFallback */) {
     // Return default configuration for a new drag‑and‑drop card.  These values
-    // initialize the card in the Full HD preset with a 20px grid and no hero
-    // background image.  The storage_key is generated once so each new
+    // initialize the card in the Full HD preset with a 20px grid and a calm
+    // particles background.  The storage_key is generated once so each new
     // card has its own persistent layout key.
     return {
       type: 'custom:drag-and-drop-card',
@@ -8096,12 +8120,16 @@ async _onToolbarAction_(action, ctx = {}) {
       auto_save: true,
       auto_save_debounce: 800,
       container_size_mode: 'preset',
-      container_background: 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+      container_background: 'radial-gradient(circle at 18% 12%, rgba(48, 199, 245, 0.24), transparent 34%), radial-gradient(circle at 82% 2%, rgba(14, 165, 233, 0.18), transparent 32%), linear-gradient(135deg, #071522 0%, #0a2b40 48%, #05111f 100%)',
       card_background: 'linear-gradient(135deg, #111827, #1f2937)',
       debug: false,
       disable_overlap: false,
       auto_resize_cards: true,
-      background_mode: 'none',
+      background_mode: 'particles',
+      background_particles: {
+        pointer_events: false,
+        config: this._defaultParticlesBackgroundConfig_(),
+      },
       animate_cards: true,
       optimize_for_mobile: false,
       mobile_dynamic_behavior: 'native',
@@ -13084,6 +13112,249 @@ _getHaSidebarGutterCandidates_() {
   return candidates;
 }
 
+_isOwnChromeElement_(el) {
+  try {
+    let node = el;
+    while (node) {
+      if (node === this || node === this.shadowRoot || node === this.renderRoot) return true;
+      if (node.parentElement) {
+        node = node.parentElement;
+        continue;
+      }
+      const root = node.getRootNode?.();
+      const host = root?.host;
+      if (!host || host === node) break;
+      node = host;
+    }
+  } catch {}
+  return false;
+}
+
+_getHaTopChromeCandidates_() {
+  const candidates = [];
+  const seen = new WeakSet();
+  const add = (el) => {
+    if (!el || seen.has(el) || this._isOwnChromeElement_?.(el)) return;
+    seen.add(el);
+    candidates.push(el);
+  };
+  const selector = [
+    'app-header',
+    'ha-top-app-bar',
+    'ha-top-app-bar-fixed',
+    'mwc-top-app-bar-fixed',
+    'ha-header-bar',
+    'app-toolbar',
+    'ha-toolbar',
+    'hui-root',
+    'hui-view',
+    'hui-panel-view',
+    'hui-masonry-view',
+    'hui-sections-view',
+    'hui-root [edit-mode]',
+    'hui-root [editing]',
+    'hui-root [data-edit-mode]',
+    'hui-root [data-mode="edit"]',
+    'hui-root .edit-mode',
+    'hui-root .editing',
+    'hui-root .toolbar',
+    'hui-root [class*="toolbar"]',
+    'hui-root [class*="edit"]',
+    'hui-root [id*="edit"]',
+    'hui-root ha-alert',
+    'hui-root ha-button',
+    'hui-root mwc-button',
+    'hui-root ha-icon-button',
+    'hui-root hui-card-options',
+    'hui-root hui-view-editor',
+    'hui-root hui-edit-mode-card',
+    'hui-root hui-dashboard-editor',
+    'partial-panel-resolver [edit-mode]',
+    'partial-panel-resolver [editing]',
+    'partial-panel-resolver [class*="toolbar"]',
+    'partial-panel-resolver [class*="edit"]'
+  ].join(',');
+  try {
+    (this._deepQueryAll?.(selector) || []).forEach(add);
+  } catch {}
+  return candidates;
+}
+
+_haEditChromeSignal_(el) {
+  try {
+    if (!el) return false;
+    const parts = [];
+    const add = (value) => {
+      if (value == null) return;
+      const text = String(value).trim();
+      if (text) parts.push(text);
+    };
+    let node = el;
+    for (let i = 0; node && i < 5; i += 1) {
+      add(node.localName);
+      add(node.id);
+      add(node.className);
+      add(node.getAttribute?.('aria-label'));
+      add(node.getAttribute?.('title'));
+      add(node.getAttribute?.('data-mode'));
+      add(node.getAttribute?.('data-edit-mode'));
+      if (
+        node.hasAttribute?.('edit-mode')
+        || node.hasAttribute?.('editing')
+        || node.hasAttribute?.('data-edit-mode')
+      ) return true;
+      if (node.parentElement) {
+        node = node.parentElement;
+        continue;
+      }
+      const root = node.getRootNode?.();
+      node = root?.host || null;
+    }
+    const signal = parts.join(' ').toLowerCase();
+    if (/(^|[\s_-])(edit|editing|editor|rediger|redigering|ferdig|done)([\s_-]|$)/.test(signal)) return true;
+    const text = String(el.textContent || '').trim().toLowerCase();
+    return !!text && /(edit dashboard|edit mode|editing|done|rediger|redigering|ferdig|avslutt)/.test(text);
+  } catch {
+    return false;
+  }
+}
+
+_isHaDashboardEditorActive_() {
+  try {
+    const roots = this._deepQueryAll?.(
+      'ha-panel-lovelace, hui-root, hui-view, hui-panel-view, hui-masonry-view, hui-sections-view'
+    ) || [];
+    for (const el of roots) {
+      if (!el || this._isOwnChromeElement_?.(el)) continue;
+      const props = ['editMode', 'isEditing', '_editMode', '_editing', 'editing', 'isEditMode'];
+      for (const prop of props) {
+        try { if (el[prop] === true) return true; } catch {}
+      }
+      try { if (el.lovelace?.editMode === true || el.lovelace?.editing === true) return true; } catch {}
+      try {
+        if (
+          el.hasAttribute?.('edit-mode')
+          || el.hasAttribute?.('editing')
+          || el.getAttribute?.('data-mode') === 'edit'
+          || el.getAttribute?.('data-edit-mode') === 'true'
+          || el.classList?.contains?.('edit-mode')
+          || el.classList?.contains?.('editing')
+        ) return true;
+      } catch {}
+    }
+  } catch {}
+  try {
+    return (this._getHaTopChromeCandidates_?.() || []).some((el) => {
+      if (!this._haEditChromeSignal_?.(el)) return false;
+      const rect = el.getBoundingClientRect?.();
+      if (!rect || rect.height < 12 || rect.width < 80) return false;
+      if (rect.height > Math.min(180, (window.innerHeight || 540) * 0.34)) return false;
+      return rect.bottom > 0 && rect.top < Math.min(220, window.innerHeight || 220);
+    });
+  } catch {
+    return false;
+  }
+}
+
+_getHaEditorChromeTopBottom_() {
+  let bottom = 0;
+  const editorActive = !!(this.editMode && this._isHaDashboardEditorActive_?.());
+  if (!editorActive) return { active: false, bottom: 0 };
+  try {
+    const vh = Math.max(1, window.innerHeight || document.documentElement?.clientHeight || 1);
+    const vw = Math.max(1, window.innerWidth || document.documentElement?.clientWidth || 1);
+    (this._getHaTopChromeCandidates_?.() || []).forEach((el) => {
+      try {
+        if (!el || this._isOwnChromeElement_?.(el)) return;
+        const cs = window.getComputedStyle?.(el);
+        if (cs?.display === 'none' || cs?.visibility === 'hidden' || Number(cs?.opacity) === 0) return;
+        const rect = el.getBoundingClientRect?.();
+        if (!rect || rect.height < 12 || rect.width < 80) return;
+        if (rect.height > Math.min(180, vh * 0.34)) return;
+        if (rect.bottom <= 0 || rect.top >= vh) return;
+        if (rect.top > Math.min(180, vh * 0.28)) return;
+        const spansTop = rect.width >= Math.min(360, vw * 0.48) || rect.left <= 12 || rect.right >= vw - 12;
+        const positioned = /^(fixed|sticky|absolute)$/i.test(String(cs?.position || ''));
+        const editSignal = this._haEditChromeSignal_?.(el);
+        if (!editSignal && !positioned) return;
+        if (!spansTop && !positioned && !editSignal) return;
+        bottom = Math.max(bottom, Math.round(rect.bottom));
+      } catch {}
+    });
+  } catch {}
+  return { active: true, bottom };
+}
+
+_measureVisibleHaTopChromeBottom_() {
+  let bottom = 0;
+  try {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return 0;
+    const vw = Math.max(1, window.innerWidth || document.documentElement?.clientWidth || 1);
+    const vh = Math.max(1, window.innerHeight || document.documentElement?.clientHeight || 1);
+    const rawLeft = parseFloat(this.style.getPropertyValue('--ddc-left-gutter') || '0') || 0;
+    const minX = Math.min(vw - 2, Math.max(2, rawLeft + 12));
+    const sampleXs = Array.from(new Set([
+      Math.round(Math.min(vw - 2, Math.max(2, minX + 36))),
+      Math.round(Math.min(vw - 2, Math.max(2, rawLeft + ((vw - rawLeft) * 0.5)))),
+      Math.round(Math.min(vw - 2, Math.max(2, vw - 48)))
+    ])).filter((x) => Number.isFinite(x) && x >= 0 && x <= vw);
+    const sampleYs = [];
+    for (let y = 4; y <= Math.min(220, vh - 1); y += 10) sampleYs.push(y);
+    const seen = new WeakSet();
+    const pointStack = (x, y) => {
+      const nodes = [];
+      let el = null;
+      try { el = document.elementFromPoint(x, y); } catch {}
+      for (let depth = 0; el && depth < 10; depth += 1) {
+        nodes.push(el);
+        const root = el.shadowRoot;
+        let inner = null;
+        try { inner = root?.elementFromPoint?.(x, y) || null; } catch {}
+        if (!inner || inner === el || nodes.includes(inner)) break;
+        el = inner;
+      }
+      return nodes;
+    };
+    const consider = (el, sampleY) => {
+      try {
+        if (!el || seen.has(el) || this._isOwnChromeElement_?.(el)) return;
+        seen.add(el);
+        const tag = String(el.localName || '').toLowerCase();
+        if (!tag || tag === 'html' || tag === 'body' || tag === 'home-assistant') return;
+        const cs = window.getComputedStyle?.(el);
+        if (!cs || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return;
+        const rect = el.getBoundingClientRect?.();
+        if (!rect || rect.width < 48 || rect.height < 10) return;
+        if (rect.height > Math.min(180, vh * 0.34)) return;
+        if (rect.bottom <= 0 || rect.top >= Math.min(220, vh)) return;
+        if (rect.top > 140) return;
+        if (rect.bottom > Math.min(240, vh)) return;
+        if (sampleY != null && (sampleY < rect.top - 2 || sampleY > rect.bottom + 2)) return;
+        const spansContent = rect.width >= Math.min(320, Math.max(120, (vw - rawLeft) * 0.35));
+        const nearTopEdge = rect.top <= 8 || rect.left <= rawLeft + 24 || rect.right >= vw - 8;
+        const positioned = /^(fixed|sticky|absolute)$/i.test(String(cs.position || ''));
+        const signal = this._haEditChromeSignal_?.(el);
+        if (!spansContent && !nearTopEdge && !positioned && !signal) return;
+        bottom = Math.max(bottom, Math.round(rect.bottom));
+      } catch {}
+    };
+    sampleXs.forEach((x) => {
+      sampleYs.forEach((y) => {
+        pointStack(x, y).forEach((pointEl) => {
+          let el = pointEl;
+          for (let depth = 0; el && depth < 8; depth += 1) {
+            consider(el, y);
+            const root = el.getRootNode?.();
+            const host = root?.host;
+            el = el.parentElement || (host && host !== el ? host : null);
+          }
+        });
+      });
+    });
+  } catch {}
+  return Math.max(0, Math.round(bottom));
+}
+
 _computeHaSidebarGutters_() {
   let left = 56; // default desktop gutter; HA collapsed is ~56-64px
   try {
@@ -13164,6 +13435,7 @@ _computeHaTopGutter_() {
     headers.forEach((el) => {
       try {
         if (!el) return;
+        if (this._isOwnChromeElement_?.(el)) return;
         const cs = getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden') return;
         const rect = el.getBoundingClientRect?.();
@@ -13174,8 +13446,22 @@ _computeHaTopGutter_() {
       } catch {}
     });
   } catch {}
+  let editorChrome = { active: false, bottom: 0 };
+  try {
+    editorChrome = this._getHaEditorChromeTopBottom_?.() || editorChrome;
+    const visibleTopChromeBottom = this._measureVisibleHaTopChromeBottom_?.() || 0;
+    const measuredBottom = Math.max(editorChrome.bottom || 0, visibleTopChromeBottom || 0);
+    if (measuredBottom > 0) {
+      top = Math.max(top, Math.round(measuredBottom + (this.editMode ? 12 : 0)));
+      if (visibleTopChromeBottom > 0) editorChrome.active = editorChrome.active || !!this.editMode;
+      editorChrome.bottom = Math.max(editorChrome.bottom || 0, measuredBottom);
+    }
+  } catch {}
   try {
     this.style.setProperty('--ddc-top-gutter', `${Math.max(0, Math.round(top))}px`);
+    this.style.setProperty('--ddc-ha-editor-top-gutter', `${Math.max(0, Math.round(editorChrome.bottom || 0))}px`);
+    this.toggleAttribute?.('ddc-ha-editor-active', !!editorChrome.active);
+    this._syncToolbarFollowPosition_?.(Math.max(0, Math.round(top)));
   } catch {}
 }
 
@@ -14040,6 +14326,19 @@ _getMobileTextAssistScale_() {
 
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+    const inHaConfigPreview = this._isInHaEditorPreview?.();
+    if (this.__haConfigPreviewMode && !inHaConfigPreview) {
+      this.__haConfigPreviewMode = false;
+      this.__haConfigPreviewRendered = false;
+      this._built = false;
+    }
+    if (inHaConfigPreview) {
+      this.__haConfigPreviewMode = true;
+      this.config = { ...config };
+      this._config = this.config;
+      this._renderHaConfigPreview_?.();
+      return;
+    }
     // Track old key so we only rebuild when storage_key actually changes
     // Keep previous to detect real key changes
     const prevKey = this.storageKey;
@@ -19480,7 +19779,9 @@ _getMobileTextAssistScale_() {
             box-shadow:none;
             overflow:visible;
             cursor:default;
-            container-type:inline-size;
+            --ddc-empty-scale:1;
+            --ddc-empty-design-w:1180px;
+            --ddc-empty-design-h:740px;
             --ddc-empty-accent: color-mix(in oklab, var(--primary-color, #03a9f4) 78%, #00e0ff 22%);
             --ddc-empty-panel: color-mix(in oklab, var(--card-background-color, #111827) 88%, #07111f 12%);
             --ddc-empty-line: color-mix(in oklab, var(--divider-color, rgba(255,255,255,.16)) 74%, var(--ddc-empty-accent) 26%);
@@ -19496,8 +19797,8 @@ _getMobileTextAssistScale_() {
           }
           .card-wrapper.ddc-placeholder > .ddc-placeholder-inner{
             position:relative;
-            width:100%;
-            height:100%;
+            width:var(--ddc-empty-design-w);
+            height:var(--ddc-empty-design-h);
             border-radius:30px;
             overflow:hidden;
             color:var(--primary-text-color, #f8fafc);
@@ -19510,6 +19811,9 @@ _getMobileTextAssistScale_() {
               inset 0 1px 0 rgba(255,255,255,.08);
             pointer-events:auto;
             isolation:isolate;
+            transform:scale(var(--ddc-empty-scale));
+            transform-origin:top left;
+            will-change:transform;
           }
           .ddc-placeholder-inner::before{
             content:"";
@@ -19540,16 +19844,16 @@ _getMobileTextAssistScale_() {
             z-index:2;
             display:grid;
             grid-template-columns:minmax(260px, .88fr) minmax(360px, 1.12fr);
-            gap:clamp(26px, 4vw, 56px);
+            gap:48px;
             align-items:center;
             width:100%;
             height:100%;
             box-sizing:border-box;
-            padding:clamp(34px, 4vw, 64px);
+            padding:54px;
           }
           .ddc-empty-visual{
             position:relative;
-            min-height:280px;
+            min-height:0;
             height:100%;
             border-radius:24px;
             overflow:hidden;
@@ -19562,7 +19866,9 @@ _getMobileTextAssistScale_() {
             inset:0;
             width:100%;
             height:100%;
-            object-fit:cover;
+            object-fit:contain;
+            box-sizing:border-box;
+            padding:34px;
             opacity:.9;
             filter:saturate(.96) contrast(1.03);
           }
@@ -19601,8 +19907,8 @@ _getMobileTextAssistScale_() {
           .ddc-empty-title{
             margin:0;
             max-width:760px;
-            font-size:3.45rem;
-            line-height:.96;
+            font-size:3.05rem;
+            line-height:1.02;
             font-weight:860;
             letter-spacing:0;
             color:var(--primary-text-color, #f8fafc);
@@ -19749,73 +20055,6 @@ _getMobileTextAssistScale_() {
           }
           .ddc-empty-link ha-icon{
             --mdc-icon-size:17px;
-          }
-          @container (max-width: 820px){
-            .ddc-empty-shell{
-              grid-template-columns:1fr;
-              gap:22px;
-              padding:28px;
-            }
-            .ddc-empty-visual{
-              min-height:210px;
-            }
-            .ddc-empty-title{
-              font-size:2.35rem;
-            }
-            .ddc-empty-sub{
-              font-size:1rem;
-            }
-            .ddc-empty-steps{
-              grid-template-columns:1fr;
-            }
-            .ddc-empty-presets{
-              grid-template-columns:1fr;
-            }
-          }
-          @container (max-width: 560px){
-            .ddc-empty-shell{
-              padding:20px;
-              gap:14px;
-            }
-            .ddc-empty-visual{
-              min-height:150px;
-            }
-            .ddc-empty-title{
-              font-size:1.9rem;
-            }
-            .ddc-empty-steps{
-              display:none;
-            }
-            .ddc-empty-links > span{
-              display:none;
-            }
-          }
-          @media (max-width: 920px){
-            .ddc-empty-shell{
-              grid-template-columns:1fr;
-              gap:22px;
-              padding:28px;
-            }
-            .ddc-empty-visual{
-              min-height:210px;
-            }
-            .ddc-empty-title{
-              font-size:2.35rem;
-            }
-            .ddc-empty-sub{
-              font-size:1rem;
-            }
-            .ddc-empty-steps{
-              grid-template-columns:1fr;
-            }
-          }
-          @media (max-width: 560px){
-            .ddc-empty-title{
-              font-size:1.9rem;
-            }
-            .ddc-empty-shell{
-              padding:22px;
-            }
           }
 
           /* --- hold-to-edit ring (cursor progress) --- */
@@ -22435,6 +22674,11 @@ _startInitialAutosize() {
 
 
 connectedCallback() {
+    if (this._isInHaEditorPreview?.()) {
+      this.__haConfigPreviewMode = true;
+      this._renderHaConfigPreview_?.();
+      return;
+    }
     try {
       this._installGridObservers_();
       this._updateGridButtonsVisibility();
@@ -22587,6 +22831,7 @@ connectedCallback() {
     this.__streamlinedToolbarRO = null;
     this.__streamlinedToolbarROTarget = null;
     try { this._removeToolbarFollowListeners_?.(); } catch {}
+    try { this._removeEmptyPlaceholderCentering_?.(); } catch {}
 
     if (this.__lpInstalled && this.__lpHandlers) {
       const cont = this.cardContainer;
@@ -24232,6 +24477,362 @@ _toggleEditMode(force = null) {
   } catch {}
 }
 
+  _renderHaConfigPreview_() {
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    if (this.__haConfigPreviewRendered) return;
+    this.__haConfigPreviewRendered = true;
+    try { this._destroyParticles_?.(); } catch {}
+    try { this._destroyYouTube_?.(); } catch {}
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host{
+          display:block;
+          width:100%;
+          max-width:100%;
+          min-height:0;
+          margin:0 auto;
+          padding:12px 0;
+          box-sizing:border-box;
+          contain:content;
+        }
+        .ddc-ha-widget-preview{
+          position:relative;
+          width:min(88%, 430px);
+          margin:0 auto;
+          overflow:hidden;
+          aspect-ratio:16 / 10;
+          border-radius:18px;
+          color:#f8fbff;
+          background:
+            linear-gradient(145deg, rgba(18,38,56,.94), rgba(3,12,24,.98)),
+            linear-gradient(135deg, #071522 0%, #0a2b40 55%, #05111f 100%);
+          border:1px solid rgba(125,220,255,.32);
+          box-shadow:
+            0 18px 46px rgba(0,0,0,.34),
+            0 6px 16px rgba(0,0,0,.18),
+            inset 0 1px 0 rgba(255,255,255,.1);
+          pointer-events:none;
+          isolation:isolate;
+        }
+        .ddc-ha-widget-preview::before{
+          content:"";
+          position:absolute;
+          inset:0;
+          z-index:0;
+          opacity:.52;
+          background:
+            linear-gradient(rgba(80,210,255,.11) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(80,210,255,.1) 1px, transparent 1px),
+            radial-gradient(300px 180px at 18% 12%, rgba(45,212,255,.22), transparent 68%),
+            radial-gradient(240px 160px at 82% 10%, rgba(255,255,255,.09), transparent 70%);
+          background-size:34px 34px, 34px 34px, auto, auto;
+        }
+        .ddc-ha-widget-preview::after{
+          content:"";
+          position:absolute;
+          inset:0;
+          z-index:1;
+          background:
+            linear-gradient(90deg, rgba(4,12,24,.54), transparent 45%, rgba(4,12,24,.4)),
+            linear-gradient(180deg, rgba(255,255,255,.07), transparent 26%, rgba(0,0,0,.14));
+        }
+        .ddc-mini-header,
+        .ddc-mini-stage,
+        .ddc-mini-footer{
+          position:absolute;
+          z-index:2;
+          box-sizing:border-box;
+        }
+        .ddc-mini-header{
+          top:22px;
+          left:24px;
+          right:24px;
+          display:flex;
+          align-items:center;
+          gap:10px;
+        }
+        .ddc-mini-mark{
+          width:38px;
+          height:38px;
+          flex:0 0 38px;
+          display:grid;
+          place-items:center;
+          border-radius:14px;
+          color:#f8fbff;
+          background:linear-gradient(180deg, #79dcff, #16b7e9);
+          box-shadow:0 10px 26px rgba(14,165,233,.34);
+        }
+        .ddc-mini-mark ha-icon{
+          --mdc-icon-size:22px;
+        }
+        .ddc-mini-title{
+          min-width:0;
+          display:flex;
+          flex-direction:column;
+          gap:3px;
+        }
+        .ddc-mini-title strong{
+          display:block;
+          color:#f8fbff;
+          font-size:16px;
+          line-height:1;
+          font-weight:860;
+          letter-spacing:0;
+          white-space:nowrap;
+        }
+        .ddc-mini-title span{
+          display:block;
+          color:rgba(248,251,255,.68);
+          font-size:11px;
+          line-height:1.15;
+          font-weight:760;
+          white-space:nowrap;
+        }
+        .ddc-mini-tools{
+          margin-left:auto;
+          display:flex;
+          align-items:center;
+          gap:6px;
+        }
+        .ddc-mini-tool{
+          width:30px;
+          height:30px;
+          display:grid;
+          place-items:center;
+          border-radius:12px;
+          border:1px solid rgba(125,220,255,.28);
+          background:rgba(255,255,255,.06);
+          color:#e8f9ff;
+          box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+        }
+        .ddc-mini-tool ha-icon{
+          --mdc-icon-size:17px;
+        }
+        .ddc-mini-stage{
+          left:34px;
+          right:34px;
+          top:82px;
+          bottom:50px;
+        }
+        .ddc-mini-card{
+          position:absolute;
+          border-radius:15px;
+          border:1px solid rgba(125,220,255,.22);
+          background:rgba(3,13,25,.82);
+          box-shadow:
+            0 14px 30px rgba(0,0,0,.22),
+            inset 0 1px 0 rgba(255,255,255,.08);
+        }
+        .ddc-mini-card::before,
+        .ddc-mini-card::after{
+          content:"";
+          position:absolute;
+          left:15%;
+          right:15%;
+          height:9px;
+          border-radius:999px;
+          background:linear-gradient(90deg, #f8fbff 0 33%, rgba(125,220,255,.42) 33% 54%, rgba(248,251,255,.22) 54%);
+        }
+        .ddc-mini-card::before{
+          top:19%;
+        }
+        .ddc-mini-card::after{
+          left:18%;
+          right:30%;
+          bottom:18%;
+          height:8px;
+          background:rgba(125,220,255,.32);
+        }
+        .ddc-mini-card.large{
+          left:0;
+          top:14px;
+          width:34%;
+          height:62px;
+        }
+        .ddc-mini-card.mid{
+          left:37%;
+          top:0;
+          width:26%;
+          height:52px;
+        }
+        .ddc-mini-card.wide{
+          left:28%;
+          bottom:0;
+          width:34%;
+          height:50px;
+        }
+        .ddc-mini-card.tall{
+          right:0;
+          top:18px;
+          width:28%;
+          height:66px;
+        }
+        .ddc-mini-line{
+          position:absolute;
+          height:3px;
+          border-radius:999px;
+          background:linear-gradient(90deg, transparent, rgba(125,220,255,.6), transparent);
+          box-shadow:0 0 14px rgba(125,220,255,.22);
+          transform-origin:center;
+        }
+        .ddc-mini-line.one{
+          left:28%;
+          top:44%;
+          width:46%;
+          transform:rotate(-9deg);
+        }
+        .ddc-mini-line.two{
+          left:44%;
+          top:72%;
+          width:40%;
+          transform:rotate(15deg);
+        }
+        .ddc-mini-dot{
+          position:absolute;
+          width:4px;
+          height:4px;
+          border-radius:50%;
+          background:#7ddcff;
+          box-shadow:0 0 10px rgba(125,220,255,.8);
+        }
+        .ddc-mini-dot.one{
+          left:24%;
+          bottom:18%;
+        }
+        .ddc-mini-dot.two{
+          right:34%;
+          bottom:2%;
+        }
+        .ddc-mini-footer{
+          left:24px;
+          right:24px;
+          bottom:19px;
+          display:flex;
+          align-items:center;
+          gap:8px;
+        }
+        .ddc-mini-chip{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          height:24px;
+          padding:0 8px;
+          border-radius:999px;
+          border:1px solid rgba(255,255,255,.14);
+          background:rgba(255,255,255,.08);
+          color:rgba(248,251,255,.74);
+          font-size:9.5px;
+          font-weight:820;
+          white-space:nowrap;
+        }
+        .ddc-mini-chip ha-icon{
+          --mdc-icon-size:13px;
+          color:#7ddcff;
+        }
+        .ddc-mini-ready{
+          margin-left:auto;
+          color:rgba(248,251,255,.72);
+          font-size:10.5px;
+          line-height:1;
+          font-weight:820;
+          white-space:nowrap;
+        }
+        @media (max-width: 420px){
+          :host{
+            padding:10px 0;
+          }
+          .ddc-ha-widget-preview{
+            width:min(92%, 390px);
+            border-radius:16px;
+          }
+          .ddc-mini-header{
+            top:18px;
+            left:20px;
+            right:20px;
+            gap:10px;
+          }
+          .ddc-mini-mark{
+            width:36px;
+            height:36px;
+            flex-basis:36px;
+            border-radius:12px;
+          }
+          .ddc-mini-title strong{
+            font-size:15px;
+          }
+          .ddc-mini-title span{
+            font-size:10px;
+          }
+          .ddc-mini-tools{
+            gap:6px;
+          }
+          .ddc-mini-tool{
+            width:29px;
+            height:29px;
+            border-radius:10px;
+          }
+          .ddc-mini-stage{
+            left:30px;
+            right:30px;
+            top:78px;
+            bottom:50px;
+          }
+          .ddc-mini-footer{
+            left:20px;
+            right:20px;
+            bottom:18px;
+            gap:6px;
+          }
+          .ddc-mini-chip{
+            height:24px;
+            padding:0 9px;
+            font-size:10px;
+          }
+          .ddc-mini-ready{
+            font-size:10px;
+          }
+        }
+        @media (max-width: 340px){
+          .ddc-mini-tools .ddc-mini-tool:nth-child(3),
+          .ddc-mini-chip:nth-child(3),
+          .ddc-mini-ready{
+            display:none;
+          }
+        }
+      </style>
+      <section class="ddc-ha-widget-preview" aria-label="Drag and Drop Card preview">
+        <div class="ddc-mini-header">
+          <div class="ddc-mini-mark" aria-hidden="true"><ha-icon icon="mdi:cursor-move"></ha-icon></div>
+          <div class="ddc-mini-title">
+            <strong>Drag & Drop Card</strong>
+            <span>Visual dashboard canvas</span>
+          </div>
+          <div class="ddc-mini-tools" aria-hidden="true">
+            <span class="ddc-mini-tool"><ha-icon icon="mdi:home"></ha-icon></span>
+            <span class="ddc-mini-tool"><ha-icon icon="mdi:lightbulb-outline"></ha-icon></span>
+            <span class="ddc-mini-tool"><ha-icon icon="mdi:chart-line"></ha-icon></span>
+          </div>
+        </div>
+        <div class="ddc-mini-stage" aria-hidden="true">
+          <span class="ddc-mini-line one"></span>
+          <span class="ddc-mini-line two"></span>
+          <span class="ddc-mini-dot one"></span>
+          <span class="ddc-mini-dot two"></span>
+          <span class="ddc-mini-card large"></span>
+          <span class="ddc-mini-card mid"></span>
+          <span class="ddc-mini-card wide"></span>
+          <span class="ddc-mini-card tall"></span>
+        </div>
+        <div class="ddc-mini-footer">
+          <span class="ddc-mini-chip"><ha-icon icon="mdi:layers-triple-outline"></ha-icon><span>Layers</span></span>
+          <span class="ddc-mini-chip"><ha-icon icon="mdi:vector-polyline"></ha-icon><span>Lines</span></span>
+          <span class="ddc-mini-chip"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon><span>Cards</span></span>
+          <span class="ddc-mini-ready">Full HD ready</span>
+        </div>
+      </section>
+    `;
+  }
+
   _isInHaEditorPreview() {
     // Walk up through parents and shadow hosts to detect HA's edit/preview dialog
     let n = this;
@@ -24743,8 +25344,8 @@ _syncEmptyStateUI() {
             leader: wrap,
             members: group,
             startRaw: new Map(group.map(w => [w, {
-              x: parseFloat(w.getAttribute('data-x-raw')) || parseFloat(w.getAttribute('data-x')) || 0,
-              y: parseFloat(w.getAttribute('data-y-raw')) || parseFloat(w.getAttribute('data-y')) || 0,
+              x: this._numberOr_(w.getAttribute('data-x-raw'), this._numberOr_(w.getAttribute('data-x'), 0)),
+              y: this._numberOr_(w.getAttribute('data-y-raw'), this._numberOr_(w.getAttribute('data-y'), 0)),
               w: parseFloat(w.style.width)  || w.getBoundingClientRect().width,
               h: parseFloat(w.style.height) || w.getBoundingClientRect().height,
             }]))
@@ -24769,8 +25370,8 @@ _syncEmptyStateUI() {
           const allCardsStart = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'))
             .filter((c) => selectedAtStart.has(c) || this._isWrapperVisibleForOverlap_?.(c));
           allCardsStart.forEach(c => {
-            const rawX = parseFloat(c.getAttribute('data-x-raw')) || parseFloat(c.getAttribute('data-x')) || 0;
-            const rawY = parseFloat(c.getAttribute('data-y-raw')) || parseFloat(c.getAttribute('data-y')) || 0;
+            const rawX = this._numberOr_(c.getAttribute('data-x-raw'), this._numberOr_(c.getAttribute('data-x'), 0));
+            const rawY = this._numberOr_(c.getAttribute('data-y-raw'), this._numberOr_(c.getAttribute('data-y'), 0));
             this.__collisionOriginals.set(c, { x: rawX, y: rawY });
           });
 
@@ -24798,8 +25399,10 @@ _syncEmptyStateUI() {
           const sx = this.__pointerScaleX || 1;
           const sy = this.__pointerScaleY || 1;
 
-          const curLeadX = (parseFloat(lead.getAttribute('data-x-raw')) || srL.x) + (ev.dx / sx);
-          const curLeadY = (parseFloat(lead.getAttribute('data-y-raw')) || srL.y) + (ev.dy / sy);
+          const leadRawX = this._numberOr_(lead.getAttribute('data-x-raw'), srL.x);
+          const leadRawY = this._numberOr_(lead.getAttribute('data-y-raw'), srL.y);
+          const curLeadX = leadRawX + (ev.dx / sx);
+          const curLeadY = leadRawY + (ev.dy / sy);
           const dxLead   = curLeadX - srL.x;
           const dyLead   = curLeadY - srL.y;
 
@@ -24812,7 +25415,7 @@ _syncEmptyStateUI() {
             const snapY = live ? Math.round(rawY / gs) * gs : rawY;
             return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
           });
-          this._shiftProposedCardsIntoCanvasTop_?.(proposed, live, gs);
+          this._constrainProposedCardsToCanvas_?.(proposed, live, gs);
 
           // If overlap protection is on, restore other cards and push them out of the way
           if (this.disableOverlap) {
@@ -24820,8 +25423,6 @@ _syncEmptyStateUI() {
           }
 
           // Commit the move: update raw coordinates and apply snapped transform
-          lead.setAttribute('data-x-raw', String(curLeadX));
-          lead.setAttribute('data-y-raw', String(curLeadY));
           for (const pr of proposed) {
             pr.el.setAttribute('data-x-raw', String(pr.rawX));
             pr.el.setAttribute('data-y-raw', String(pr.rawY));
@@ -24836,15 +25437,15 @@ _syncEmptyStateUI() {
 
           // Gather final positions (unsnapped and snapped) for the dragged group
           const endRects = this.__groupDrag.members.map(m => {
-            const rawX = parseFloat(m.getAttribute('data-x-raw')) || parseFloat(m.getAttribute('data-x')) || 0;
-            const rawY = parseFloat(m.getAttribute('data-y-raw')) || parseFloat(m.getAttribute('data-y')) || 0;
+            const rawX = this._numberOr_(m.getAttribute('data-x-raw'), this._numberOr_(m.getAttribute('data-x'), 0));
+            const rawY = this._numberOr_(m.getAttribute('data-y-raw'), this._numberOr_(m.getAttribute('data-y'), 0));
             const snapX = Math.round(rawX / gs) * gs;
             const snapY = Math.round(rawY / gs) * gs;
             const w  = parseFloat(m.style.width)  || m.getBoundingClientRect().width;
             const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
             return { el: m, rawX, rawY, snapX, snapY, w, h };
           });
-          this._shiftProposedCardsIntoCanvasTop_?.(endRects, true, gs);
+          this._constrainProposedCardsToCanvas_?.(endRects, true, gs);
 
           // On end, do a final restore/push to prevent leftover overlaps
           if (this.disableOverlap) {
@@ -25538,7 +26139,7 @@ _syncEmptyStateUI() {
     }
   }
 
-  _makePlaceholderAt(x=0,y=0,w=400,h=400) {
+  _makePlaceholderAt(x=0,y=0,w=400,h=400, options = {}) {
     const wrap = document.createElement('div');
     wrap.classList.add('card-wrapper','ddc-placeholder');
     wrap.dataset.placeholder = '1';
@@ -25546,8 +26147,20 @@ _syncEmptyStateUI() {
     wrap.setAttribute('aria-label', 'Drag and Drop Card getting started');
     if (this.editMode) wrap.classList.add('editing');
     this._setCardPosition(wrap, x, y);
-    wrap.style.width = `${w}px`;
-    wrap.style.height = `${h}px`;
+    const designW = Math.max(320, Math.round(Number(options.designW || w) || 1180));
+    const designH = Math.max(420, Math.round(Number(options.designH || h) || 740));
+    const scale = Math.max(0.0001, Number(options.scale || Math.min(w / designW, h / designH, 1)) || 1);
+    const displayW = Math.max(1, Math.round(designW * scale));
+    const displayH = Math.max(1, Math.round(designH * scale));
+    wrap.style.width = `${displayW}px`;
+    wrap.style.height = `${displayH}px`;
+    wrap.style.setProperty('--ddc-empty-design-w', `${designW}px`);
+    wrap.style.setProperty('--ddc-empty-design-h', `${designH}px`);
+    wrap.style.setProperty('--ddc-empty-scale', scale.toFixed(5));
+    wrap.dataset.emptyDesignW = String(designW);
+    wrap.dataset.emptyDesignH = String(designH);
+    wrap.dataset.emptyScale = scale.toFixed(5);
+    wrap.__ddcEmptySizeSig = `${displayW}x${displayH}@${scale.toFixed(5)}`;
     wrap.style.zIndex = String(this._highestZ() + 1);
   
     const inner = document.createElement('div');
@@ -25688,64 +26301,205 @@ _syncEmptyStateUI() {
     });
   }
 
+  _emptyPlaceholderBaseSize_() {
+    return { w: 1180, h: 740 };
+  }
+
+  _emptyPlaceholderMetrics_() {
+    const base = this._emptyPlaceholderBaseSize_?.() || { w: 1180, h: 740 };
+    const designW = Math.max(320, Math.round(Number(base.w) || 1180));
+    const designH = Math.max(420, Math.round(Number(base.h) || 740));
+    let frame = null;
+    try { frame = this._emptyPlaceholderVisibleFrame_?.(); } catch {}
+    if (!frame || !Number.isFinite(frame.width) || !Number.isFinite(frame.height)) {
+      try {
+        const rect = this.getBoundingClientRect?.();
+        frame = {
+          width: Math.max(1, rect?.width || window.innerWidth || designW),
+          height: Math.max(1, rect?.height || window.innerHeight || designH),
+        };
+      } catch {
+        frame = { width: designW, height: designH };
+      }
+    }
+    const frameW = Math.max(1, Number(frame.width) || designW);
+    const frameH = Math.max(1, Number(frame.height) || designH);
+    const marginX = frameW < 760 ? 32 : 80;
+    const marginY = frameH < 760 ? 32 : 80;
+    const availableW = Math.max(220, frameW - marginX);
+    const availableH = Math.max(220, frameH - marginY);
+    const scale = Math.max(0.0001, Math.min(1, availableW / designW, availableH / designH) || 1);
+    return {
+      designW,
+      designH,
+      scale,
+      w: Math.max(1, Math.round(designW * scale)),
+      h: Math.max(1, Math.round(designH * scale)),
+    };
+  }
+
+  _syncEmptyPlaceholderSize_(placeholder = null) {
+    const p = placeholder || this.cardContainer?.querySelector?.('.ddc-placeholder');
+    if (!p || !p.isConnected) return null;
+    const metrics = this._emptyPlaceholderMetrics_?.() || { designW: 1180, designH: 740, scale: 1, w: 1180, h: 740 };
+    const scale = Math.max(0.0001, Number(metrics.scale) || 1);
+    const displayW = Math.max(1, Math.round(Number(metrics.w) || (metrics.designW * scale)));
+    const displayH = Math.max(1, Math.round(Number(metrics.h) || (metrics.designH * scale)));
+    const designW = Math.max(320, Math.round(Number(metrics.designW) || 1180));
+    const designH = Math.max(420, Math.round(Number(metrics.designH) || 740));
+    const sig = `${displayW}x${displayH}@${scale.toFixed(5)}`;
+    if (p.__ddcEmptySizeSig === sig) return metrics;
+    p.style.width = `${displayW}px`;
+    p.style.height = `${displayH}px`;
+    p.style.setProperty('--ddc-empty-design-w', `${designW}px`);
+    p.style.setProperty('--ddc-empty-design-h', `${designH}px`);
+    p.style.setProperty('--ddc-empty-scale', scale.toFixed(5));
+    p.dataset.emptyDesignW = String(designW);
+    p.dataset.emptyDesignH = String(designH);
+    p.dataset.emptyScale = scale.toFixed(5);
+    p.__ddcEmptySizeSig = sig;
+    try {
+      if (!this._isContainerFixed?.()) this._resizeContainer?.();
+    } catch {}
+    return metrics;
+  }
+
   _showEmptyPlaceholder() {
     // Avoid creating multiple placeholders
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
-    // Keep the welcome panel large enough to be useful, but let it respect
-    // smaller canvas presets such as tablet and mobile.
-    let canvasW = 1920;
-    let canvasH = 1080;
-    try {
-      const size = this._getContainerSize?.();
-      canvasW = Math.max(320, Number(size?.w || canvasW) || canvasW);
-      canvasH = Math.max(420, Number(size?.h || canvasH) || canvasH);
-    } catch {}
-    const phW = Math.round(Math.max(320, Math.min(1280, canvasW - Math.min(160, canvasW * .12))));
-    const phH = Math.round(Math.max(420, Math.min(680, canvasH - Math.min(160, canvasH * .12))));
+    const metrics = this._emptyPlaceholderMetrics_?.() || { designW: 1180, designH: 740, scale: 1, w: 1180, h: 740 };
     // Initially create the placeholder at (0,0) so that the resize logic can
     // compute an appropriate container size.  We will center it after the
     // container dimensions have been updated.
-    const p = this._makePlaceholderAt(0, 0, phW, phH);
+    const p = this._makePlaceholderAt(0, 0, metrics.w, metrics.h, metrics);
     this.cardContainer.appendChild(p);
     // Resize the container so its dimensions reflect the presence of the
     // placeholder.  Without this call the container width/height may be
     // reported as zero, preventing proper centering.
     this._resizeContainer();
-    // Compute the center position for the placeholder relative to the
-    // component’s bounding box rather than the card container.  The card
-    // container grows and shrinks based on its contents, so its width may
-    // match the placeholder width exactly, making (cw - phW)/2 equal to 0.
-    // Instead, use the host element’s bounding rectangle to find the
-    // available width/height and offset by the difference between the
-    // container and host origins.  This centers the placeholder within
-    // the entire drag‑and‑drop card, not just within the container.
-    try {
-      const rootRect = this.getBoundingClientRect?.();
-      const contRect = this.cardContainer?.getBoundingClientRect?.();
-      if (rootRect && contRect) {
-        // Compute center coordinates in the host’s coordinate space
-        const hostCenterX = (rootRect.width  - phW) / 2;
-        const hostCenterY = (rootRect.height - phH) / 2;
-        // Translate host coordinates into container coordinates
-        let centerX = hostCenterX - (contRect.left - rootRect.left);
-        let centerY = hostCenterY - (contRect.top  - rootRect.top);
-        // Clamp to zero to avoid negative translations on very small hosts
-        if (!Number.isFinite(centerX) || centerX < 0) centerX = 0;
-        if (!Number.isFinite(centerY) || centerY < 0) centerY = 0;
-        this._setCardPosition(p, centerX, centerY);
-      }
-    } catch {
-      // Fallback: leave placeholder at (0,0) if any errors occur
-    }
+    this._installEmptyPlaceholderCentering_?.();
+    this._centerEmptyPlaceholderInViewport_?.(p);
+    this._scheduleEmptyPlaceholderCenter_?.();
     // Update UI state (add button visibility, etc.)
     this._syncEmptyStateUI();
   }
-  _hideEmptyPlaceholder() { this.cardContainer.querySelectorAll('.ddc-placeholder').forEach(n => n.remove()); }
+  _hideEmptyPlaceholder() {
+    this.cardContainer.querySelectorAll('.ddc-placeholder').forEach(n => n.remove());
+    this._removeEmptyPlaceholderCentering_?.();
+  }
   _ensurePlaceholderIfEmpty() {
     const realCards = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
     if (realCards.length === 0) this._showEmptyPlaceholder();
         this._applyAutoScale?.();
+    this._scheduleEmptyPlaceholderCenter_?.();
     this._syncEmptyStateUI();
+  }
+
+  _emptyPlaceholderVisibleFrame_() {
+    const frameEl = this.__scaleOuter || this.cardContainer || this;
+    const rect = frameEl?.getBoundingClientRect?.() || this.getBoundingClientRect?.();
+    const fallback = this.getBoundingClientRect?.() || { left: 0, top: 0, right: window.innerWidth || 1, bottom: window.innerHeight || 1, width: window.innerWidth || 1, height: window.innerHeight || 1 };
+    const base = rect && rect.width && rect.height ? rect : fallback;
+    const winW = Math.max(1, window.innerWidth || document.documentElement?.clientWidth || base.right || 1);
+    const winH = Math.max(1, window.innerHeight || document.documentElement?.clientHeight || base.bottom || 1);
+    let left = Math.max(base.left || 0, 0);
+    let top = Math.max(base.top || 0, 0);
+    let right = Math.min(base.right || winW, winW);
+    let bottom = Math.min(base.bottom || winH, winH);
+    if (right - left < 40) {
+      left = base.left || 0;
+      right = base.right || (left + (base.width || winW));
+    }
+    if (bottom - top < 40) {
+      top = base.top || 0;
+      bottom = base.bottom || (top + (base.height || winH));
+    }
+    return { left, top, right, bottom, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
+  }
+
+  _centerEmptyPlaceholderInViewport_(placeholder = null) {
+    try {
+      const p = placeholder || this.cardContainer?.querySelector?.('.ddc-placeholder');
+      const c = this.cardContainer;
+      if (!p || !c || !p.isConnected) return;
+      this._syncEmptyPlaceholderSize_?.(p);
+      const frame = this._emptyPlaceholderVisibleFrame_?.();
+      const contRect = c.getBoundingClientRect?.();
+      if (!frame || !contRect) return;
+      const designW = parseFloat(c.style.width || '') || c.offsetWidth || c.scrollWidth || Math.max(1, contRect.width);
+      const designH = parseFloat(c.style.height || '') || c.offsetHeight || c.scrollHeight || Math.max(1, contRect.height);
+      const scaleX = Math.max(0.0001, Number(this.__pointerScaleX || (designW ? contRect.width / designW : 1)) || 1);
+      const scaleY = Math.max(0.0001, Number(this.__pointerScaleY || (designH ? contRect.height / designH : 1)) || 1);
+      const pW = parseFloat(p.style.width || '') || p.offsetWidth || Math.max(1, p.getBoundingClientRect?.().width / scaleX || 1);
+      const pH = parseFloat(p.style.height || '') || p.offsetHeight || Math.max(1, p.getBoundingClientRect?.().height / scaleY || 1);
+      const targetX = frame.left + frame.width / 2;
+      const targetY = frame.top + frame.height / 2;
+      const desiredX = ((targetX - contRect.left) / scaleX) - (pW / 2);
+      const desiredY = ((targetY - contRect.top) / scaleY) - (pH / 2);
+      const maxX = Math.max(0, designW - pW);
+      const maxY = Math.max(0, designH - pH);
+      const x = Math.max(0, Math.min(maxX, Number.isFinite(desiredX) ? desiredX : 0));
+      const y = Math.max(0, Math.min(maxY, Number.isFinite(desiredY) ? desiredY : 0));
+      this._setCardPosition(p, x, y);
+    } catch {}
+  }
+
+  _scheduleEmptyPlaceholderCenter_() {
+    if (!this.cardContainer?.querySelector?.('.ddc-placeholder')) return;
+    this._installEmptyPlaceholderCentering_?.();
+    if (this.__emptyPlaceholderCenterRAF) return;
+    this.__emptyPlaceholderCenterRAF = requestAnimationFrame(() => {
+      this.__emptyPlaceholderCenterRAF = 0;
+      this._syncEmptyPlaceholderCenterObservers_?.();
+      this._centerEmptyPlaceholderInViewport_?.();
+    });
+  }
+
+  _syncEmptyPlaceholderCenterObservers_() {
+    try {
+      if (!this.__emptyPlaceholderCenterRO) return;
+      const targets = [this, this.__scaleOuter, this.cardContainer].filter(Boolean);
+      const seen = this.__emptyPlaceholderObserved || new WeakSet();
+      targets.forEach((target) => {
+        if (!target || seen.has(target)) return;
+        seen.add(target);
+        try { this.__emptyPlaceholderCenterRO.observe(target); } catch {}
+      });
+      this.__emptyPlaceholderObserved = seen;
+    } catch {}
+  }
+
+  _installEmptyPlaceholderCentering_() {
+    try {
+      if (!this.cardContainer?.querySelector?.('.ddc-placeholder')) return;
+      if (!this.__emptyPlaceholderCenterHandler) {
+        this.__emptyPlaceholderCenterHandler = () => this._scheduleEmptyPlaceholderCenter_?.();
+        window.addEventListener('resize', this.__emptyPlaceholderCenterHandler, { passive: true });
+        window.addEventListener('scroll', this.__emptyPlaceholderCenterHandler, true);
+      }
+      if (!this.__emptyPlaceholderCenterRO && typeof ResizeObserver !== 'undefined') {
+        this.__emptyPlaceholderCenterRO = new ResizeObserver(() => this._scheduleEmptyPlaceholderCenter_?.());
+        this.__emptyPlaceholderObserved = new WeakSet();
+      }
+      this._syncEmptyPlaceholderCenterObservers_?.();
+    } catch {}
+  }
+
+  _removeEmptyPlaceholderCentering_() {
+    try {
+      if (this.__emptyPlaceholderCenterHandler) {
+        window.removeEventListener('resize', this.__emptyPlaceholderCenterHandler);
+        window.removeEventListener('scroll', this.__emptyPlaceholderCenterHandler, true);
+        this.__emptyPlaceholderCenterHandler = null;
+      }
+      try { this.__emptyPlaceholderCenterRO?.disconnect?.(); } catch {}
+      this.__emptyPlaceholderCenterRO = null;
+      this.__emptyPlaceholderObserved = null;
+      if (this.__emptyPlaceholderCenterRAF) {
+        try { cancelAnimationFrame(this.__emptyPlaceholderCenterRAF); } catch {}
+        this.__emptyPlaceholderCenterRAF = 0;
+      }
+    } catch {}
   }
 
   _adjustZ(wrap, delta) {
@@ -25783,24 +26537,89 @@ _syncEmptyStateUI() {
 	    // Do NOT touch data-*-raw here; drag/resize
 	  }
 
+  _numberOr_(value, fallback = 0) {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   _clampYToCanvasTop_(value = 0) {
     const n = Number(value);
     return Number.isFinite(n) ? Math.max(0, n) : 0;
   }
 
-  _shiftProposedCardsIntoCanvasTop_(proposed = [], liveSnap = false, gridSize = this.gridSize) {
+  _constrainProposedCardsToCanvas_(proposed = [], liveSnap = false, gridSize = this.gridSize) {
     const items = Array.isArray(proposed) ? proposed : [];
     if (!items.length) return items;
-    const minY = items.reduce((min, item) => Math.min(min, Number(item?.rawY ?? item?.snapY ?? 0) || 0), Infinity);
-    if (!Number.isFinite(minY) || minY >= 0) return items;
-    const offset = Math.abs(minY);
     const gs = Math.max(1, Number(gridSize || this.gridSize || 1) || 1);
+    const numberOr = (value, fallback = 0) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const snap = (value) => liveSnap ? Math.round(value / gs) * gs : value;
+    const readBounds = () => items.reduce((bounds, item) => {
+      if (!item) return bounds;
+      const rawX = numberOr(item.rawX, numberOr(item.snapX, 0));
+      const rawY = numberOr(item.rawY, numberOr(item.snapY, 0));
+      const width = Math.max(0, numberOr(item.w, item.el?.getBoundingClientRect?.().width || 0));
+      const height = Math.max(0, numberOr(item.h, item.el?.getBoundingClientRect?.().height || 0));
+      item.rawX = rawX;
+      item.rawY = rawY;
+      item.w = width;
+      item.h = height;
+      bounds.minX = Math.min(bounds.minX, rawX);
+      bounds.minY = Math.min(bounds.minY, rawY);
+      bounds.maxX = Math.max(bounds.maxX, rawX + width);
+      bounds.maxY = Math.max(bounds.maxY, rawY + height);
+      return bounds;
+    }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    const shift = (dx = 0, dy = 0) => {
+      if (!dx && !dy) return;
+      items.forEach((item) => {
+        if (!item) return;
+        item.rawX = numberOr(item.rawX, 0) + dx;
+        item.rawY = numberOr(item.rawY, 0) + dy;
+      });
+    };
+    let bounds = readBounds();
+    if (Number.isFinite(bounds.minX) && bounds.minX < 0) shift(-bounds.minX, 0);
+    if (Number.isFinite(bounds.minY) && bounds.minY < 0) shift(0, -bounds.minY);
+    let fixedContainerW = 0;
+    let fixedContainerH = 0;
+    if (this._isContainerFixed?.()) {
+      try {
+        const { w: cw, h: ch } = this._getContainerSize?.() || {};
+        const containerW = Math.max(0, numberOr(cw, 0));
+        const containerH = Math.max(0, numberOr(ch, 0));
+        fixedContainerW = containerW;
+        fixedContainerH = containerH;
+        bounds = readBounds();
+        if (containerW > 0 && Number.isFinite(bounds.maxX) && bounds.maxX > containerW) {
+          const groupWidth = bounds.maxX - bounds.minX;
+          shift(groupWidth <= containerW ? containerW - bounds.maxX : -bounds.minX, 0);
+        }
+        bounds = readBounds();
+        if (containerH > 0 && Number.isFinite(bounds.maxY) && bounds.maxY > containerH) {
+          const groupHeight = bounds.maxY - bounds.minY;
+          shift(groupHeight <= containerH ? containerH - bounds.maxY : -bounds.minY, 0);
+        }
+      } catch {}
+    }
     items.forEach((item) => {
       if (!item) return;
-      item.rawY = this._clampYToCanvasTop_((Number(item.rawY) || 0) + offset);
-      item.snapY = liveSnap ? Math.round(item.rawY / gs) * gs : item.rawY;
+      item.rawX = Math.max(0, numberOr(item.rawX, 0));
+      item.rawY = this._clampYToCanvasTop_(numberOr(item.rawY, 0));
+      let snapX = Math.max(0, snap(item.rawX));
+      let snapY = this._clampYToCanvasTop_(snap(item.rawY));
+      if (fixedContainerW > 0) snapX = Math.max(0, Math.min(snapX, Math.max(0, fixedContainerW - numberOr(item.w, 0))));
+      if (fixedContainerH > 0) snapY = Math.max(0, Math.min(snapY, Math.max(0, fixedContainerH - numberOr(item.h, 0))));
+      item.snapX = snapX;
+      item.snapY = snapY;
     });
     return items;
+  }
+
+  _shiftProposedCardsIntoCanvasTop_(proposed = [], liveSnap = false, gridSize = this.gridSize) {
+    return this._constrainProposedCardsToCanvas_(proposed, liveSnap, gridSize);
   }
   
 
@@ -26058,6 +26877,7 @@ _setToolbarFollowMode_(enabled = false) {
     const next = !!enabled;
     this.toggleAttribute?.('ddc-toolbar-follow', next);
     if (!next) {
+      this._syncToolbarFollowPosition_?.(0);
       this._removeToolbarFollowListeners_?.();
       this._refreshToolbarOpenHeight_?.();
       return;
@@ -26069,6 +26889,30 @@ _setToolbarFollowMode_(enabled = false) {
   } catch {}
 }
 
+_syncToolbarFollowPosition_(topOverride = null) {
+  try {
+    const host = this.shadowRoot || this.renderRoot || this;
+    const toolbar = host?.querySelector?.('.ddc-toolbar.streamlined.v2, .ddc-toolbar.streamlined.v3');
+    if (!toolbar) return;
+    const followsViewport = this.hasAttribute?.('ddc-toolbar-follow');
+    if (!followsViewport) {
+      toolbar.style.removeProperty('top');
+      toolbar.style.removeProperty('position');
+      return;
+    }
+    const rawTop = topOverride == null
+      ? parseFloat(this.style.getPropertyValue('--ddc-top-gutter') || '0')
+      : Number(topOverride);
+    const top = Math.max(0, Math.round(Number.isFinite(rawTop) ? rawTop : 0));
+    toolbar.style.setProperty('position', 'fixed', 'important');
+    toolbar.style.setProperty(
+      'top',
+      `calc(${top}px + max(env(safe-area-inset-top, 0px), 0px))`,
+      'important'
+    );
+  } catch {}
+}
+
 _installToolbarFollowListeners_() {
   try {
     if (this.__toolbarFollowListeners || typeof window === 'undefined') return;
@@ -26076,6 +26920,7 @@ _installToolbarFollowListeners_() {
     const sync = () => {
       try { this._computeHaSidebarGutters_?.(); } catch {}
       try { this._computeHaTopGutter_?.(); } catch {}
+      try { this._syncToolbarFollowPosition_?.(); } catch {}
       try { this._refreshToolbarOpenHeight_?.(); } catch {}
       try { this._positionToolbarDropdown_?.(); } catch {}
     };
@@ -26094,7 +26939,10 @@ _installToolbarFollowListeners_() {
       resizeObserver = new ResizeObserver(schedule);
       const watchChrome = () => {
         try {
-          (this._getHaSidebarGutterCandidates_?.() || []).forEach((el) => {
+          [
+            ...(this._getHaSidebarGutterCandidates_?.() || []),
+            ...(this._getHaTopChromeCandidates_?.() || [])
+          ].forEach((el) => {
             if (!el || watched.has(el)) return;
             watched.add(el);
             try { resizeObserver.observe(el); } catch {}
@@ -26102,7 +26950,10 @@ _installToolbarFollowListeners_() {
         } catch {}
       };
       watchChrome();
-      discoveryTimer = window.setInterval(watchChrome, 1500);
+      discoveryTimer = window.setInterval(() => {
+        watchChrome();
+        schedule();
+      }, 1200);
     } catch {}
     this.__toolbarFollowListeners = { schedule, resizeObserver, discoveryTimer };
     schedule();
@@ -26126,6 +26977,7 @@ _removeToolbarFollowListeners_() {
       this.__toolbarFollowRAF = 0;
     }
     this.removeAttribute?.('ddc-toolbar-follow');
+    this._syncToolbarFollowPosition_?.(0);
   } catch {}
 }
 
@@ -26150,6 +27002,7 @@ _refreshToolbarOpenHeight_() {
           : (toolbar.scrollHeight || toolbar.offsetHeight || 0);
         const h = isOpen ? baseHeight : 0;
         toolbar.style.setProperty('--open-h', `${h}px`);
+        this._syncToolbarFollowPosition_?.();
         this._positionToolbarDropdown_?.(toolbar);
         if (root) root.style.setProperty('--ddc-toolbar-height', `${h}px`);
         if (!this.autoResizeCards && this.cardContainer) {
@@ -26462,6 +27315,7 @@ _applyAutoScale() {
     try { this._syncTabsWidth_?.(); } catch {}
     try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
     try { this._syncPreviewOutsideCards_?.(); } catch {}
+    try { this._scheduleEmptyPlaceholderCenter_?.(); } catch {}
     return;
   }
 
@@ -26535,6 +27389,7 @@ _applyAutoScale() {
     try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
     try { this._requestGridButtonsUpdateSoon?.(); } catch {}
     try { this._syncPreviewOutsideCards_?.(); } catch {}
+    try { this._scheduleEmptyPlaceholderCenter_?.(); } catch {}
     return;
   }
 
@@ -26591,6 +27446,7 @@ _applyAutoScale() {
   try { this._scheduleTextResizeLockRefresh_?.(); } catch {}
   try { this._requestGridButtonsUpdateSoon?.(); } catch {}
   try { this._syncPreviewOutsideCards_?.(); } catch {}
+  try { this._scheduleEmptyPlaceholderCenter_?.(); } catch {}
 }
 
 
@@ -45035,7 +45891,10 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       window.customCards = [];
     }
     // Avoid duplicate registrations (multiple script loads)
-    const exists = window.customCards.some((c) => c && typeof c.type === 'string' && c.type.toLowerCase() === 'custom:drag-and-drop-card');
+    const exists = window.customCards.some((c) => {
+      if (!c || typeof c.type !== 'string') return false;
+      return c.type.toLowerCase().replace(/^custom:/, '') === 'drag-and-drop-card';
+    });
     if (!exists) {
       window.customCards.push({
         // Use the tag name here (no `custom:` prefix) as required by the HA
@@ -45043,13 +45902,25 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
         type: 'drag-and-drop-card',
         name: 'Drag & Drop Card',
         description: 'Flexible grid layout card with drag‑and‑drop editing.',
-        // Do not enable the preview; the card’s dynamic nature means
-        // generating a static preview isn’t meaningful.  Setting this to
-        // false matches the behaviour of the original implementation.
         preview: false,
+        documentationURL: 'https://hads.smarti.dev/d/drag-and-drop-card',
+        version: (typeof VERSION !== 'undefined' && VERSION) ? VERSION : undefined,
         // Icon shown in the card picker (optional)
         icon: 'mdi:cursor-move'
       });
+    } else {
+      const current = window.customCards.find((c) => (
+        c && typeof c.type === 'string'
+        && c.type.toLowerCase().replace(/^custom:/, '') === 'drag-and-drop-card'
+      ));
+      if (current) {
+        current.name = 'Drag & Drop Card';
+        current.description = 'Flexible grid layout card with drag‑and‑drop editing.';
+        current.preview = false;
+        current.documentationURL = 'https://hads.smarti.dev/d/drag-and-drop-card';
+        current.version = (typeof VERSION !== 'undefined' && VERSION) ? VERSION : undefined;
+        current.icon = 'mdi:cursor-move';
+      }
     }
   } catch (e) {
     console.warn('[drag-and-drop-card] Failed to register card in customCards', e);
