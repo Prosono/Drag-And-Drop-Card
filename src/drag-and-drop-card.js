@@ -500,7 +500,7 @@ _getScreenSaverEntitySlots_() {
     },
     {
       key: 'weather',
-      title: 'Vær',
+      title: 'Weather',
       note: 'Weather, outdoor temperature, or any outside sensor.',
       icon: 'mdi:weather-partly-cloudy',
       tone: 'blue',
@@ -508,7 +508,7 @@ _getScreenSaverEntitySlots_() {
     },
     {
       key: 'energy',
-      title: 'Energi',
+      title: 'Energy',
       note: 'Power, energy, price, battery, or utility sensor.',
       icon: 'mdi:chart-bell-curve-cumulative',
       tone: 'purple',
@@ -2041,6 +2041,57 @@ _ensureSettingsStyles_() {
       border-radius:10px;
       background:var(--ha-card-background,#fff);
     }
+    .particle-settings-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+      gap:12px;
+      margin-top:2px;
+    }
+    .particle-control{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid var(--ddc-settings-line, var(--divider-color, rgba(0,0,0,.16)));
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+        color-mix(in oklab, var(--ha-card-background, #fff) 78%, transparent);
+    }
+    .particle-control > label,
+    .particle-control .particle-label{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+      color:var(--primary-text-color);
+      font-size:.9rem;
+      font-weight:800;
+      line-height:1.25;
+    }
+    .particle-control ha-icon{ --mdc-icon-size:18px; flex:0 0 auto; }
+    .particle-control .row{
+      justify-content:space-between;
+      gap:10px;
+    }
+    .particle-color-row{
+      display:grid;
+      grid-template-columns:48px minmax(0, 1fr);
+      gap:10px;
+      align-items:center;
+    }
+    .particle-color-row input[type="color"]{
+      width:48px;
+      height:42px;
+      padding:2px;
+      border-radius:12px;
+      border:1px solid var(--ddc-settings-line, var(--divider-color, rgba(0,0,0,.16)));
+      background:var(--ddc-settings-field, var(--ha-card-background, #fff));
+    }
+    .particle-control.is-disabled{
+      opacity:.58;
+    }
 
     /* Slider + output */
     .range-wrap { display:flex; align-items:center; gap:10px; width:100%; }
@@ -2641,6 +2692,14 @@ _ensureSettingsStyles_() {
   .setting > .hint{
     margin:4px 0 0 36px;
     max-width:min(760px, calc(100% - 36px));
+  }
+  .setting-subcontrol{
+    margin:8px 0 0 36px;
+    max-width:min(760px, calc(100% - 36px));
+    transition:opacity .16s ease;
+  }
+  .setting-subcontrol.is-disabled{
+    opacity:.58;
   }
   .setting-doc-link{
     width:fit-content;
@@ -3400,6 +3459,9 @@ _getVisualRefreshSignature_() {
         ? {
             config_url: String(particles?.config_url || ''),
             pointer_events: !!particles?.pointer_events,
+            hover_mode: String(particles?.hover_mode || ''),
+            click_mode: String(particles?.click_mode || ''),
+            interaction_distance: String(particles?.interaction_distance ?? ''),
             config: particles?.config || null,
           }
         : null,
@@ -4138,6 +4200,7 @@ _attachParticlesBackground_(cfg = {}, mountHost = null) {
   el.className = 'particles-js';
   el.style.position = 'absolute';
   el.style.inset = '0';
+  el.style.pointerEvents = 'none';
   host.appendChild(el);
 
   const allowPointer = !!cfg.pointer_events;
@@ -4145,16 +4208,68 @@ _attachParticlesBackground_(cfg = {}, mountHost = null) {
     ? cfg.config
     : DragAndDropCard._defaultParticlesBackgroundConfig_();
   const conf = JSON.parse(JSON.stringify(sourceConf));
+  host.style.pointerEvents = 'none';
 
-  if (allowPointer) {
-    conf.interactivity = conf.interactivity || {};
-    conf.interactivity.events = conf.interactivity.events || {};
-    conf.interactivity.events.onhover = { enable: true, mode: 'repulse' };
-    conf.interactivity.events.onclick = { enable: true, mode: 'push' };
-    host.style.pointerEvents = 'auto';
-  } else {
-    host.style.pointerEvents = 'none';
-  }
+  const normalizeMode = (value, allowed, fallback) => {
+    const mode = String(value || '').trim().toLowerCase();
+    return allowed.includes(mode) ? mode : fallback;
+  };
+  const toDistance = (value, fallback = 110) => {
+    const n = Number(value);
+    return Math.max(40, Math.min(240, Number.isFinite(n) ? Math.round(n) : fallback));
+  };
+  const applyPointerInteractivity = (targetConf = {}) => {
+    const next = targetConf && typeof targetConf === 'object' ? targetConf : {};
+    next.interactivity = next.interactivity && typeof next.interactivity === 'object' ? next.interactivity : {};
+    next.interactivity.events = next.interactivity.events && typeof next.interactivity.events === 'object' ? next.interactivity.events : {};
+    next.interactivity.modes = next.interactivity.modes && typeof next.interactivity.modes === 'object' ? next.interactivity.modes : {};
+    const existingHoverMode = Array.isArray(next.interactivity.events.onhover?.mode)
+      ? next.interactivity.events.onhover.mode[0]
+      : next.interactivity.events.onhover?.mode;
+    const existingClickMode = Array.isArray(next.interactivity.events.onclick?.mode)
+      ? next.interactivity.events.onclick.mode[0]
+      : next.interactivity.events.onclick?.mode;
+    const hoverMode = normalizeMode(cfg.hover_mode || existingHoverMode, ['repulse', 'grab', 'bubble', 'none'], 'repulse');
+    const clickMode = normalizeMode(cfg.click_mode || existingClickMode, ['push', 'repulse', 'none'], 'push');
+    const distance = toDistance(
+      cfg.interaction_distance
+        ?? next.interactivity.modes.repulse?.distance
+        ?? next.interactivity.modes.grab?.distance
+        ?? next.interactivity.modes.bubble?.distance,
+      110
+    );
+    next.interactivity.detect_on = allowPointer ? 'window' : 'canvas';
+    next.interactivity.events.resize = true;
+    next.interactivity.events.onhover = {
+      enable: allowPointer && hoverMode !== 'none',
+      mode: hoverMode === 'none' ? 'repulse' : hoverMode,
+    };
+    next.interactivity.events.onclick = {
+      enable: allowPointer && clickMode !== 'none',
+      mode: clickMode === 'none' ? 'push' : clickMode,
+    };
+    next.interactivity.modes.repulse = {
+      ...(next.interactivity.modes.repulse || {}),
+      distance,
+    };
+    next.interactivity.modes.grab = {
+      ...(next.interactivity.modes.grab || {}),
+      distance: Math.max(60, distance),
+      line_linked: {
+        ...(next.interactivity.modes.grab?.line_linked || {}),
+        opacity: next.interactivity.modes.grab?.line_linked?.opacity ?? 0.28,
+      },
+    };
+    next.interactivity.modes.bubble = {
+      ...(next.interactivity.modes.bubble || {}),
+      distance,
+    };
+    next.interactivity.modes.push = {
+      ...(next.interactivity.modes.push || {}),
+      particles_nb: next.interactivity.modes.push?.particles_nb ?? 3,
+    };
+    return next;
+  };
 
   const apply = async () => {
     const ok = await this._ensureParticles_?.();
@@ -4183,6 +4298,7 @@ _attachParticlesBackground_(cfg = {}, mountHost = null) {
         finalConf = conf;
       }
     }
+    finalConf = applyPointerInteractivity(JSON.parse(JSON.stringify(finalConf || conf)));
 
 
     // Scope getElementById to the shadow root just for the *synchronous* init call.
@@ -4726,7 +4842,7 @@ _applyLayerVisibilityChange_() {
     else this._renderLayersBar_?.();
   } catch {}
   if (changed) {
-    try { this._animateCards_?.(becameVisible); } catch {}
+    try { this._animateCards?.(becameVisible, { replay: true, reason: 'layer-change' }); } catch {}
     try { this._renderConnectors_?.(); } catch {}
   }
 }
@@ -7815,6 +7931,7 @@ async _onToolbarAction_(action, ctx = {}) {
     this.layers = [];
     this.activeLayerIds = [];
     this.layersEnabled = false;
+    this.layersButtonDetails = false;
     this.sidebarEnabled = false;
     this.sidebarItems = ['navigation'];
     this.sidebarStyle = 'glass';
@@ -8149,6 +8266,8 @@ async _onToolbarAction_(action, ctx = {}) {
       animate_cards: true,
       optimize_for_mobile: false,
       mobile_dynamic_behavior: 'native',
+      outer_grid_buffer: false,
+      outer_grid_buffer_cells: 1,
       responsive_viewports: {
         desktop: { width: 1430, height: 896 },
         tablet: {
@@ -8179,6 +8298,7 @@ async _onToolbarAction_(action, ctx = {}) {
       default_tab: 'home',
       tabs_position: 'top',
       layers_enabled: false,
+      layers_button_details: false,
       layers: [],
     };
   }
@@ -8460,6 +8580,10 @@ static getConfigElement() {
       const rngBgOpacity     = el.querySelector('#ddc-bg-opacity');
       const inpParticlesUrl  = el.querySelector('#ddc-particles-url');
       const chkParticlesPtr  = el.querySelector('#ddc-particles-pointer');
+      const selParticlesHoverMode = el.querySelector('#ddc-particles-hover-mode');
+      const selParticlesClickMode = el.querySelector('#ddc-particles-click-mode');
+      const rngParticlesInteractionDistance = el.querySelector('#ddc-particles-interaction-distance');
+      const rngOuterGridBufferCells = el.querySelector('#ddc-setting-outerGridBufferCells');
       const inpYtUrl         = el.querySelector('#ddc-youtube-url');
       const inpYtStart       = el.querySelector('#ddc-youtube-start');
       const inpYtEnd         = el.querySelector('#ddc-youtube-end');
@@ -8472,6 +8596,8 @@ static getConfigElement() {
 
       const mode = selBgMode?.value || 'none';
       base.background_mode = mode;
+      const outerGridBufferCells = parseInt(rngOuterGridBufferCells?.value || '', 10);
+      if (Number.isFinite(outerGridBufferCells)) base.outer_grid_buffer_cells = Math.max(1, Math.min(10, outerGridBufferCells));
 
       const clamp01 = (v) => Math.max(0, Math.min(1, v));
       const pctTo01 = (el) => {
@@ -8498,9 +8624,13 @@ static getConfigElement() {
 
       // Particles
       if (mode === 'particles') {
+        const interactionDistance = parseInt(rngParticlesInteractionDistance?.value || '', 10);
         base.background_particles = pick({
           config_url: (inpParticlesUrl?.value || '').trim() || undefined,
           pointer_events: !!chkParticlesPtr?.checked,
+          hover_mode: selParticlesHoverMode?.value || undefined,
+          click_mode: selParticlesClickMode?.value || undefined,
+          interaction_distance: Number.isFinite(interactionDistance) ? interactionDistance : undefined,
         });
       }
 
@@ -9277,9 +9407,11 @@ _setDashboardLayers_(layers = [], { refresh = true, persist = true } = {}) {
   this.layers = normalized;
   const validIds = new Set(normalized.map((layer) => layer.id));
   const stored = this._getStoredActiveLayerIds_();
+  const hasStored = Array.isArray(stored);
+  const storedActive = hasStored ? stored.filter((id) => validIds.has(id)) : [];
   const current = Array.isArray(this.activeLayerIds) ? this.activeLayerIds.filter((id) => validIds.has(id)) : [];
-  const nextActive = (stored && stored.filter((id) => validIds.has(id)).length)
-    ? stored.filter((id) => validIds.has(id))
+  const nextActive = hasStored
+    ? storedActive
     : (current.length ? current : this._getDefaultActiveLayerIds_());
   this.activeLayerIds = nextActive;
   if (persist) this._persistActiveLayerIds_();
@@ -9415,7 +9547,7 @@ _syncLayerTriggerState_() {
   const activeCount = Array.isArray(activeIds) ? activeIds.length : 0;
   const trigger = this.shadowRoot.querySelector?.('.ddc-layer-trigger');
   if (trigger) {
-    trigger.classList.toggle('active', !!this.__layersMenuOpen || allActive);
+    trigger.classList.toggle('active', !!this.__layersMenuOpen || (!!total && !allActive));
     trigger.setAttribute('aria-label', `Layers (${activeCount} of ${total} active)`);
     const badge = trigger.querySelector?.('.ddc-layer-count');
     if (badge) badge.textContent = String(activeCount);
@@ -9511,7 +9643,8 @@ _appendLayersMenuToTabs_(bar) {
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
-  trigger.className = `ddc-layer-trigger ${this.__layersMenuOpen || allActive ? 'active' : ''}`.trim();
+  const showDetails = !!this.layersButtonDetails;
+  trigger.className = `ddc-layer-trigger ${showDetails ? 'details' : 'compact'} ${this.__layersMenuOpen || !allActive ? 'active' : ''}`.trim();
   trigger.setAttribute('aria-haspopup', 'menu');
   trigger.setAttribute('aria-expanded', this.__layersMenuOpen ? 'true' : 'false');
   trigger.setAttribute('aria-label', `Layers (${activeIds.length} of ${layers.length} active)`);
@@ -9530,12 +9663,12 @@ _appendLayersMenuToTabs_(bar) {
   triggerMeta.className = 'ddc-layer-trigger-meta';
   triggerMeta.textContent = layers.length ? `${activeIds.length} of ${layers.length} active` : 'No layers';
   triggerCopy.append(triggerLabel, triggerMeta);
-  trigger.appendChild(triggerCopy);
+  if (showDetails) trigger.appendChild(triggerCopy);
 
   const count = document.createElement('span');
   count.className = 'ddc-layer-count';
   count.textContent = String(activeIds.length);
-  trigger.appendChild(count);
+  if (showDetails) trigger.appendChild(count);
 
   trigger.addEventListener('click', (ev) => {
     ev.stopPropagation();
@@ -13079,9 +13212,17 @@ _getContainerSize() {
   return { w, h };
 }
 
+_normalizeOuterGridBufferCells_(value = 1) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+
 _getOuterGridBufferPx_() {
   if (!this.outerGridBuffer) return 0;
-  return Math.max(0, Number(this.gridSize || this._config?.grid || 0) || 0);
+  const grid = Math.max(0, Number(this.gridSize || this._config?.grid || 0) || 0);
+  const cells = this._normalizeOuterGridBufferCells_(this.outerGridBufferCells ?? this._config?.outer_grid_buffer_cells ?? 1);
+  return grid * cells;
 }
 
 _getCanvasEdgeBufferPx_() {
@@ -13475,9 +13616,15 @@ _computeHaTopGutter_() {
   let top = chromeTop;
   let editorChrome = { active: false, bottom: 0 };
   try {
-    editorChrome = this._getHaEditorChromeTopBottom_?.() || editorChrome;
-    const visibleTopChromeBottom = this._measureVisibleHaTopChromeBottom_?.() || 0;
+    const dashboardEditorActive = !!this._isHaDashboardEditorActive_?.();
+    editorChrome = dashboardEditorActive
+      ? (this._getHaEditorChromeTopBottom_?.() || editorChrome)
+      : editorChrome;
+    const visibleTopChromeBottom = dashboardEditorActive
+      ? (this._measureVisibleHaTopChromeBottom_?.() || 0)
+      : 0;
     const visibleLooksLikeNativeEditor = !!(
+      dashboardEditorActive &&
       this.editMode &&
       visibleTopChromeBottom >= Math.min(96, Math.max(72, (window.innerHeight || 720) * 0.08))
     );
@@ -14401,6 +14548,9 @@ _getMobileTextAssistScale_() {
     this.dashboardThemeEnabled    = !!this.dashboardTheme || !!(config.dashboard_theme_enabled ?? config.theme_enabled ?? false);
     this.dashboardThemeOverrideAllDesign = !!(config.dashboard_theme_override_all_design ?? config.theme_override_all_design ?? false);
     this.outerGridBuffer          = !!(config.outer_grid_buffer ?? false);
+    this.outerGridBufferCells     = this._normalizeOuterGridBufferCells_(
+      config.outer_grid_buffer_cells ?? config.outerGridBufferCells ?? this.outerGridBufferCells ?? 1
+    );
 
     // Whether to apply a drop shadow to card wrappers (defaults to false)
     this.cardShadowEnabled        = !!config.card_shadow;
@@ -14484,6 +14634,7 @@ _getMobileTextAssistScale_() {
       this.sidebarCalendarEntities = this._normalizeSidebarCalendarEntities_(config.sidebar_calendar_entities ?? config.sidebar_calendars ?? config.sidebarCalendarEntities ?? []);
     }
     this.layersEnabled = !!(config.layers_enabled ?? config.enable_layers ?? false);
+    this.layersButtonDetails = !!(config.layers_button_details ?? config.show_layer_button_details ?? config.layersButtonDetails ?? false);
     this._setDashboardLayers_(config.layers || [], { refresh: false });
     this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
     this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
@@ -18709,7 +18860,7 @@ _getMobileTextAssistScale_() {
       .card-container{
         position: relative;
         transform-origin: top left;
-        padding: 10px;
+        padding: 0;
         border: 1px solid var(--divider-color);
         background: var(--ddc-bg, transparent);
         width: auto; height: auto; border-radius: 12px; overflow: hidden;
@@ -21685,13 +21836,15 @@ _getMobileTextAssistScale_() {
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:11px;
-  min-width:186px;
+  gap:0;
+  width:58px;
+  min-width:58px;
+  height:58px;
   min-height:58px;
-  padding:0 13px 0 16px;
+  padding:0;
   overflow:hidden;
   border:1px solid color-mix(in oklab, var(--ddc-layer-accent) 34%, rgba(255,255,255,.14));
-  border-radius:20px;
+  border-radius:18px;
   background:
     radial-gradient(circle at 8% 0%, color-mix(in oklab, var(--ddc-layer-accent) 32%, transparent), transparent 46%),
     linear-gradient(135deg, color-mix(in oklab, var(--ddc-layer-accent) 14%, transparent), transparent 58%),
@@ -21715,6 +21868,14 @@ _getMobileTextAssistScale_() {
     box-shadow .18s ease;
 }
 
+.ddc-layer-trigger.details{
+  width:auto;
+  min-width:186px;
+  gap:11px;
+  padding:0 13px 0 16px;
+  border-radius:20px;
+}
+
 .ddc-layer-trigger::before{
   content:"";
   position:absolute;
@@ -21726,6 +21887,10 @@ _getMobileTextAssistScale_() {
   background:linear-gradient(180deg, var(--ddc-layer-accent), color-mix(in oklab, var(--ddc-layer-accent) 42%, #22d3ee 58%));
   box-shadow:0 0 18px color-mix(in oklab, var(--ddc-layer-accent) 62%, transparent);
   opacity:.82;
+}
+
+.ddc-layer-trigger.compact::before{
+  display:none;
 }
 
 .ddc-layer-trigger ha-icon{
@@ -22070,6 +22235,10 @@ _getMobileTextAssistScale_() {
   .ddc-layer-trigger{
     min-width:58px;
     padding:0 11px;
+  }
+  .ddc-layer-trigger.details{
+    min-width:58px;
+    gap:8px;
   }
   .ddc-layer-trigger-label{
     position:absolute;
@@ -23687,7 +23856,7 @@ connectedCallback() {
         'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
         'container_background','card_background','card_shadow','card_shadow_intensity','debug','disable_overlap',
         'container_size_mode','container_fixed_width','container_fixed_height',
-        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
+        'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers_button_details','layers', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'outer_grid_buffer_cells', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports',
         // Ensure screen saver settings from YAML override persisted options on reload. Without
         // including these keys, the screensaver delay can become stuck because the overlay
         // of YAML values never occurs. Adding them keeps behaviour consistent with other
@@ -23874,8 +24043,10 @@ connectedCallback() {
   }
   _applyActiveTab() {
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
+    const becameVisible = [];
     wraps.forEach(w => {
-      this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
+      const result = this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
+      if (result?.becameVisible) becameVisible.push(w);
     });
 
     // After switching tabs, reapply sizing based on the current container mode.
@@ -23885,8 +24056,12 @@ connectedCallback() {
     } catch {}
 
     try { this._clearSelection(); } catch {}
-    // When card animations are enabled, animate visible cards after switching tabs
-    try { this._animateCards?.(); } catch {}
+    // On tab changes, replay entrance motion only for cards that just became
+    // visible. Initial render still uses the one-time mount animation below.
+    try {
+      if (becameVisible.length) this._animateCards?.(becameVisible, { replay: true, reason: 'tab-change' });
+      else this._animateCards?.();
+    } catch {}
     try { this._renderConnectors_?.(); } catch {}
   }
 
@@ -23901,22 +24076,22 @@ connectedCallback() {
   }
 
   /**
-   * Animate all visible card wrappers. When the animateCards flag is true
-   * this method is invoked after switching tabs or on initial load. Each
-   * card is animated once per mounted dashboard instance so switching tabs,
-   * undo/redo, or rebuilding the same layout does not replay the entrance
-   * effect over and over. Hidden wrappers (display: none) are skipped.
+   * Animate visible card wrappers. Initial render uses a one-time guard so
+   * rebuilds do not keep replaying entrance motion. Explicit UI transitions
+   * such as tab or layer changes pass { replay: true } so cards can fly in
+   * every time they become visible.
    */
-_animateCards(targetWraps = null) {
+_animateCards(targetWraps = null, options = {}) {
   try {
     if (this.__suppressCardAnimation || this.__historyRestoring) return;
     if (!this.__animatedCardIds) this.__animatedCardIds = new Set();
-    const wraps = Array.isArray(targetWraps)
-      ? targetWraps
+    const replay = !!options?.replay;
+    const wraps = targetWraps
+      ? Array.from(targetWraps)
       : Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper') || []);
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
-    // 🎚️ Master controls
+    // Master controls
     const totalAnimationTime = 800;   // Total sequence time (ms)
     const animationIntensity = 0.8;    // 1 = default, 2 = more dramatic, 0.5 = subtle
 
@@ -23941,33 +24116,50 @@ _animateCards(targetWraps = null) {
       if (!shouldAnimate) return;
 
       const animationId = this._cardAnimationId_(w);
-      if (animationId && this.__animatedCardIds.has(animationId)) return;
-      if (animationId) this.__animatedCardIds.add(animationId);
+      if (!replay && animationId && this.__animatedCardIds.has(animationId)) return;
+      if (!replay && animationId) this.__animatedCardIds.add(animationId);
 
       // Preserve any existing transform from layout
       const base = (cs && cs.transform && cs.transform !== 'none') ? cs.transform : '';
 
-      // 🪄 Fly-in distance increases with intensity
+      // Fly-in distance increases with intensity
       const offsetY = 100 * animationIntensity; // % of element height
       const fromT = `${base} translate3d(0, ${offsetY}%, 0)`;
       const toT   = `${base} translate3d(0, 0, 0)`;
 
-      // 🎲 Random delay spread scales with intensity
-      const delay = Math.random() * (maxDelay * Math.min(animationIntensity, 2)); // cap at 2× spread
+      // Random delay spread scales with intensity
+      const delay = Math.random() * (maxDelay * Math.min(animationIntensity, 2)); // cap at 2x spread
+      const restoreWillChange = w.style.willChange || '';
+      const restoreOpacity = w.style.opacity || '';
+      const restoreTransform = w.style.transform || '';
+      try {
+        w.getAnimations?.()
+          ?.filter((anim) => String(anim?.id || '').startsWith('ddc-card-enter-'))
+          ?.forEach((anim) => anim.cancel());
+      } catch {}
 
       if (reduceMotion) {
         try {
-          w.animate([{ opacity: 0 }, { opacity: 1 }], {
+          const fade = w.animate([{ opacity: 0 }, { opacity: 1 }], {
             duration: totalAnimationTime * 0.15,
             delay,
             easing: 'linear',
-            fill: 'backwards'
+            fill: 'both'
+          });
+          fade.id = 'ddc-card-enter-opacity';
+          fade.finished?.finally?.(() => {
+            try { fade.cancel(); } catch {}
+            w.style.opacity = restoreOpacity;
           });
         } catch {
           w.style.opacity = '0';
           setTimeout(() => {
             w.style.transition = `opacity ${totalAnimationTime * 0.15}ms linear`;
             w.style.opacity = '1';
+            setTimeout(() => {
+              w.style.transition = '';
+              w.style.opacity = restoreOpacity;
+            }, (totalAnimationTime * 0.15) + 60);
           }, delay);
         }
         return;
@@ -23980,18 +24172,30 @@ _animateCards(targetWraps = null) {
         const opacityEase = 'linear';
 
         // Opacity fade
-        w.animate(
+        const fade = w.animate(
           [{ opacity: 0 }, { opacity: 1 }],
-          { duration, delay, easing: opacityEase, fill: 'backwards' }
+          { duration, delay, easing: opacityEase, fill: 'both' }
         );
+        fade.id = 'ddc-card-enter-opacity';
 
         // Transform upward flight
-        w.animate(
+        const motion = w.animate(
           [{ transform: fromT }, { transform: toT }],
-          { duration, delay, easing: motionEase, fill: 'backwards' }
-        ).addEventListener?.('finish', () => {
-          w.style.willChange = '';
-        });
+          { duration, delay, easing: motionEase, fill: 'both' }
+        );
+        motion.id = 'ddc-card-enter-transform';
+        const cleanup = () => {
+          try { fade.cancel(); } catch {}
+          try { motion.cancel(); } catch {}
+          w.style.opacity = restoreOpacity;
+          w.style.transform = restoreTransform;
+          w.style.willChange = restoreWillChange;
+        };
+        if (motion.finished && fade.finished) {
+          Promise.allSettled([motion.finished, fade.finished]).then(cleanup);
+        } else {
+          motion.addEventListener?.('finish', cleanup, { once: true });
+        }
       } catch {
         // Fallback without Web Animations API
         w.style.opacity = '0';
@@ -24003,7 +24207,9 @@ _animateCards(targetWraps = null) {
           w.style.transform = toT;
           setTimeout(() => {
             w.style.transition = '';
-            w.style.willChange = '';
+            w.style.willChange = restoreWillChange;
+            w.style.opacity = restoreOpacity;
+            w.style.transform = restoreTransform;
           }, duration + 60);
         }, delay);
       }
@@ -25023,6 +25229,10 @@ _toggleEditMode(force = null) {
 
   // === Your existing non-visual logic unchanged ===
   this.editMode = entering;
+  if (entering) {
+    try { this._computeHaTopGutter_?.(); } catch {}
+    try { this._syncToolbarFollowPosition_?.(); } catch {}
+  }
   if (!entering) {
     this._stopMiddleMousePan_?.();
     this._persistCurrentResponsiveProfileToMemory_();
@@ -32138,11 +32348,10 @@ async _getStubConfigForType(type) {
         return;
       }
       const items = clip.items;
-      // Determine a collision‑free base position. We attempt to place the
-      // group starting at one grid unit from the origin and slide further
-      // down/right until no overlap occurs.
+      // Determine a collision-free base position. Start at the configured
+      // edge buffer, then slide down/right until no overlap occurs.
       let shift = 1;
-      const baseOffset = Math.max(this.gridSize, this._getCanvasEdgeBufferPx_?.() || 0);
+      const baseOffset = this._getCanvasEdgeBufferPx_?.() || 0;
       let proposedRects;
       do {
         const baseX = baseOffset + (this.gridSize * (shift - 1));
@@ -32599,7 +32808,13 @@ modal.innerHTML = `
             <ha-switch id="ddc-setting-outerGridBuffer"></ha-switch>
           </div>
         </div>
-        <div class="hint">Adds breathing room beyond the furthest card so new cards do not sit flush against the edge.</div>
+        <div class="setting-subcontrol" data-outer-grid-buffer-cells>
+          <div class="range-wrap">
+            <input type="range" id="ddc-setting-outerGridBufferCells" min="1" max="10" step="1" />
+            <output id="ddc-outerGridBufferCellsOut" for="ddc-setting-outerGridBufferCells">1 cell</output>
+          </div>
+        </div>
+        <div class="hint">When off, cards can sit flush with every canvas edge. When on, this adds the selected number of grid cells around the layout.</div>
       </div>
 
     </section>
@@ -32911,6 +33126,95 @@ modal.innerHTML = `
                 <span>Enable pointer interactivity (hover/click)</span>
               </label>
               <div class="hint">Keep this off when dragging should always win over particle interaction.</div>
+
+              <div class="particle-settings-grid" aria-label="Particle tuning">
+                <div class="particle-control">
+                  <label for="ddc-particles-count"><ha-icon icon="mdi:dots-hexagon"></ha-icon><span>Particle count</span></label>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-count" min="8" max="120" step="1" />
+                    <output id="ddc-particles-count-out" for="ddc-particles-count">52</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-speed"><ha-icon icon="mdi:speedometer-slow"></ha-icon><span>Motion speed</span></label>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-speed" min="0" max="4" step="0.1" />
+                    <output id="ddc-particles-speed-out" for="ddc-particles-speed">0.4</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-size"><ha-icon icon="mdi:circle-medium"></ha-icon><span>Particle size</span></label>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-size" min="1" max="8" step="0.1" />
+                    <output id="ddc-particles-size-out" for="ddc-particles-size">2.2</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-opacity"><ha-icon icon="mdi:opacity"></ha-icon><span>Particle opacity</span></label>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-opacity" min="5" max="85" step="1" />
+                    <output id="ddc-particles-opacity-out" for="ddc-particles-opacity">22%</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <div class="row">
+                    <span class="particle-label"><ha-icon icon="mdi:vector-line"></ha-icon><span>Connection lines</span></span>
+                    <ha-switch id="ddc-particles-lines"></ha-switch>
+                  </div>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-line-distance" min="60" max="260" step="5" />
+                    <output id="ddc-particles-line-distance-out" for="ddc-particles-line-distance">155px</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-interaction-distance"><ha-icon icon="mdi:gesture-tap"></ha-icon><span>Interaction distance</span></label>
+                  <div class="range-wrap">
+                    <input type="range" id="ddc-particles-interaction-distance" min="40" max="240" step="5" />
+                    <output id="ddc-particles-interaction-distance-out" for="ddc-particles-interaction-distance">110px</output>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-color"><ha-icon icon="mdi:palette-outline"></ha-icon><span>Particle color</span></label>
+                  <div class="particle-color-row">
+                    <input type="color" id="ddc-particles-color" />
+                    <select id="ddc-particles-shape">
+                      <option value="circle">Circle</option>
+                      <option value="triangle">Triangle</option>
+                      <option value="edge">Edge</option>
+                      <option value="polygon">Polygon</option>
+                      <option value="star">Star</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-line-color"><ha-icon icon="mdi:palette-swatch-outline"></ha-icon><span>Line color</span></label>
+                  <div class="particle-color-row">
+                    <input type="color" id="ddc-particles-line-color" />
+                    <select id="ddc-particles-hover-mode">
+                      <option value="repulse">Hover: repel</option>
+                      <option value="grab">Hover: connect</option>
+                      <option value="bubble">Hover: glow</option>
+                      <option value="none">Hover: off</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="particle-control">
+                  <label for="ddc-particles-click-mode"><ha-icon icon="mdi:cursor-default-click-outline"></ha-icon><span>Click action</span></label>
+                  <select id="ddc-particles-click-mode">
+                    <option value="push">Add particles</option>
+                    <option value="repulse">Repel particles</option>
+                    <option value="none">Off</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -33302,6 +33606,19 @@ modal.innerHTML = `
         <div class="hint">When enabled, cards can belong to one or more layers and be shown or hidden from the layer bar.</div>
       </div>
 
+      <div class="setting" role="group" aria-labelledby="lbl-layers-button-details">
+        <div class="layer-toggle-row">
+          <div class="title">
+            <ha-icon icon="mdi:card-text-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-layers-button-details" for="ddc-setting-layersButtonDetails">Show layer button details</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-layersButtonDetails"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Shows the Layers label and active count beside the icon. Off keeps the layer button compact.</div>
+      </div>
+
       <div id="ddc-layers-list" class="setting" aria-live="polite"></div>
 
       <div class="setting" role="group" aria-labelledby="lbl-add-layer">
@@ -33506,6 +33823,9 @@ modal.innerHTML = `
     const chkDoNotResizeText = modal.querySelector('#ddc-setting-doNotResizeText');
     const txtDoNotResizeTextHint = modal.querySelector('#ddc-setting-doNotResizeTextHint');
     const chkOuterGridBuffer = modal.querySelector('#ddc-setting-outerGridBuffer');
+    const rngOuterGridBufferCells = modal.querySelector('#ddc-setting-outerGridBufferCells');
+    const outOuterGridBufferCells = modal.querySelector('#ddc-outerGridBufferCellsOut');
+    const outerGridBufferCellsControl = modal.querySelector('[data-outer-grid-buffer-cells]');
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
     const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
@@ -33556,6 +33876,24 @@ modal.innerHTML = `
     const secYoutube          = modal.querySelector('[data-bg-section="youtube"]');
     const inpParticlesUrl     = modal.querySelector('#ddc-particles-url');
     const chkParticlesPointer = modal.querySelector('#ddc-particles-pointer');
+    const rngParticlesCount   = modal.querySelector('#ddc-particles-count');
+    const outParticlesCount   = modal.querySelector('#ddc-particles-count-out');
+    const rngParticlesSpeed   = modal.querySelector('#ddc-particles-speed');
+    const outParticlesSpeed   = modal.querySelector('#ddc-particles-speed-out');
+    const rngParticlesSize    = modal.querySelector('#ddc-particles-size');
+    const outParticlesSize    = modal.querySelector('#ddc-particles-size-out');
+    const rngParticlesOpacity = modal.querySelector('#ddc-particles-opacity');
+    const outParticlesOpacity = modal.querySelector('#ddc-particles-opacity-out');
+    const chkParticlesLines   = modal.querySelector('#ddc-particles-lines');
+    const rngParticlesLineDistance = modal.querySelector('#ddc-particles-line-distance');
+    const outParticlesLineDistance = modal.querySelector('#ddc-particles-line-distance-out');
+    const rngParticlesInteractionDistance = modal.querySelector('#ddc-particles-interaction-distance');
+    const outParticlesInteractionDistance = modal.querySelector('#ddc-particles-interaction-distance-out');
+    const inpParticlesColor   = modal.querySelector('#ddc-particles-color');
+    const inpParticlesLineColor = modal.querySelector('#ddc-particles-line-color');
+    const selParticlesShape   = modal.querySelector('#ddc-particles-shape');
+    const selParticlesHoverMode = modal.querySelector('#ddc-particles-hover-mode');
+    const selParticlesClickMode = modal.querySelector('#ddc-particles-click-mode');
     const inpYtUrl            = modal.querySelector('#ddc-youtube-url');
     const inpYtStart          = modal.querySelector('#ddc-youtube-start');
     const inpYtEnd            = modal.querySelector('#ddc-youtube-end');
@@ -33578,6 +33916,7 @@ modal.innerHTML = `
     const sidebarHomeImagePreview = modal.querySelector('#ddc-setting-sidebarHomeImagePreview');
     const inpSidebarCalendarEntities = modal.querySelector('#ddc-setting-sidebarCalendarEntities');
     const chkLayersEnabled   = modal.querySelector('#ddc-setting-layersEnabled');
+    const chkLayersButtonDetails = modal.querySelector('#ddc-setting-layersButtonDetails');
     const layersListEl       = modal.querySelector('#ddc-layers-list');
     const newLayerNameInput  = modal.querySelector('#ddc-new-layer-name');
     const addLayerBtn        = modal.querySelector('#ddc-add-layer-btn');
@@ -33747,6 +34086,7 @@ modal.innerHTML = `
       }))
     );
     let layersEnabledDraft = !!this.layersEnabled;
+    let layersButtonDetailsDraft = !!this.layersButtonDetails;
     let layerDrafts = (this.layers || []).map((layer, index) => cloneLayerDraft(layer, index));
     if (layersEnabledDraft && !layerDrafts.length) {
       layerDrafts = [cloneLayerDraft(this._defaultDashboardLayer_(), 0)];
@@ -33794,9 +34134,11 @@ modal.innerHTML = `
     const syncLayerDraftState = () => {
       const enabled = !!layersEnabledDraft;
       if (chkLayersEnabled) chkLayersEnabled.checked = enabled;
+      if (chkLayersButtonDetails) chkLayersButtonDetails.checked = !!layersButtonDetailsDraft;
       if (layersListEl) {
         layersListEl.style.opacity = enabled ? '1' : '.6';
       }
+      if (chkLayersButtonDetails) chkLayersButtonDetails.disabled = !enabled;
       if (newLayerNameInput) newLayerNameInput.disabled = !enabled;
       if (addLayerBtn) addLayerBtn.disabled = !enabled;
     };
@@ -34296,6 +34638,195 @@ modal.innerHTML = `
     let particlesLiveConfig = cloneData(pCfg.config);
     if (inpParticlesUrl)     inpParticlesUrl.value = pCfg.config_url || '';
     if (chkParticlesPointer) chkParticlesPointer.checked = !!pCfg.pointer_events;
+    const defaultParticlesConfig = () => cloneData(DragAndDropCard._defaultParticlesBackgroundConfig_()) || {};
+    const clampNum = (value, min, max, fallback, digits = 0) => {
+      const n = Number(value);
+      const safe = Number.isFinite(n) ? n : fallback;
+      const clamped = Math.max(min, Math.min(max, safe));
+      return digits > 0 ? Number(clamped.toFixed(digits)) : Math.round(clamped);
+    };
+    const normalizeParticleConfig = (config = null) => {
+      const conf = cloneData(config) || defaultParticlesConfig();
+      conf.particles = conf.particles && typeof conf.particles === 'object' ? conf.particles : {};
+      conf.particles.number = conf.particles.number && typeof conf.particles.number === 'object'
+        ? conf.particles.number
+        : { value: 52, density: { enable: true, value_area: 1150 } };
+      conf.particles.number.density = conf.particles.number.density && typeof conf.particles.number.density === 'object'
+        ? conf.particles.number.density
+        : { enable: true, value_area: 1150 };
+      conf.particles.color = conf.particles.color && typeof conf.particles.color === 'object'
+        ? conf.particles.color
+        : { value: '#7ddcff' };
+      conf.particles.shape = conf.particles.shape && typeof conf.particles.shape === 'object'
+        ? conf.particles.shape
+        : { type: 'circle' };
+      conf.particles.opacity = conf.particles.opacity && typeof conf.particles.opacity === 'object'
+        ? conf.particles.opacity
+        : { value: 0.22, random: true, anim: { enable: false, speed: 0.8, opacity_min: 0.08, sync: false } };
+      conf.particles.size = conf.particles.size && typeof conf.particles.size === 'object'
+        ? conf.particles.size
+        : { value: 2.2, random: true, anim: { enable: false, speed: 1, size_min: 0.7, sync: false } };
+      conf.particles.line_linked = conf.particles.line_linked && typeof conf.particles.line_linked === 'object'
+        ? conf.particles.line_linked
+        : { enable: true, distance: 155, color: '#7ddcff', opacity: 0.18, width: 1 };
+      conf.particles.move = conf.particles.move && typeof conf.particles.move === 'object'
+        ? conf.particles.move
+        : { enable: true, speed: 0.4, direction: 'none', random: true, straight: false, out_mode: 'out' };
+      conf.interactivity = conf.interactivity && typeof conf.interactivity === 'object' ? conf.interactivity : {};
+      conf.interactivity.events = conf.interactivity.events && typeof conf.interactivity.events === 'object' ? conf.interactivity.events : {};
+      conf.interactivity.modes = conf.interactivity.modes && typeof conf.interactivity.modes === 'object' ? conf.interactivity.modes : {};
+      conf.interactivity.modes.repulse = conf.interactivity.modes.repulse && typeof conf.interactivity.modes.repulse === 'object'
+        ? conf.interactivity.modes.repulse
+        : { distance: 110, duration: 0.4 };
+      conf.interactivity.modes.grab = conf.interactivity.modes.grab && typeof conf.interactivity.modes.grab === 'object'
+        ? conf.interactivity.modes.grab
+        : { distance: 145, line_linked: { opacity: 0.26 } };
+      conf.interactivity.modes.grab.line_linked = conf.interactivity.modes.grab.line_linked && typeof conf.interactivity.modes.grab.line_linked === 'object'
+        ? conf.interactivity.modes.grab.line_linked
+        : { opacity: 0.26 };
+      conf.interactivity.modes.bubble = conf.interactivity.modes.bubble && typeof conf.interactivity.modes.bubble === 'object'
+        ? conf.interactivity.modes.bubble
+        : { distance: 140, size: 5, duration: 2, opacity: 0.4 };
+      conf.interactivity.modes.push = conf.interactivity.modes.push && typeof conf.interactivity.modes.push === 'object'
+        ? conf.interactivity.modes.push
+        : { particles_nb: 3 };
+      return conf;
+    };
+    particlesLiveConfig = normalizeParticleConfig(particlesLiveConfig);
+    const firstColor = (value, fallback = '#7ddcff') => {
+      const candidate = Array.isArray(value) ? value[0] : value;
+      const match = String(candidate || '').trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      return match ? match[0] : fallback;
+    };
+    const normalizeParticleMode = (value, allowed, fallback) => {
+      const mode = String(value || '').trim().toLowerCase();
+      return allowed.includes(mode) ? mode : fallback;
+    };
+    const getParticleUiState = () => {
+      const conf = normalizeParticleConfig(particlesLiveConfig);
+      const events = conf.interactivity?.events || {};
+      const modes = conf.interactivity?.modes || {};
+      return {
+        pointer: !!chkParticlesPointer?.checked,
+        count: clampNum(rngParticlesCount?.value, 8, 120, conf.particles.number?.value ?? 52),
+        speed: clampNum(rngParticlesSpeed?.value, 0, 4, conf.particles.move?.speed ?? 0.4, 1),
+        size: clampNum(rngParticlesSize?.value, 1, 8, conf.particles.size?.value ?? 2.2, 1),
+        opacity: clampNum(rngParticlesOpacity?.value, 5, 85, Math.round((conf.particles.opacity?.value ?? 0.22) * 100)),
+        lines: !!chkParticlesLines?.checked,
+        lineDistance: clampNum(rngParticlesLineDistance?.value, 60, 260, conf.particles.line_linked?.distance ?? 155),
+        interactionDistance: clampNum(
+          rngParticlesInteractionDistance?.value,
+          40,
+          240,
+          pCfg.interaction_distance ?? modes.repulse?.distance ?? modes.grab?.distance ?? modes.bubble?.distance ?? 110
+        ),
+        particleColor: firstColor(inpParticlesColor?.value || conf.particles.color?.value, '#7ddcff'),
+        lineColor: firstColor(inpParticlesLineColor?.value || conf.particles.line_linked?.color, '#7ddcff'),
+        shape: normalizeParticleMode(selParticlesShape?.value || conf.particles.shape?.type, ['circle', 'triangle', 'edge', 'polygon', 'star'], 'circle'),
+        hoverMode: normalizeParticleMode(selParticlesHoverMode?.value || pCfg.hover_mode || events.onhover?.mode, ['repulse', 'grab', 'bubble', 'none'], 'repulse'),
+        clickMode: normalizeParticleMode(selParticlesClickMode?.value || pCfg.click_mode || events.onclick?.mode, ['push', 'repulse', 'none'], 'push'),
+      };
+    };
+    const setParticleOutputs = () => {
+      const state = getParticleUiState();
+      if (outParticlesCount) outParticlesCount.textContent = String(state.count);
+      if (outParticlesSpeed) outParticlesSpeed.textContent = state.speed.toFixed(1);
+      if (outParticlesSize) outParticlesSize.textContent = state.size.toFixed(1);
+      if (outParticlesOpacity) outParticlesOpacity.textContent = `${state.opacity}%`;
+      if (outParticlesLineDistance) outParticlesLineDistance.textContent = `${state.lineDistance}px`;
+      if (outParticlesInteractionDistance) outParticlesInteractionDistance.textContent = `${state.interactionDistance}px`;
+      if (rngParticlesLineDistance) rngParticlesLineDistance.disabled = !state.lines;
+      const pointerControls = [rngParticlesInteractionDistance, selParticlesHoverMode, selParticlesClickMode].filter(Boolean);
+      pointerControls.forEach((el) => { el.disabled = !state.pointer; });
+      [rngParticlesInteractionDistance, selParticlesClickMode]
+        .filter(Boolean)
+        .forEach((el) => el.closest?.('.particle-control')?.classList.toggle('is-disabled', !state.pointer));
+    };
+    const writeParticleControlsFromConfig = ({ useSavedModes = true } = {}) => {
+      const conf = normalizeParticleConfig(particlesLiveConfig);
+      const events = conf.interactivity?.events || {};
+      const modes = conf.interactivity?.modes || {};
+      if (rngParticlesCount) rngParticlesCount.value = String(clampNum(conf.particles.number?.value, 8, 120, 52));
+      if (rngParticlesSpeed) rngParticlesSpeed.value = String(clampNum(conf.particles.move?.speed, 0, 4, 0.4, 1));
+      if (rngParticlesSize) rngParticlesSize.value = String(clampNum(conf.particles.size?.value, 1, 8, 2.2, 1));
+      if (rngParticlesOpacity) rngParticlesOpacity.value = String(clampNum((conf.particles.opacity?.value ?? 0.22) * 100, 5, 85, 22));
+      if (chkParticlesLines) chkParticlesLines.checked = conf.particles.line_linked?.enable !== false;
+      if (rngParticlesLineDistance) rngParticlesLineDistance.value = String(clampNum(conf.particles.line_linked?.distance, 60, 260, 155));
+      if (rngParticlesInteractionDistance) {
+        rngParticlesInteractionDistance.value = String(clampNum(
+          (useSavedModes ? pCfg.interaction_distance : undefined) ?? modes.repulse?.distance ?? modes.grab?.distance ?? modes.bubble?.distance,
+          40,
+          240,
+          110
+        ));
+      }
+      if (inpParticlesColor) inpParticlesColor.value = firstColor(conf.particles.color?.value, '#7ddcff');
+      if (inpParticlesLineColor) inpParticlesLineColor.value = firstColor(conf.particles.line_linked?.color, '#7ddcff');
+      if (selParticlesShape) selParticlesShape.value = normalizeParticleMode(conf.particles.shape?.type, ['circle', 'triangle', 'edge', 'polygon', 'star'], 'circle');
+      if (selParticlesHoverMode) selParticlesHoverMode.value = normalizeParticleMode((useSavedModes ? pCfg.hover_mode : undefined) || events.onhover?.mode, ['repulse', 'grab', 'bubble', 'none'], 'repulse');
+      if (selParticlesClickMode) selParticlesClickMode.value = normalizeParticleMode((useSavedModes ? pCfg.click_mode : undefined) || events.onclick?.mode, ['push', 'repulse', 'none'], 'push');
+      setParticleOutputs();
+    };
+    const applyParticleControlsToConfig = () => {
+      const state = getParticleUiState();
+      const conf = normalizeParticleConfig(particlesLiveConfig);
+      conf.particles.number.value = state.count;
+      conf.particles.number.density = { ...(conf.particles.number.density || {}), enable: true };
+      conf.particles.color.value = state.particleColor;
+      conf.particles.shape.type = state.shape;
+      conf.particles.opacity.value = state.opacity / 100;
+      conf.particles.size.value = state.size;
+      conf.particles.line_linked.enable = !!state.lines;
+      conf.particles.line_linked.distance = state.lineDistance;
+      conf.particles.line_linked.color = state.lineColor;
+      conf.particles.move.enable = true;
+      conf.particles.move.speed = state.speed;
+      conf.interactivity.detect_on = state.pointer ? 'window' : 'canvas';
+      conf.interactivity.events.resize = true;
+      conf.interactivity.events.onhover = {
+        enable: state.pointer && state.hoverMode !== 'none',
+        mode: state.hoverMode === 'none' ? 'repulse' : state.hoverMode,
+      };
+      conf.interactivity.events.onclick = {
+        enable: state.pointer && state.clickMode !== 'none',
+        mode: state.clickMode === 'none' ? 'push' : state.clickMode,
+      };
+      conf.interactivity.modes.repulse.distance = state.interactionDistance;
+      conf.interactivity.modes.grab.distance = Math.max(60, state.interactionDistance);
+      conf.interactivity.modes.grab.line_linked.opacity = 0.28;
+      conf.interactivity.modes.bubble.distance = state.interactionDistance;
+      conf.interactivity.modes.bubble.size = Math.max(state.size + 2, 5);
+      conf.interactivity.modes.push.particles_nb = Math.max(2, Math.min(8, Math.round(state.count / 18)));
+      particlesLiveConfig = conf;
+      setParticleOutputs();
+      return state;
+    };
+    let particlesPreviewTimer = null;
+    const scheduleParticlesPreview = ({ clearUrl = true, immediate = false } = {}) => {
+      clearTimeout(particlesPreviewTimer);
+      const run = () => {
+        const state = applyParticleControlsToConfig();
+        if (clearUrl && inpParticlesUrl) inpParticlesUrl.value = '';
+        if ((selBgMode?.value || 'none') !== 'particles') return;
+        this._config = {
+          ...(this._config || {}),
+          background_mode: 'particles',
+          background_particles: {
+            ...(this._config?.background_particles || {}),
+            config_url: (inpParticlesUrl?.value || '').trim() || undefined,
+            config: (!(inpParticlesUrl?.value || '').trim() && particlesLiveConfig) ? cloneData(particlesLiveConfig) : undefined,
+            pointer_events: !!state.pointer,
+            hover_mode: state.hoverMode,
+            click_mode: state.clickMode,
+            interaction_distance: state.interactionDistance,
+          }
+        };
+        this._applyBackgroundFromConfig?.();
+      };
+      if (immediate) run();
+      else particlesPreviewTimer = setTimeout(run, 140);
+    };
+    writeParticleControlsFromConfig();
     if (selTabsPosition) selTabsPosition.value = this._normalizeTabsPosition_(this.tabsPosition || 'top');
     const sidebarItemsForSettings = this._normalizeSidebarItems_(this.sidebarItems, { enabled: !!this.sidebarEnabled });
     if (chkSidebarEnabled) chkSidebarEnabled.checked = !!this.sidebarEnabled;
@@ -34472,6 +35003,39 @@ modal.innerHTML = `
     updateDoNotResizeTextState();
     if (chkDoNotResizeText) chkDoNotResizeText.checked = !!this.doNotResizeText;
     if (chkOuterGridBuffer) chkOuterGridBuffer.checked = !!this.outerGridBuffer;
+    const normalizeOuterGridBufferCells = (value) => this._normalizeOuterGridBufferCells_?.(value) || 1;
+    const syncOuterGridBufferCellsControl = () => {
+      const value = normalizeOuterGridBufferCells(rngOuterGridBufferCells?.value ?? this.outerGridBufferCells ?? 1);
+      if (rngOuterGridBufferCells) {
+        rngOuterGridBufferCells.value = String(value);
+        rngOuterGridBufferCells.disabled = !this.outerGridBuffer;
+      }
+      if (outOuterGridBufferCells) outOuterGridBufferCells.textContent = `${value} cell${value === 1 ? '' : 's'}`;
+      if (outerGridBufferCellsControl) outerGridBufferCellsControl.classList.toggle('is-disabled', !this.outerGridBuffer);
+    };
+    if (rngOuterGridBufferCells) {
+      rngOuterGridBufferCells.value = String(normalizeOuterGridBufferCells(this.outerGridBufferCells));
+      syncOuterGridBufferCellsControl();
+      rngOuterGridBufferCells.addEventListener('input', () => {
+        try {
+          this.outerGridBufferCells = normalizeOuterGridBufferCells(rngOuterGridBufferCells.value);
+          syncOuterGridBufferCellsControl();
+          this._resizeContainer?.();
+          if (this._isContainerFixed?.()) this._clampAllCardsInside?.();
+        } catch {}
+      });
+    } else {
+      syncOuterGridBufferCellsControl();
+    }
+    chkOuterGridBuffer?.addEventListener('change', () => {
+      try {
+        this.outerGridBuffer = !!chkOuterGridBuffer.checked;
+        this.outerGridBufferCells = normalizeOuterGridBufferCells(rngOuterGridBufferCells?.value ?? this.outerGridBufferCells ?? 1);
+        syncOuterGridBufferCellsControl();
+        this._resizeContainer?.();
+        if (this._isContainerFixed?.()) this._clampAllCardsInside?.();
+      } catch {}
+    });
     if (chkOverlap) chkOverlap.checked = !!this.disableOverlap;
     if (selDashboardTheme) selDashboardTheme.value = String(this.dashboardTheme || '');
     if (chkDashboardThemeOverrideAllDesign) chkDashboardThemeOverrideAllDesign.checked = !!this.dashboardThemeOverrideAllDesign;
@@ -35461,6 +36025,10 @@ modal.innerHTML = `
       }
       renderLayers();
     });
+    chkLayersButtonDetails?.addEventListener('change', () => {
+      layersButtonDetailsDraft = !!chkLayersButtonDetails.checked;
+      syncLayerDraftState();
+    });
 
     const addLayerFromInput = () => {
       if (!layersEnabledDraft) return;
@@ -35567,10 +36135,12 @@ modal.innerHTML = `
     buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
     buildGradients('#ddc-gradients-cardBg',      '#ddc-setting-cardBg');
     const applyRandomParticlesPreview = () => {
-      particlesLiveConfig = createRandomParticlesConfig();
+      particlesLiveConfig = normalizeParticleConfig(createRandomParticlesConfig());
       if (selBgMode) selBgMode.value = 'particles';
       if (inpParticlesUrl) inpParticlesUrl.value = '';
+      writeParticleControlsFromConfig({ useSavedModes: false });
       showBgSections();
+      const state = applyParticleControlsToConfig();
       this._config = {
         ...(this._config || {}),
         background_mode: 'particles',
@@ -35578,7 +36148,10 @@ modal.innerHTML = `
           ...(this._config?.background_particles || {}),
           config_url: undefined,
           config: cloneData(particlesLiveConfig),
-          pointer_events: !!chkParticlesPointer?.checked,
+          pointer_events: !!state.pointer,
+          hover_mode: state.hoverMode,
+          click_mode: state.clickMode,
+          interaction_distance: state.interactionDistance,
         }
       };
       this._applyBackgroundFromConfig?.();
@@ -35617,19 +36190,42 @@ modal.innerHTML = `
     btnRandomParticles?.addEventListener('click', () => {
       applyRandomParticlesPreview();
     });
+    [
+      rngParticlesCount,
+      rngParticlesSpeed,
+      rngParticlesSize,
+      rngParticlesOpacity,
+      rngParticlesLineDistance,
+      inpParticlesColor,
+      inpParticlesLineColor,
+      selParticlesShape,
+    ].filter(Boolean).forEach((el) => {
+      const eventName = el.tagName === 'SELECT' ? 'change' : 'input';
+      el.addEventListener(eventName, () => {
+        setParticleOutputs();
+        scheduleParticlesPreview({ clearUrl: true });
+      });
+    });
+    chkParticlesLines?.addEventListener('change', () => {
+      setParticleOutputs();
+      scheduleParticlesPreview({ clearUrl: true, immediate: true });
+    });
+    [
+      rngParticlesInteractionDistance,
+      selParticlesHoverMode,
+      selParticlesClickMode,
+    ].filter(Boolean).forEach((el) => {
+      const eventName = el.tagName === 'SELECT' ? 'change' : 'input';
+      el.addEventListener(eventName, () => {
+        setParticleOutputs();
+        scheduleParticlesPreview({ clearUrl: false });
+      });
+    });
+    inpParticlesUrl?.addEventListener('change', () => scheduleParticlesPreview({ clearUrl: false, immediate: true }));
     chkParticlesPointer?.addEventListener('change', () => {
+      setParticleOutputs();
       if ((selBgMode?.value || 'none') !== 'particles') return;
-      this._config = {
-        ...(this._config || {}),
-        background_mode: 'particles',
-        background_particles: {
-          ...(this._config?.background_particles || {}),
-          config_url: (inpParticlesUrl?.value || '').trim() || undefined,
-          config: cloneData(particlesLiveConfig) || undefined,
-          pointer_events: !!chkParticlesPointer.checked,
-        }
-      };
-      this._applyBackgroundFromConfig?.();
+      scheduleParticlesPreview({ clearUrl: false, immediate: true });
     });
 
     // Live preview when manually editing background text inputs
@@ -35665,6 +36261,7 @@ modal.innerHTML = `
     const closeModal = () => {
       try { closeFeatureEditor(); } catch {}
       try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
+      try { clearTimeout(particlesPreviewTimer); } catch {}
       try { document.removeEventListener('keydown', onKey); } catch {}
       try { modal.remove(); } catch {}
       if (this.__settingsModal === modal) this.__settingsModal = null;
@@ -35694,6 +36291,7 @@ modal.innerHTML = `
         : 'native';
       const newDoNotResizeText = !!chkDoNotResizeText?.checked;
       const newOuterGridBuffer = !!chkOuterGridBuffer?.checked;
+      const newOuterGridBufferCells = normalizeOuterGridBufferCells(rngOuterGridBufferCells?.value ?? this.outerGridBufferCells ?? 1);
       const newOverlap   = !!chkOverlap?.checked;
       const newDashboardTheme = String(selDashboardTheme?.value || '').trim();
       const newDashboardThemeEnabled = !!newDashboardTheme;
@@ -35707,6 +36305,7 @@ modal.innerHTML = `
       const newBgMode = selBgMode?.value || 'none';
       const newParticlesUrl = (inpParticlesUrl?.value || '').trim();
       const newParticlesPtr = !!chkParticlesPointer?.checked;
+      const newParticlesState = applyParticleControlsToConfig();
       const newYtUrl   = (inpYtUrl?.value || '').trim();
       const newYtStart = parseInt(inpYtStart?.value || '', 10);
       const newYtEnd   = parseInt(inpYtEnd?.value   || '', 10);
@@ -35719,6 +36318,7 @@ modal.innerHTML = `
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
       const newLayersEnabled = !!chkLayersEnabled?.checked;
+      const newLayersButtonDetails = !!chkLayersButtonDetails?.checked;
       const normalizedLayers = normalizeLayerDrafts(
         newLayersEnabled
           ? (layerDrafts.length ? layerDrafts : [cloneLayerDraft(this._defaultDashboardLayer_(), 0)])
@@ -35823,13 +36423,16 @@ modal.innerHTML = `
         this._syncToolbarAutoSaveState_?.();
         // Container size mode
         const sizeChanged = newSize !== this.containerSizeMode;
-        const outerBufferChanged = newOuterGridBuffer !== !!this.outerGridBuffer;
+        const outerBufferChanged = newOuterGridBuffer !== !!this.outerGridBuffer
+          || newOuterGridBufferCells !== normalizeOuterGridBufferCells(this.outerGridBufferCells);
         this.containerSizeMode = newSize;
         this.optimizeForMobile = newOptimizeForMobile;
         this.mobileDynamicBehavior = newMobileDynamicBehavior;
         this.doNotResizeText = newDoNotResizeText;
         this.outerGridBuffer = newOuterGridBuffer;
+        this.outerGridBufferCells = newOuterGridBufferCells;
         this.layersEnabled = newLayersEnabled;
+        this.layersButtonDetails = newLayersButtonDetails;
         this.dashboardThemeEnabled = newDashboardThemeEnabled;
         this.dashboardTheme = newDashboardTheme;
         this.dashboardThemeOverrideAllDesign = newDashboardThemeOverrideAllDesign;
@@ -35868,6 +36471,7 @@ modal.innerHTML = `
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
             layers_enabled: !!this.layersEnabled,
+            layers_button_details: !!this.layersButtonDetails,
             layers: this._cloneJson_(normalizedLayers),
           };
           this._deleteParkedSidebarOptions_(this._config.options);
@@ -35875,6 +36479,7 @@ modal.innerHTML = `
         this._config.tabs_position = this.tabsPosition;
         this._deleteParkedSidebarOptions_(this._config);
         this._config.layers_enabled = !!this.layersEnabled;
+        this._config.layers_button_details = !!this.layersButtonDetails;
         this._config.layers = this._cloneJson_(normalizedLayers);
         this._setDashboardLayers_(normalizedLayers, { refresh: true, persist: true });
         this._syncTabsPlacement_?.();
@@ -35959,6 +36564,9 @@ modal.innerHTML = `
             config_url: newParticlesUrl || undefined,
             config: (!newParticlesUrl && particlesLiveConfig) ? cloneData(particlesLiveConfig) : undefined,
             pointer_events: newParticlesPtr || undefined,
+            hover_mode: newParticlesState.hoverMode,
+            click_mode: newParticlesState.clickMode,
+            interaction_distance: newParticlesState.interactionDistance,
           };
         } else {
           const { background_particles, ...rest } = this._config || {};
@@ -36026,6 +36634,7 @@ modal.innerHTML = `
           this._config.mobile_dynamic_behavior = this.mobileDynamicBehavior || 'native';
           this._config.do_not_resize_text      = !!this.doNotResizeText;
           this._config.outer_grid_buffer       = !!this.outerGridBuffer;
+          this._config.outer_grid_buffer_cells = this._normalizeOuterGridBufferCells_(this.outerGridBufferCells);
           this._config.dashboard_theme_enabled = undefined;
           this._config.theme_enabled = undefined;
           this._config.dashboard_theme = this.dashboardTheme || undefined;
@@ -36153,6 +36762,7 @@ modal.innerHTML = `
       mobile_dynamic_behavior: this.mobileDynamicBehavior || 'native',
       do_not_resize_text: !!this.doNotResizeText,
       outer_grid_buffer: !!this.outerGridBuffer,
+      outer_grid_buffer_cells: this._normalizeOuterGridBufferCells_(this.outerGridBufferCells),
       responsive_viewports: this._cloneJson_(this._serializeResponsiveViewportProfiles_(this.responsiveViewportProfiles)),
       connectors: this._cloneJson_(this._responsiveConnectors?.[this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape'] || []),
       responsive_connectors: this._cloneJson_(this._serializeResponsiveConnectorLayouts_(this._responsiveConnectors)),
@@ -36177,6 +36787,7 @@ modal.innerHTML = `
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
       layers_enabled: !!this.layersEnabled,
+      layers_button_details: !!this.layersButtonDetails,
       layers: this._cloneJson_(this.layers || []),
 
       // Background (image | particles | youtube | none)
@@ -36185,7 +36796,7 @@ modal.innerHTML = `
         ? pick(cfg.background_image, ['src','repeat','size','position','attachment','opacity'])
         : undefined,
       background_particles: cfg.background_particles
-        ? pick(cfg.background_particles, ['config_url','pointer_events','config'])
+        ? pick(cfg.background_particles, ['config_url','pointer_events','hover_mode','click_mode','interaction_distance','config'])
         : undefined,
       background_youtube: cfg.background_youtube
         ? pick(cfg.background_youtube, [
@@ -36248,6 +36859,9 @@ modal.innerHTML = `
         : 'native';
     }
     if ('outer_grid_buffer' in opts)  this.outerGridBuffer = !!opts.outer_grid_buffer;
+    if ('outer_grid_buffer_cells' in opts || 'outerGridBufferCells' in opts) {
+      this.outerGridBufferCells = this._normalizeOuterGridBufferCells_(opts.outer_grid_buffer_cells ?? opts.outerGridBufferCells ?? 1);
+    }
     if ('responsive_viewports' in opts) this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(opts.responsive_viewports);
     if ('responsive_connectors' in opts || 'connectors' in opts) {
       this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(
@@ -36285,6 +36899,9 @@ modal.innerHTML = `
     }
     if ('layers_enabled' in opts || 'enable_layers' in opts) {
       this.layersEnabled = !!(opts.layers_enabled ?? opts.enable_layers);
+    }
+    if ('layers_button_details' in opts || 'show_layer_button_details' in opts || 'layersButtonDetails' in opts) {
+      this.layersButtonDetails = !!(opts.layers_button_details ?? opts.show_layer_button_details ?? opts.layersButtonDetails);
     }
     if ('layers' in opts) {
       this._setDashboardLayers_(opts.layers || [], { refresh: false, persist: true });
@@ -36437,7 +37054,7 @@ modal.innerHTML = `
       this._applyActiveTab?.();
       this._syncTabsWidth_?.();
     }
-    if ('layers' in opts || 'layers_enabled' in opts || 'enable_layers' in opts) {
+    if ('layers' in opts || 'layers_enabled' in opts || 'enable_layers' in opts || 'layers_button_details' in opts || 'show_layer_button_details' in opts || 'layersButtonDetails' in opts) {
       this._renderLayersBar_?.();
       this._applyActiveTab?.();
     }
@@ -36462,6 +37079,7 @@ modal.innerHTML = `
       mobile_dynamic_behavior: { type: 'string' },
       do_not_resize_text: { type: 'boolean' },
       outer_grid_buffer: { type: 'boolean' },
+      outer_grid_buffer_cells: { type: 'number' },
       responsive_viewports: { type: 'object' },
       connectors: { type: 'array' },
       responsive_connectors: { type: 'object' },
@@ -36482,6 +37100,7 @@ modal.innerHTML = `
       default_tab: { type: 'string' },
       hide_tabs_when_single: { type: 'boolean' },
       layers_enabled: { type: 'boolean' },
+      layers_button_details: { type: 'boolean' },
       layers: { type: 'array' },
       hide_HA_Header: { type: 'boolean' },
       hide_HA_Sidebar: { type: 'boolean' },
@@ -36512,6 +37131,7 @@ modal.innerHTML = `
       mobileDynamicBehavior: 'mobile_dynamic_behavior',
       doNotResizeText: 'do_not_resize_text',
       outerGridBuffer: 'outer_grid_buffer',
+      outerGridBufferCells: 'outer_grid_buffer_cells',
       responsiveViewports: 'responsive_viewports',
       responsiveConnectors: 'responsive_connectors',
       containerBackground: 'container_background',
@@ -36532,6 +37152,9 @@ modal.innerHTML = `
       hideTabsWhenSingle: 'hide_tabs_when_single',
       layersEnabled: 'layers_enabled',
       enable_layers: 'layers_enabled',
+      layersButtonDetails: 'layers_button_details',
+      showLayerButtonDetails: 'layers_button_details',
+      show_layer_button_details: 'layers_button_details',
       hideHAHeader: 'hide_HA_Header',
       hideHaHeader: 'hide_HA_Header',
       hide_ha_header: 'hide_HA_Header',
@@ -37063,7 +37686,7 @@ _importDesign() {
     // Core + behavior
     'grid','drag_live_snap','auto_save','auto_save_debounce',
     'debug','disable_overlap','card_mod','storage_key',
-    'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','responsive_viewports',
+    'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports',
     'connectors','responsive_connectors',
 
     // Visuals
@@ -37075,7 +37698,7 @@ _importDesign() {
     'container_preset','container_preset_orientation',
 
     // Tabs
-    'tabs','tabs_position','default_tab','hide_tabs_when_single','sidebar_enabled','sidebar_items','sidebar_style','sidebar_density','sidebar_accent','sidebar_header','sidebar_canvas_height','sidebar_cards','sidebar_home_image','sidebar_calendar_entities','layers_enabled',
+    'tabs','tabs_position','default_tab','hide_tabs_when_single','sidebar_enabled','sidebar_items','sidebar_style','sidebar_density','sidebar_accent','sidebar_header','sidebar_canvas_height','sidebar_cards','sidebar_home_image','sidebar_calendar_entities','layers_enabled','layers_button_details',
     'layers',
 
     // HA chrome
@@ -37939,48 +38562,48 @@ _importDesign() {
 
     if (item.key === 'alarm') {
       const activeAt = this._rememberScreenSaverAlarmActive_(item.entity || item.entity_id, stateObj, rawState, domain);
-      const activeLabel = domain === 'lock' ? 'Sist låst' : 'Sist aktivert';
+      const activeLabel = domain === 'lock' ? 'Last locked' : 'Last activated';
       if (activeAt) this._pushScreenSaverMeta_(meta, activeLabel, this._formatScreenSaverTimestamp_(activeAt));
-      else if (stateObj?.last_changed) this._pushScreenSaverMeta_(meta, 'Sist endret', this._formatScreenSaverTimestamp_(stateObj.last_changed));
-      if (attrs.changed_by) this._pushScreenSaverMeta_(meta, 'Av', attrs.changed_by);
-      if (attrs.battery_level !== undefined) this._pushScreenSaverMeta_(meta, 'Batteri', attrs.battery_level, '%');
+      else if (stateObj?.last_changed) this._pushScreenSaverMeta_(meta, 'Last changed', this._formatScreenSaverTimestamp_(stateObj.last_changed));
+      if (attrs.changed_by) this._pushScreenSaverMeta_(meta, 'By', attrs.changed_by);
+      if (attrs.battery_level !== undefined) this._pushScreenSaverMeta_(meta, 'Battery', attrs.battery_level, '%');
       if (activeAt) detailParts.push(`${activeLabel} ${this._formatScreenSaverTimestamp_(activeAt)}`);
-      else if (String(rawState || '').toLowerCase().includes('disarmed')) detailParts.push('Alle systemer normal');
-      else if (updatedAt) detailParts.push(`Oppdatert ${updatedAt}`);
+      else if (String(rawState || '').toLowerCase().includes('disarmed')) detailParts.push('All systems normal');
+      else if (updatedAt) detailParts.push(`Updated ${updatedAt}`);
     } else if (item.key === 'weather' || domain === 'weather') {
       const tempUnit = attrs.temperature_unit || unit || '°';
-      if (attrs.apparent_temperature !== undefined) this._pushScreenSaverMeta_(meta, 'Føles', attrs.apparent_temperature, tempUnit);
-      if (attrs.humidity !== undefined) this._pushScreenSaverMeta_(meta, 'Fukt', attrs.humidity, '%');
-      if (attrs.wind_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Vind', attrs.wind_speed, attrs.wind_speed_unit || '');
-      if (meta.length < 3 && attrs.precipitation !== undefined) this._pushScreenSaverMeta_(meta, 'Nedbør', attrs.precipitation, attrs.precipitation_unit || 'mm');
-      if (meta.length < 3 && attrs.wind_gust_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Kast', attrs.wind_gust_speed, attrs.wind_speed_unit || '');
-      if (meta.length < 3 && attrs.pressure !== undefined) this._pushScreenSaverMeta_(meta, 'Trykk', attrs.pressure, attrs.pressure_unit || 'hPa');
+      if (attrs.apparent_temperature !== undefined) this._pushScreenSaverMeta_(meta, 'Feels like', attrs.apparent_temperature, tempUnit);
+      if (attrs.humidity !== undefined) this._pushScreenSaverMeta_(meta, 'Humidity', attrs.humidity, '%');
+      if (attrs.wind_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Wind', attrs.wind_speed, attrs.wind_speed_unit || '');
+      if (meta.length < 3 && attrs.precipitation !== undefined) this._pushScreenSaverMeta_(meta, 'Precipitation', attrs.precipitation, attrs.precipitation_unit || 'mm');
+      if (meta.length < 3 && attrs.wind_gust_speed !== undefined) this._pushScreenSaverMeta_(meta, 'Gust', attrs.wind_gust_speed, attrs.wind_speed_unit || '');
+      if (meta.length < 3 && attrs.pressure !== undefined) this._pushScreenSaverMeta_(meta, 'Pressure', attrs.pressure, attrs.pressure_unit || 'hPa');
       const condition = this._formatScreenSaverState_(rawState);
       if (condition) detailParts.push(condition);
     } else if (item.key === 'energy') {
       const stats = this._screenSaverSparklineStats_(samples);
       if (stats?.count > 1) {
-        this._pushScreenSaverMeta_(meta, 'Snitt', this._roundScreenSaverNumber_(stats.avg), unit);
-        this._pushScreenSaverMeta_(meta, 'Topp', this._roundScreenSaverNumber_(stats.max), unit);
+        this._pushScreenSaverMeta_(meta, 'Average', this._roundScreenSaverNumber_(stats.avg), unit);
+        this._pushScreenSaverMeta_(meta, 'Peak', this._roundScreenSaverNumber_(stats.max), unit);
       }
       const attrPairs = [
-        ['today', 'I dag', unit],
-        ['energy_today', 'I dag', unit],
-        ['daily_energy', 'I dag', unit],
-        ['cost_today', 'Kost', attrs.currency || ''],
-        ['price', 'Pris', attrs.currency || ''],
+        ['today', 'Today', unit],
+        ['energy_today', 'Today', unit],
+        ['daily_energy', 'Today', unit],
+        ['cost_today', 'Cost', attrs.currency || ''],
+        ['price', 'Price', attrs.currency || ''],
         ['voltage', 'Volt', 'V'],
         ['current', 'Amp', 'A'],
         ['power_factor', 'PF', ''],
-        ['battery_level', 'Batteri', '%'],
+        ['battery_level', 'Battery', '%'],
       ];
       attrPairs.forEach(([key, label, suffix]) => {
         if (meta.length < 3 && attrs[key] !== undefined) this._pushScreenSaverMeta_(meta, label, attrs[key], suffix);
       });
       if (stats?.count > 1) {
-        detailParts.push(`Snitt ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.avg), unit)} · Topp ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.max), unit)}`);
+        detailParts.push(`Average ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.avg), unit)} · Peak ${this._screenSaverAttrValue_(this._roundScreenSaverNumber_(stats.max), unit)}`);
       } else if (updatedAt) {
-        detailParts.push(`Oppdatert ${updatedAt}`);
+        detailParts.push(`Updated ${updatedAt}`);
       }
     }
 
