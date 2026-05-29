@@ -1,2 +1,10 @@
 node_modules
 .DS_Store
+examples/simple-media-player-card-1-0-0-fixed.json
+examples/ddc-card-washer-alert-icon-card.json
+examples/home-assistant-package-ddc-laundry-service-matrix.yaml
+examples/ddc-card-people-home-fixed.json
+examples/ddc-card-neo-score-energy-html-fixed.json
+examples/ddc-card-media-player-color-bridge.json
+examples/ddc-card-laundry-service-matrix-table-card.json
+examples/ddc-card-bosch-wgg246f1sn-e18-text-card.json
