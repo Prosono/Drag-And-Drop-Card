@@ -3,7 +3,7 @@
   "version": "0.9.5",
   "description": "A true drag and drop card for Home Assistant. Make it as large (or small) as you want where you can add as many cards as you like, ANYWHERE you like.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": false,
   "scripts": {
   "build": "esbuild src/drag-and-drop-card.js --bundle --minify --sourcemap --format=esm --target=es2019 --outfile=dist/drag-and-drop-card.js --define:__VERSION__=\\\"$npm_package_version\\\"",

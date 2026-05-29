@@ -8,13 +8,15 @@
 
 ▶️ Click the image above to watch the video of the latest release of the card
 
-
+> **Start here:** The clearest walkthrough is the HADS start guide: https://hads.smarti.dev/wiki/start-here. It has pictures, step-by-step setup, video, and the fastest path to getting the card working.
+>
+> Use the rest of this README when you want to go deeper into configuration details and advanced options.
 
 A freeform **drag / resize / snap-to-grid** canvas for Lovelace cards.  
 Arrange any Lovelace cards visually, save the layout (auto-save or manual), export/import full designs, and quickly prototype dashboards with device-size presets.
 
-> ⚠️ **License & Terms**  
-> This project is **proprietary** and governed by **EULA.md**.  
+> **License**
+> This project is licensed under the **MIT License**.
 > Third-party notices are listed in **THIRD_PARTY_NOTICES.md**.
 
 ---
@@ -941,7 +943,7 @@ _Add screenshots or GIFs here._
 
 ## 🤝 Contributing
 
-1. Read **EULA.md** and **THIRD_PARTY_NOTICES.md**.  
+1. Read **LICENSE** and **THIRD_PARTY_NOTICES.md**.
 2. Open issues for bugs/requests.  
 3. PRs: keep style, no CDN deps, test with **card-mod**.
 
@@ -949,9 +951,9 @@ _Add screenshots or GIFs here._
 
 ## 📄 License
 
-**© 2025 SMARTI AS** — All rights reserved.  
-Use is governed by **EULA.md**.  
-See **THIRD_PARTY_NOTICES.md**.
+MIT License.
+Copyright (c) 2025 SMARTI AS.
+See **LICENSE** and **THIRD_PARTY_NOTICES.md**.
 
 ---
 
