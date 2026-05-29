@@ -4,15 +4,9 @@
   <img src="assets/demo.gif" alt="Demo of Drag and Drop Card" width="100%">
 </p>
 
-[![Watch the demo on YouTube](https://img.youtube.com/vi/1T68T51tEqY/maxresdefault.jpg)](https://www.youtube.com/watch?v=1T68T51tEqY)
+[![Watch the video of our latest release here on YouTube](https://img.youtube.com/vi/Z8PyYaySCxM/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z8PyYaySCxM)
 
 ▶️ Click the image above to watch the video of the latest release of the card
-
----
-
-[![Watch the demo on YouTube](https://img.youtube.com/vi/__4U081hwtM/maxresdefault.jpg)](https://www.youtube.com/watch?v=__4U081hwtM)
-
-▶️ Click the image above to watch the video of first release of the card
 
 
 
