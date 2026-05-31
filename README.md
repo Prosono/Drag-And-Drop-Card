@@ -55,6 +55,7 @@ Arrange any Lovelace cards visually, save the layout (auto-save or manual), expo
 2. Search for "Drag and Drop Card" in HACS
 3. Click the download button. ⬇️
 4. The card is now available as a custom card in the Native Home Assistant Card Selector when adding new cards to a dashboard. 
+5. On Home Assistant 2026.5 or newer, it also appears in the **Add dashboard** dialog under **Community dashboards** as **Drag & Drop Dashboard**.
 
 ### Option B: Manual
 
@@ -104,6 +105,30 @@ Now:
 - Use the **toolbar** to **Add** cards, **Import/Export**, **Apply**, or **Exit** edit mode.
 - **Ctrl/Cmd + S** applies (saves) the layout while in edit mode.
 - **Esc** exits edit mode.
+
+## 🧩 Add as a Dashboard
+
+Home Assistant 2026.5 introduced discoverable community dashboard strategies. This card registers a dashboard strategy named **Drag & Drop Dashboard**, so after the resource is loaded you can create a new dashboard from the **Add dashboard** dialog instead of starting from an empty dashboard and adding the card manually.
+
+The generated dashboard contains a single panel view with one full-width Drag & Drop Card. You can also use the strategy in YAML:
+
+```yaml
+strategy:
+  type: custom:drag-and-drop-card
+  title: Drag & Drop Dashboard
+  storage_key: my_drag_drop_dashboard
+```
+
+Optional strategy settings:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `title` | string | Dashboard title used by the generated dashboard. |
+| `storage_key` | string | Persistent Drag & Drop Card layout key. If omitted, one is derived from the dashboard details. |
+| `view_title` | string | Title for the generated panel view. Defaults to `Home`. |
+| `view_path` | string | URL path for the generated view. Defaults to `home`. |
+| `view_icon` | string | Icon for the generated view. Defaults to `mdi:home`. |
+| `card` | object | Extra Drag & Drop Card options merged into the generated card. |
 
 ---
 
