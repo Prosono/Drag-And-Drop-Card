@@ -668,6 +668,26 @@ const converterMethods = {
     }));
   },
 
+  _applyDashboardConverterTabs_(options = {}) {
+    const tabs = Array.isArray(options.tabs)
+      ? options.tabs.map((tab, index) => ({
+          id: String(tab?.id || tab?.label || `tab_${index + 1}`).trim() || `tab_${index + 1}`,
+          label: String(tab?.label || tab?.id || `Tab ${index + 1}`).trim(),
+          icon: tab?.icon || '',
+          label_mode: tab?.label_mode || tab?.labelMode || 'both',
+        }))
+      : [];
+    if (!tabs.length) return false;
+    const validTabIds = new Set(tabs.map((tab) => tab.id));
+    const requestedDefault = String(options.default_tab || '').trim();
+    this.tabs = tabs;
+    this.defaultTab = validTabIds.has(requestedDefault) ? requestedDefault : tabs[0].id;
+    this.activeTab = validTabIds.has(this.activeTab) ? this.activeTab : this.defaultTab;
+    if ('hide_tabs_when_single' in options) this.hideTabsWhenSingle = options.hide_tabs_when_single !== false;
+    if ('tabs_position' in options) this.tabsPosition = this._normalizeTabsPosition_?.(options.tabs_position) || options.tabs_position || this.tabsPosition;
+    return true;
+  },
+
   async _persistDashboardConverterConfig_() {
     try {
       this._dispatchDashboardConverterConfigChanged_?.();
@@ -803,6 +823,7 @@ const converterMethods = {
     this._connectorDraft = null;
 
     const options = payload.options || {};
+    this._applyDashboardConverterTabs_?.(options);
     const previousSuppressResponsiveRebuild = !!this.__suppressResponsiveRebuild;
     this.__suppressResponsiveRebuild = true;
     try {
@@ -810,6 +831,7 @@ const converterMethods = {
     } finally {
       this.__suppressResponsiveRebuild = previousSuppressResponsiveRebuild;
     }
+    this._applyDashboardConverterTabs_?.(options);
     this._responsiveLayouts = this._normalizeResponsiveLayouts_(cards, payload.responsive_layouts || null);
     const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || cards;
     this._config = {
