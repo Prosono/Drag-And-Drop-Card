@@ -688,6 +688,52 @@ const converterMethods = {
     return true;
   },
 
+  _dashboardConverterPayloadTabMap_(payload = {}) {
+    const validTabIds = new Set((Array.isArray(payload?.options?.tabs) ? payload.options.tabs : [])
+      .map((tab) => String(tab?.id || '').trim())
+      .filter(Boolean));
+    const map = new Map();
+    const visitEntry = (entry = {}) => {
+      const id = String(entry?.id || '').trim();
+      const tabId = String(entry?.tabId || entry?.tab_id || '').trim();
+      if (id && tabId && (!validTabIds.size || validTabIds.has(tabId))) map.set(id, tabId);
+    };
+    const visitLayouts = (layouts = null) => {
+      if (!layouts || typeof layouts !== 'object') return;
+      Object.values(layouts).forEach((value) => {
+        if (Array.isArray(value)) value.forEach(visitEntry);
+        else if (Array.isArray(value?.cards)) value.cards.forEach(visitEntry);
+        else if (value && typeof value === 'object') visitLayouts(value);
+      });
+    };
+    if (Array.isArray(payload.cards)) payload.cards.forEach(visitEntry);
+    visitLayouts(payload.responsive_layouts);
+    return map;
+  },
+
+  _restoreDashboardConverterTabAssignments_(payload = {}) {
+    const tabMap = this._dashboardConverterPayloadTabMap_?.(payload) || new Map();
+    if (!tabMap.size) return false;
+    let changed = false;
+    Object.keys(this._responsiveLayouts || {}).forEach((variantKey) => {
+      const entries = Array.isArray(this._responsiveLayouts?.[variantKey]) ? this._responsiveLayouts[variantKey] : [];
+      this._responsiveLayouts[variantKey] = entries.map((entry) => {
+        const tabId = tabMap.get(String(entry?.id || '').trim());
+        if (!tabId || entry.tabId === tabId) return entry;
+        changed = true;
+        return { ...entry, tabId };
+      });
+    });
+    this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.forEach((wrap) => {
+      const tabId = tabMap.get(String(wrap?.dataset?.layoutCardId || '').trim());
+      if (!tabId || wrap.dataset.tabId === tabId) return;
+      wrap.dataset.tabId = tabId;
+      changed = true;
+      try { this._addTabSelectorToChip?.(wrap, tabId); } catch {}
+    });
+    return changed;
+  },
+
   async _persistDashboardConverterConfig_() {
     try {
       this._dispatchDashboardConverterConfigChanged_?.();
@@ -859,14 +905,22 @@ const converterMethods = {
     if (!mountedCards && activeEntries.length) {
       await this._buildCardsFromEntries_?.(activeEntries);
     }
+    this._restoreDashboardConverterTabAssignments_?.(payload);
     this._resizeContainer?.();
     try { this._syncTabsPlacement_?.(); this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); } catch {}
     try { this._applyVisibility_?.(); } catch {}
     try { this._syncTabsWidth_?.(); } catch {}
     try { this._renderConnectors_?.(); } catch {}
     try { this._syncEmptyStateUI?.(); } catch {}
-    try { await this._saveLayout?.(true); } catch { this._queueSave?.('dashboard-converter'); }
-    await this._persistDashboardConverterConfig_?.();
+    this._restoreDashboardConverterTabAssignments_?.(payload);
+    const previousSaveSuppressResponsiveMemoryPersist = !!this.__suppressResponsiveMemoryPersist;
+    this.__suppressResponsiveMemoryPersist = true;
+    try {
+      try { await this._saveLayout?.(true); } catch { this._queueSave?.('dashboard-converter'); }
+      await this._persistDashboardConverterConfig_?.();
+    } finally {
+      this.__suppressResponsiveMemoryPersist = previousSaveSuppressResponsiveMemoryPersist;
+    }
     this._toast?.(`Converted ${payload.summary?.cards || cards.length} cards across ${payload.summary?.views || options.tabs?.length || 1} tabs.`);
     return true;
   },
