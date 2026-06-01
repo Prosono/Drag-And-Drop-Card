@@ -178,7 +178,10 @@ const converterMethods = {
       return value.map((item) => this._dashboardConverterStyleText_(item, depth + 1)).filter(Boolean).join('\n');
     }
     if (typeof value === 'object') {
-      return Object.values(value).map((item) => this._dashboardConverterStyleText_(item, depth + 1)).filter(Boolean).join('\n');
+      return Object.entries(value).map(([key, item]) => {
+        if (typeof item === 'string' || typeof item === 'number') return `${key}: ${item}`;
+        return this._dashboardConverterStyleText_(item, depth + 1);
+      }).filter(Boolean).join('\n');
     }
     return '';
   },
