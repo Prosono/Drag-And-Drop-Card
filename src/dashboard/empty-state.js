@@ -148,6 +148,9 @@ const emptyStateMethods = {
         <button type="button" class="ddc-empty-btn primary" data-ddc-empty-action="add">
           <ha-icon icon="mdi:plus-circle-outline"></ha-icon><span>Add first card</span>
         </button>
+        <button type="button" class="ddc-empty-btn" data-ddc-empty-action="convert-dashboard">
+          <ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import dashboard</span>
+        </button>
         <button type="button" class="ddc-empty-btn" data-ddc-empty-action="settings">
           <ha-icon icon="mdi:tune-variant"></ha-icon><span>Dashboard settings</span>
         </button>
@@ -182,6 +185,8 @@ const emptyStateMethods = {
       } else if (action === 'settings') {
         if (!this.editMode) this._toggleEditMode(true);
         this._openDashboardSettings?.();
+      } else if (action === 'convert-dashboard') {
+        this._openDashboardConverter_?.();
       } else if (action === 'docs') {
         window.open('https://hads.smarti.dev/wiki/start-here', '_blank', 'noopener,noreferrer');
       } else if (action === 'size-mode') {
