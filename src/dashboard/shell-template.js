@@ -7141,7 +7141,8 @@ export function getDashboardShellTemplate() {
 }
 
 .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
-  overflow:visible;
+  overflow-x:auto;
+  overflow-y:hidden;
   scrollbar-gutter:auto;
 }
 
@@ -7150,7 +7151,8 @@ export function getDashboardShellTemplate() {
 }
 
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
-  overflow:visible !important;
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
 }
 
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-menu{
@@ -7696,7 +7698,8 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
-    overflow:visible !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
   }
 
   .ddc-tabs .ddc-layer-menu{
@@ -7760,10 +7763,10 @@ export function getDashboardShellTemplate() {
 
   .ddc-tabs.ddc-layer-menu-open .ddc-layer-menu-panel,
   .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left.ddc-layer-menu-open .ddc-layer-menu-panel{
-    position:fixed;
+    position:absolute;
     left:max(12px, env(safe-area-inset-left, 0px));
     right:max(12px, env(safe-area-inset-right, 0px));
-    top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 74px);
+    top:calc(100% + 10px);
     bottom:auto;
     width:auto;
     min-width:0;
@@ -7776,7 +7779,7 @@ export function getDashboardShellTemplate() {
 
   .ddc-tabs.ddc-tabs-bottom.ddc-layer-menu-open .ddc-layer-menu-panel{
     top:auto;
-    bottom:calc(max(env(safe-area-inset-bottom, 0px), 8px) + 74px);
+    bottom:calc(100% + 10px);
     transform-origin:bottom right;
   }
 }

@@ -80,7 +80,7 @@ const tabsLayoutMethods = {
       });
       tabScroller.appendChild(btn);
     }
-    this._appendLayersMenuToTabs_?.(tabScroller);
+    this._appendLayersMenuToTabs_?.(tabScroller, { panelHost: bar });
     this.__renderingTabs = false;
     this._syncTabsPlacement_?.();
     this._renderSidebar_?.();

@@ -230,8 +230,10 @@ const layerMethods = {
     if (!this.__layersMenuOpen) return;
     this.__layerMenuDismissHandler = (ev) => {
       const menu = this.shadowRoot?.querySelector?.('.ddc-layer-menu');
+      const panel = this.shadowRoot?.querySelector?.('.ddc-layer-menu-panel');
       const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
       if (menu && path.includes(menu)) return;
+      if (panel && path.includes(panel)) return;
       this._closeLayersMenu_?.();
     };
     this.__layerMenuEscapeHandler = (ev) => {
@@ -340,12 +342,20 @@ const layerMethods = {
     return btn;
   },
 
-  _appendLayersMenuToTabs_(bar) {
+  _appendLayersMenuToTabs_(bar, { panelHost = null } = {}) {
     if (!bar || !this._hasLayerMenu_?.()) return;
     const { layers, activeIds, activeSet, allActive } = this._getLayerSelectionSummary_();
     const wrap = document.createElement('div');
     wrap.className = 'ddc-layer-menu';
     wrap.setAttribute('role', 'presentation');
+    const shouldUsePanelHost = (() => {
+      try {
+        const viewportWidth = window.visualViewport?.width || window.innerWidth || document.documentElement?.clientWidth || 0;
+        return !!panelHost && viewportWidth > 0 && viewportWidth <= 768;
+      } catch {
+        return false;
+      }
+    })();
   
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -432,7 +442,8 @@ const layerMethods = {
           active: activeSet.has(layer.id),
         }));
       });
-      wrap.appendChild(panel);
+      if (shouldUsePanelHost) panelHost.appendChild(panel);
+      else wrap.appendChild(panel);
       requestAnimationFrame(() => this._installLayerMenuDismissHandlers_?.());
     }
   
