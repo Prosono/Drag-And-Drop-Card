@@ -47,6 +47,7 @@ const dashboardApiMethods = {
       outer_grid_buffer: !!this.outerGridBuffer,
       outer_grid_buffer_cells: this._normalizeOuterGridBufferCells_(this.outerGridBufferCells),
       responsive_viewports: this._cloneJson_(this._serializeResponsiveViewportProfiles_(this.responsiveViewportProfiles)),
+      responsive_viewport_aspect_locks: this._cloneJson_(this._normalizeResponsiveViewportAspectLocks_(this.responsiveViewportAspectLocks)),
       connectors: this._cloneJson_(this._responsiveConnectors?.[this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape'] || []),
       responsive_connectors: this._cloneJson_(this._serializeResponsiveConnectorLayouts_(this._responsiveConnectors)),
 
@@ -143,6 +144,14 @@ const dashboardApiMethods = {
     if ('outer_grid_buffer_cells' in opts || 'outerGridBufferCells' in opts) {
       this.outerGridBufferCells = this._normalizeOuterGridBufferCells_(opts.outer_grid_buffer_cells ?? opts.outerGridBufferCells ?? 1);
     }
+    if ('responsive_viewport_aspect_locks' in opts || 'responsiveViewportAspectLocks' in opts) {
+      this.responsiveViewportAspectLocks = this._normalizeResponsiveViewportAspectLocks_(
+        opts.responsive_viewport_aspect_locks ?? opts.responsiveViewportAspectLocks
+      );
+      if (this._config) {
+        this._config.responsive_viewport_aspect_locks = this._cloneJson_(this.responsiveViewportAspectLocks);
+      }
+    }
     if ('responsive_viewports' in opts) this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(opts.responsive_viewports);
     if ('responsive_connectors' in opts || 'connectors' in opts) {
       this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_(
@@ -209,6 +218,7 @@ const dashboardApiMethods = {
 
       this._syncViewportPreviewUI_?.();
       this._applyAutoScale?.();
+      try { Promise.resolve(this._syncResponsiveProfileForViewport_?.({ force: true })).catch(() => {}); } catch {}
     }
 
     if ('container_fixed_width' in opts)      this.containerFixedWidth  = Number(opts.container_fixed_width)  || null;
@@ -362,6 +372,7 @@ const dashboardApiMethods = {
       outer_grid_buffer: { type: 'boolean' },
       outer_grid_buffer_cells: { type: 'number' },
       responsive_viewports: { type: 'object' },
+      responsive_viewport_aspect_locks: { type: 'object' },
       connectors: { type: 'array' },
       responsive_connectors: { type: 'object' },
       container_background: { type: 'string' },
@@ -414,6 +425,7 @@ const dashboardApiMethods = {
       outerGridBuffer: 'outer_grid_buffer',
       outerGridBufferCells: 'outer_grid_buffer_cells',
       responsiveViewports: 'responsive_viewports',
+      responsiveViewportAspectLocks: 'responsive_viewport_aspect_locks',
       responsiveConnectors: 'responsive_connectors',
       containerBackground: 'container_background',
       applyBackgroundToPage: 'apply_background_to_page',

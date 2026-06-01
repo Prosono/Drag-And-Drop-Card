@@ -37,6 +37,7 @@ export function initializeDragAndDropCardInstance(instance) {
     mobile: 'portrait',
   };
   instance.responsiveViewportProfiles = instance._defaultResponsiveViewportProfiles_();
+  instance.responsiveViewportAspectLocks = instance._defaultResponsiveViewportAspectLocks_();
   instance.__responsiveSwitchSeq = 0;
   instance.__toolbarExpanded = false;
 }

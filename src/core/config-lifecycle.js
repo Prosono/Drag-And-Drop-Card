@@ -69,6 +69,11 @@ const setConfigMethods = {
       this.mobileDynamicBehavior    = String(config.mobile_dynamic_behavior ?? config.mobileDynamicBehavior ?? 'native').toLowerCase() === 'scale'
         ? 'scale'
         : 'native';
+      this.responsiveViewportAspectLocks = this._normalizeResponsiveViewportAspectLocks_(
+        config.responsive_viewport_aspect_locks
+        || config.responsiveViewportAspectLocks
+        || this.responsiveViewportAspectLocks
+      );
       const providedResponsiveViewports = config.responsive_viewports || this.responsiveViewportProfiles;
       this.responsiveViewportProfiles = this._isLegacyResponsiveViewportProfiles_(providedResponsiveViewports)
         ? this._defaultResponsiveViewportProfiles_()

@@ -45,6 +45,7 @@ const dashboardShellBindingMethods = {
     this.previewMeta = this.shadowRoot.querySelector('#previewModeMeta');
     this.previewWidthInput = this.shadowRoot.querySelector('#previewWidthInput');
     this.previewHeightInput = this.shadowRoot.querySelector('#previewHeightInput');
+    this.previewRatioLockButton = this.shadowRoot.querySelector('#previewRatioLockButton');
     this.previewSwapButton = this.shadowRoot.querySelector('#previewSwapButton');
     this.shadowRoot.querySelectorAll('.ddc-toolbar [data-tooltip]').forEach((node) => {
       try {
@@ -109,6 +110,7 @@ const dashboardShellBindingMethods = {
       ev.preventDefault();
       ev.stopPropagation();
     }, { passive: false });
+    this.previewRatioLockButton?.addEventListener('click', () => this._toggleResponsiveViewportAspectLock_?.());
     this.previewSwapButton?.addEventListener('click', () => this._swapResponsiveViewportOrientation_?.());
     try { this._syncViewportPreviewUI_?.(); } catch {}
     try { this._renderTabs(); this._renderLayersBar(); this._applyActiveTab(); } catch {}

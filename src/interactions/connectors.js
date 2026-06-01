@@ -721,6 +721,14 @@ const connectorMethods = {
     variants.forEach((variantKey) => {
       normalized[variantKey] = (normalized[variantKey] || []).map((entry) => this._normalizeConnectorEntry_(entry));
     });
+
+    if (this._shouldUseSharedResponsiveLayout_?.()) {
+      const primaryKey = this._getPrimaryResponsiveLayoutKey_();
+      const shared = (normalized[primaryKey] || baseConnectors || []).map((entry) => this._normalizeConnectorEntry_(entry, entry));
+      variants.forEach((variantKey) => {
+        normalized[variantKey] = shared.map((entry) => this._normalizeConnectorEntry_(this._cloneJson_?.(entry) || entry, entry));
+      });
+    }
   
     return normalized;
   },
@@ -728,10 +736,11 @@ const connectorMethods = {
   _serializeResponsiveConnectorLayouts_(layouts = null, fallbackConnectors = null) {
     const normalized = this._normalizeResponsiveConnectorLayouts_(fallbackConnectors || [], layouts || this._responsiveConnectors);
     const desktopLandscape = normalized.desktop_landscape || fallbackConnectors || [];
-    const tabletLandscape = normalized.tablet_landscape || desktopLandscape;
-    const tabletPortrait = normalized.tablet_portrait || tabletLandscape;
-    const mobileLandscape = normalized.mobile_landscape || desktopLandscape;
-    const mobilePortrait = normalized.mobile_portrait || mobileLandscape;
+    const sharedMode = this._shouldUseSharedResponsiveLayout_?.();
+    const tabletLandscape = sharedMode ? desktopLandscape : (normalized.tablet_landscape || desktopLandscape);
+    const tabletPortrait = sharedMode ? desktopLandscape : (normalized.tablet_portrait || tabletLandscape);
+    const mobileLandscape = sharedMode ? desktopLandscape : (normalized.mobile_landscape || desktopLandscape);
+    const mobilePortrait = sharedMode ? desktopLandscape : (normalized.mobile_portrait || mobileLandscape);
     return {
       desktop: {
         connectors: this._cloneJson_(desktopLandscape),
@@ -762,6 +771,7 @@ const connectorMethods = {
   },
 
   _getCurrentConnectorLayoutKey_() {
+    if (this._shouldUseSharedResponsiveLayout_?.()) return this._getPrimaryResponsiveLayoutKey_();
     return this._activeResponsiveLayoutKey
       || this._getRequestedResponsiveLayoutKey_?.()
       || this._getPrimaryResponsiveLayoutKey_();

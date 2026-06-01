@@ -151,6 +151,11 @@ const dashboardSettingsMethods = {
     const chkASave   = modal.querySelector('#ddc-setting-autoSave');
     const inpDeb     = modal.querySelector('#ddc-setting-autoSaveDebounce');
     const selSize    = modal.querySelector('#ddc-setting-sizeMode');
+    const responsiveAspectLockSetting = modal.querySelector('[data-responsive-aspect-locks]');
+    const responsiveAspectLockControls = ['desktop', 'tablet', 'mobile'].map((profile) => ({
+      profile,
+      input: modal.querySelector(`#ddc-setting-aspect-${profile}`),
+    }));
     const chkDoNotResizeText = modal.querySelector('#ddc-setting-doNotResizeText');
     const txtDoNotResizeTextHint = modal.querySelector('#ddc-setting-doNotResizeTextHint');
     const chkOuterGridBuffer = modal.querySelector('#ddc-setting-outerGridBuffer');
@@ -1316,10 +1321,28 @@ const dashboardSettingsMethods = {
           : 'Stored, but only used while the container size mode is Auto.';
       }
     };
+    const readResponsiveAspectLocksFromControls = () => this._normalizeResponsiveViewportAspectLocks_?.(
+      responsiveAspectLockControls.reduce((out, { profile, input }) => {
+        out[profile] = input ? !!input.checked : this._isResponsiveViewportAspectLocked_?.(profile) !== false;
+        return out;
+      }, {})
+    ) || this.responsiveViewportAspectLocks || {};
+    const syncResponsiveAspectLockControls = () => {
+      const mode = this._normalizeContainerSizeMode_(selSize?.value);
+      const supported = mode === 'auto';
+      responsiveAspectLockSetting?.classList?.toggle?.('is-disabled', !supported);
+      responsiveAspectLockControls.forEach(({ profile, input }) => {
+        if (!input) return;
+        input.checked = this._isResponsiveViewportAspectLocked_?.(profile) !== false;
+        input.disabled = !supported;
+      });
+    };
     updateAutoResizeVisibility();
     updateDoNotResizeTextState();
+    syncResponsiveAspectLockControls();
     selSize?.addEventListener('change', updateAutoResizeVisibility);
     selSize?.addEventListener('change', updateDoNotResizeTextState);
+    selSize?.addEventListener('change', syncResponsiveAspectLockControls);
 
     if (inpStorageKey) inpStorageKey.value = String(this.storageKey || this._config?.storage_key || '').trim();
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
@@ -1333,6 +1356,15 @@ const dashboardSettingsMethods = {
     if (selSize)    selSize.value      = this._normalizeContainerSizeMode_(this.containerSizeMode);
     updateAutoResizeVisibility();
     updateDoNotResizeTextState();
+    syncResponsiveAspectLockControls();
+    responsiveAspectLockControls.forEach(({ profile, input }) => {
+      input?.addEventListener?.('change', () => {
+        try {
+          this._setResponsiveViewportAspectLocked_?.(profile, !!input.checked);
+          syncResponsiveAspectLockControls();
+        } catch {}
+      });
+    });
     if (chkDoNotResizeText) chkDoNotResizeText.checked = !!this.doNotResizeText;
     if (chkOuterGridBuffer) chkOuterGridBuffer.checked = !!this.outerGridBuffer;
     const normalizeOuterGridBufferCells = (value) => this._normalizeOuterGridBufferCells_?.(value) || 1;
@@ -2620,6 +2652,7 @@ const dashboardSettingsMethods = {
       e.stopPropagation();
       // Read values
       const newSize      = this._normalizeContainerSizeMode_(selSize?.value);
+      const newResponsiveAspectLocks = readResponsiveAspectLocksFromControls();
       const newStorageKey = String(inpStorageKey?.value || this.storageKey || this._config?.storage_key || '').trim();
       const newAuto      = newSize === 'auto' ? true : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
@@ -2782,6 +2815,7 @@ const dashboardSettingsMethods = {
         const outerBufferChanged = newOuterGridBuffer !== !!this.outerGridBuffer
           || newOuterGridBufferCells !== normalizeOuterGridBufferCells(this.outerGridBufferCells);
         this.containerSizeMode = newSize;
+        this.responsiveViewportAspectLocks = newResponsiveAspectLocks;
         this.optimizeForMobile = newOptimizeForMobile;
         this.mobileDynamicBehavior = newMobileDynamicBehavior;
         this.doNotResizeText = newDoNotResizeText;
@@ -2816,6 +2850,9 @@ const dashboardSettingsMethods = {
           // Recompute container size after updating preset
           this._resizeContainer?.();
         }
+        this._applyAutoScale?.();
+        await this._syncResponsiveProfileForViewport_?.({ force: true });
+        this._resizeContainer?.();
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
         this.sidebarEnabled = false;
@@ -2992,6 +3029,7 @@ const dashboardSettingsMethods = {
           this._config.do_not_resize_text      = !!this.doNotResizeText;
           this._config.outer_grid_buffer       = !!this.outerGridBuffer;
           this._config.outer_grid_buffer_cells = this._normalizeOuterGridBufferCells_(this.outerGridBufferCells);
+          this._config.responsive_viewport_aspect_locks = this._cloneJson_?.(this._normalizeResponsiveViewportAspectLocks_?.(this.responsiveViewportAspectLocks)) || this.responsiveViewportAspectLocks;
           this._config.dashboard_theme_enabled = undefined;
           this._config.theme_enabled = undefined;
           this._config.dashboard_theme = this.dashboardTheme || undefined;

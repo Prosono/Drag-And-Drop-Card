@@ -2810,7 +2810,7 @@ export function getDashboardShellTemplate() {
 
 .ddc-toolbar.streamlined.v2 .ddc-preview-dimensions{
   display:grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
   gap:8px;
   align-items:end;
 }
@@ -2860,7 +2860,8 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-toolbar.streamlined.v2 .ddc-preview-chip--icon{
-    grid-column: 1 / -1;
+    grid-column:auto;
+    width:100%;
   }
 }
 
@@ -8507,6 +8508,9 @@ export function getDashboardShellTemplate() {
           <span>H</span>
           <input type="number" id="previewHeightInput" min="240" max="6000" step="1" />
         </label>
+        <button type="button" class="ddc-preview-chip ddc-preview-chip--icon" id="previewRatioLockButton" title="Aspect ratio linked" aria-label="Toggle aspect ratio lock" aria-pressed="true">
+          <ha-icon icon="mdi:link-variant"></ha-icon>
+        </button>
         <button type="button" class="ddc-preview-chip ddc-preview-chip--icon" id="previewSwapButton" title="Swap width and height" aria-label="Swap width and height">
           <ha-icon icon="mdi:phone-rotate-landscape"></ha-icon>
         </button>

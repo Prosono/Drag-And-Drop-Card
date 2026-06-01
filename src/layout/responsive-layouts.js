@@ -57,6 +57,18 @@ const responsiveModelMethods = {
     return 'desktop_landscape';
   },
 
+  _shouldUseSharedResponsiveLayout_() {
+    const rawMode = String(this.containerSizeMode || this.container_size_mode || this._config?.container_size_mode || '').toLowerCase();
+    const mode = this._normalizeContainerSizeMode_?.(rawMode) || rawMode;
+    return rawMode === 'fixed' || mode === 'fixed_custom' || mode === 'preset';
+  },
+
+  _getRuntimeResponsiveLayoutKey_(profile = 'desktop', orientation = null) {
+    if (this._shouldUseSharedResponsiveLayout_?.()) return this._getPrimaryResponsiveLayoutKey_();
+    const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : 'desktop';
+    return this._getResponsiveLayoutKey_(baseProfile, orientation);
+  },
+
   _ensureResponsivePreviewOrientations_() {
     const defaults = this._defaultResponsivePreviewOrientations_();
     const next = { ...defaults, ...(this._responsivePreviewOrientations || {}) };
@@ -90,6 +102,55 @@ const responsiveModelMethods = {
       mobile_landscape: { width: 1080, height: 500 },
       mobile_portrait: { width: 500, height: 1080 },
     };
+  },
+
+  _defaultResponsiveViewportAspectLocks_() {
+    return {
+      desktop: true,
+      tablet: true,
+      mobile: true,
+    };
+  },
+
+  _normalizeResponsiveViewportAspectLocks_(locks = null) {
+    const defaults = this._defaultResponsiveViewportAspectLocks_();
+    const source = (locks && typeof locks === 'object') ? locks : {};
+    const readBool = (value, fallback) => {
+      if (value === false || value === 0 || value === 'false' || value === '0') return false;
+      if (value === true || value === 1 || value === 'true' || value === '1') return true;
+      return fallback;
+    };
+
+    return this._responsiveProfileKeys_().reduce((out, profile) => {
+      out[profile] = readBool(source?.[profile], defaults[profile]);
+      return out;
+    }, {});
+  },
+
+  _isResponsiveViewportAspectLocked_(profile = 'desktop') {
+    const split = this._splitResponsiveLayoutKey_(profile);
+    const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : split.profile;
+    const locks = this._normalizeResponsiveViewportAspectLocks_(this.responsiveViewportAspectLocks);
+    return locks?.[baseProfile] !== false;
+  },
+
+  _setResponsiveViewportAspectLocked_(profile = 'desktop', locked = true) {
+    const split = this._splitResponsiveLayoutKey_(profile);
+    const baseProfile = this._responsiveProfileKeys_().includes(profile) ? profile : split.profile;
+    const next = this._normalizeResponsiveViewportAspectLocks_({
+      ...(this.responsiveViewportAspectLocks || {}),
+      [baseProfile]: locked !== false,
+    });
+    this.responsiveViewportAspectLocks = next;
+    this._config = {
+      ...(this._config || {}),
+      responsive_viewport_aspect_locks: this._cloneJson_(next),
+    };
+    this._syncResponsiveViewportFields_?.();
+    this._syncViewportPreviewUI_?.();
+    this._applyAutoScale?.();
+    try { if (!this._isInHaEditorPreview()) this._queueSave?.('responsive-viewport-aspect-lock'); } catch {}
+    return next[baseProfile] !== false;
   },
 
   _getDefaultResponsiveViewportProfile_(profile = 'desktop', orientation = null) {
@@ -176,11 +237,14 @@ const responsiveModelMethods = {
     const raw = viewport || fallback || {};
     let width = this._lockResponsiveViewportValue_(raw.width || fallback.width || 0);
     let height = this._lockResponsiveViewportValue_(raw.height || fallback.height || 0);
+    const aspectLocked = this._isResponsiveViewportAspectLocked_?.(baseProfile) !== false;
     if (!width) width = fallback.width || 390;
     if (!height) height = fallback.height || 844;
-    if (nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
-    if (nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
-    const lock = this._getPreviewDeviceFrameLock_?.(baseProfile, width, height, { orientation: nextOrientation });
+    if (aspectLocked && nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
+    if (aspectLocked && nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
+    const lock = aspectLocked
+      ? this._getPreviewDeviceFrameLock_?.(baseProfile, width, height, { orientation: nextOrientation })
+      : null;
     if (lock?.ratio) {
       if (preferAxis === 'height') {
         width = this._lockResponsiveViewportValue_(height * lock.ratio);
@@ -188,8 +252,8 @@ const responsiveModelMethods = {
         height = this._lockResponsiveViewportValue_(width / lock.ratio);
       }
     }
-    if (nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
-    if (nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
+    if (aspectLocked && nextOrientation === 'landscape' && height > width) [width, height] = [height, width];
+    if (aspectLocked && nextOrientation === 'portrait' && width > height) [width, height] = [height, width];
     return {
       width,
       height,
@@ -370,6 +434,14 @@ const responsiveModelMethods = {
       });
       normalized[variantKey] = Array.from(map.values());
     });
+
+    if (this._shouldUseSharedResponsiveLayout_?.()) {
+      const primaryKey = this._getPrimaryResponsiveLayoutKey_();
+      const shared = (normalized[primaryKey] || baseCards || []).map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+      variants.forEach((variantKey) => {
+        normalized[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(this._cloneJson_?.(entry) || entry, entry));
+      });
+    }
   
     return normalized;
   },
@@ -377,10 +449,11 @@ const responsiveModelMethods = {
   _serializeResponsiveLayouts_(layouts = null, fallbackCards = null) {
     const normalized = this._normalizeResponsiveLayouts_(fallbackCards || [], layouts || this._responsiveLayouts);
     const desktopLandscape = normalized.desktop_landscape || fallbackCards || [];
-    const tabletLandscape = normalized.tablet_landscape || desktopLandscape;
-    const tabletPortrait = normalized.tablet_portrait || tabletLandscape;
-    const mobileLandscape = normalized.mobile_landscape || desktopLandscape;
-    const mobilePortrait = normalized.mobile_portrait || mobileLandscape;
+    const sharedMode = this._shouldUseSharedResponsiveLayout_?.();
+    const tabletLandscape = sharedMode ? desktopLandscape : (normalized.tablet_landscape || desktopLandscape);
+    const tabletPortrait = sharedMode ? desktopLandscape : (normalized.tablet_portrait || tabletLandscape);
+    const mobileLandscape = sharedMode ? desktopLandscape : (normalized.mobile_landscape || desktopLandscape);
+    const mobilePortrait = sharedMode ? desktopLandscape : (normalized.mobile_portrait || mobileLandscape);
     return {
       desktop: {
         cards: this._cloneJson_(desktopLandscape),
@@ -507,10 +580,22 @@ const responsiveModelMethods = {
     const variants = this._responsiveLayoutVariantKeys_();
     const origin = variants.includes(sourceLayoutKey)
       ? sourceLayoutKey
-      : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_());
+      : (
+          this._shouldUseSharedResponsiveLayout_?.()
+            ? this._getPrimaryResponsiveLayoutKey_()
+            : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_())
+        );
     const sourceEntries = Array.isArray(this._responsiveLayouts?.[origin]) ? this._responsiveLayouts[origin] : [];
     const sourceIds = new Set(sourceEntries.map((entry) => entry.id));
     const sourceMap = new Map(sourceEntries.map((entry) => [entry.id, entry]));
+
+    if (this._shouldUseSharedResponsiveLayout_?.()) {
+      const shared = sourceEntries.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+      variants.forEach((variantKey) => {
+        this._responsiveLayouts[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(this._cloneJson_?.(entry) || entry, entry));
+      });
+      return;
+    }
   
     variants.forEach((variantKey) => {
       if (variantKey === origin) return;
@@ -529,7 +614,9 @@ const responsiveModelMethods = {
   _persistCurrentResponsiveProfileToMemory_({ syncMembership = true } = {}) {
     if (this._loading || !this.cardContainer) return;
     if (!this._responsiveLayouts && !this.cardContainer.querySelector('.card-wrapper:not(.ddc-placeholder)')) return;
-    const layoutKey = this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_();
+    const layoutKey = this._shouldUseSharedResponsiveLayout_?.()
+      ? this._getPrimaryResponsiveLayoutKey_()
+      : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_());
     if (!layoutKey) return;
     if (!this._responsiveLayouts) {
       this._responsiveLayouts = this._normalizeResponsiveLayouts_(this._captureCurrentLayoutEntries_(), null);
@@ -680,15 +767,15 @@ const responsiveModelMethods = {
   _getRequestedResponsiveLayoutKey_() {
     const profile = this._getRequestedResponsiveProfile_?.() || 'desktop';
     const orientation = this._getRequestedResponsiveOrientation_?.(profile) || 'landscape';
-    return this._getResponsiveLayoutKey_(profile, orientation);
+    return this._getRuntimeResponsiveLayoutKey_?.(profile, orientation) || this._getResponsiveLayoutKey_(profile, orientation);
   },
 
   async _activateResponsiveProfile_(profile, { force = false } = {}) {
     const next = this._responsiveProfileKeys_().includes(profile) ? profile : 'desktop';
     const nextOrientation = this._getRequestedResponsiveOrientation_?.(next) || 'landscape';
-    const nextLayoutKey = this._getResponsiveLayoutKey_(next, nextOrientation);
+    const nextLayoutKey = this._getRuntimeResponsiveLayoutKey_?.(next, nextOrientation) || this._getResponsiveLayoutKey_(next, nextOrientation);
     const prev = this._activeResponsiveProfile || null;
-    const prevLayoutKey = this._activeResponsiveLayoutKey || this._getResponsiveLayoutKey_(prev || 'desktop', 'landscape');
+    const prevLayoutKey = this._activeResponsiveLayoutKey || this._getRuntimeResponsiveLayoutKey_?.(prev || 'desktop', 'landscape') || this._getResponsiveLayoutKey_(prev || 'desktop', 'landscape');
     if (!force && prevLayoutKey === nextLayoutKey) {
       this._syncViewportPreviewUI_?.();
       return;

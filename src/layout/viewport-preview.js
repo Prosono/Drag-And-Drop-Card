@@ -397,6 +397,13 @@ const viewportPreviewMethods = {
     if (!base) return null;
     const orientation = this._getPreviewDeviceFrameOrientation_?.(id, screenWidth, screenHeight, opts?.orientation) || base.viewportOrientation || 'landscape';
     const rotated = this._rotatePreviewDeviceFrameConfig_?.(base, orientation) || base;
+    if (this._isResponsiveViewportAspectLocked_?.(id) === false && Number(screenWidth || 0) > 0 && Number(screenHeight || 0) > 0) {
+      return {
+        ...rotated,
+        viewportInnerWidth: Math.max(1, Number(screenWidth || 1) || 1),
+        viewportInnerHeight: Math.max(1, Number(screenHeight || 1) || 1),
+      };
+    }
     return this._lockPreviewDeviceFrameViewportRect_?.(rotated) || rotated;
   },
 
@@ -660,6 +667,7 @@ const viewportPreviewMethods = {
     try {
       const widthInput = this.previewWidthInput;
       const heightInput = this.previewHeightInput;
+      const ratioLockButton = this.previewRatioLockButton;
       const swapButton = this.previewSwapButton;
       const meta = this.previewMeta;
       if (!widthInput || !heightInput) return;
@@ -669,6 +677,13 @@ const viewportPreviewMethods = {
         heightInput.disabled = true;
         widthInput.title = 'Only available in Auto Mode';
         heightInput.title = 'Only available in Auto Mode';
+        if (ratioLockButton) {
+          ratioLockButton.disabled = true;
+          ratioLockButton.classList.add('is-disabled');
+          ratioLockButton.setAttribute('aria-disabled', 'true');
+          ratioLockButton.setAttribute('aria-pressed', 'false');
+          ratioLockButton.title = 'Only available in Auto Mode';
+        }
         if (swapButton) {
           swapButton.disabled = true;
           swapButton.hidden = true;
@@ -689,6 +704,7 @@ const viewportPreviewMethods = {
       if (editingProfile) this._ensureResponsiveViewportProfileLock_?.(editingProfile, 'width', activeOrientation);
       const viewport = this._getResponsiveViewportProfile_(activeProfile, activeOrientation);
       const frameLock = this._getPreviewDeviceFrameLock_?.(activeProfile, viewport.width, viewport.height, { orientation: activeOrientation });
+      const aspectLocked = this._isResponsiveViewportAspectLocked_?.(activeProfile) !== false;
       if (activeEl !== widthInput) widthInput.value = String(Math.round(viewport.width));
       if (activeEl !== heightInput) heightInput.value = String(Math.round(viewport.height));
   
@@ -696,6 +712,19 @@ const viewportPreviewMethods = {
       const canRotate = !!editingProfile && editingProfile !== 'desktop';
       widthInput.disabled = isLive;
       heightInput.disabled = isLive;
+      if (ratioLockButton) {
+        ratioLockButton.disabled = isLive;
+        ratioLockButton.classList.toggle('is-disabled', isLive);
+        ratioLockButton.classList.toggle('is-active', !isLive && aspectLocked);
+        ratioLockButton.setAttribute('aria-disabled', isLive ? 'true' : 'false');
+        ratioLockButton.setAttribute('aria-pressed', (!isLive && aspectLocked) ? 'true' : 'false');
+        ratioLockButton.title = isLive
+          ? 'Choose a preview size before changing ratio lock'
+          : (aspectLocked ? 'Aspect ratio linked' : 'Aspect ratio unlocked');
+        ratioLockButton.setAttribute('data-tooltip', ratioLockButton.title);
+        const icon = ratioLockButton.querySelector?.('ha-icon');
+        if (icon) icon.setAttribute('icon', aspectLocked ? 'mdi:link-variant' : 'mdi:link-variant-off');
+      }
       if (swapButton) {
         swapButton.disabled = !canRotate;
         swapButton.hidden = !canRotate;
@@ -705,7 +734,7 @@ const viewportPreviewMethods = {
       if (meta) {
         meta.textContent = isLive
           ? `Auto: ${this._getResponsiveProfileLabel_(this._getActualResponsiveProfile_?.() || 'desktop')}`
-          : `Editing ${this._getResponsiveProfileLabel_(editingProfile)} · ${frameLock?.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${Math.round(viewport.width)}×${Math.round(viewport.height)} · locked ratio`;
+          : `Editing ${this._getResponsiveProfileLabel_(editingProfile)} · ${frameLock?.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${Math.round(viewport.width)}×${Math.round(viewport.height)} · ${aspectLocked ? 'linked ratio' : 'free ratio'}`;
       }
     } catch {}
   },
@@ -749,8 +778,9 @@ const viewportPreviewMethods = {
     const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
     const current = this._getResponsiveViewportProfile_(profile, orientation);
     const preferAxis = opts?.preferAxis === 'height' ? 'height' : 'width';
+    const aspectLocked = this._isResponsiveViewportAspectLocked_?.(profile) !== false;
     const nextPatch = { ...patch };
-    if (profile === 'desktop') {
+    if (aspectLocked && profile === 'desktop') {
       const width = Number(nextPatch.width ?? current.width) || current.width;
       const height = Number(nextPatch.height ?? current.height) || current.height;
       nextPatch.width = Math.max(width, height);
@@ -780,6 +810,25 @@ const viewportPreviewMethods = {
     this._applyAutoScale?.();
     this._syncTabsWidth_?.();
     try { if (!this._isInHaEditorPreview()) this._queueSave?.('responsive-viewports'); } catch {}
+  },
+
+  _toggleResponsiveViewportAspectLock_() {
+    const sizeMode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    if (sizeMode !== 'auto') {
+      this._syncResponsiveViewportFields_?.();
+      return;
+    }
+    const profile = String(this.viewportPreviewMode || 'live').toLowerCase();
+    if (!this._responsiveProfileKeys_().includes(profile)) return;
+    const nextLocked = this._isResponsiveViewportAspectLocked_?.(profile) === false;
+    this._setResponsiveViewportAspectLocked_?.(profile, nextLocked);
+    if (nextLocked) {
+      const orientation = this._getRequestedResponsiveOrientation_?.(profile) || 'landscape';
+      this._ensureResponsiveViewportProfileLock_?.(profile, 'width', orientation);
+    }
+    this._syncResponsiveViewportFields_?.();
+    this._syncViewportPreviewUI_?.();
+    this._applyAutoScale?.();
   },
 
   _swapResponsiveViewportOrientation_() {

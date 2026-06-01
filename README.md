@@ -478,6 +478,7 @@ These are the most important option keys for an LLM to know:
 | `dashboard_theme` | string | Theme name |
 | `dashboard_theme_override_all_design` | boolean | Force theme to win over custom design choices |
 | `responsive_viewports` | object | Editor preview sizes for desktop/tablet/mobile |
+| `responsive_viewport_aspect_locks` | object | Per-profile preview ratio locks for desktop/tablet/mobile |
 | `responsive_connectors` | object | Animated connector overlay layouts |
 
 ### Local dashboard settings API

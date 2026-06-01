@@ -42,9 +42,11 @@ const layoutHistoryMethods = {
     try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
 
     const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
-    const activeKey = this._activeResponsiveLayoutKey
-      || this._getRequestedResponsiveLayoutKey_?.()
-      || primaryKey;
+    const activeKey = this._shouldUseSharedResponsiveLayout_?.()
+      ? primaryKey
+      : (this._activeResponsiveLayoutKey
+          || this._getRequestedResponsiveLayoutKey_?.()
+          || primaryKey);
     const primaryCards = this._responsiveLayouts?.[primaryKey] || this._captureCurrentLayoutEntries_?.() || [];
     const responsiveLayouts = this._serializeResponsiveLayouts_
       ? this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards))

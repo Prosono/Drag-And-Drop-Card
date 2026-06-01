@@ -91,7 +91,9 @@ const designImportExportMethods = {
       if (!wrap) return null;
       this._persistCurrentResponsiveProfileToMemory_?.();
       const layoutCardId = wrap.dataset.layoutCardId || this._genLayoutCardId_();
-      const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+      const activeLayoutKey = this._shouldUseSharedResponsiveLayout_?.()
+        ? (this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape')
+        : (this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
       const currentEntries = this._captureCurrentLayoutEntries_();
       const activeEntry = currentEntries.find((entry) => entry.id === layoutCardId)
         || this._responsiveLayouts?.[activeLayoutKey]?.find?.((entry) => entry?.id === layoutCardId)
@@ -259,7 +261,9 @@ const designImportExportMethods = {
       });
       this._syncConnectorLayoutsToConfig_?.();
   
-      const activeLayoutKey = this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+      const activeLayoutKey = this._shouldUseSharedResponsiveLayout_?.()
+        ? (this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape')
+        : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
       const activeEntry = importedByVariant[activeLayoutKey] || importedByVariant[this._getPrimaryResponsiveLayoutKey_?.()] || Object.values(importedByVariant)[0];
       if (activeEntry) {
         this._hideEmptyPlaceholder?.();
@@ -320,7 +324,7 @@ const designImportExportMethods = {
       // Core + behavior
       'grid','drag_live_snap','auto_save','auto_save_debounce',
       'debug','disable_overlap','card_mod','storage_key',
-      'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports',
+      'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
       'connectors','responsive_connectors',
   
       // Visuals

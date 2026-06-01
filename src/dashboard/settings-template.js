@@ -166,6 +166,31 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Choose whether the canvas scales as one surface, uses exact custom dimensions, or follows a preset.</div>
       </div>
 
+      <!-- RESPONSIVE PREVIEW ASPECT LOCKS -->
+      <div class="setting" role="group" aria-labelledby="lbl-preview-aspect-locks" data-responsive-aspect-locks>
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:link-variant" aria-hidden="true"></ha-icon>
+            <span id="lbl-preview-aspect-locks">Preview aspect ratio</span>
+          </div>
+          <div class="control preview-aspect-locks" role="group" aria-label="Preview aspect ratio locks">
+            <label class="preview-aspect-lock" for="ddc-setting-aspect-desktop">
+              <span>Desktop</span>
+              <ha-switch id="ddc-setting-aspect-desktop"></ha-switch>
+            </label>
+            <label class="preview-aspect-lock" for="ddc-setting-aspect-tablet">
+              <span>Tablet</span>
+              <ha-switch id="ddc-setting-aspect-tablet"></ha-switch>
+            </label>
+            <label class="preview-aspect-lock" for="ddc-setting-aspect-mobile">
+              <span>Mobile</span>
+              <ha-switch id="ddc-setting-aspect-mobile"></ha-switch>
+            </label>
+          </div>
+        </div>
+        <div class="hint">Turn a profile off to enter width and height independently in Auto preview.</div>
+      </div>
+
       <!-- SIZE EXTRAS (injected) -->
       <div id="ddc-setting-sizeExtras" class="setting" aria-live="polite"></div>
 
