@@ -144,6 +144,69 @@ const converterMethods = {
     });
   },
 
+  _dashboardConverterStyleText_(value, depth = 0) {
+    if (value == null || depth > 4) return '';
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) {
+      return value.map((item) => this._dashboardConverterStyleText_(item, depth + 1)).filter(Boolean).join('\n');
+    }
+    if (typeof value === 'object') {
+      return Object.values(value).map((item) => this._dashboardConverterStyleText_(item, depth + 1)).filter(Boolean).join('\n');
+    }
+    return '';
+  },
+
+  _dashboardConverterAspectRatio_(value = null) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const colon = raw.match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+    if (colon) {
+      const w = Number(colon[1]);
+      const h = Number(colon[2]);
+      return w > 0 && h > 0 ? w / h : null;
+    }
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  },
+
+  _dashboardConverterCardSizeHints_(card = {}) {
+    const styleText = [
+      this._dashboardConverterStyleText_(card?.card_mod?.style),
+      this._dashboardConverterStyleText_(card?.style),
+      this._dashboardConverterStyleText_(card?.styles),
+    ].filter(Boolean).join('\n');
+    const readCssPx = (prop) => {
+      const re = new RegExp(`(?:^|[;\\n{}\\s])${prop}\\s*:\\s*([^;\\n}]+)`, 'i');
+      const match = styleText.match(re);
+      return match ? this._dashboardConverterPixelValue_(match[1], null) : null;
+    };
+    const height =
+      this._dashboardConverterPixelValue_(card?.height, null)
+      ?? this._dashboardConverterPixelValue_(card?.grid_options?.height, null)
+      ?? readCssPx('height')
+      ?? readCssPx('min-height');
+    const width =
+      this._dashboardConverterPixelValue_(card?.width, null)
+      ?? this._dashboardConverterPixelValue_(card?.grid_options?.width, null)
+      ?? readCssPx('width')
+      ?? readCssPx('min-width');
+    const aspectRatio = this._dashboardConverterAspectRatio_(
+      card?.aspect_ratio
+      ?? card?.image_aspect_ratio
+      ?? card?.grid_options?.aspect_ratio
+      ?? card?.card_mod?.aspect_ratio
+    );
+    const gridColumns = Number(card?.grid_options?.columns);
+    const gridRows = Number(card?.grid_options?.rows);
+    return {
+      width: Number.isFinite(width) && width > 0 ? width : null,
+      height: Number.isFinite(height) && height > 0 ? height : null,
+      aspectRatio,
+      gridColumns: Number.isFinite(gridColumns) && gridColumns > 0 ? gridColumns : null,
+      gridRows: Number.isFinite(gridRows) && gridRows > 0 ? gridRows : null,
+    };
+  },
+
   _collectDashboardConverterCardsForView_(view = {}) {
     const cards = [];
     const badges = Array.isArray(view.badges)
@@ -185,26 +248,40 @@ const converterMethods = {
     const entitiesCount = Array.isArray(card.entities) ? card.entities.length : 0;
     const nestedCount = Array.isArray(card.cards) ? card.cards.length : 0;
     const panel = !!context.panel;
+    const hints = this._dashboardConverterCardSizeHints_(card);
+    const withHints = (estimate = {}) => {
+      const next = { ...estimate };
+      if (hints.gridColumns) next.span = Math.max(Number(next.span || 1), Math.ceil(hints.gridColumns / 4));
+      if (hints.gridRows) next.height = Math.max(Number(next.height || 0), hints.gridRows * 56);
+      if (hints.width) {
+        if (hints.width >= 980) next.full = true;
+        next.span = Math.max(Number(next.span || 1), hints.width >= 620 ? 2 : 1);
+        next.width = hints.width;
+      }
+      if (hints.height) next.height = hints.height;
+      if (hints.aspectRatio) next.aspectRatio = hints.aspectRatio;
+      return next;
+    };
 
-    if (panel) return { span: 4, height: 640, full: true };
+    if (panel) return withHints({ span: 4, height: 640, full: true });
     if (type.includes('picture') || type.includes('map') || type.includes('iframe') || type.includes('webpage')) {
-      return { span: 2, height: 360 };
+      return withHints({ span: 2, height: 360 });
     }
     if (type.includes('grid')) {
       const columns = Math.max(1, Number(card.columns || 2) || 2);
       const rows = Math.max(1, Math.ceil(nestedCount / columns));
-      return { span: Math.min(2, columns), height: Math.max(220, rows * 170 + 56) };
+      return withHints({ span: Math.min(2, columns), height: Math.max(220, rows * 170 + 56) });
     }
-    if (type.includes('horizontal-stack')) return { span: 2, height: Math.max(220, 170 + Math.ceil(nestedCount / 3) * 70) };
-    if (type.includes('vertical-stack')) return { span: 1, height: Math.max(240, nestedCount * 145) };
-    if (type.includes('entities')) return { span: 1, height: Math.max(220, Math.min(620, 96 + entitiesCount * 42)) };
-    if (type.includes('glance')) return { span: 1, height: Math.max(170, Math.min(360, 120 + Math.ceil(entitiesCount / 3) * 64)) };
-    if (type.includes('history') || type.includes('statistics') || type.includes('logbook')) return { span: 2, height: 320 };
-    if (type.includes('calendar') || type.includes('todo')) return { span: 2, height: 360 };
-    if (type.includes('thermostat') || type.includes('humidifier') || type.includes('media-control') || type.includes('weather')) return { span: 1, height: 300 };
-    if (type.includes('markdown')) return { span: 1, height: Math.max(140, Math.min(340, 120 + String(card.content || '').length / 6)) };
-    if (type.includes('button') || type.includes('tile') || type.includes('entity')) return { span: 1, height: 170 };
-    return { span: 1, height: 240 };
+    if (type.includes('horizontal-stack')) return withHints({ span: 2, height: Math.max(220, 170 + Math.ceil(nestedCount / 3) * 70) });
+    if (type.includes('vertical-stack')) return withHints({ span: 1, height: Math.max(240, nestedCount * 145) });
+    if (type.includes('entities')) return withHints({ span: 1, height: Math.max(220, Math.min(620, 96 + entitiesCount * 42)) });
+    if (type.includes('glance')) return withHints({ span: 1, height: Math.max(170, Math.min(360, 120 + Math.ceil(entitiesCount / 3) * 64)) });
+    if (type.includes('history') || type.includes('statistics') || type.includes('logbook')) return withHints({ span: 2, height: 320 });
+    if (type.includes('calendar') || type.includes('todo')) return withHints({ span: 2, height: 360 });
+    if (type.includes('thermostat') || type.includes('humidifier') || type.includes('media-control') || type.includes('weather')) return withHints({ span: 1, height: 300 });
+    if (type.includes('markdown')) return withHints({ span: 1, height: Math.max(140, Math.min(340, 120 + String(card.content || '').length / 6)) });
+    if (type.includes('button') || type.includes('tile') || type.includes('entity')) return withHints({ span: 1, height: 170 });
+    return withHints({ span: 1, height: 240 });
   },
 
   _dashboardConverterViewportWidth_(variantKey = 'desktop_landscape') {
@@ -265,7 +342,10 @@ const converterMethods = {
     const visibleGroup = group.filter((item) => String(item.card?.type || '').toLowerCase() !== 'custom:layout-break');
     const entries = visibleGroup.map((item) => {
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: item.panel });
-      const span = estimate.full ? columns : Math.max(1, Math.min(columns, Number(estimate.span || 1) || 1));
+      const widthSpan = estimate.width
+        ? Math.ceil((estimate.width + gap) / Math.max(1, columnWidth + gap))
+        : 1;
+      const span = estimate.full ? columns : Math.max(1, Math.min(columns, Number(estimate.span || widthSpan) || widthSpan));
       let bestCol = 0;
       let bestY = Infinity;
       for (let col = 0; col <= columns - span; col += 1) {
@@ -275,8 +355,10 @@ const converterMethods = {
           bestCol = col;
         }
       }
-      const height = Math.max(120, Math.round(Number(estimate.height || 240)));
-      const width = Math.max(180, Math.round(columnWidth * span + gap * (span - 1)));
+      const slotWidth = Math.max(180, Math.round(columnWidth * span + gap * (span - 1)));
+      const width = Math.max(180, Math.round(Math.min(estimate.width || slotWidth, slotWidth)));
+      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
+      const height = Math.max(120, Math.round(Number(heightFromAspect || estimate.height || 240)));
       const x = margin + bestCol * (columnWidth + gap);
       const y = Number.isFinite(bestY) ? bestY : offsetY + margin;
       for (let col = bestCol; col < bestCol + span; col += 1) heights[col] = y + height + gap;
@@ -301,7 +383,8 @@ const converterMethods = {
     const entries = visibleGroup.map((item) => {
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: false });
       const minPanelHeight = visibleGroup.length === 1 ? Math.max(360, Math.round(canvasWidth * 0.42)) : 180;
-      const height = Math.max(120, Math.round(Math.max(Number(estimate.height || 240), minPanelHeight)));
+      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
+      const height = Math.max(120, Math.round(Math.max(Number(heightFromAspect || estimate.height || 240), minPanelHeight)));
       const entry = {
         id: item.id,
         card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
@@ -341,10 +424,11 @@ const converterMethods = {
       const column = forcedColumn >= 1 && forcedColumn <= columns ? forcedColumn - 1 : nextColumn;
       const visualColumn = rtl ? columns - 1 - column : column;
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: false });
-      const height = Math.max(120, Math.round(Number(estimate.height || 240)));
       const x = startX + (base.columnOffsets?.[visualColumn] || 0);
       const y = heights[column];
       const width = base.columnWidths?.[visualColumn] || base.columnWidth;
+      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
+      const height = Math.max(120, Math.round(Number(heightFromAspect || estimate.height || 240)));
       entries.push({
         id: item.id,
         card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
@@ -405,6 +489,32 @@ const converterMethods = {
         return packed.entries;
       });
     });
+  },
+
+  _dispatchDashboardConverterConfigChanged_() {
+    const cfg = {
+      type: 'custom:drag-and-drop-card',
+      ...(this._config || {}),
+    };
+    this._deleteParkedSidebarOptions_?.(cfg);
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: cfg },
+      bubbles: true,
+      composed: true,
+    }));
+  },
+
+  async _persistDashboardConverterConfig_() {
+    try {
+      this._dispatchDashboardConverterConfigChanged_?.();
+    } catch {}
+    try {
+      await this._persistThisCardConfigToStorage_?.();
+      return true;
+    } catch (err) {
+      console.warn('[drag-and-drop-card] Could not persist converted dashboard config to Lovelace storage', err);
+      return false;
+    }
   },
 
   _convertLovelaceDashboardToDdc_(sourceConfig = {}) {
@@ -544,6 +654,7 @@ const converterMethods = {
     try { this._renderConnectors_?.(); } catch {}
     try { this._syncEmptyStateUI?.(); } catch {}
     try { await this._saveLayout?.(true); } catch { this._queueSave?.('dashboard-converter'); }
+    await this._persistDashboardConverterConfig_?.();
     this._toast?.(`Converted ${payload.summary?.cards || cards.length} cards across ${payload.summary?.views || options.tabs?.length || 1} tabs.`);
     return true;
   },
