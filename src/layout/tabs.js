@@ -137,6 +137,9 @@ const tabsLayoutMethods = {
     } catch {}
 
     try { this._clearSelection(); } catch {}
+    try {
+      this._hydrateVisibleDeferredCards_?.(becameVisible).catch?.(() => {});
+    } catch {}
     // On tab changes, replay entrance motion only for cards that just became
     // visible. Initial render still uses the one-time mount animation below.
     try {

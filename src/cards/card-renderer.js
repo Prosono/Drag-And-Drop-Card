@@ -28,6 +28,8 @@ const cardBuilderMethods = {
     this._clearSelection?.();
   
     let builtAny = false;
+    const activeTabId = this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.defaultTab;
+    const canDeferInactiveTabs = !this.editMode && Array.isArray(this.tabs) && this.tabs.length > 1;
     for (const conf of Array.isArray(entries) ? entries : []) {
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
@@ -43,6 +45,15 @@ const cardBuilderMethods = {
         this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
         this.cardContainer.appendChild(wrap);
         try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+        builtAny = true;
+        continue;
+      }
+
+      const entryTabId = this._normalizeTabId?.(normalized.tabId || this.defaultTab) || this.defaultTab;
+      if (canDeferInactiveTabs && entryTabId !== activeTabId) {
+        const wrap = this._makeDeferredCardWrapper_(normalized);
+        this.cardContainer.appendChild(wrap);
+        this._initCardInteract(wrap);
         builtAny = true;
         continue;
       }
@@ -89,6 +100,86 @@ const cardBuilderMethods = {
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
   },
+
+    _makeDeferredCardElement_(cardConfig = {}) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'ddc-deferred-card';
+      placeholder.setAttribute('aria-hidden', 'true');
+      placeholder.__ddcSourceConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+      return placeholder;
+    },
+
+    _makeDeferredCardWrapper_(normalized = {}) {
+      const cleanCard = this._sanitizeCardConfigForStorage_(normalized.card || {});
+      const placeholder = this._makeDeferredCardElement_(cleanCard);
+      const wrap = this._makeWrapper(placeholder, { layoutCardId: normalized.id });
+      wrap.dataset.ddcDeferred = 'true';
+      wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+      this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+      this._setCardPosition(wrap, normalized.position?.x || 0, normalized.position?.y || 0);
+      wrap.style.width = `${normalized.size?.width ?? 14 * this.gridSize}px`;
+      wrap.style.height = `${normalized.size?.height ?? 10 * this.gridSize}px`;
+      if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
+      if (normalized.overflow) {
+        try {
+          wrap.style.overflow = normalized.overflow;
+          wrap.dataset.overflow = normalized.overflow;
+        } catch {}
+      }
+      try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
+      try { wrap.dataset.cfg = JSON.stringify(cleanCard); } catch {}
+      return wrap;
+    },
+
+    async _hydrateDeferredCardWrapper_(wrap) {
+      if (!wrap || wrap.dataset?.ddcDeferred !== 'true' || wrap.dataset?.ddcHydrating === 'true') return false;
+      wrap.dataset.ddcHydrating = 'true';
+      try {
+        let cardConfig = null;
+        try { cardConfig = JSON.parse(wrap.dataset.cfg || 'null'); } catch {}
+        if (!cardConfig || typeof cardConfig !== 'object') cardConfig = this._extractCardConfig(wrap.firstElementChild) || {};
+        const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+        const cardEl = await this._createCard(cleanConfig);
+        cardEl.__ddcSourceConfig = cleanConfig;
+        const current = wrap.firstElementChild;
+        if (current) wrap.replaceChild(cardEl, current);
+        else wrap.prepend(cardEl);
+        try { wrap.dataset.cfg = JSON.stringify(cleanConfig); } catch {}
+        delete wrap.dataset.ddcDeferred;
+        delete wrap.dataset.ddcHydrating;
+        if (this._hasCardModDeep?.(cleanConfig)) wrap.dataset.needsCardMod = 'true';
+        if (wrap.dataset.overflow) {
+          try { cardEl.style.overflow = wrap.dataset.overflow; } catch {}
+        }
+        try { this._rebuildOnce(cardEl); } catch {}
+        this.__ddcTextLockDirty = true;
+        try { this._scheduleTextResizeLockRefresh_?.(true); } catch {}
+        return true;
+      } catch (err) {
+        delete wrap.dataset.ddcHydrating;
+        console.warn('[drag-and-drop-card] Failed to hydrate deferred card', err);
+        return false;
+      }
+    },
+
+    async _hydrateVisibleDeferredCards_(wraps = null) {
+      const source = wraps
+        ? Array.from(wraps)
+        : Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper[data-ddc-deferred="true"]') || []);
+      const candidates = source.filter((wrap) => {
+        if (!wrap || wrap.dataset?.ddcDeferred !== 'true') return false;
+        if (wrap.style.display === 'none' || wrap.classList.contains('ddc-hidden') || wrap.inert === true) return false;
+        return true;
+      });
+      if (!candidates.length) return 0;
+      const results = await Promise.all(candidates.map((wrap) => this._hydrateDeferredCardWrapper_(wrap)));
+      const count = results.filter(Boolean).length;
+      if (count) {
+        try { this._applyVisibility_?.(); } catch {}
+        try { this._renderConnectors_?.(); } catch {}
+      }
+      return count;
+    },
 
     async _createCard(cfg) {
       let sourceCfg = this._sanitizeCardConfigForStorage_(cfg || {});
