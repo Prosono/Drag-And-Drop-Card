@@ -109,17 +109,27 @@ const converterMethods = {
     [
       'width',
       'column_width',
+      'columnWidth',
+      'column-width',
       'max_width',
       'max_cols',
+      'max-width',
       'maxCols',
+      'max-cols',
       'columns',
       'rtl',
       'column_widths',
+      'columnWidths',
+      'column-widths',
       'margin',
       'padding',
       'height',
       'card_margin',
+      'cardMargin',
+      'card-margin',
       'min_height',
+      'minHeight',
+      'min-height',
     ].forEach((key) => {
       if (options[key] === undefined && source?.[key] !== undefined) options[key] = source[key];
     });
@@ -193,6 +203,150 @@ const converterMethods = {
       }).filter(Boolean).join('\n');
     }
     return '';
+  },
+
+  _dashboardConverterCleanCssValue_(value = '') {
+    return String(value ?? '')
+      .trim()
+      .replace(/!important/ig, '')
+      .replace(/;+\s*$/g, '')
+      .replace(/^['"]|['"]$/g, '')
+      .trim();
+  },
+
+  _dashboardConverterCssDeclaration_(styleText = '', prop = '') {
+    const name = String(prop || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!name) return '';
+    const match = String(styleText || '').match(new RegExp(`(?:^|[;\\n{}\\s])\\s*${name}\\s*:\\s*([^;\\n}]+)`, 'i'));
+    return match ? this._dashboardConverterCleanCssValue_(match[1]) : '';
+  },
+
+  _dashboardConverterColorFromCssValue_(value = '') {
+    const raw = this._dashboardConverterCleanCssValue_(value);
+    if (!raw || /^(none|initial|inherit|unset|0)$/i.test(raw)) return '';
+    const direct = raw.match(/^(#[0-9a-f]{3,8}\b|rgba?\([^)]+\)|hsla?\([^)]+\)|color-mix\([^)]+\)|var\([^)]+\)|transparent\b)$/i);
+    if (direct) return raw;
+    const candidates = raw.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]+\)|hsla?\([^)]+\)|color-mix\([^)]+\)|var\([^)]+\)|\b[a-z]+\b/ig) || [];
+    const skip = new Set(['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset', 'none', 'thin', 'medium', 'thick']);
+    for (let i = candidates.length - 1; i >= 0; i -= 1) {
+      const candidate = candidates[i];
+      if (!skip.has(String(candidate).toLowerCase())) return candidate;
+    }
+    return '';
+  },
+
+  _dashboardConverterBackgroundUrl_(value = '') {
+    const raw = this._dashboardConverterCleanCssValue_(value);
+    if (!raw) return '';
+    const urlMatch = raw.match(/url\(\s*(['"]?)(.*?)\1\s*\)/i);
+    if (urlMatch?.[2]) return this._dashboardConverterCleanCssValue_(urlMatch[2]);
+    if (/^(https?:\/\/|\/|\.{1,2}\/|local\/|media-source:\/\/|data:image\/)/i.test(raw) && !/\s/.test(raw)) return raw;
+    return '';
+  },
+
+  _dashboardConverterCardStyleHints_(card = {}) {
+    const styleText = [
+      this._dashboardConverterStyleText_(card?.card_mod?.style),
+      this._dashboardConverterStyleText_(card?.style),
+      this._dashboardConverterStyleText_(card?.styles),
+    ].filter(Boolean).join('\n');
+    if (!styleText) return {};
+    const background =
+      this._dashboardConverterCssDeclaration_(styleText, '--ha-card-background')
+      || this._dashboardConverterCssDeclaration_(styleText, '--card-background-color')
+      || this._dashboardConverterCssDeclaration_(styleText, 'background')
+      || this._dashboardConverterCssDeclaration_(styleText, 'background-color');
+    const textColor =
+      this._dashboardConverterCssDeclaration_(styleText, '--primary-text-color')
+      || this._dashboardConverterCssDeclaration_(styleText, 'color');
+    const borderColor =
+      this._dashboardConverterCssDeclaration_(styleText, 'border-color')
+      || this._dashboardConverterColorFromCssValue_(this._dashboardConverterCssDeclaration_(styleText, 'border'));
+    const shadow = this._dashboardConverterCssDeclaration_(styleText, 'box-shadow');
+    const out = {};
+    if (background && !/^none$/i.test(background)) out.background = background;
+    if (textColor) out.text_color = textColor;
+    if (borderColor) out.border_color = borderColor;
+    if (shadow) out.card_shadow = /^none$/i.test(shadow) ? 'off' : 'on';
+    return this._normalizePerCardStyle_?.(out) || out;
+  },
+
+  _dashboardConverterEntryStyle_(item = {}) {
+    const style = item?.cardStyle || item?.card_style || null;
+    if (!style || typeof style !== 'object' || !Object.keys(style).length) return {};
+    return { card_style: this._cloneJson_?.(style) || { ...style } };
+  },
+
+  _dashboardConverterBackgroundOptionsFromValue_(value = '', styleText = '') {
+    const raw = this._dashboardConverterCleanCssValue_(value);
+    if (!raw) return {};
+    const url = this._dashboardConverterBackgroundUrl_(raw);
+    if (url) {
+      return {
+        background_mode: 'image',
+        background_image: {
+          src: url,
+          repeat: this._dashboardConverterCssDeclaration_(styleText, 'background-repeat') || 'no-repeat',
+          size: this._dashboardConverterCssDeclaration_(styleText, 'background-size') || 'cover',
+          position: this._dashboardConverterCssDeclaration_(styleText, 'background-position') || 'center center',
+          attachment: this._dashboardConverterCssDeclaration_(styleText, 'background-attachment') || 'scroll',
+          opacity: 1,
+        },
+      };
+    }
+    return { container_background: raw };
+  },
+
+  _dashboardConverterDashboardStyleOptions_(config = {}, views = []) {
+    const candidates = [];
+    const pushValue = (value, styleText = '') => {
+      if (value == null) return;
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        const src = value.src || value.url || value.image || value.path;
+        if (src) {
+          candidates.push({
+            background_mode: 'image',
+            background_image: {
+              src: String(src).trim(),
+              repeat: value.repeat || 'no-repeat',
+              size: value.size || 'cover',
+              position: value.position || 'center center',
+              attachment: value.attachment || 'scroll',
+              opacity: value.opacity ?? 1,
+            },
+          });
+          return;
+        }
+      }
+      const next = this._dashboardConverterBackgroundOptionsFromValue_(value, styleText);
+      if (Object.keys(next).length) candidates.push(next);
+    };
+
+    const configStyleText = [
+      this._dashboardConverterStyleText_(config?.card_mod?.style),
+      this._dashboardConverterStyleText_(config?.style),
+    ].filter(Boolean).join('\n');
+    pushValue(config.background ?? config.background_image ?? config.backgroundImage, configStyleText);
+    const configBgCss = this._dashboardConverterCssDeclaration_(configStyleText, 'background-image')
+      || this._dashboardConverterCssDeclaration_(configStyleText, 'background')
+      || this._dashboardConverterCssDeclaration_(configStyleText, 'background-color');
+    pushValue(configBgCss, configStyleText);
+
+    for (const view of views) {
+      const viewStyleText = [
+        this._dashboardConverterStyleText_(view?.card_mod?.style),
+        this._dashboardConverterStyleText_(view?.style),
+      ].filter(Boolean).join('\n');
+      pushValue(view?.background ?? view?.background_image ?? view?.backgroundImage, viewStyleText);
+      const viewBgCss = this._dashboardConverterCssDeclaration_(viewStyleText, 'background-image')
+        || this._dashboardConverterCssDeclaration_(viewStyleText, 'background')
+        || this._dashboardConverterCssDeclaration_(viewStyleText, 'background-color');
+      pushValue(viewBgCss, viewStyleText);
+    }
+
+    return candidates.find((candidate) => candidate.background_mode === 'image')
+      || candidates.find((candidate) => candidate.container_background)
+      || {};
   },
 
   _dashboardConverterAspectRatio_(value = null) {
@@ -381,6 +535,10 @@ const converterMethods = {
         height = Math.max(height, 360);
       } else if (type.includes('calendar') || type.includes('todo')) {
         height = Math.max(height, 420);
+      } else if (type.startsWith('custom:')) {
+        height = Math.max(height, 320);
+      } else if (type.includes('button') || type.includes('tile') || type.includes('entity')) {
+        height = Math.max(height, 220);
       }
     }
     return Math.max(100, Math.round(height));
@@ -412,11 +570,88 @@ const converterMethods = {
     return 1430;
   },
 
+  _dashboardConverterFixedSizeForOptions_(options = {}) {
+    const mode = this._normalizeContainerSizeMode_?.(options.container_size_mode || this.containerSizeMode || this._config?.container_size_mode);
+    if (mode === 'fixed_custom') {
+      return {
+        w: Math.max(100, Number(options.container_fixed_width || this.containerFixedWidth || this._config?.container_fixed_width || 0) || 100),
+        h: Math.max(100, Number(options.container_fixed_height || this.containerFixedHeight || this._config?.container_fixed_height || 0) || 100),
+      };
+    }
+    if (mode === 'preset') {
+      const presets = this.constructor?._sizePresets?.() || [];
+      const preset = presets.find((item) => item.key === (options.container_preset || this.containerPreset || this._config?.container_preset))
+        || presets.find((item) => item.key === 'fhd')
+        || { w: 1920, h: 1080 };
+      let w = Number(preset.w) || 1920;
+      let h = Number(preset.h) || 1080;
+      const orient = String(options.container_preset_orientation || this.containerPresetOrient || this._config?.container_preset_orientation || 'auto').toLowerCase();
+      if (orient === 'portrait' && w > h) [w, h] = [h, w];
+      if (orient === 'landscape' && h > w) [w, h] = [h, w];
+      return { w, h };
+    }
+    return null;
+  },
+
+  _dashboardConverterLayoutBounds_(responsiveLayouts = {}, primaryCards = []) {
+    let maxRight = 0;
+    let maxBottom = 0;
+    let count = 0;
+    const visitEntry = (entry = {}) => {
+      if (!entry || typeof entry !== 'object') return;
+      const x = Number(entry?.position?.x ?? entry.x ?? 0) || 0;
+      const y = Number(entry?.position?.y ?? entry.y ?? 0) || 0;
+      const width = Math.max(0, Number(entry?.size?.width ?? entry.width ?? 0) || 0);
+      const height = Math.max(0, Number(entry?.size?.height ?? entry.height ?? 0) || 0);
+      if (!width && !height) return;
+      maxRight = Math.max(maxRight, x + width);
+      maxBottom = Math.max(maxBottom, y + height);
+      count += 1;
+    };
+    const visitLayout = (layout = null) => {
+      if (Array.isArray(layout)) {
+        layout.forEach(visitEntry);
+        return;
+      }
+      if (!layout || typeof layout !== 'object') return;
+      if (Array.isArray(layout.cards)) layout.cards.forEach(visitEntry);
+      else Object.values(layout).forEach(visitLayout);
+    };
+    visitLayout(primaryCards);
+    visitLayout(responsiveLayouts);
+    return {
+      width: Math.ceil(maxRight),
+      height: Math.ceil(maxBottom),
+      cards: count,
+    };
+  },
+
+  _dashboardConverterInflateCanvasOptions_(options = {}, responsiveLayouts = {}, primaryCards = []) {
+    const mode = this._normalizeContainerSizeMode_?.(options.container_size_mode || this.containerSizeMode || this._config?.container_size_mode);
+    const bounds = this._dashboardConverterLayoutBounds_(responsiveLayouts, primaryCards);
+    const fixed = this._dashboardConverterFixedSizeForOptions_(options);
+    if (!bounds.cards || mode === 'auto' || !fixed) return { options, bounds };
+    const grid = Math.max(1, Number(this.gridSize || this._config?.grid || 10) || 10);
+    const pad = Math.max(64, grid * 4);
+    const requiredWidth = Math.ceil(Math.max(fixed.w, bounds.width + pad) / grid) * grid;
+    const requiredHeight = Math.ceil(Math.max(fixed.h, bounds.height + pad) / grid) * grid;
+    if (requiredWidth <= fixed.w && requiredHeight <= fixed.h) return { options, bounds };
+    return {
+      bounds,
+      options: {
+        ...options,
+        container_size_mode: 'fixed_custom',
+        container_fixed_width: requiredWidth,
+        container_fixed_height: requiredHeight,
+      },
+    };
+  },
+
   _dashboardConverterColumnLayoutMetrics_(layoutOptions = {}, canvasWidth = 1430, fallbackMaxCols = 4) {
     const canvasInset = canvasWidth <= 720 ? 16 : 24;
     const layoutMargin = this._dashboardConverterCssBox_(layoutOptions.margin, '0px 4px 0px 4px');
     const layoutPadding = this._dashboardConverterCssBox_(layoutOptions.padding, '4px 0px 4px 0px');
-    const cardMargin = this._dashboardConverterCssBox_(layoutOptions.card_margin, '4px 4px 8px 4px');
+    const cardMargin = this._dashboardConverterCssBox_(layoutOptions.card_margin ?? layoutOptions.cardMargin ?? layoutOptions['card-margin'], '4px 4px 8px 4px');
     const gap = Math.max(0, cardMargin.left + cardMargin.right);
     const rowGap = Math.max(0, cardMargin.top + cardMargin.bottom);
     const edgeLeft = canvasInset + layoutMargin.left + layoutPadding.left;
@@ -425,17 +660,20 @@ const converterMethods = {
     const edgeBottom = canvasInset + layoutMargin.bottom + layoutPadding.bottom + cardMargin.bottom;
     const available = Math.max(180, canvasWidth - edgeLeft - edgeRight);
     const rawMaxCols = this._dashboardConverterPixelValue_(
-      layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions.columns,
+      layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions['max-cols'] ?? layoutOptions.columns,
       fallbackMaxCols
     );
     const maxCols = Math.max(1, Math.floor(Number.isFinite(rawMaxCols) && rawMaxCols > 0 ? rawMaxCols : fallbackMaxCols));
-    const maxWidthValue = layoutOptions.max_width ?? layoutOptions.maxWidth;
+    const maxWidthValue = layoutOptions.max_width ?? layoutOptions.maxWidth ?? layoutOptions['max-width'];
     const explicitWidthValue = layoutOptions.width
       ?? layoutOptions.column_width
+      ?? layoutOptions.columnWidth
+      ?? layoutOptions['column-width']
       ?? (maxCols === 1 ? maxWidthValue : undefined);
     const explicitWidth = this._dashboardConverterPixelValue_(explicitWidthValue, null, available);
     const hasExplicitWidth = Number.isFinite(explicitWidth) && explicitWidth > 0;
-    const hasExplicitColumnWidths = layoutOptions.column_widths !== undefined && layoutOptions.column_widths !== null;
+    const columnWidthsValue = layoutOptions.column_widths ?? layoutOptions.columnWidths ?? layoutOptions['column-widths'];
+    const hasExplicitColumnWidths = columnWidthsValue !== undefined && columnWidthsValue !== null;
     const explicitMaxWidth = this._dashboardConverterPixelValue_(maxWidthValue, null, available);
     const hasExplicitMaxWidth = maxCols === 1 && Number.isFinite(explicitMaxWidth) && explicitMaxWidth > 0;
     const desiredWidth = Math.max(
@@ -446,8 +684,8 @@ const converterMethods = {
     const columns = Math.max(1, Math.min(maxCols, columnsByWidth));
     const preserveSingleColumnWidth = maxCols === 1 && (hasExplicitWidth || hasExplicitColumnWidths || hasExplicitMaxWidth);
     const maxColumnWidth =
-      this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available) > 0
-        ? this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available)
+      this._dashboardConverterPixelValue_(maxWidthValue, null, available) > 0
+        ? this._dashboardConverterPixelValue_(maxWidthValue, null, available)
         : Math.max(500, desiredWidth * 1.5);
     const columnWidth = Math.max(
       120,
@@ -456,7 +694,7 @@ const converterMethods = {
         : Math.min(desiredWidth, maxColumnWidth, (available - gap * (columns - 1)) / columns))
     );
     const rawColumnWidths = this._dashboardConverterColumnWidthList_(
-      layoutOptions.column_widths,
+      columnWidthsValue,
       columns,
       columnWidth,
       available
@@ -520,6 +758,7 @@ const converterMethods = {
         size: { width, height },
         z: item.z,
         tabId: item.tabId,
+        ...this._dashboardConverterEntryStyle_(item),
       };
     });
     const bottom = entries.reduce((max, entry) => Math.max(max, entry.position.y + entry.size.height), offsetY);
@@ -545,6 +784,7 @@ const converterMethods = {
         size: { width, height },
         z: item.z,
         tabId: item.tabId,
+        ...this._dashboardConverterEntryStyle_(item),
       };
       y += height + gap;
       return entry;
@@ -588,6 +828,7 @@ const converterMethods = {
         size: { width, height },
         z: item.z,
         tabId: item.tabId,
+        ...this._dashboardConverterEntryStyle_(item),
       });
       heights[column] = y + height + base.rowGap;
       if (mode === 'vertical') {
@@ -780,6 +1021,7 @@ const converterMethods = {
               id: this._dashboardConverterCardId_(viewIndex, `${cardIndex}-${childIndex}`),
               tabId,
               card: this._cloneJson_?.(childCard) || JSON.parse(JSON.stringify(childCard)),
+              cardStyle: this._dashboardConverterCardStyleHints_(childCard),
               layoutMode: layoutCardMode,
               layoutBlockMode: layoutCardMode,
               layoutBlockId: `${tabId}:layout-card:${cardIndex}`,
@@ -801,6 +1043,7 @@ const converterMethods = {
           id: this._dashboardConverterCardId_(viewIndex, cardIndex),
           tabId,
           card,
+          cardStyle: this._dashboardConverterCardStyleHints_(card),
           layoutMode,
           layoutBlockMode: blockMode,
           layoutBlockId: blockMode === 'grid' ? `${tabId}:grid:${gridBlockIndex}` : `${tabId}:${blockMode}:0`,
@@ -820,7 +1063,7 @@ const converterMethods = {
     });
     const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
     const primaryCards = responsiveLayouts[primaryKey] || Object.values(responsiveLayouts)[0] || [];
-    const options = {
+    let options = {
       tabs,
       default_tab: tabs[0]?.id || 'imported',
       hide_tabs_when_single: tabs.length <= 1,
@@ -830,6 +1073,17 @@ const converterMethods = {
       container_preset_orientation: this.containerPresetOrient || this._config?.container_preset_orientation || 'auto',
       auto_resize_cards: !!this.autoResizeCards,
     };
+    const currentFixedWidth = Number(this.containerFixedWidth || this._config?.container_fixed_width || 0);
+    const currentFixedHeight = Number(this.containerFixedHeight || this._config?.container_fixed_height || 0);
+    if (Number.isFinite(currentFixedWidth) && currentFixedWidth > 0) options.container_fixed_width = currentFixedWidth;
+    if (Number.isFinite(currentFixedHeight) && currentFixedHeight > 0) options.container_fixed_height = currentFixedHeight;
+
+    options = {
+      ...options,
+      ...this._dashboardConverterDashboardStyleOptions_(config, views),
+    };
+    const inflated = this._dashboardConverterInflateCanvasOptions_(options, responsiveLayouts, primaryCards);
+    options = inflated.options;
 
     return {
       version: 3,
@@ -841,6 +1095,8 @@ const converterMethods = {
       summary: {
         views: tabs.length,
         cards: visibleItemCount,
+        canvas_width: options.container_fixed_width || inflated.bounds?.width || null,
+        canvas_height: options.container_fixed_height || inflated.bounds?.height || null,
         skipped_drag_drop_cards: views.reduce((count, view) => {
           const all = [
             ...(Array.isArray(view.cards) ? view.cards : []),
