@@ -65,23 +65,26 @@ const tabsLayoutMethods = {
       btn.title = t.label || t.id;
       btn.setAttribute('aria-label', t.label || t.id);
       btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
-      btn.addEventListener('click', () => {
-        if (this.activeTab !== t.id) {
-          this._closeLayersMenu_?.({ render: false });
-          this.activeTab = t.id;
-          try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
-          this._applyActiveTab();
-          this._renderTabs();
+      btn.type = 'button';
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault?.();
+        ev.stopPropagation?.();
+        const nextTab = this._normalizeTabId?.(t.id) || t.id;
+        if (this.activeTab !== nextTab) {
+          this.activeTab = nextTab;
+          try { this._closeLayersMenu_?.({ render: false }); } catch {}
+          try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, nextTab); } catch {}
+          try { this._applyActiveTab(); } catch (err) { console.warn('[ddc:tabs] Could not apply active tab', err); }
+          try { this._renderTabs(); } catch (err) { console.warn('[ddc:tabs] Could not render tabs after switch', err); }
           // Reapply visibility for the newly active tab. Visibility must be
           // evaluated after switching tabs so cards with conditions are
           // properly hidden when the tab becomes active.
           try { this._applyVisibility_(); } catch {}
-      try {
-        const host = this.cardContainer?.querySelector?.('#ddcBgHost');
-        if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
-      } catch {}
-        }
-        else {
+          try {
+            const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+            if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+          } catch {}
+        } else {
           try { this._centerTabButtonInScroller_?.(btn); } catch {}
         }
       });
@@ -126,8 +129,12 @@ const tabsLayoutMethods = {
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
     const becameVisible = [];
     wraps.forEach(w => {
-      const result = this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
-      if (result?.becameVisible) becameVisible.push(w);
+      try {
+        const result = this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
+        if (result?.becameVisible) becameVisible.push(w);
+      } catch (err) {
+        console.warn('[ddc:tabs] Could not update wrapper for active tab', err);
+      }
     });
 
     // After switching tabs, reapply sizing based on the current container mode.
