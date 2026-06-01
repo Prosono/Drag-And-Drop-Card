@@ -367,26 +367,35 @@ const tabsLayoutMethods = {
       this._syncTabsPlacement_?.();
       this._syncViewportPreviewUI_?.();
       this._syncLeftRailViewportPosition_?.();
+      const bar = this.tabsBar;
+      if (!bar) return;
+      const vw =
+        window.innerWidth ||
+        document.documentElement?.clientWidth ||
+        0;
+      const isNarrowViewport = !!(vw && vw <= 768);
+      const clearInlineWidth = () => {
+        bar.style.width = '';
+        bar.style.maxWidth = '';
+      };
       const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
       if (mode === 'auto') {
+        clearInlineWidth();
+        bar.style.marginInline = this._isSidebarNavigationActive_?.() ? '' : 'auto';
         this._syncLeftRailViewportPosition_?.();
+        this._refreshTabsAlignment_?.();
         return;
       }
 
-      const bar = this.tabsBar;
-      if (!bar) return;
-
       if (this._isSidebarNavigationActive_?.()) {
-        bar.style.width = '';
-        bar.style.maxWidth = '';
+        clearInlineWidth();
         bar.style.marginInline = '';
         this._refreshTabsAlignment_?.();
         return;
       }
 
       if (this._isExplicitViewportPreview_?.()) {
-        bar.style.width = '';
-        bar.style.maxWidth = '';
+        clearInlineWidth();
         bar.style.marginInline = 'auto';
         this._refreshTabsAlignment_?.();
         return;
@@ -395,13 +404,9 @@ const tabsLayoutMethods = {
       // 📱 On narrow viewports, don't clamp the bar at all.
       // Let CSS handle width and scrolling so you can reach all tabs.
       try {
-        const vw =
-          window.innerWidth ||
-          document.documentElement?.clientWidth ||
-          0;
-        if (vw && vw <= 768) {
-          bar.style.width = '';
-          bar.style.maxWidth = '';
+        if (isNarrowViewport) {
+          clearInlineWidth();
+          bar.style.marginInline = 'auto';
           this._refreshTabsAlignment_?.();
           this._syncLeftRailViewportPosition_?.();
           return;
@@ -410,8 +415,7 @@ const tabsLayoutMethods = {
 
       // Top and bottom placements should size naturally from their content.
       if (this.tabsPosition === 'top' || this.tabsPosition === 'bottom') {
-        bar.style.width = '';
-        bar.style.maxWidth = '';
+        clearInlineWidth();
         bar.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
         this._refreshTabsAlignment_?.();
         this._syncLeftRailViewportPosition_?.();

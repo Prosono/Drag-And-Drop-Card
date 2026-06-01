@@ -7586,6 +7586,124 @@ export function getDashboardShellTemplate() {
     min-width:205px;
   }
 }
+
+@media (max-width: 768px){
+  :host([ddc-fixed-ui]) .ddc-tabs,
+  .ddc-tabs{
+    left:0 !important;
+    right:0 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box;
+    justify-content:flex-start;
+    gap:8px;
+    padding:8px max(10px, env(safe-area-inset-right, 0px)) 8px max(10px, env(safe-area-inset-left, 0px)) !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    scroll-padding-inline:12px;
+    scrollbar-width:none;
+    scrollbar-gutter:auto;
+  }
+
+  .ddc-tabs::-webkit-scrollbar{
+    display:none;
+  }
+
+  .ddc-tabs.ddc-tabs-bottom{
+    padding-bottom:calc(8px + max(env(safe-area-inset-bottom, 0px), 0px)) !important;
+  }
+
+  .ddc-tabs:not(.ddc-tabs-left)::before{
+    inset:0;
+  }
+
+  .ddc-tabs.ddc-layer-menu-open{
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+  }
+
+  .ddc-tabs .ddc-layer-menu{
+    flex:0 0 auto;
+  }
+
+  .ddc-tabs .ddc-layer-trigger,
+  .ddc-tabs .ddc-layer-trigger.details,
+  .ddc-tabs .ddc-layer-trigger.compact,
+  .ddc-tabs-left .ddc-layer-trigger,
+  .ddc-tabs-left .ddc-layer-trigger.details,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-trigger{
+    width:54px !important;
+    min-width:54px !important;
+    max-width:54px !important;
+    height:54px !important;
+    min-height:54px !important;
+    padding:0 !important;
+    gap:0 !important;
+    border-radius:18px !important;
+    overflow:visible;
+  }
+
+  .ddc-tabs .ddc-layer-trigger::before{
+    display:none;
+  }
+
+  .ddc-tabs .ddc-layer-trigger ha-icon{
+    --mdc-icon-size:23px;
+    width:36px;
+    height:36px;
+    border-radius:14px;
+  }
+
+  .ddc-tabs .ddc-layer-trigger-copy,
+  .ddc-tabs .ddc-layer-trigger-label,
+  .ddc-tabs .ddc-layer-trigger-meta,
+  .ddc-tabs-left .ddc-layer-trigger-copy,
+  .ddc-tabs-left .ddc-layer-trigger-label{
+    position:absolute !important;
+    inline-size:1px !important;
+    block-size:1px !important;
+    overflow:hidden !important;
+    clip-path:inset(50%) !important;
+    white-space:nowrap !important;
+  }
+
+  .ddc-tabs .ddc-layer-count,
+  .ddc-tabs-left .ddc-layer-count,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-count{
+    position:absolute !important;
+    top:2px !important;
+    right:2px !important;
+    min-width:18px !important;
+    height:18px !important;
+    padding:0 5px !important;
+    font-size:10px !important;
+    line-height:1 !important;
+    border:1px solid color-mix(in oklab, var(--card-background-color, #111827) 62%, rgba(255,255,255,.42));
+  }
+
+  .ddc-tabs.ddc-layer-menu-open .ddc-layer-menu-panel,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left.ddc-layer-menu-open .ddc-layer-menu-panel{
+    position:fixed;
+    left:max(12px, env(safe-area-inset-left, 0px));
+    right:max(12px, env(safe-area-inset-right, 0px));
+    top:calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px) + 74px);
+    bottom:auto;
+    width:auto;
+    min-width:0;
+    max-width:none;
+    max-height:min(62vh, calc(100vh - var(--ddc-top-gutter, 0px) - var(--ddc-toolbar-height, 0px) - 112px));
+    transform:none;
+    transform-origin:top right;
+    animation:ddc-layer-menu-in .16s ease-out both;
+  }
+
+  .ddc-tabs.ddc-tabs-bottom.ddc-layer-menu-open .ddc-layer-menu-panel{
+    top:auto;
+    bottom:calc(max(env(safe-area-inset-bottom, 0px), 8px) + 74px);
+    transform-origin:bottom right;
+  }
+}
 /* ===== DDC Layers menu END ==================== */
 
 
