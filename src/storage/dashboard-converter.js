@@ -83,6 +83,8 @@ const converterMethods = {
     const type = String(view?.type || '').trim().toLowerCase();
     if (type === 'panel' || view?.panel === true) return 'panel';
     if (type === 'custom:horizontal-layout' || type === 'horizontal') return 'horizontal';
+    if (type === 'custom:vertical-layout' || type === 'vertical') return 'vertical';
+    if (type === 'custom:masonry-layout' || type === 'masonry') return 'masonry';
     return 'grid';
   },
 
@@ -92,10 +94,13 @@ const converterMethods = {
     return String(layoutType || '').trim().toLowerCase();
   },
 
-  _isDashboardConverterHorizontalLayoutCard_(card = {}) {
+  _dashboardConverterLayoutCardMode_(card = {}) {
     if (String(card?.type || '').trim().toLowerCase() !== 'custom:layout-card') return false;
     const layoutType = this._dashboardConverterLayoutType_(card);
-    return !layoutType || layoutType === 'default' || layoutType.includes('horizontal');
+    if (!layoutType || layoutType === 'default' || layoutType.includes('horizontal')) return 'horizontal';
+    if (layoutType.includes('vertical')) return 'vertical';
+    if (layoutType.includes('masonry')) return 'masonry';
+    return null;
   },
 
   _dashboardConverterLayoutOptions_(source = {}) {
@@ -110,6 +115,11 @@ const converterMethods = {
       'columns',
       'rtl',
       'column_widths',
+      'margin',
+      'padding',
+      'height',
+      'card_margin',
+      'min_height',
     ].forEach((key) => {
       if (options[key] === undefined && source?.[key] !== undefined) options[key] = source[key];
     });
@@ -142,6 +152,23 @@ const converterMethods = {
       const token = tokens[index] ?? tokens[tokens.length - 1];
       return Math.max(120, Math.round(this._dashboardConverterPixelValue_(token, fallbackWidth, available)));
     });
+  },
+
+  _dashboardConverterCssBox_(value = null, fallback = '0px') {
+    const raw = String(value || fallback || '0px').trim();
+    const clean = raw.startsWith('var(') ? fallback : raw;
+    const parts = String(clean || '0px').split(/\s+/).filter(Boolean);
+    const values = [0, 1, 2, 3].map((index) => {
+      const token =
+        parts[index]
+        ?? (index === 2 ? parts[0] : null)
+        ?? (index === 3 ? parts[1] : null)
+        ?? parts[0]
+        ?? '0px';
+      return this._dashboardConverterPixelValue_(token, 0) || 0;
+    });
+    const [top, right, bottom, left] = values;
+    return { top, right, bottom, left };
   },
 
   _dashboardConverterStyleText_(value, depth = 0) {
@@ -296,9 +323,17 @@ const converterMethods = {
   },
 
   _dashboardConverterColumnLayoutMetrics_(layoutOptions = {}, canvasWidth = 1430, fallbackMaxCols = 4) {
-    const margin = canvasWidth <= 720 ? 16 : 24;
-    const gap = canvasWidth <= 720 ? 14 : 24;
-    const available = Math.max(180, canvasWidth - margin * 2);
+    const canvasInset = canvasWidth <= 720 ? 16 : 24;
+    const layoutMargin = this._dashboardConverterCssBox_(layoutOptions.margin, '0px 4px 0px 4px');
+    const layoutPadding = this._dashboardConverterCssBox_(layoutOptions.padding, '4px 0px 4px 0px');
+    const cardMargin = this._dashboardConverterCssBox_(layoutOptions.card_margin, '4px 4px 8px 4px');
+    const gap = Math.max(0, cardMargin.left + cardMargin.right);
+    const rowGap = Math.max(0, cardMargin.top + cardMargin.bottom);
+    const edgeLeft = canvasInset + layoutMargin.left + layoutPadding.left;
+    const edgeRight = canvasInset + layoutMargin.right + layoutPadding.right;
+    const edgeTop = canvasInset + layoutMargin.top + layoutPadding.top + cardMargin.top;
+    const edgeBottom = canvasInset + layoutMargin.bottom + layoutPadding.bottom + cardMargin.bottom;
+    const available = Math.max(180, canvasWidth - edgeLeft - edgeRight);
     const desiredWidth = Math.max(
       120,
       this._dashboardConverterPixelValue_(layoutOptions.width ?? layoutOptions.column_width, 300, available)
@@ -328,12 +363,24 @@ const converterMethods = {
     const scale = totalRawWidth > available ? Math.max(0.1, (available - gap * (columns - 1)) / Math.max(1, totalRawWidth - gap * (columns - 1))) : 1;
     const columnWidths = rawColumnWidths.map((width) => Math.max(120, Math.round(width * scale)));
     const usedWidth = columnWidths.reduce((sum, width) => sum + width, 0) + gap * (columns - 1);
-    const startX = margin + Math.max(0, Math.round((available - usedWidth) / 2));
+    const startX = edgeLeft + Math.max(0, Math.round((available - usedWidth) / 2));
     const columnOffsets = columnWidths.reduce((offsets, width, index) => {
       offsets.push(index === 0 ? 0 : offsets[index - 1] + columnWidths[index - 1] + gap);
       return offsets;
     }, []);
-    return { margin, gap, columns, columnWidth, columnWidths, columnOffsets, startX, sourceWidth: desiredWidth };
+    return {
+      margin: canvasInset,
+      gap,
+      rowGap,
+      columns,
+      columnWidth,
+      columnWidths,
+      columnOffsets,
+      startX,
+      edgeTop,
+      edgeBottom,
+      sourceWidth: desiredWidth,
+    };
   },
 
   _packDashboardConverterGridBlock_(group = [], metrics = {}, offsetY = 0) {
@@ -400,24 +447,24 @@ const converterMethods = {
     return { entries, bottom };
   },
 
-  _packDashboardConverterHorizontalBlock_(group = [], metrics = {}, offsetY = 0) {
+  _packDashboardConverterColumnBlock_(group = [], metrics = {}, offsetY = 0, mode = 'horizontal') {
     const cards = group.filter((item) => String(item.card?.type || '').toLowerCase() !== 'custom:layout-break');
     if (!cards.length) return { entries: [], bottom: offsetY };
     const { canvasWidth } = metrics;
     const layoutOptions = cards[0]?.layoutOptions || {};
     const base = this._dashboardConverterColumnLayoutMetrics_(layoutOptions, canvasWidth, 4);
     const columns = Math.max(1, Math.min(base.columns, cards.length));
+    const usedWidth = (base.columnWidths || []).slice(0, columns).reduce((sum, width) => sum + width, 0) + base.gap * (columns - 1);
     const available = Math.max(180, canvasWidth - base.margin * 2);
-    const usedWidth = base.columnWidth * columns + base.gap * (columns - 1);
-    const startX = base.margin + Math.max(0, Math.round((available - usedWidth) / 2));
-    const heights = Array(columns).fill(offsetY + base.margin);
+    const startX = base.startX + Math.max(0, Math.round((((base.columnWidths || []).reduce((sum, width) => sum + width, 0) + base.gap * (base.columns - 1)) - usedWidth) / 2));
+    const heights = Array(columns).fill(offsetY + base.edgeTop);
     const rtl = layoutOptions.rtl === true || String(layoutOptions.rtl || '').toLowerCase() === 'true';
     let nextColumn = 0;
     const entries = [];
 
     group.forEach((item) => {
       if (String(item.card?.type || '').toLowerCase() === 'custom:layout-break') {
-        nextColumn = 0;
+        nextColumn = mode === 'vertical' ? Math.min(columns - 1, nextColumn + 1) : 0;
         return;
       }
       const forcedColumn = Math.floor(Number(item.card?.view_layout?.column ?? item.card?.viewLayout?.column) || 0);
@@ -437,12 +484,22 @@ const converterMethods = {
         z: item.z,
         tabId: item.tabId,
       });
-      heights[column] = y + height + base.gap;
-      nextColumn = (column + 1) % columns;
+      heights[column] = y + height + base.rowGap;
+      if (mode === 'vertical') {
+        nextColumn = column;
+      } else if (mode === 'masonry') {
+        nextColumn = heights.indexOf(Math.min(...heights));
+      } else {
+        nextColumn = (column + 1) % columns;
+      }
     });
 
-    const bottom = entries.reduce((max, entry) => Math.max(max, entry.position.y + entry.size.height), offsetY);
+    const bottom = entries.reduce((max, entry) => Math.max(max, entry.position.y + entry.size.height), offsetY) + base.edgeBottom;
     return { entries, bottom };
+  },
+
+  _packDashboardConverterHorizontalBlock_(group = [], metrics = {}, offsetY = 0) {
+    return this._packDashboardConverterColumnBlock_(group, metrics, offsetY, 'horizontal');
   },
 
   _packDashboardConverterItems_(items = [], variantKey = 'desktop_landscape') {
@@ -484,6 +541,8 @@ const converterMethods = {
             ? this._packDashboardConverterPanelBlock_(block.items, metrics, offsetY)
             : mode === 'horizontal'
               ? this._packDashboardConverterHorizontalBlock_(block.items, metrics, offsetY)
+              : mode === 'vertical' || mode === 'masonry'
+                ? this._packDashboardConverterColumnBlock_(block.items, metrics, offsetY, mode)
               : this._packDashboardConverterGridBlock_(block.items, metrics, offsetY);
         offsetY = packed.bottom > offsetY ? packed.bottom + gap : offsetY;
         return packed.entries;
@@ -539,7 +598,8 @@ const converterMethods = {
       const cards = this._collectDashboardConverterCardsForView_(view);
       let gridBlockIndex = 0;
       cards.forEach((card, cardIndex) => {
-        if (this._isDashboardConverterHorizontalLayoutCard_(card) && Array.isArray(card.cards)) {
+        const layoutCardMode = this._dashboardConverterLayoutCardMode_(card);
+        if (layoutCardMode && Array.isArray(card.cards)) {
           const layoutOptions = this._dashboardConverterLayoutOptions_(card);
           card.cards.forEach((childCard, childIndex) => {
             if (!childCard || typeof childCard !== 'object') return;
@@ -549,8 +609,8 @@ const converterMethods = {
               id: this._dashboardConverterCardId_(viewIndex, `${cardIndex}-${childIndex}`),
               tabId,
               card: this._cloneJson_?.(childCard) || JSON.parse(JSON.stringify(childCard)),
-              layoutMode: 'horizontal',
-              layoutBlockMode: 'horizontal',
+              layoutMode: layoutCardMode,
+              layoutBlockMode: layoutCardMode,
               layoutBlockId: `${tabId}:layout-card:${cardIndex}`,
               layoutOptions,
               isLayoutBreak,
@@ -561,7 +621,10 @@ const converterMethods = {
           return;
         }
 
-        const blockMode = layoutMode === 'panel' ? 'panel' : (layoutMode === 'horizontal' ? 'horizontal' : 'grid');
+        const blockMode =
+          layoutMode === 'panel'
+            ? 'panel'
+            : (layoutMode === 'horizontal' || layoutMode === 'vertical' || layoutMode === 'masonry' ? layoutMode : 'grid');
         const isLayoutBreak = String(card.type || '').toLowerCase() === 'custom:layout-break';
         items.push({
           id: this._dashboardConverterCardId_(viewIndex, cardIndex),
@@ -570,7 +633,7 @@ const converterMethods = {
           layoutMode,
           layoutBlockMode: blockMode,
           layoutBlockId: blockMode === 'grid' ? `${tabId}:grid:${gridBlockIndex}` : `${tabId}:${blockMode}:0`,
-          layoutOptions: blockMode === 'horizontal' ? viewLayoutOptions : {},
+          layoutOptions: blockMode === 'horizontal' || blockMode === 'vertical' || blockMode === 'masonry' ? viewLayoutOptions : {},
           panel: layoutMode === 'panel',
           isLayoutBreak,
         });
