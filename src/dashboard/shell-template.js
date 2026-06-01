@@ -2097,8 +2097,7 @@ export function getDashboardShellTemplate() {
   .ddc-tabs {
     top: calc(var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px)) !important;
     padding-inline: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     -webkit-overflow-scrolling: touch;
     -webkit-mask-image: none;
     mask-image: none;
@@ -6309,13 +6308,30 @@ export function getDashboardShellTemplate() {
   margin-inline: auto;
   isolation: isolate;
 
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
   scrollbar-gutter: stable;
   -webkit-mask-image: none;
   mask-image: none;
+}
+
+.ddc-tabs-scroller{
+  position:relative;
+  z-index:1;
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  column-gap:inherit;
+  min-width:0;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
 }
 
 .ddc-tabs::before,
@@ -6337,11 +6353,17 @@ export function getDashboardShellTemplate() {
 }
 
 .ddc-tabs::-webkit-scrollbar{ height: 8px; }
+.ddc-tabs-scroller::-webkit-scrollbar{ height: 8px; }
 .ddc-tabs::-webkit-scrollbar-thumb{
   background: color-mix(in oklab, var(--fg) 26%, transparent);
   border-radius: 999px;
 }
+.ddc-tabs-scroller::-webkit-scrollbar-thumb{
+  background: color-mix(in oklab, var(--fg) 26%, transparent);
+  border-radius: 999px;
+}
 .ddc-tabs::-webkit-scrollbar-track{ background: transparent; }
+.ddc-tabs-scroller::-webkit-scrollbar-track{ background: transparent; }
 
 .ddc-tab{
   -webkit-tap-highlight-color: transparent;
@@ -6475,6 +6497,12 @@ export function getDashboardShellTemplate() {
   display:none;
 }
 
+.ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+  flex-direction:column;
+  width:100%;
+  overflow:visible;
+}
+
 .ddc-sidebar .ddc-tabs.ddc-tabs-left{
   position:static;
   left:auto;
@@ -6494,6 +6522,13 @@ export function getDashboardShellTemplate() {
   box-shadow:none;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
+}
+
+.ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+  display:grid;
+  width:100%;
+  gap:7px;
+  overflow:visible;
 }
 
 :host([ddc-fixed-ui]) .ddc-sidebar .ddc-tabs.ddc-tabs-left{
@@ -6893,10 +6928,16 @@ export function getDashboardShellTemplate() {
     min-width: 0;
     max-width: 100%;
     padding: 10px 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     margin-inline: auto;
     z-index: 5;
+  }
+
+  .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .ddc-tabs.ddc-tabs-left .ddc-tab{
@@ -7062,6 +7103,13 @@ export function getDashboardShellTemplate() {
   align-self: auto;
 }
 
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+  flex-direction:row;
+  width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+}
+
 @media (prefers-color-scheme: dark){
   .ddc-tabs{
     --bg: var(--card-background-color, #0f1216);
@@ -7092,7 +7140,16 @@ export function getDashboardShellTemplate() {
   scrollbar-gutter:auto;
 }
 
+.ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
+  overflow:visible;
+  scrollbar-gutter:auto;
+}
+
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-layer-menu-open{
+  overflow:visible !important;
+}
+
+.ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
   overflow:visible !important;
 }
 
@@ -7589,7 +7646,10 @@ export function getDashboardShellTemplate() {
 
 @media (max-width: 768px){
   :host([ddc-fixed-ui]) .ddc-tabs,
-  .ddc-tabs{
+  .ddc-tabs,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left,
+  .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-bottom{
     left:0 !important;
     right:0 !important;
     width:100% !important;
@@ -7599,6 +7659,18 @@ export function getDashboardShellTemplate() {
     justify-content:flex-start;
     gap:8px;
     padding:8px max(10px, env(safe-area-inset-right, 0px)) 8px max(10px, env(safe-area-inset-left, 0px)) !important;
+    overflow:visible !important;
+    scroll-padding-inline:12px;
+    scrollbar-width:none;
+    scrollbar-gutter:auto;
+  }
+
+  .ddc-tabs .ddc-tabs-scroller{
+    flex-direction:row !important;
+    width:100%;
+    max-width:100%;
+    justify-content:flex-start;
+    gap:8px;
     overflow-x:auto !important;
     overflow-y:hidden !important;
     scroll-padding-inline:12px;
@@ -7606,7 +7678,8 @@ export function getDashboardShellTemplate() {
     scrollbar-gutter:auto;
   }
 
-  .ddc-tabs::-webkit-scrollbar{
+  .ddc-tabs::-webkit-scrollbar,
+  .ddc-tabs .ddc-tabs-scroller::-webkit-scrollbar{
     display:none;
   }
 
@@ -7619,8 +7692,11 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tabs.ddc-layer-menu-open{
-    overflow-x:auto !important;
-    overflow-y:hidden !important;
+    overflow:visible !important;
+  }
+
+  .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
+    overflow:visible !important;
   }
 
   .ddc-tabs .ddc-layer-menu{

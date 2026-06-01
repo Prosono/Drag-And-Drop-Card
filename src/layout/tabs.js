@@ -37,6 +37,10 @@ const tabsLayoutMethods = {
     this.__renderingTabs = true;
     bar.className = classes.join(' ');
     bar.innerHTML = '';
+    const tabScroller = document.createElement('div');
+    tabScroller.className = 'ddc-tabs-scroller';
+    tabScroller.setAttribute('role', 'presentation');
+    bar.appendChild(tabScroller);
 
     // Let the common sizing logic decide width for all placements so top and
     // bottom share the same dock treatment.
@@ -74,9 +78,9 @@ const tabsLayoutMethods = {
       } catch {}
         }
       });
-      bar.appendChild(btn);
+      tabScroller.appendChild(btn);
     }
-    this._appendLayersMenuToTabs_?.(bar);
+    this._appendLayersMenuToTabs_?.(tabScroller);
     this.__renderingTabs = false;
     this._syncTabsPlacement_?.();
     this._renderSidebar_?.();
@@ -97,7 +101,8 @@ const tabsLayoutMethods = {
     // just enough to reveal the element without recentring the entire list.
     try {
       const activeBtn = bar.querySelector?.('.ddc-tab.active');
-      if (activeBtn && bar.scrollWidth > bar.clientWidth) {
+      const scrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
+      if (activeBtn && scrollHost.scrollWidth > scrollHost.clientWidth) {
         activeBtn.scrollIntoView({
           behavior: 'auto',
           block: 'nearest',
@@ -325,6 +330,7 @@ const tabsLayoutMethods = {
 
   _updateTabsA11y_() {
     const bar = this.tabsBar; if (!bar) return;
+    const scrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
     const btns = bar.querySelectorAll('.ddc-tab');
     if (btns.length) bar.setAttribute('role', 'tablist');
     else bar.removeAttribute('role');
@@ -357,7 +363,11 @@ const tabsLayoutMethods = {
     }
     if (!this.__tabsScrollHandler) {
       this.__tabsScrollHandler = () => this._updateTabOverflowShadows_?.();
-      bar.addEventListener('scroll', this.__tabsScrollHandler, { passive: true });
+    }
+    if (this.__tabsScrollTarget !== scrollHost) {
+      try { this.__tabsScrollTarget?.removeEventListener?.('scroll', this.__tabsScrollHandler); } catch {}
+      scrollHost.addEventListener('scroll', this.__tabsScrollHandler, { passive: true });
+      this.__tabsScrollTarget = scrollHost;
     }
     this._updateTabOverflowShadows_?.();
   },
@@ -535,15 +545,17 @@ const tabsLayoutMethods = {
     try {
       const bar = this.tabsBar;
       if (!bar) return;
+      const scrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
       bar.style.justifyContent = '';
+      scrollHost.style.justifyContent = '';
       if (this._isSidebarNavigationActive_?.()) {
-        bar.style.justifyContent = 'flex-start';
+        scrollHost.style.justifyContent = 'flex-start';
         return;
       }
-      if (bar.scrollWidth <= bar.clientWidth) {
-        bar.style.justifyContent = 'center';
+      if (scrollHost.scrollWidth <= scrollHost.clientWidth) {
+        scrollHost.style.justifyContent = 'center';
       } else {
-        bar.style.justifyContent = 'flex-start';
+        scrollHost.style.justifyContent = 'flex-start';
       }
     } catch {}
   },
