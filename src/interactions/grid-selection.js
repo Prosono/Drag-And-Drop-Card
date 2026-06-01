@@ -546,7 +546,9 @@ export function installGridSelectPatch(DragAndDropCard) {
       return { sx: 1, sy: 1 };
     },
 
-    // Convert a canvas-space rect (x,y,w,h) to container's absolute-position CSS pixels
+    // Convert a grid canvas rect to card-container design coordinates.  The
+    // canvas lives inside the same scaled container as the cards, so its input
+    // x/y/w/h values are already unscaled grid units.
     _canvasRectToContainerRect_({ x, y, w, h }) {
       const container = this.cardContainer;
       const canvas = this._gridCanvas;
@@ -560,27 +562,19 @@ export function installGridSelectPatch(DragAndDropCard) {
       const canvRect = canvas.getBoundingClientRect();
       const contRect = container.getBoundingClientRect();
 
-      const viewportX = canvRect.left + x;
-      const viewportY = canvRect.top  + y;
+      const safeSX = Math.max(0.0001, Math.abs(Number(sx) || 1));
+      const safeSY = Math.max(0.0001, Math.abs(Number(sy) || 1));
+      const viewportX = canvRect.left + (x * safeSX);
+      const viewportY = canvRect.top  + (y * safeSY);
 
-      let dx = viewportX - contRect.left;
-      let dy = viewportY - contRect.top;
+      let dx = (viewportX - contRect.left) / safeSX;
+      let dy = (viewportY - contRect.top) / safeSY;
 
       // border-box → padding-box
       dx -= bL;
       dy -= bT;
 
-
-
-      const invSX = sx ? 1 / sx : 1;
-      const invSY = sy ? 1 / sy : 1;
-
-      const outX = dx * invSX;
-      const outY = dy * invSY;
-      const outW = (w * invSX);
-      const outH = (h * invSY);
-
-      return { x: outX, y: outY, w: outW, h: outH };
+      return { x: dx, y: dy, w, h };
     },
     /* === GRID SELECT PATCH END (helpers) === */
 
@@ -597,18 +591,11 @@ export function installGridSelectPatch(DragAndDropCard) {
         const sx = snap(x), sy = snap(y), sw = Math.max(g, snap(w)), sh = Math.max(g, snap(h));
 
         // Map the snapped canvas-space rect into the card container coordinate space.
-        // When the layout is scaled (auto-resize in dynamic mode), the
-        // container may be transformed and scrolled, so we use the
-        // grid-to-card mapping which compensates for padding, borders, scroll
-        // and scale.  In strict auto size mode the container is resized
-        // instead of transformed, so we fall back to the canvas→container
-        // mapping that accounts for differences between the canvas and
-        // container bounding boxes.  If neither helper exists we use the
-        // snapped values directly.
+        // Use the same mapper for every size mode so Auto and Fixed/Preset insert
+        // cards into the exact same grid cells that were highlighted.
         let mapped;
         try {
-          const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-          if (mode === 'auto' && typeof this._canvasRectToContainerRect_ === 'function') {
+          if (typeof this._canvasRectToContainerRect_ === 'function') {
             mapped = this._canvasRectToContainerRect_({ x: sx, y: sy, w: sw, h: sh });
           } else if (typeof this._gridRectToCardRect_ === 'function') {
             mapped = this._gridRectToCardRect_({ x: sx, y: sy, w: sw, h: sh });
@@ -698,18 +685,7 @@ if (!DragAndDropCard.prototype.__addPickedPatched) {
       const cardEl = await this._createCard(cardConfig);
       const wrap   = this._makeWrapper(cardEl);
 
-      // Determine mode: auto vs everything else
-      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode || this._config?.container_size_mode);
-
-      // In auto mode we use 0 offset; otherwise 11 px up/left
-      const isAuto = mode === 'auto';
-      const offX   = isAuto ? -11 : 11;
-      const offY   = isAuto ? -11 : 11;
-
-      const posX = Math.round(x) - offX;
-      const posY = Math.round(y) - offY;
-
-      this._setCardPosition(wrap, posX, posY);
+      this._setCardPosition(wrap, Math.round(x), Math.round(y));
       wrap.style.width  = `${Math.round(w)}px`;
       wrap.style.height = `${Math.round(h)}px`;
 
