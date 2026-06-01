@@ -118,6 +118,41 @@ const initialLoadMethods = {
         for (const k of overrideKeys) {
           if (yamlCfg[k] !== undefined) cfgOpts[k] = yamlCfg[k];
         }
+        const collectSavedLayoutTabIds = (source = null, out = new Set()) => {
+          if (!source) return out;
+          if (Array.isArray(source)) {
+            source.forEach((entry) => {
+              const tabId = String(entry?.tabId || entry?.tab_id || '').trim();
+              if (tabId) out.add(tabId);
+            });
+            return out;
+          }
+          if (typeof source === 'object') {
+            if (Array.isArray(source.cards)) collectSavedLayoutTabIds(source.cards, out);
+            Object.values(source).forEach((value) => {
+              if (value && typeof value === 'object') collectSavedLayoutTabIds(value, out);
+            });
+          }
+          return out;
+        };
+        const savedTabs = Array.isArray(saved?.options?.tabs)
+          ? saved.options.tabs.filter((tab) => String(tab?.id || '').trim())
+          : [];
+        if (savedTabs.length) {
+          const savedTabIds = new Set(savedTabs.map((tab) => String(tab.id).trim()));
+          const yamlTabs = Array.isArray(cfgOpts.tabs) ? cfgOpts.tabs.filter((tab) => String(tab?.id || '').trim()) : [];
+          const yamlTabIds = new Set(yamlTabs.map((tab) => String(tab.id).trim()));
+          const layoutTabIds = collectSavedLayoutTabIds(saved?.cards);
+          collectSavedLayoutTabIds(saved?.responsive_layouts, layoutTabIds);
+          const savedLayoutUsesSavedTabs = Array.from(layoutTabIds).some((tabId) => savedTabIds.has(tabId));
+          const yamlMissingSavedLayoutTabs = !yamlTabs.length || Array.from(layoutTabIds).some((tabId) => !yamlTabIds.has(tabId));
+          if (savedLayoutUsesSavedTabs && yamlMissingSavedLayoutTabs) {
+            delete cfgOpts.tabs;
+            delete cfgOpts.default_tab;
+            delete cfgOpts.hide_tabs_when_single;
+            delete cfgOpts.tabs_position;
+          }
+        }
         if (Object.keys(cfgOpts).length) {
           this._applyImportedOptions(cfgOpts, true);
         }
