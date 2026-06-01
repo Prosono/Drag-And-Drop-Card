@@ -116,6 +116,34 @@ const converterMethods = {
     return options;
   },
 
+  _dashboardConverterPixelValue_(value, fallback = null, relativeTo = null) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const raw = String(value ?? '').trim();
+    if (!raw) return fallback;
+    if (raw.endsWith('%') && Number(relativeTo) > 0) {
+      const pct = Number.parseFloat(raw);
+      return Number.isFinite(pct) ? (relativeTo * pct) / 100 : fallback;
+    }
+    if (!/^-?\d+(?:\.\d+)?(?:px)?$/i.test(raw)) return fallback;
+    const parsed = Number.parseFloat(raw.replace(/px$/i, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  },
+
+  _dashboardConverterColumnWidthList_(columnWidths = null, columns = 1, fallbackWidth = 300, available = null) {
+    if (!columnWidths) return Array(columns).fill(fallbackWidth);
+    const tokens = Array.isArray(columnWidths)
+      ? columnWidths
+      : String(columnWidths)
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+    if (!tokens.length) return Array(columns).fill(fallbackWidth);
+    return Array.from({ length: columns }, (_, index) => {
+      const token = tokens[index] ?? tokens[tokens.length - 1];
+      return Math.max(120, Math.round(this._dashboardConverterPixelValue_(token, fallbackWidth, available)));
+    });
+  },
+
   _collectDashboardConverterCardsForView_(view = {}) {
     const cards = [];
     const badges = Array.isArray(view.badges)
@@ -194,22 +222,41 @@ const converterMethods = {
     const margin = canvasWidth <= 720 ? 16 : 24;
     const gap = canvasWidth <= 720 ? 14 : 24;
     const available = Math.max(180, canvasWidth - margin * 2);
-    const desiredWidth = Math.max(120, Number(layoutOptions.width ?? layoutOptions.column_width ?? 300) || 300);
-    const rawMaxCols = Number(layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions.columns ?? fallbackMaxCols);
+    const desiredWidth = Math.max(
+      120,
+      this._dashboardConverterPixelValue_(layoutOptions.width ?? layoutOptions.column_width, 300, available)
+    );
+    const rawMaxCols = this._dashboardConverterPixelValue_(
+      layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions.columns,
+      fallbackMaxCols
+    );
     const maxCols = Math.max(1, Math.floor(Number.isFinite(rawMaxCols) && rawMaxCols > 0 ? rawMaxCols : fallbackMaxCols));
     const columnsByWidth = Math.max(1, Math.floor((available + gap) / (desiredWidth + gap)));
     const columns = Math.max(1, Math.min(maxCols, columnsByWidth));
     const maxColumnWidth =
-      Number(layoutOptions.max_width ?? layoutOptions.maxWidth) > 0
-        ? Number(layoutOptions.max_width ?? layoutOptions.maxWidth)
+      this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available) > 0
+        ? this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available)
         : Math.max(500, desiredWidth * 1.5);
     const columnWidth = Math.max(
       120,
       Math.round(Math.min(desiredWidth, maxColumnWidth, (available - gap * (columns - 1)) / columns))
     );
-    const usedWidth = columnWidth * columns + gap * (columns - 1);
+    const rawColumnWidths = this._dashboardConverterColumnWidthList_(
+      layoutOptions.column_widths,
+      columns,
+      columnWidth,
+      available
+    );
+    const totalRawWidth = rawColumnWidths.reduce((sum, width) => sum + width, 0) + gap * (columns - 1);
+    const scale = totalRawWidth > available ? Math.max(0.1, (available - gap * (columns - 1)) / Math.max(1, totalRawWidth - gap * (columns - 1))) : 1;
+    const columnWidths = rawColumnWidths.map((width) => Math.max(120, Math.round(width * scale)));
+    const usedWidth = columnWidths.reduce((sum, width) => sum + width, 0) + gap * (columns - 1);
     const startX = margin + Math.max(0, Math.round((available - usedWidth) / 2));
-    return { margin, gap, columns, columnWidth, startX };
+    const columnOffsets = columnWidths.reduce((offsets, width, index) => {
+      offsets.push(index === 0 ? 0 : offsets[index - 1] + columnWidths[index - 1] + gap);
+      return offsets;
+    }, []);
+    return { margin, gap, columns, columnWidth, columnWidths, columnOffsets, startX, sourceWidth: desiredWidth };
   },
 
   _packDashboardConverterGridBlock_(group = [], metrics = {}, offsetY = 0) {
@@ -295,13 +342,14 @@ const converterMethods = {
       const visualColumn = rtl ? columns - 1 - column : column;
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: false });
       const height = Math.max(120, Math.round(Number(estimate.height || 240)));
-      const x = startX + visualColumn * (base.columnWidth + base.gap);
+      const x = startX + (base.columnOffsets?.[visualColumn] || 0);
       const y = heights[column];
+      const width = base.columnWidths?.[visualColumn] || base.columnWidth;
       entries.push({
         id: item.id,
         card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
         position: { x, y },
-        size: { width: base.columnWidth, height },
+        size: { width, height },
         z: item.z,
         tabId: item.tabId,
       });
