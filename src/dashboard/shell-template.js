@@ -4906,6 +4906,25 @@ export function getDashboardShellTemplate() {
         font-size:.86rem;
         line-height:1.45;
       }
+      .ddc-card-settings .ddc-card-theme-warning{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        padding:10px 12px;
+        border-radius:12px;
+        border:1px solid color-mix(in oklab, var(--ddc-popup-accent) 36%, var(--ddc-popup-line));
+        background:
+          linear-gradient(90deg, color-mix(in oklab, var(--ddc-popup-accent) 14%, transparent), transparent 78%),
+          color-mix(in oklab, var(--ddc-popup-elevated) 92%, transparent);
+        color:var(--primary-text-color, #f5f5f5);
+        font-size:.84rem;
+        line-height:1.45;
+      }
+      .ddc-card-settings .ddc-card-theme-warning ha-icon{
+        flex:0 0 auto;
+        color:var(--ddc-popup-accent);
+        --mdc-icon-size:20px;
+      }
       .ddc-card-settings input[type="text"],
       .ddc-card-settings select{
         min-height:44px!important;

@@ -244,6 +244,7 @@ const cardSettingsMenuMethods = {
       });
     };
 
+    const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_?.();
     const currentCardStyle = this._extractPerCardStyle_(wrap);
     const quickBackgroundPresets = [
       'transparent',
@@ -502,6 +503,18 @@ const cardSettingsMenuMethods = {
     const visibilitySection = makeSection('Visibility & placement', 'Control where this card appears and how it behaves inside the dashboard.');
     const styleSection = makeSection('Per-card style', 'Overrides Dashboard Settings for this card only.');
     const actionsSection = makeSection('Actions', 'Quick actions for this individual card.');
+
+    if (themeOwnsDesign) {
+      const themeWarning = document.createElement('div');
+      themeWarning.className = 'ddc-card-theme-warning';
+      const themeWarningIcon = document.createElement('ha-icon');
+      themeWarningIcon.setAttribute('icon', 'mdi:alert-circle-outline');
+      themeWarningIcon.setAttribute('aria-hidden', 'true');
+      const themeWarningText = document.createElement('span');
+      themeWarningText.textContent = "Prioritize theme colors is on. This card's background, text, border, and shadow choices are saved, but the dashboard theme controls the visible styling until that setting is turned off.";
+      themeWarning.append(themeWarningIcon, themeWarningText);
+      styleSection.appendChild(themeWarning);
+    }
 
     if (Array.isArray(this.tabs) && this.tabs.length > 1) {
       const tabSelect = document.createElement('select');

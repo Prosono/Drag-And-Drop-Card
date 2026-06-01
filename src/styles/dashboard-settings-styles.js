@@ -145,6 +145,28 @@ export function getSettingsStyles() {
   .auto-viewport-help p {
     margin:0;
   }
+  .theme-override-warning {
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid color-mix(in oklab, var(--primary-color, #03a9f4) 36%, var(--divider-color, rgba(0,0,0,.16)));
+    border-radius:10px;
+    background:
+      linear-gradient(90deg, color-mix(in oklab, var(--primary-color, #03a9f4) 12%, transparent), transparent 76%),
+      color-mix(in oklab, var(--ha-card-background, #fff) 92%, transparent);
+    color:var(--primary-text-color);
+    font-size:.86rem;
+    line-height:1.45;
+  }
+  .theme-override-warning[hidden] {
+    display:none !important;
+  }
+  .theme-override-warning ha-icon {
+    flex:0 0 auto;
+    color:var(--primary-color, #03a9f4);
+    --mdc-icon-size:20px;
+  }
   .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
 
   .ss-style-picker{

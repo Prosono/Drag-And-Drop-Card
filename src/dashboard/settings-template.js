@@ -263,6 +263,12 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         </div>
         <div class="hint" id="ddc-setting-dashboardThemeOverrideAllDesignHint">Optional: let the selected theme win over dashboard colors, card shadows, and per-card design overrides.</div>
       </div>
+
+      <div class="theme-override-warning" data-theme-color-warning hidden>
+        <ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon>
+        <span>Prioritize theme colors is on. These color choices are still saved, but the selected Home Assistant theme controls the visible dashboard and card colors until this setting is turned off.</span>
+      </div>
+
       <div class="section-actions">
         <button type="button" class="mini-action primary" id="ddc-randomize-allStyle">
           <ha-icon icon="mdi:palette-outline"></ha-icon>

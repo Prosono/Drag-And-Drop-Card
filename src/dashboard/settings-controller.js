@@ -166,6 +166,7 @@ const dashboardSettingsMethods = {
     const txtDashboardThemeHint = modal.querySelector('#ddc-setting-dashboardThemeHint');
     const chkDashboardThemeOverrideAllDesign = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesign');
     const txtDashboardThemeOverrideAllDesignHint = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesignHint');
+    const dashboardThemeColorWarning = modal.querySelector('[data-theme-color-warning]');
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
     const chkApplyPageBg = modal.querySelector('#ddc-setting-applyPageBackground');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
@@ -606,9 +607,17 @@ const dashboardSettingsMethods = {
               : 'Pick a Home Assistant theme to activate theme styling for this dashboard.');
       }
       if (txtDashboardThemeOverrideAllDesignHint) {
+        const overrideActive = !!selectedTheme && !!chkDashboardThemeOverrideAllDesign?.checked;
         txtDashboardThemeOverrideAllDesignHint.textContent = !selectedTheme
           ? 'Select a dashboard theme before override mode can take control.'
-          : 'Optional: let the selected theme win over dashboard colors, card shadows, and per-card design overrides.';
+          : (overrideActive
+              ? 'Active: the selected theme wins over dashboard colors, card shadows, and per-card design overrides.'
+              : 'Optional: let the selected theme win over dashboard colors, card shadows, and per-card design overrides.');
+      }
+      if (dashboardThemeColorWarning) {
+        const overrideActive = !!selectedTheme && !!chkDashboardThemeOverrideAllDesign?.checked;
+        dashboardThemeColorWarning.hidden = !overrideActive;
+        dashboardThemeColorWarning.style.display = overrideActive ? '' : 'none';
       }
     };
     const applyLiveDashboardThemePreview = () => {
