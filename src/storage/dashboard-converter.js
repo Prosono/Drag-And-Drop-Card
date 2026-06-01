@@ -128,15 +128,24 @@ const converterMethods = {
 
   _dashboardConverterPixelValue_(value, fallback = null, relativeTo = null) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
-    const raw = String(value ?? '').trim();
+    const raw = String(value ?? '')
+      .trim()
+      .replace(/!important/ig, '')
+      .replace(/;+\s*$/g, '')
+      .replace(/^['"]|['"]$/g, '')
+      .trim();
     if (!raw) return fallback;
     if (raw.endsWith('%') && Number(relativeTo) > 0) {
       const pct = Number.parseFloat(raw);
       return Number.isFinite(pct) ? (relativeTo * pct) / 100 : fallback;
     }
-    if (!/^-?\d+(?:\.\d+)?(?:px)?$/i.test(raw)) return fallback;
-    const parsed = Number.parseFloat(raw.replace(/px$/i, ''));
-    return Number.isFinite(parsed) ? parsed : fallback;
+    const length = raw.match(/^(-?\d+(?:\.\d+)?)(px|rem|em)?$/i);
+    if (!length) return fallback;
+    const parsed = Number.parseFloat(length[1]);
+    if (!Number.isFinite(parsed)) return fallback;
+    const unit = String(length[2] || 'px').toLowerCase();
+    if (unit === 'rem' || unit === 'em') return parsed * 16;
+    return parsed;
   },
 
   _dashboardConverterColumnWidthList_(columnWidths = null, columns = 1, fallbackWidth = 300, available = null) {
@@ -212,14 +221,18 @@ const converterMethods = {
     };
     const height =
       this._dashboardConverterPixelValue_(card?.height, null)
+      ?? this._dashboardConverterPixelValue_(card?.min_height ?? card?.minHeight, null)
       ?? this._dashboardConverterPixelValue_(card?.grid_options?.height, null)
       ?? readCssPx('height')
-      ?? readCssPx('min-height');
+      ?? readCssPx('min-height')
+      ?? readCssPx('max-height');
     const width =
       this._dashboardConverterPixelValue_(card?.width, null)
+      ?? this._dashboardConverterPixelValue_(card?.min_width ?? card?.minWidth, null)
       ?? this._dashboardConverterPixelValue_(card?.grid_options?.width, null)
       ?? readCssPx('width')
-      ?? readCssPx('min-width');
+      ?? readCssPx('min-width')
+      ?? readCssPx('max-width');
     const aspectRatio = this._dashboardConverterAspectRatio_(
       card?.aspect_ratio
       ?? card?.image_aspect_ratio
@@ -231,6 +244,8 @@ const converterMethods = {
     return {
       width: Number.isFinite(width) && width > 0 ? width : null,
       height: Number.isFinite(height) && height > 0 ? height : null,
+      explicitWidth: Number.isFinite(width) && width > 0,
+      explicitHeight: Number.isFinite(height) && height > 0,
       aspectRatio,
       gridColumns: Number.isFinite(gridColumns) && gridColumns > 0 ? gridColumns : null,
       gridRows: Number.isFinite(gridRows) && gridRows > 0 ? gridRows : null,
@@ -314,6 +329,62 @@ const converterMethods = {
     return withHints({ span: 1, height: 240 });
   },
 
+  _dashboardConverterCardHeightForWidth_(card = {}, width = 300, estimate = null, context = {}, depth = 0) {
+    const type = String(card?.type || '').toLowerCase();
+    const safeWidth = Math.max(120, Number(width || 300) || 300);
+    const hints = this._dashboardConverterCardSizeHints_(card);
+    if (hints.explicitHeight) return Math.max(80, Math.round(hints.height));
+
+    const currentEstimate = estimate || this._estimateDashboardConverterCardSize_(card, context);
+    if (currentEstimate?.aspectRatio) {
+      return Math.max(80, Math.round(safeWidth / Math.max(0.05, currentEstimate.aspectRatio)));
+    }
+
+    const children = depth < 4 && Array.isArray(card?.cards) ? card.cards.filter((child) => child && typeof child === 'object') : [];
+    if (children.length) {
+      const gap = 12;
+      if (type.includes('vertical-stack')) {
+        const childTotal = children.reduce((sum, child) => (
+          sum + this._dashboardConverterCardHeightForWidth_(child, safeWidth, null, { panel: false }, depth + 1)
+        ), 0);
+        return Math.max(140, Math.round(childTotal + gap * Math.max(0, children.length - 1)));
+      }
+      if (type.includes('horizontal-stack')) {
+        const childWidth = Math.max(120, (safeWidth - gap * Math.max(0, children.length - 1)) / Math.max(1, children.length));
+        const childMax = children.reduce((max, child) => Math.max(
+          max,
+          this._dashboardConverterCardHeightForWidth_(child, childWidth, null, { panel: false }, depth + 1)
+        ), 0);
+        return Math.max(140, Math.round(childMax));
+      }
+      if (type.includes('grid')) {
+        const columns = Math.max(1, Number(card.columns || 2) || 2);
+        const childWidth = Math.max(120, (safeWidth - gap * Math.max(0, columns - 1)) / columns);
+        const rows = [];
+        children.forEach((child, index) => {
+          const row = Math.floor(index / columns);
+          rows[row] = Math.max(
+            rows[row] || 0,
+            this._dashboardConverterCardHeightForWidth_(child, childWidth, null, { panel: false }, depth + 1)
+          );
+        });
+        return Math.max(160, Math.round(rows.reduce((sum, height) => sum + height, 0) + gap * Math.max(0, rows.length - 1) + 40));
+      }
+    }
+
+    let height = Number(currentEstimate?.height || 240) || 240;
+    if (safeWidth >= 1200) {
+      if (type.includes('picture') || type.includes('map') || type.includes('iframe') || type.includes('webpage')) {
+        height = Math.max(height, Math.round(safeWidth * 0.38));
+      } else if (type.includes('history') || type.includes('statistics') || type.includes('logbook')) {
+        height = Math.max(height, 360);
+      } else if (type.includes('calendar') || type.includes('todo')) {
+        height = Math.max(height, 420);
+      }
+    }
+    return Math.max(100, Math.round(height));
+  },
+
   _dashboardConverterViewportWidth_(variantKey = 'desktop_landscape') {
     try {
       const mode = this._normalizeContainerSizeMode_?.(this.containerSizeMode || this._config?.container_size_mode);
@@ -352,9 +423,13 @@ const converterMethods = {
     const edgeTop = canvasInset + layoutMargin.top + layoutPadding.top + cardMargin.top;
     const edgeBottom = canvasInset + layoutMargin.bottom + layoutPadding.bottom + cardMargin.bottom;
     const available = Math.max(180, canvasWidth - edgeLeft - edgeRight);
+    const explicitWidthValue = layoutOptions.width ?? layoutOptions.column_width;
+    const explicitWidth = this._dashboardConverterPixelValue_(explicitWidthValue, null, available);
+    const hasExplicitWidth = Number.isFinite(explicitWidth) && explicitWidth > 0;
+    const hasExplicitColumnWidths = layoutOptions.column_widths !== undefined && layoutOptions.column_widths !== null;
     const desiredWidth = Math.max(
       120,
-      this._dashboardConverterPixelValue_(layoutOptions.width ?? layoutOptions.column_width, 300, available)
+      this._dashboardConverterPixelValue_(explicitWidthValue, 300, available)
     );
     const rawMaxCols = this._dashboardConverterPixelValue_(
       layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions.columns,
@@ -363,13 +438,16 @@ const converterMethods = {
     const maxCols = Math.max(1, Math.floor(Number.isFinite(rawMaxCols) && rawMaxCols > 0 ? rawMaxCols : fallbackMaxCols));
     const columnsByWidth = Math.max(1, Math.floor((available + gap) / (desiredWidth + gap)));
     const columns = Math.max(1, Math.min(maxCols, columnsByWidth));
+    const preserveSingleColumnWidth = maxCols === 1 && (hasExplicitWidth || hasExplicitColumnWidths);
     const maxColumnWidth =
       this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available) > 0
         ? this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available)
         : Math.max(500, desiredWidth * 1.5);
     const columnWidth = Math.max(
       120,
-      Math.round(Math.min(desiredWidth, maxColumnWidth, (available - gap * (columns - 1)) / columns))
+      Math.round(preserveSingleColumnWidth
+        ? desiredWidth
+        : Math.min(desiredWidth, maxColumnWidth, (available - gap * (columns - 1)) / columns))
     );
     const rawColumnWidths = this._dashboardConverterColumnWidthList_(
       layoutOptions.column_widths,
@@ -378,7 +456,9 @@ const converterMethods = {
       available
     );
     const totalRawWidth = rawColumnWidths.reduce((sum, width) => sum + width, 0) + gap * (columns - 1);
-    const scale = totalRawWidth > available ? Math.max(0.1, (available - gap * (columns - 1)) / Math.max(1, totalRawWidth - gap * (columns - 1))) : 1;
+    const scale = !preserveSingleColumnWidth && totalRawWidth > available
+      ? Math.max(0.1, (available - gap * (columns - 1)) / Math.max(1, totalRawWidth - gap * (columns - 1)))
+      : 1;
     const columnWidths = rawColumnWidths.map((width) => Math.max(120, Math.round(width * scale)));
     const usedWidth = columnWidths.reduce((sum, width) => sum + width, 0) + gap * (columns - 1);
     const startX = edgeLeft + Math.max(0, Math.round((available - usedWidth) / 2));
@@ -398,6 +478,7 @@ const converterMethods = {
       edgeTop,
       edgeBottom,
       sourceWidth: desiredWidth,
+      preserveSingleColumnWidth,
     };
   },
 
@@ -422,8 +503,7 @@ const converterMethods = {
       }
       const slotWidth = Math.max(180, Math.round(columnWidth * span + gap * (span - 1)));
       const width = Math.max(180, Math.round(Math.min(estimate.width || slotWidth, slotWidth)));
-      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
-      const height = Math.max(120, Math.round(Number(heightFromAspect || estimate.height || 240)));
+      const height = this._dashboardConverterCardHeightForWidth_(item.card, width, estimate, { panel: item.panel });
       const x = margin + bestCol * (columnWidth + gap);
       const y = Number.isFinite(bestY) ? bestY : offsetY + margin;
       for (let col = bestCol; col < bestCol + span; col += 1) heights[col] = y + height + gap;
@@ -448,8 +528,10 @@ const converterMethods = {
     const entries = visibleGroup.map((item) => {
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: false });
       const minPanelHeight = visibleGroup.length === 1 ? Math.max(360, Math.round(canvasWidth * 0.42)) : 180;
-      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
-      const height = Math.max(120, Math.round(Math.max(Number(heightFromAspect || estimate.height || 240), minPanelHeight)));
+      const height = Math.max(
+        minPanelHeight,
+        this._dashboardConverterCardHeightForWidth_(item.card, width, estimate, { panel: false })
+      );
       const entry = {
         id: item.id,
         card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
@@ -492,8 +574,7 @@ const converterMethods = {
       const x = startX + (base.columnOffsets?.[visualColumn] || 0);
       const y = heights[column];
       const width = base.columnWidths?.[visualColumn] || base.columnWidth;
-      const heightFromAspect = estimate.aspectRatio ? width / estimate.aspectRatio : null;
-      const height = Math.max(120, Math.round(Number(heightFromAspect || estimate.height || 240)));
+      const height = this._dashboardConverterCardHeightForWidth_(item.card, width, estimate, { panel: false });
       entries.push({
         id: item.id,
         card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
