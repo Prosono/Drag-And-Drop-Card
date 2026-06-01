@@ -11517,8 +11517,7 @@ return {
 }
 
 .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
-  overflow-x:auto;
-  overflow-y:hidden;
+  overflow:visible;
   scrollbar-gutter:auto;
 }
 
@@ -11527,8 +11526,7 @@ return {
 }
 
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-layer-menu-open .ddc-tabs-scroller{
-  overflow-x:auto !important;
-  overflow-y:hidden !important;
+  overflow:visible !important;
 }
 
 .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-menu{
