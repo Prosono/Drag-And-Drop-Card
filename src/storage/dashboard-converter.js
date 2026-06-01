@@ -716,7 +716,13 @@ const converterMethods = {
     this._connectorDraft = null;
 
     const options = payload.options || {};
-    this._applyImportedOptions?.(options, true);
+    const previousSuppressResponsiveRebuild = !!this.__suppressResponsiveRebuild;
+    this.__suppressResponsiveRebuild = true;
+    try {
+      this._applyImportedOptions?.(options, true);
+    } finally {
+      this.__suppressResponsiveRebuild = previousSuppressResponsiveRebuild;
+    }
     this._responsiveLayouts = this._normalizeResponsiveLayouts_(cards, payload.responsive_layouts || null);
     const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || cards;
     this._config = {
@@ -726,8 +732,24 @@ const converterMethods = {
       responsive_layouts: this._cloneJson_?.(this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards)) || payload.responsive_layouts,
     };
 
-    await this._syncResponsiveProfileForViewport_?.({ force: true });
     this._applyOptionsToDom?.(this._config);
+    try {
+      this._applyContainerSizingFromConfig?.(true);
+      this._applyAutoScale?.();
+    } catch {}
+    const previousSuppressResponsiveMemoryPersist = !!this.__suppressResponsiveMemoryPersist;
+    this.__suppressResponsiveMemoryPersist = true;
+    try {
+      await this._syncResponsiveProfileForViewport_?.({ force: true });
+    } finally {
+      this.__suppressResponsiveMemoryPersist = previousSuppressResponsiveMemoryPersist;
+    }
+    const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const activeEntries = this._responsiveLayouts?.[activeLayoutKey] || primaryCards;
+    const mountedCards = this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.length || 0;
+    if (!mountedCards && activeEntries.length) {
+      await this._buildCardsFromEntries_?.(activeEntries);
+    }
     this._resizeContainer?.();
     try { this._syncTabsPlacement_?.(); this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); } catch {}
     try { this._applyVisibility_?.(); } catch {}

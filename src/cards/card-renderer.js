@@ -5,7 +5,12 @@
  * rebuilt when needed, and coordinates sidebar/card-mod rebuild behavior.
  */
 
-const raf = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+const raf = () => new Promise((resolve) => {
+  const scheduler = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (callback) => setTimeout(callback, 0);
+  scheduler(() => resolve());
+});
 
 /* Card creation, wrapper controls, card config extraction, and layout insertion helpers. */
 const cardBuilderMethods = {
@@ -28,7 +33,9 @@ const cardBuilderMethods = {
     this._clearSelection?.();
   
     let builtAny = false;
-    const canDeferCards = !this.editMode && Array.isArray(entries) && entries.length > 0;
+    let builtCardCount = 0;
+    const activeTabId = this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.defaultTab;
+    const canDeferInactiveTabs = !this.editMode && Array.isArray(this.tabs) && this.tabs.length > 1;
     for (const conf of Array.isArray(entries) ? entries : []) {
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
@@ -48,7 +55,8 @@ const cardBuilderMethods = {
         continue;
       }
 
-      if (canDeferCards) {
+      const entryTabId = this._normalizeTabId?.(normalized.tabId || this.defaultTab) || this.defaultTab;
+      if (canDeferInactiveTabs && entryTabId !== activeTabId) {
         const wrap = this._makeDeferredCardWrapper_(normalized);
         this.cardContainer.appendChild(wrap);
         this._initCardInteract(wrap);
@@ -56,7 +64,8 @@ const cardBuilderMethods = {
         continue;
       }
   
-      const cardEl = await this._createCard(normalized.card);
+      const cardEl = await this._createCardSafely_(normalized.card);
+      if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
       if (this.editMode) wrap.classList.add('editing');
       wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
@@ -80,6 +89,11 @@ const cardBuilderMethods = {
       try { this._rebuildOnce(wrap.firstElementChild); } catch {}
       this._initCardInteract(wrap);
       builtAny = true;
+      builtCardCount += 1;
+      if (!this.editMode && builtCardCount % 4 === 0) {
+        await raf();
+        if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+      }
     }
   
     if (!builtAny) {
@@ -96,11 +110,50 @@ const cardBuilderMethods = {
       this._renderLayersBar_?.();
       this._applyActiveTab?.();
     } catch {}
-    try {
-      this._hydrateVisibleDeferredCards_?.().catch?.(() => {});
-    } catch {}
     try { this._renderConnectors_?.(); } catch {}
   },
+
+    _makeCardLoadErrorElement_(cardConfig = {}, err = null) {
+      const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+      const type = String(cleanConfig?.type || 'unknown card');
+      const message = String(err?.message || err || 'This card could not be rendered.');
+      const el = document.createElement('div');
+      el.className = 'ddc-card-load-error';
+      el.__ddcSourceConfig = cleanConfig;
+      el.style.cssText = [
+        'box-sizing:border-box',
+        'width:100%',
+        'height:100%',
+        'display:flex',
+        'flex-direction:column',
+        'justify-content:center',
+        'gap:8px',
+        'padding:14px',
+        'border-radius:12px',
+        'border:1px solid color-mix(in oklab,var(--error-color,#ef4444) 42%,transparent)',
+        'background:color-mix(in oklab,var(--error-color,#ef4444) 10%,var(--card-background-color,#111827) 90%)',
+        'color:var(--primary-text-color,#f8fafc)',
+        'font:500 13px/1.35 var(--paper-font-body1_-_font-family,Arial,sans-serif)',
+        'overflow:auto',
+      ].join(';');
+      const title = document.createElement('strong');
+      title.textContent = `Could not render ${type}`;
+      title.style.cssText = 'font-size:13px;font-weight:800;color:var(--error-color,#ef4444);';
+      const body = document.createElement('div');
+      body.textContent = message;
+      body.style.cssText = 'color:var(--secondary-text-color,#94a3b8);word-break:break-word;';
+      el.append(title, body);
+      return el;
+    },
+
+    async _createCardSafely_(cfg) {
+      try {
+        return await this._createCard(cfg);
+      } catch (err) {
+        console.warn('[drag-and-drop-card] Could not create Lovelace card', { config: cfg, error: err });
+        return this._makeCardLoadErrorElement_(cfg, err);
+      }
+    },
 
     _makeDeferredCardElement_(cardConfig = {}) {
       const placeholder = document.createElement('div');
@@ -140,7 +193,7 @@ const cardBuilderMethods = {
         try { cardConfig = JSON.parse(wrap.dataset.cfg || 'null'); } catch {}
         if (!cardConfig || typeof cardConfig !== 'object') cardConfig = this._extractCardConfig(wrap.firstElementChild) || {};
         const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
-        const cardEl = await this._createCard(cleanConfig);
+        const cardEl = await this._createCardSafely_(cleanConfig);
         cardEl.__ddcSourceConfig = cleanConfig;
         const current = wrap.firstElementChild;
         if (current) wrap.replaceChild(cardEl, current);

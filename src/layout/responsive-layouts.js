@@ -612,6 +612,7 @@ const responsiveModelMethods = {
   },
 
   _persistCurrentResponsiveProfileToMemory_({ syncMembership = true } = {}) {
+    if (this.__suppressResponsiveMemoryPersist) return;
     if (this._loading || !this.cardContainer) return;
     if (!this._responsiveLayouts && !this.cardContainer.querySelector('.card-wrapper:not(.ddc-placeholder)')) return;
     const layoutKey = this._shouldUseSharedResponsiveLayout_?.()
