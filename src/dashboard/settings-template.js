@@ -166,31 +166,6 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Choose whether the canvas scales as one surface, uses exact custom dimensions, or follows a preset.</div>
       </div>
 
-      <!-- RESPONSIVE PREVIEW ASPECT LOCKS -->
-      <div class="setting" role="group" aria-labelledby="lbl-preview-aspect-locks" data-responsive-aspect-locks>
-        <div class="row">
-          <div class="title">
-            <ha-icon icon="mdi:link-variant" aria-hidden="true"></ha-icon>
-            <span id="lbl-preview-aspect-locks">Preview aspect ratio</span>
-          </div>
-          <div class="control preview-aspect-locks" role="group" aria-label="Preview aspect ratio locks">
-            <label class="preview-aspect-lock" for="ddc-setting-aspect-desktop">
-              <span>Desktop</span>
-              <ha-switch id="ddc-setting-aspect-desktop"></ha-switch>
-            </label>
-            <label class="preview-aspect-lock" for="ddc-setting-aspect-tablet">
-              <span>Tablet</span>
-              <ha-switch id="ddc-setting-aspect-tablet"></ha-switch>
-            </label>
-            <label class="preview-aspect-lock" for="ddc-setting-aspect-mobile">
-              <span>Mobile</span>
-              <ha-switch id="ddc-setting-aspect-mobile"></ha-switch>
-            </label>
-          </div>
-        </div>
-        <div class="hint">Turn a profile off to enter width and height independently in Auto preview.</div>
-      </div>
-
       <!-- AUTO VIEWPORT LIMITS -->
       <div class="setting" role="group" aria-labelledby="lbl-auto-viewport-limits" data-auto-viewport-limits>
         <div class="row">
@@ -209,7 +184,11 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
             </label>
           </div>
         </div>
-        <div class="hint">Caps live Auto mode on ultrawide displays. Leave empty or 0 for no cap.</div>
+        <div class="hint auto-viewport-help">
+          <p><strong>Max width</strong> sets the largest real screen width the live Auto canvas may use. For example, 1600 makes an ultrawide screen behave as if the canvas has at most 1600 px available, and the canvas is centered.</p>
+          <p><strong>Max scale</strong> sets how much the whole canvas may grow. For example, 1 means the canvas never grows beyond its original design size, while 1.2 allows 20% enlargement.</p>
+          <p><strong>Empty or 0</strong> keeps the previous unlimited behavior.</p>
+        </div>
       </div>
 
       <!-- SIZE EXTRAS (injected) -->

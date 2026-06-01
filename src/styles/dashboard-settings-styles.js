@@ -117,23 +117,6 @@ export function getSettingsStyles() {
   .chips { display:flex; gap:8px; flex-wrap:wrap; }
   .chip { border:1px solid var(--divider-color, rgba(0,0,0,.25)); padding:6px 10px; border-radius:999px; background:transparent; cursor:pointer; font-size:.9rem; }
   .chip[aria-pressed="true"] { background:var(--primary-color); color:#fff; border-color:transparent; }
-  .preview-aspect-locks { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-  .preview-aspect-lock {
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    min-height:34px;
-    padding:4px 8px;
-    border:1px solid var(--divider-color, rgba(0,0,0,.18));
-    border-radius:10px;
-    background:color-mix(in oklab, var(--card-background-color, #fff) 92%, transparent);
-    color:var(--primary-text-color);
-    font-size:.86rem;
-    font-weight:600;
-  }
-  .setting.is-disabled .preview-aspect-lock {
-    opacity:.55;
-  }
   .auto-viewport-limits {
     display:grid;
     grid-template-columns:repeat(2, minmax(120px, 1fr));
@@ -154,6 +137,13 @@ export function getSettingsStyles() {
   }
   .setting.is-disabled .auto-viewport-limits {
     opacity:.55;
+  }
+  .auto-viewport-help {
+    display:grid;
+    gap:5px;
+  }
+  .auto-viewport-help p {
+    margin:0;
   }
   .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
 
