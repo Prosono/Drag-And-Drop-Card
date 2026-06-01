@@ -229,6 +229,7 @@ const converterMethods = {
     const width =
       this._dashboardConverterPixelValue_(card?.width, null)
       ?? this._dashboardConverterPixelValue_(card?.min_width ?? card?.minWidth, null)
+      ?? this._dashboardConverterPixelValue_(card?.max_width ?? card?.maxWidth, null)
       ?? this._dashboardConverterPixelValue_(card?.grid_options?.width, null)
       ?? readCssPx('width')
       ?? readCssPx('min-width')
@@ -423,22 +424,27 @@ const converterMethods = {
     const edgeTop = canvasInset + layoutMargin.top + layoutPadding.top + cardMargin.top;
     const edgeBottom = canvasInset + layoutMargin.bottom + layoutPadding.bottom + cardMargin.bottom;
     const available = Math.max(180, canvasWidth - edgeLeft - edgeRight);
-    const explicitWidthValue = layoutOptions.width ?? layoutOptions.column_width;
-    const explicitWidth = this._dashboardConverterPixelValue_(explicitWidthValue, null, available);
-    const hasExplicitWidth = Number.isFinite(explicitWidth) && explicitWidth > 0;
-    const hasExplicitColumnWidths = layoutOptions.column_widths !== undefined && layoutOptions.column_widths !== null;
-    const desiredWidth = Math.max(
-      120,
-      this._dashboardConverterPixelValue_(explicitWidthValue, 300, available)
-    );
     const rawMaxCols = this._dashboardConverterPixelValue_(
       layoutOptions.max_cols ?? layoutOptions.maxCols ?? layoutOptions.columns,
       fallbackMaxCols
     );
     const maxCols = Math.max(1, Math.floor(Number.isFinite(rawMaxCols) && rawMaxCols > 0 ? rawMaxCols : fallbackMaxCols));
+    const maxWidthValue = layoutOptions.max_width ?? layoutOptions.maxWidth;
+    const explicitWidthValue = layoutOptions.width
+      ?? layoutOptions.column_width
+      ?? (maxCols === 1 ? maxWidthValue : undefined);
+    const explicitWidth = this._dashboardConverterPixelValue_(explicitWidthValue, null, available);
+    const hasExplicitWidth = Number.isFinite(explicitWidth) && explicitWidth > 0;
+    const hasExplicitColumnWidths = layoutOptions.column_widths !== undefined && layoutOptions.column_widths !== null;
+    const explicitMaxWidth = this._dashboardConverterPixelValue_(maxWidthValue, null, available);
+    const hasExplicitMaxWidth = maxCols === 1 && Number.isFinite(explicitMaxWidth) && explicitMaxWidth > 0;
+    const desiredWidth = Math.max(
+      120,
+      this._dashboardConverterPixelValue_(explicitWidthValue, 300, available)
+    );
     const columnsByWidth = Math.max(1, Math.floor((available + gap) / (desiredWidth + gap)));
     const columns = Math.max(1, Math.min(maxCols, columnsByWidth));
-    const preserveSingleColumnWidth = maxCols === 1 && (hasExplicitWidth || hasExplicitColumnWidths);
+    const preserveSingleColumnWidth = maxCols === 1 && (hasExplicitWidth || hasExplicitColumnWidths || hasExplicitMaxWidth);
     const maxColumnWidth =
       this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available) > 0
         ? this._dashboardConverterPixelValue_(layoutOptions.max_width ?? layoutOptions.maxWidth, null, available)
