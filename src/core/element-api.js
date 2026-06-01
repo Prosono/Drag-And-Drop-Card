@@ -73,7 +73,7 @@ const coreMethods = {
       const nodes = this._deepQueryAll('#storage_key');
       nodes.forEach((inp) => {
         try {
-          if (inp && inp.tagName === 'INPUT' && inp.value !== val) {
+          if (inp && 'value' in inp && inp.value !== val) {
             inp.value = val;
             inp.dispatchEvent(new Event('input', { bubbles: true }));
             inp.dispatchEvent(new Event('change', { bubbles: true }));

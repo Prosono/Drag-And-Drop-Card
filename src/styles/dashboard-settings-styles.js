@@ -1930,14 +1930,31 @@ export function getSettingsStyles() {
 
   /* Settings polish pass: one coherent system for all dashboard settings. */
   .dialog.modern{
-    --ddc-settings-line:color-mix(in oklab, var(--divider-color, rgba(0,0,0,.16)) 82%, transparent);
-    --ddc-settings-soft:color-mix(in oklab, var(--ha-card-background, #111827) 94%, var(--primary-color, #03a9f4) 6%);
-    --ddc-settings-field:color-mix(in oklab, var(--card-background-color, #111827) 92%, var(--primary-background-color, #050812));
+    --ddc-settings-surface:#ffffff;
+    --ddc-settings-surface-raised:#f6f8fb;
+    --ddc-settings-bg:#eef3f8;
+    --ddc-settings-text:#172033;
+    --ddc-settings-muted:#5f6b7a;
+    --ddc-settings-line:rgba(15, 23, 42, .14);
+    --ddc-settings-field:#ffffff;
+    --ddc-settings-field-border:rgba(15, 23, 42, .22);
     --ddc-settings-accent-soft:color-mix(in oklab, var(--primary-color, #03a9f4) 12%, transparent);
     border:1px solid color-mix(in oklab, var(--primary-color, #03a9f4) 16%, var(--ddc-settings-line));
+    color:var(--ddc-settings-text);
     background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ha-card-background, #fff) 96%, var(--primary-color, #03a9f4) 4%), var(--card-background-color, #fff));
+      linear-gradient(180deg, color-mix(in oklab, var(--ddc-settings-surface) 96%, var(--primary-color, #03a9f4) 4%), var(--ddc-settings-surface-raised));
     box-shadow:0 24px 80px rgba(0,0,0,.36);
+  }
+  .modal[data-ddc-theme="dark"] .dialog.modern{
+    --ddc-settings-surface:#121821;
+    --ddc-settings-surface-raised:#17212d;
+    --ddc-settings-bg:#0b1118;
+    --ddc-settings-text:#eef5fb;
+    --ddc-settings-muted:#a8b6c6;
+    --ddc-settings-line:rgba(171, 201, 222, .20);
+    --ddc-settings-field:#0d131b;
+    --ddc-settings-field-border:rgba(171, 201, 222, .30);
+    --ddc-settings-accent-soft:color-mix(in oklab, var(--primary-color, #03a9f4) 18%, transparent);
   }
   .dialog.modern > .dlg-head{
     min-height:58px;
@@ -1964,7 +1981,7 @@ export function getSettingsStyles() {
     gap:9px;
     padding:12px 16px;
     background:
-      linear-gradient(180deg, color-mix(in oklab, var(--ha-card-background, #fff) 94%, var(--primary-color, #03a9f4) 6%), color-mix(in oklab, var(--card-background-color, #fff) 98%, transparent));
+      linear-gradient(180deg, color-mix(in oklab, var(--ddc-settings-surface-raised) 94%, var(--primary-color, #03a9f4) 6%), var(--ddc-settings-bg));
     border-bottom:1px solid var(--ddc-settings-line);
   }
   .settings-tab{
@@ -1972,8 +1989,8 @@ export function getSettingsStyles() {
     padding:0 14px;
     border-radius:999px;
     border-color:var(--ddc-settings-line);
-    background:color-mix(in oklab, var(--ha-card-background, #fff) 76%, transparent);
-    color:color-mix(in oklab, var(--primary-text-color, #111827) 86%, var(--secondary-text-color, #64748b));
+    background:color-mix(in oklab, var(--ddc-settings-surface) 82%, transparent);
+    color:var(--ddc-settings-muted);
   }
   .settings-tab.active,
   .settings-tab[aria-selected="true"]{
@@ -1986,7 +2003,8 @@ export function getSettingsStyles() {
     row-gap:18px;
     padding:clamp(16px, 2vw, 24px);
     background:
-      linear-gradient(180deg, color-mix(in oklab, var(--primary-background-color, #0f172a) 7%, transparent), transparent 160px);
+      linear-gradient(180deg, color-mix(in oklab, var(--ddc-settings-bg) 74%, transparent), transparent 160px),
+      var(--ddc-settings-bg);
   }
   .settings-body > .card{
     border:1px solid var(--ddc-settings-line);
@@ -1994,7 +2012,7 @@ export function getSettingsStyles() {
     padding:18px 18px 20px;
     background:
       linear-gradient(180deg, rgba(255,255,255,.035), transparent 120px),
-      var(--ha-card-background, #fff);
+      var(--ddc-settings-surface);
     box-shadow:0 12px 34px rgba(0,0,0,.08);
   }
   section.card{
@@ -2021,7 +2039,7 @@ export function getSettingsStyles() {
   }
   .section-head h4,
   section.card:hover > .section-head h4{
-    color:var(--primary-text-color);
+    color:var(--ddc-settings-text);
     font-size:1.1rem;
     letter-spacing:0;
   }
@@ -2033,11 +2051,12 @@ export function getSettingsStyles() {
     border-radius:10px;
     background:
       linear-gradient(90deg, color-mix(in oklab, var(--primary-color, #03a9f4) 8%, transparent), transparent 72%);
-    color:color-mix(in oklab, var(--primary-text-color, #111827) 78%, var(--secondary-text-color, #64748b));
+    color:var(--ddc-settings-muted);
   }
   .tab-intro strong{
     display:inline;
     margin-right:4px;
+    color:var(--ddc-settings-text);
   }
   .setting{
     margin:0;
@@ -2057,13 +2076,13 @@ export function getSettingsStyles() {
   .setting .title{
     flex:0 0 250px;
     min-width:0;
-    color:var(--primary-text-color);
+    color:var(--ddc-settings-text);
     font-weight:750;
   }
   .setting .title ha-icon{
     --mdc-icon-size:19px;
     width:28px;
-    color:color-mix(in oklab, var(--primary-color, #03a9f4) 78%, var(--primary-text-color) 22%);
+    color:color-mix(in oklab, var(--primary-color, #03a9f4) 78%, var(--ddc-settings-text) 22%);
     opacity:1;
   }
   .setting .title label,
@@ -2080,7 +2099,7 @@ export function getSettingsStyles() {
   }
   .setting .hint,
   .hint{
-    color:color-mix(in oklab, var(--secondary-text-color, #64748b) 88%, var(--primary-text-color, #111827));
+    color:var(--ddc-settings-muted);
     font-size:.86rem;
     line-height:1.45;
   }
@@ -2109,8 +2128,8 @@ export function getSettingsStyles() {
     border:1px solid color-mix(in oklab, var(--primary-color, #03a9f4) 28%, var(--ddc-settings-line));
     background:
       linear-gradient(90deg, color-mix(in oklab, var(--primary-color, #03a9f4) 14%, transparent), transparent),
-      color-mix(in oklab, var(--ha-card-background, #fff) 82%, transparent);
-    color:color-mix(in oklab, var(--primary-color, #03a9f4) 78%, var(--primary-text-color, #111827));
+      color-mix(in oklab, var(--ddc-settings-surface) 82%, transparent);
+    color:color-mix(in oklab, var(--primary-color, #03a9f4) 78%, var(--ddc-settings-text));
     font-size:.82rem;
     font-weight:800;
     line-height:1.25;
@@ -2123,7 +2142,7 @@ export function getSettingsStyles() {
     border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 58%, transparent);
     background:
       linear-gradient(90deg, color-mix(in oklab, var(--primary-color, #03a9f4) 21%, transparent), transparent),
-      color-mix(in oklab, var(--ha-card-background, #fff) 92%, var(--primary-color, #03a9f4) 8%);
+      color-mix(in oklab, var(--ddc-settings-surface) 92%, var(--primary-color, #03a9f4) 8%);
     box-shadow:0 10px 26px color-mix(in oklab, var(--primary-color, #03a9f4) 14%, transparent);
   }
   .setting-doc-link:focus-visible{
@@ -2171,33 +2190,35 @@ export function getSettingsStyles() {
     min-height:42px;
     box-sizing:border-box;
     padding:8px 11px;
-    border:1px solid color-mix(in oklab, var(--primary-text-color, #111827) 24%, var(--ddc-settings-line));
+    border:1px solid var(--ddc-settings-field-border);
     border-radius:8px;
     background:
       linear-gradient(180deg, rgba(255,255,255,.04), transparent),
       var(--ddc-settings-field);
-    color:var(--primary-text-color);
+    color:var(--ddc-settings-text);
+    -webkit-text-fill-color:var(--ddc-settings-text);
     outline:none;
     box-shadow:
-      inset 0 0 0 1px color-mix(in oklab, var(--ha-card-background, #fff) 66%, transparent),
+      inset 0 0 0 1px color-mix(in oklab, var(--ddc-settings-surface) 66%, transparent),
       0 1px 2px rgba(0,0,0,.04);
     transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
   }
   .modern select{
     cursor:pointer;
     padding-right:32px;
-    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 32%, var(--primary-text-color, #111827) 18%);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 32%, var(--ddc-settings-text) 18%);
   }
   .modern input::placeholder,
   .modern textarea::placeholder{
-    color:color-mix(in oklab, var(--secondary-text-color, #64748b) 72%, transparent);
+    color:color-mix(in oklab, var(--ddc-settings-muted) 76%, transparent);
+    -webkit-text-fill-color:color-mix(in oklab, var(--ddc-settings-muted) 76%, transparent);
   }
   .modern select:hover,
   .modern input[type="text"]:hover,
   .modern input[type="number"]:hover,
   .modern input[type="password"]:hover,
   .modern textarea:hover{
-    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 52%, var(--primary-text-color, #111827) 12%);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 52%, var(--ddc-settings-text) 12%);
     box-shadow:
       inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #03a9f4) 10%, transparent),
       0 2px 8px rgba(0,0,0,.06);
@@ -2231,7 +2252,8 @@ export function getSettingsStyles() {
     padding:0 10px;
     border-radius:999px;
     border:1px solid var(--ddc-settings-line);
-    background:color-mix(in oklab, var(--ha-card-background, #fff) 72%, transparent);
+    background:color-mix(in oklab, var(--ddc-settings-surface-raised) 72%, transparent);
+    color:var(--ddc-settings-muted);
     font-weight:800;
     font-variant-numeric:tabular-nums;
   }
@@ -2254,8 +2276,9 @@ export function getSettingsStyles() {
   }
   .dialog.modern .chip{
     padding:0 13px;
-    background:color-mix(in oklab, var(--ha-card-background, #fff) 74%, transparent);
+    background:color-mix(in oklab, var(--ddc-settings-surface) 74%, transparent);
     border-color:var(--ddc-settings-line);
+    color:var(--ddc-settings-text);
   }
   .dialog.modern .chip:hover,
   .dialog.modern .mini-action:hover,
@@ -2276,7 +2299,17 @@ export function getSettingsStyles() {
     border:1px solid var(--ddc-settings-line);
     border-radius:12px;
     padding:12px;
-    background:color-mix(in oklab, var(--primary-background-color, #0f172a) 7%, transparent);
+    background:color-mix(in oklab, var(--ddc-settings-surface-raised) 88%, var(--ddc-settings-bg));
+  }
+  .dialog.modern .grid-demo{
+    --line-minor:color-mix(in oklab, var(--primary-color, #03a9f4) 30%, var(--ddc-settings-muted) 12%);
+    --line-major:color-mix(in oklab, var(--primary-color, #03a9f4) 58%, var(--ddc-settings-muted) 12%);
+    --line-axis:color-mix(in oklab, var(--primary-color, #03a9f4) 82%, var(--ddc-settings-text) 8%);
+    --grid-surface:color-mix(in oklab, var(--ddc-settings-surface-raised) 88%, var(--primary-color, #03a9f4) 6%);
+  }
+  .dialog.modern .grid-meta-badge{
+    color:var(--ddc-settings-muted);
+    background:color-mix(in oklab, var(--ddc-settings-surface) 88%, var(--primary-color, #03a9f4) 8%);
   }
   .color-group,
   .package-sync-status,
@@ -2287,12 +2320,12 @@ export function getSettingsStyles() {
     border-color:var(--ddc-settings-line);
     background:
       linear-gradient(180deg, rgba(255,255,255,.035), transparent),
-      color-mix(in oklab, var(--ha-card-background, #fff) 84%, transparent);
+      color-mix(in oklab, var(--ddc-settings-surface-raised) 84%, transparent);
   }
   .color-group-title{
     letter-spacing:.03em;
     opacity:1;
-    color:var(--secondary-text-color);
+    color:var(--ddc-settings-muted);
   }
   .swatch,
   .gradient{
@@ -2307,7 +2340,7 @@ export function getSettingsStyles() {
     padding:12px;
     background:
       linear-gradient(180deg, rgba(255,255,255,.03), transparent),
-      color-mix(in oklab, var(--ha-card-background, #fff) 92%, transparent);
+      color-mix(in oklab, var(--ddc-settings-surface-raised) 92%, transparent);
   }
   .tabs-card .tab-row,
   .layers-card .layer-row{
@@ -2326,10 +2359,100 @@ export function getSettingsStyles() {
   .footer{
     padding:14px 20px;
     border-top:1px solid var(--ddc-settings-line);
-    background:color-mix(in oklab, var(--ha-card-background, #fff) 92%, var(--primary-color, #03a9f4) 8%);
+    background:color-mix(in oklab, var(--ddc-settings-surface) 92%, var(--primary-color, #03a9f4) 8%);
   }
   .footer .btn{
     min-width:112px;
+  }
+
+  /* Dark/light-safe overrides for nested settings widgets that define their
+     own surfaces earlier in the stylesheet. */
+  .dialog.modern .ss-style-current strong,
+  .dialog.modern .ss-style-name,
+  .dialog.modern .ss-entity-slot strong,
+  .dialog.modern .tab-name input,
+  .dialog.modern #ddc-new-tab-name{
+    color:var(--ddc-settings-text);
+    -webkit-text-fill-color:var(--ddc-settings-text);
+  }
+  .dialog.modern .ss-style-current span,
+  .dialog.modern .ss-style-note,
+  .dialog.modern .ss-entity-slot span,
+  .dialog.modern .media-browser-meta,
+  .dialog.modern .feature-card-meta,
+  .dialog.modern .feature-card-summary{
+    color:var(--ddc-settings-muted);
+  }
+  .dialog.modern .ss-style-nav button{
+    border-color:var(--ddc-settings-line);
+    background:color-mix(in oklab, var(--ddc-settings-surface-raised) 88%, transparent);
+    color:var(--ddc-settings-text);
+  }
+  .dialog.modern .ss-style-nav button:hover{
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 44%, var(--ddc-settings-line));
+    background:var(--ddc-settings-accent-soft);
+  }
+  .dialog.modern .ss-style-carousel::-webkit-scrollbar{
+    height:8px;
+  }
+  .dialog.modern .ss-style-carousel::-webkit-scrollbar-thumb{
+    border-radius:999px;
+    background:color-mix(in oklab, var(--ddc-settings-muted) 58%, transparent);
+  }
+  .dialog.modern .ss-style-card{
+    border-color:var(--ddc-settings-line);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+      var(--ddc-settings-surface-raised);
+    color:var(--ddc-settings-text);
+    box-shadow:0 10px 24px rgba(0,0,0,.12);
+  }
+  .dialog.modern .ss-style-card[aria-selected="true"]{
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 68%, var(--ddc-settings-line));
+  }
+  .dialog.modern .ss-style-meta{
+    color:var(--ddc-settings-text);
+  }
+  .dialog.modern .ss-entity-row,
+  .dialog.modern .tab-row,
+  .dialog.modern .tabs-card .tab-row{
+    border-color:var(--ddc-settings-line);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.025), transparent),
+      color-mix(in oklab, var(--ddc-settings-surface-raised) 92%, transparent);
+  }
+  .dialog.modern .ss-entity-slot ha-icon,
+  .dialog.modern .tab-icon-wrap ha-icon{
+    color:color-mix(in oklab, var(--primary-color, #03a9f4) 78%, var(--ddc-settings-text) 22%);
+  }
+  .dialog.modern .ss-entity-fields input,
+  .dialog.modern .tabs-card .tab-name input,
+  .dialog.modern .tab-name input,
+  .dialog.modern #ddc-new-tab-name{
+    min-height:38px;
+    border:1px solid var(--ddc-settings-field-border);
+    border-radius:8px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.04), transparent),
+      var(--ddc-settings-field);
+    color:var(--ddc-settings-text);
+    -webkit-text-fill-color:var(--ddc-settings-text);
+    box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--ddc-settings-surface) 46%, transparent);
+  }
+  .dialog.modern .ss-entity-fields input::placeholder,
+  .dialog.modern .tabs-card .tab-name input::placeholder,
+  .dialog.modern #ddc-new-tab-name::placeholder{
+    color:color-mix(in oklab, var(--ddc-settings-muted) 78%, transparent);
+    -webkit-text-fill-color:color-mix(in oklab, var(--ddc-settings-muted) 78%, transparent);
+  }
+  .dialog.modern .ss-entity-fields input:focus,
+  .dialog.modern .tabs-card .tab-name input:focus,
+  .dialog.modern #ddc-new-tab-name:focus{
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 66%, transparent);
+    outline:none;
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--primary-color, #03a9f4) 18%, transparent),
+      inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #03a9f4) 18%, transparent);
   }
   .card-wrapper > .chip,
   .card-wrapper > .chip:hover{

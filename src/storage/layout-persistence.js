@@ -19,6 +19,14 @@ const persistenceMethods = {
     return first;
   },
 
+  _hasHassApi_() {
+    return !!(this.hass && typeof this.hass.callApi === 'function');
+  },
+
+  _hasHassWebSocketApi_() {
+    return !!(this.hass && typeof this.hass.callWS === 'function');
+  },
+
   // ---------------- Storage-mode persistence (Visual Editor path) ----------------
 
   // Ensure this card has a persistent id in its config (stored in Lovelace)
@@ -57,6 +65,7 @@ const persistenceMethods = {
 
   // Persist this._config back into the stored card (Storage dashboards)
   async _persistThisCardConfigToStorage_() {
+    if (!this._hasHassWebSocketApi_()) return false;
     await this._ensureCardIdSeededInStorage_();
     try {
       this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true });
@@ -269,7 +278,7 @@ const persistenceMethods = {
          if ('storageKey' in ref) delete ref.storageKey;
        }
 
-      console.debug('[ddc:import] persist -> saving', { patched: targets.length, keysTried: keys, patch });
+      console.debug('[ddc:import] persist -> saving', { patched: targets.length, keysTried: keys, patch: basePatch });
       await ll.saveConfig(cfg);
       return true;
     } catch (e) {
@@ -344,6 +353,11 @@ const persistenceMethods = {
 
   async _probeBackend() {
     this._backendOK = false;
+    if (!this._hasHassApi_()) {
+      this._dbgPush('probe', 'Skipped: Home Assistant API is not ready');
+      this._updateStoreBadge();
+      return false;
+    }
     const t0 = performance.now();
     try {
       this._dbgPush('probe', 'GET /api/dragdrop_storage (list keys)');
@@ -357,9 +371,14 @@ const persistenceMethods = {
       this._backendOK = false;
     }
     this._updateStoreBadge();
+    return this._backendOK;
   },
 
   async _loadLayoutFromBackend(key) {
+    if (!this._hasHassApi_()) {
+      this._dbgPush('load', 'Skipped backend load: Home Assistant API is not ready');
+      return null;
+    }
     const url = `dragdrop_storage/${encodeURIComponent(key)}`;
     const t0 = performance.now();
     try {
@@ -376,6 +395,9 @@ const persistenceMethods = {
   },
 
   async _saveLayoutToBackend(key, data) {
+    if (!this._hasHassApi_()) {
+      throw new Error('Home Assistant API is not ready');
+    }
     data = this._normalizeDashboardPayload_(data);
     const url = `dragdrop_storage/${encodeURIComponent(key)}`;
     const size = JSON.stringify(data).length;
@@ -411,6 +433,7 @@ const persistenceMethods = {
   },
 
   async _saveOptionsToBackend(key, newOptions) {
+    if (!this._hasHassApi_()) return false;
     try {
       const cur = await this._loadLayoutFromBackend(key);
       let local = null;

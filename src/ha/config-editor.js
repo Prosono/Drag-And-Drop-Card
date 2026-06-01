@@ -17,11 +17,29 @@ function createGetConfigElement(CardClass) {
     editor.style.display = 'grid';
     editor.style.gridTemplateColumns = '1fr';
     editor.style.rowGap = '12px';
-    // Create storage key input field
-    const text = document.createElement('ha-textfield');
+    // Use a native input instead of relying on ha-textfield being upgraded in
+    // every Home Assistant editor context. This keeps the storage key visible
+    // even on clean installs where HA lazy-loads form elements later.
+    const label = document.createElement('label');
+    label.setAttribute('for', 'storage_key');
+    label.textContent = 'Storage key';
+    label.style.fontWeight = '600';
+    label.style.display = 'block';
+    const text = document.createElement('input');
+    text.type = 'text';
     text.id = 'storage_key';
-    text.label = 'Storage key';
     text.placeholder = 'Auto-generated if left blank';
+    text.autocomplete = 'off';
+    text.spellcheck = false;
+    text.style.boxSizing = 'border-box';
+    text.style.width = '100%';
+    text.style.minHeight = '40px';
+    text.style.padding = '8px 10px';
+    text.style.border = '1px solid var(--divider-color, rgba(0,0,0,.2))';
+    text.style.borderRadius = '8px';
+    text.style.background = 'var(--card-background-color, white)';
+    text.style.color = 'var(--primary-text-color, inherit)';
+    editor.appendChild(label);
     editor.appendChild(text);
     // Provide helper text below the input
     const helper = document.createElement('div');
@@ -114,7 +132,11 @@ function createGetConfigElement(CardClass) {
     };
     // Dispatch config-changed event when the value changes
     text.addEventListener('input', () => {
-      editor.dispatchEvent(new CustomEvent('config-changed', { detail: { config: editor.getConfig() } }));
+      editor.dispatchEvent(new CustomEvent('config-changed', {
+        detail: { config: editor.getConfig() },
+        bubbles: true,
+        composed: true,
+      }));
     });
     return editor;
 

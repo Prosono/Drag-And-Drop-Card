@@ -28,6 +28,9 @@ const dashboardSettingsMethods = {
     // Build modal container
     const modal = document.createElement('div');
     modal.className = 'modal';
+    const settingsThemeMode = this._getEffectiveDashboardThemeMode_?.()
+      || (window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light');
+    modal.dataset.ddcTheme = settingsThemeMode === 'dark' ? 'dark' : 'light';
     // Use the existing .dialog styles for consistent centering and sizing. Limit
     // the maximum width so the settings sheet doesn't overwhelm the screen.
     this._ensureSettingsStyles_();
@@ -138,6 +141,7 @@ const dashboardSettingsMethods = {
 
     // Prepopulate current settings
     const chkAuto    = modal.querySelector('#ddc-setting-autoResize');
+    const inpStorageKey = modal.querySelector('#ddc-setting-storageKey');
     const inpGrid    = modal.querySelector('#ddc-setting-gridSize');
 
     const chkAnim    = modal.querySelector('#ddc-setting-animate');
@@ -1317,6 +1321,7 @@ const dashboardSettingsMethods = {
     selSize?.addEventListener('change', updateAutoResizeVisibility);
     selSize?.addEventListener('change', updateDoNotResizeTextState);
 
+    if (inpStorageKey) inpStorageKey.value = String(this.storageKey || this._config?.storage_key || '').trim();
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
     if (chkAnim)    chkAnim.checked    = !!this.animateCards;
@@ -2615,6 +2620,7 @@ const dashboardSettingsMethods = {
       e.stopPropagation();
       // Read values
       const newSize      = this._normalizeContainerSizeMode_(selSize?.value);
+      const newStorageKey = String(inpStorageKey?.value || this.storageKey || this._config?.storage_key || '').trim();
       const newAuto      = newSize === 'auto' ? true : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
@@ -2699,6 +2705,15 @@ const dashboardSettingsMethods = {
 
       // hero image not exposed to user
       try {
+        const resolvedStorageKey = newStorageKey || this._deriveStorageKeyFromConfig_?.(this._config || this.config || {}) || this.storageKey;
+        if (resolvedStorageKey) {
+          this.storageKey = resolvedStorageKey;
+          this._config = { ...(this._config || {}), storage_key: resolvedStorageKey };
+          this.config = { ...(this.config || {}), storage_key: resolvedStorageKey };
+          if (inpStorageKey) inpStorageKey.value = resolvedStorageKey;
+          this._syncEditorsStorageKey?.();
+        }
+
         // Auto resize cards
         this.autoResizeCards = newAuto;
 
@@ -2962,6 +2977,7 @@ const dashboardSettingsMethods = {
         // Update underlying config so changes persist in YAML/storage
         try {
           if (!this._config) this._config = {};
+          if (this.storageKey) this._config.storage_key = this.storageKey;
           this._config.grid                    = this.gridSize;
           if (this.connectorGridSize) this._config.connector_grid_size = this.connectorGridSize;
           else delete this._config.connector_grid_size;

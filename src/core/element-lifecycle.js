@@ -244,15 +244,21 @@ const lifecycleMethods = {
 
   set hass(hass) {
       this._hass = hass;
-      if (!this.__probed && hass) {
+      const hassApiReady = !!(hass && typeof hass.callApi === 'function');
+      if (!this.__probed && hassApiReady) {
         this.__probed = true;
         this._probeBackend().then(() => {
           this.__probed = true;
           if (!this.__booted && this.__cfgReady) {
             this.__booted = true;
             this._initialLoad(true);
+          } else if (this.__booted && this._backendOK && this.storageKey && !this.__booting) {
+            this._initialLoad(true);
           }
         });
+      } else if (!this.__booted && this.__cfgReady && hass) {
+        this.__booted = true;
+        this._initialLoad(true);
       }
 
       const wraps = this.cardContainer?.children || [];

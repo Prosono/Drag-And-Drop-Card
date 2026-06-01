@@ -56,6 +56,26 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       </div>
       <p class="tab-intro" id="ddc-settings-intro-layout"><strong>Layout sets the rules for the canvas.</strong> Fine-tune grid density, snapping, responsive sizing, and how cards sit on the page.</p>
 
+      <!-- STORAGE KEY -->
+      <div class="setting" role="group" aria-labelledby="lbl-storage-key">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:key-variant" aria-hidden="true"></ha-icon>
+            <label id="lbl-storage-key" for="ddc-setting-storageKey">Storage key</label>
+          </div>
+          <div class="control">
+            <input
+              type="text"
+              id="ddc-setting-storageKey"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="living_room_dashboard"
+            />
+          </div>
+        </div>
+        <div class="hint">Use a stable key to reuse the same saved layout after deleting or recreating the dashboard card.</div>
+      </div>
+
       <!-- GRID SIZE -->
       <div class="setting" role="group" aria-labelledby="lbl-grid-size">
         <div class="row">

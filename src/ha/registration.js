@@ -135,6 +135,7 @@ export function registerDragAndDropCard(DragAndDropCard, version) {
         name: 'Drag & Drop Card',
         description: 'Flexible grid layout card with drag‑and‑drop editing.',
         preview: false,
+        configurable: true,
         documentationURL: 'https://hads.smarti.dev/d/drag-and-drop-card',
         version: cardVersion,
         icon: 'mdi:cursor-move'
@@ -148,6 +149,7 @@ export function registerDragAndDropCard(DragAndDropCard, version) {
         current.name = 'Drag & Drop Card';
         current.description = 'Flexible grid layout card with drag‑and‑drop editing.';
         current.preview = false;
+        current.configurable = true;
         current.documentationURL = 'https://hads.smarti.dev/d/drag-and-drop-card';
         current.version = cardVersion;
         current.icon = 'mdi:cursor-move';

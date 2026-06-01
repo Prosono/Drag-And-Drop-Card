@@ -227,19 +227,9 @@ async function _persistOptionsToYaml(opts, {
     try {
       if (this?.hass?.callApi) {
         const r = await this.hass.callApi('get', 'dragdrop_storage');
-        const k = parseKeys(r);
-        if (k.length) return k;
+        return parseKeys(r);
       }
     } catch(e) { console.debug('[ddc:switcher] hass.callApi dragdrop_storage failed', e); }
-    const urls = ['/api/dragdrop_storage', '/api/dragdrop_storage/keys', '/api/dragdrop_storage/list', '/api/dragdrop_storage?all=1'];
-    for (const url of urls) {
-      try {
-        const resp = await fetch(url, { cache: 'no-store' });
-        const json = await resp.json();
-        const k = parseKeys(json);
-        if (k.length) return k;
-      } catch(e) {}
-    }
     return [];
   }
   async function _fetchLayoutByKey(key) {
@@ -261,22 +251,8 @@ async function _persistOptionsToYaml(opts, {
       } catch(e) {}
       return null;
     };
-    const tryFetch = async (url) => {
-      try {
-        const resp = await fetch(url, { cache: 'no-store' });
-        const ct = resp.headers.get('content-type') || '';
-        if (ct.includes('application/json') || ct.includes('text/plain')) {
-          const j = await resp.json().catch(()=>null) || await resp.text().catch(()=>null);
-          const d = parseDesign(j);
-          if (d) return d;
-        }
-      } catch(e) {}
-      return null;
-    };
     const enc = encodeURIComponent(key);
     return await (tryCall('get', `dragdrop_storage/${enc}`)
-      || tryFetch(`/api/dragdrop_storage/${enc}`)
-      || tryFetch(`/api/dragdrop_storage?key=${enc}`)
       || tryCall('post', 'dragdrop_storage/get', { key })
       || null);
   }
@@ -517,13 +493,6 @@ async function _persistOptionsToYaml(opts, {
             okDelete = false;
           }
         }
-        // Final fallback: direct HTTP DELETE call to /api/drag_and_drop_card_backend/<key>
-        if (!okDelete) {
-          try {
-            const resp = await fetch(`/api/drag_and_drop_card_backend/${encodeURIComponent(key)}`, { method: 'DELETE' });
-            if (resp && resp.ok) okDelete = true;
-          } catch(e) {}
-        }
         // Remove any local backup copy
         try { localStorage.removeItem(`ddc_local_${key}`); } catch(e) {}
         // Notify user
@@ -553,17 +522,6 @@ async function _persistOptionsToYaml(opts, {
             okRestore = true;
           }
         } catch(e) {}
-        // Fallback: POST directly via fetch
-        if (!okRestore) {
-          try {
-            const resp = await fetch(`/api/dragdrop_storage/${encodeURIComponent(restoreKey)}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(design)
-            });
-            if (resp && resp.ok) okRestore = true;
-          } catch(e) {}
-        }
         // Save a local copy as well
         try { localStorage.setItem(`ddc_local_${restoreKey}`, JSON.stringify(design)); } catch(e) {}
         if (okRestore) {
