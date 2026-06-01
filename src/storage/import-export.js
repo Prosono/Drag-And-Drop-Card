@@ -324,7 +324,7 @@ const designImportExportMethods = {
       // Core + behavior
       'grid','drag_live_snap','auto_save','auto_save_debounce',
       'debug','disable_overlap','card_mod','storage_key',
-      'animate_cards','auto_resize_cards','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
+      'animate_cards','auto_resize_cards','auto_viewport_max_width','auto_scale_max','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
       'connectors','responsive_connectors',
   
       // Visuals

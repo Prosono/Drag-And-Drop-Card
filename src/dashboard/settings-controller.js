@@ -156,6 +156,9 @@ const dashboardSettingsMethods = {
       profile,
       input: modal.querySelector(`#ddc-setting-aspect-${profile}`),
     }));
+    const autoViewportLimitsSetting = modal.querySelector('[data-auto-viewport-limits]');
+    const inpAutoViewportMaxWidth = modal.querySelector('#ddc-setting-autoViewportMaxWidth');
+    const inpAutoScaleMax = modal.querySelector('#ddc-setting-autoScaleMax');
     const chkDoNotResizeText = modal.querySelector('#ddc-setting-doNotResizeText');
     const txtDoNotResizeTextHint = modal.querySelector('#ddc-setting-doNotResizeTextHint');
     const chkOuterGridBuffer = modal.querySelector('#ddc-setting-outerGridBuffer');
@@ -1327,6 +1330,12 @@ const dashboardSettingsMethods = {
         return out;
       }, {})
     ) || this.responsiveViewportAspectLocks || {};
+    const normalizeAutoViewportMaxWidth = (value) => this._normalizeAutoViewportMaxWidth_?.(value) || 0;
+    const normalizeAutoScaleMax = (value) => this._normalizeAutoScaleMax_?.(value) || 0;
+    const formatOptionalNumber = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? String(n) : '';
+    };
     const syncResponsiveAspectLockControls = () => {
       const mode = this._normalizeContainerSizeMode_(selSize?.value);
       const supported = mode === 'auto';
@@ -1337,12 +1346,22 @@ const dashboardSettingsMethods = {
         input.disabled = !supported;
       });
     };
+    const syncAutoViewportLimitControls = () => {
+      const mode = this._normalizeContainerSizeMode_(selSize?.value);
+      const supported = mode === 'auto';
+      autoViewportLimitsSetting?.classList?.toggle?.('is-disabled', !supported);
+      [inpAutoViewportMaxWidth, inpAutoScaleMax].forEach((input) => {
+        if (input) input.disabled = !supported;
+      });
+    };
     updateAutoResizeVisibility();
     updateDoNotResizeTextState();
     syncResponsiveAspectLockControls();
+    syncAutoViewportLimitControls();
     selSize?.addEventListener('change', updateAutoResizeVisibility);
     selSize?.addEventListener('change', updateDoNotResizeTextState);
     selSize?.addEventListener('change', syncResponsiveAspectLockControls);
+    selSize?.addEventListener('change', syncAutoViewportLimitControls);
 
     if (inpStorageKey) inpStorageKey.value = String(this.storageKey || this._config?.storage_key || '').trim();
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
@@ -1354,9 +1373,16 @@ const dashboardSettingsMethods = {
     if (chkASave)   chkASave.checked   = !!this.autoSave;
     if (inpDeb)     inpDeb.value       = String(this.autoSaveDebounce ?? 800);
     if (selSize)    selSize.value      = this._normalizeContainerSizeMode_(this.containerSizeMode);
+    if (inpAutoViewportMaxWidth) {
+      inpAutoViewportMaxWidth.value = formatOptionalNumber(normalizeAutoViewportMaxWidth(this.autoViewportMaxWidth));
+    }
+    if (inpAutoScaleMax) {
+      inpAutoScaleMax.value = formatOptionalNumber(normalizeAutoScaleMax(this.autoScaleMax));
+    }
     updateAutoResizeVisibility();
     updateDoNotResizeTextState();
     syncResponsiveAspectLockControls();
+    syncAutoViewportLimitControls();
     responsiveAspectLockControls.forEach(({ profile, input }) => {
       input?.addEventListener?.('change', () => {
         try {
@@ -2669,6 +2695,8 @@ const dashboardSettingsMethods = {
       const newMobileDynamicBehavior = String(this.mobileDynamicBehavior || 'native').toLowerCase() === 'scale'
         ? 'scale'
         : 'native';
+      const newAutoViewportMaxWidth = normalizeAutoViewportMaxWidth(inpAutoViewportMaxWidth?.value);
+      const newAutoScaleMax = normalizeAutoScaleMax(inpAutoScaleMax?.value);
       const newDoNotResizeText = !!chkDoNotResizeText?.checked;
       const newOuterGridBuffer = !!chkOuterGridBuffer?.checked;
       const newOuterGridBufferCells = normalizeOuterGridBufferCells(rngOuterGridBufferCells?.value ?? this.outerGridBufferCells ?? 1);
@@ -2749,6 +2777,8 @@ const dashboardSettingsMethods = {
 
         // Auto resize cards
         this.autoResizeCards = newAuto;
+        this.autoViewportMaxWidth = newAutoViewportMaxWidth;
+        this.autoScaleMax = newAutoScaleMax;
 
         // If turning OFF: disconnect observers & listeners
         if (!this.autoResizeCards && this.__ddcResizeObs) {
@@ -3024,6 +3054,8 @@ const dashboardSettingsMethods = {
           this._config.auto_save_debounce      = this.autoSaveDebounce;
           this._config.container_size_mode     = this._normalizeContainerSizeMode_(this.containerSizeMode);
           this._config.container_preset_orientation = this.containerPresetOrient;
+          this._config.auto_viewport_max_width = this.autoViewportMaxWidth || undefined;
+          this._config.auto_scale_max          = this.autoScaleMax || undefined;
           this._config.optimize_for_mobile     = !!this.optimizeForMobile;
           this._config.mobile_dynamic_behavior = this.mobileDynamicBehavior || 'native';
           this._config.do_not_resize_text      = !!this.doNotResizeText;

@@ -485,23 +485,29 @@ _applyAutoScale() {
     Number(baseScale) || 0,
     Number(mobilePlan?.scale || 0) || 0
   );
-  const maxScale = isMobileAutoContext ? 1.2 : Number.POSITIVE_INFINITY;
+  const configuredMaxScale = this._normalizeAutoScaleMax_?.(this.autoScaleMax ?? this._config?.auto_scale_max) || 0;
+  const defaultMaxScale = isMobileAutoContext ? 1.2 : Number.POSITIVE_INFINITY;
+  const maxScale = configuredMaxScale > 0
+    ? Math.min(defaultMaxScale, configuredMaxScale)
+    : defaultMaxScale;
   const scale = Math.max(0.0001, Math.min(maxScale, preferredScale || 1));
   const targetDesignW = Math.max(1, d.w, minimumW, availableW / scale);
   const targetDesignH = Math.max(1, d.h, minimumH, availableH / scale);
   const visualW = Math.max(availableW, targetDesignW * scale);
   const visualH = Math.max(availableH, targetDesignH * scale);
+  const constrainedLiveWidth = !hasPreview && availableW < Math.max(1, Number(pw || 1) || 1) - 1;
+  const shouldCenterOuter = !!this._getViewportPreviewPreset_?.() || constrainedLiveWidth;
 
 	  if (this.__scaleOuter) {
 	    this.__scaleOuter.style.width  = `${availableW}px`;
 	    this.__scaleOuter.style.height = `${Math.max(1, hasPreview ? availableH : visualH)}px`;
 	    if (hasPreview) this.__scaleOuter.style.overflow = '';
 	    this.__scaleOuter.style.overflowX = (mobilePlan?.allowPanX || visualW > availableW + 1) ? 'auto' : 'hidden';
-	    this.__scaleOuter.style.overflowY = hasPreview ? 'auto' : 'hidden';
+    this.__scaleOuter.style.overflowY = hasPreview ? 'auto' : 'hidden';
     this.__scaleOuter.style.webkitOverflowScrolling = (hasPreview || mobilePlan?.allowPanX) ? 'touch' : '';
     this.__scaleOuter.style.overscrollBehavior = hasPreview ? 'contain' : '';
-    this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
-    this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
+    this.__scaleOuter.style.marginInline = shouldCenterOuter ? 'auto' : '';
+    this.__scaleOuter.style.maxWidth = shouldCenterOuter ? '100%' : '';
     this._applyPreviewDeviceFrame_?.(availableW, hasPreview ? availableH : visualH);
   }
 

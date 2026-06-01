@@ -107,7 +107,7 @@ const initialLoadMethods = {
           'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
           'container_background','card_background','card_shadow','card_shadow_intensity','debug','disable_overlap',
           'container_size_mode','container_fixed_width','container_fixed_height',
-          'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers_button_details','layers', 'auto_resize_cards', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'outer_grid_buffer_cells', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports', 'responsive_viewport_aspect_locks',
+          'container_preset','container_preset_orientation','tabs','tabs_position','default_tab','hide_tabs_when_single','layers_enabled','layers_button_details','layers', 'auto_resize_cards', 'auto_viewport_max_width', 'auto_scale_max', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'outer_grid_buffer_cells', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports', 'responsive_viewport_aspect_locks',
           // Ensure screen saver settings from YAML override persisted options on reload. Without
           // including these keys, the screensaver delay can become stuck because the overlay
           // of YAML values never occurs. Adding them keeps behaviour consistent with other

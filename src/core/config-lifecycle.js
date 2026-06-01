@@ -69,6 +69,12 @@ const setConfigMethods = {
       this.mobileDynamicBehavior    = String(config.mobile_dynamic_behavior ?? config.mobileDynamicBehavior ?? 'native').toLowerCase() === 'scale'
         ? 'scale'
         : 'native';
+      this.autoViewportMaxWidth     = this._normalizeAutoViewportMaxWidth_(
+        config.auto_viewport_max_width ?? config.autoViewportMaxWidth ?? this.autoViewportMaxWidth
+      );
+      this.autoScaleMax             = this._normalizeAutoScaleMax_(
+        config.auto_scale_max ?? config.autoScaleMax ?? this.autoScaleMax
+      );
       this.responsiveViewportAspectLocks = this._normalizeResponsiveViewportAspectLocks_(
         config.responsive_viewport_aspect_locks
         || config.responsiveViewportAspectLocks

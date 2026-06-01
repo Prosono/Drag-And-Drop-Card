@@ -41,6 +41,8 @@ const dashboardApiMethods = {
       container_fixed_height: this.containerFixedHeight ?? undefined,
       container_preset: this.containerPreset,
       auto_resize_cards: this._normalizeContainerSizeMode_(this.containerSizeMode || cfg.container_size_mode) === 'auto' ? true : !!this.autoResizeCards,
+      auto_viewport_max_width: this._normalizeAutoViewportMaxWidth_(this.autoViewportMaxWidth ?? cfg.auto_viewport_max_width) || undefined,
+      auto_scale_max: this._normalizeAutoScaleMax_(this.autoScaleMax ?? cfg.auto_scale_max) || undefined,
       optimize_for_mobile: !!this.optimizeForMobile,
       mobile_dynamic_behavior: this.mobileDynamicBehavior || 'native',
       do_not_resize_text: !!this.doNotResizeText,
@@ -139,6 +141,14 @@ const dashboardApiMethods = {
       this.mobileDynamicBehavior = String(opts.mobile_dynamic_behavior || 'native').toLowerCase() === 'scale'
         ? 'scale'
         : 'native';
+    }
+    if ('auto_viewport_max_width' in opts) {
+      this.autoViewportMaxWidth = this._normalizeAutoViewportMaxWidth_(opts.auto_viewport_max_width);
+      if (this._config) this._config.auto_viewport_max_width = this.autoViewportMaxWidth || undefined;
+    }
+    if ('auto_scale_max' in opts) {
+      this.autoScaleMax = this._normalizeAutoScaleMax_(opts.auto_scale_max);
+      if (this._config) this._config.auto_scale_max = this.autoScaleMax || undefined;
     }
     if ('outer_grid_buffer' in opts)  this.outerGridBuffer = !!opts.outer_grid_buffer;
     if ('outer_grid_buffer_cells' in opts || 'outerGridBufferCells' in opts) {
@@ -366,6 +376,8 @@ const dashboardApiMethods = {
       edit_mode_pin: { type: 'string' },
       animate_cards: { type: 'boolean' },
       auto_resize_cards: { type: 'boolean' },
+      auto_viewport_max_width: { type: 'number' },
+      auto_scale_max: { type: 'number' },
       optimize_for_mobile: { type: 'boolean' },
       mobile_dynamic_behavior: { type: 'string' },
       do_not_resize_text: { type: 'boolean' },
@@ -419,6 +431,8 @@ const dashboardApiMethods = {
       editModePin: 'edit_mode_pin',
       animateCards: 'animate_cards',
       autoResizeCards: 'auto_resize_cards',
+      autoViewportMaxWidth: 'auto_viewport_max_width',
+      autoScaleMax: 'auto_scale_max',
       optimizeForMobile: 'optimize_for_mobile',
       mobileDynamicBehavior: 'mobile_dynamic_behavior',
       doNotResizeText: 'do_not_resize_text',

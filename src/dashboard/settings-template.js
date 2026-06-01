@@ -191,6 +191,27 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Turn a profile off to enter width and height independently in Auto preview.</div>
       </div>
 
+      <!-- AUTO VIEWPORT LIMITS -->
+      <div class="setting" role="group" aria-labelledby="lbl-auto-viewport-limits" data-auto-viewport-limits>
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:monitor-screenshot" aria-hidden="true"></ha-icon>
+            <span id="lbl-auto-viewport-limits">Auto viewport limits</span>
+          </div>
+          <div class="control auto-viewport-limits" role="group" aria-label="Auto viewport limits">
+            <label class="auto-viewport-limit-field" for="ddc-setting-autoViewportMaxWidth">
+              <span>Max width</span>
+              <input type="number" id="ddc-setting-autoViewportMaxWidth" min="0" max="10000" step="10" placeholder="Unlimited" />
+            </label>
+            <label class="auto-viewport-limit-field" for="ddc-setting-autoScaleMax">
+              <span>Max scale</span>
+              <input type="number" id="ddc-setting-autoScaleMax" min="0" max="4" step="0.05" placeholder="Unlimited" />
+            </label>
+          </div>
+        </div>
+        <div class="hint">Caps live Auto mode on ultrawide displays. Leave empty or 0 for no cap.</div>
+      </div>
+
       <!-- SIZE EXTRAS (injected) -->
       <div id="ddc-setting-sizeExtras" class="setting" aria-live="polite"></div>
 

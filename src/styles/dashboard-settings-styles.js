@@ -134,6 +134,27 @@ export function getSettingsStyles() {
   .setting.is-disabled .preview-aspect-lock {
     opacity:.55;
   }
+  .auto-viewport-limits {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(120px, 1fr));
+    gap:10px;
+    min-width:min(420px, 100%);
+  }
+  .auto-viewport-limit-field {
+    display:grid;
+    gap:5px;
+    color:var(--primary-text-color);
+    font-size:.82rem;
+    font-weight:600;
+  }
+  .auto-viewport-limit-field input {
+    width:100%;
+    min-width:0;
+    box-sizing:border-box;
+  }
+  .setting.is-disabled .auto-viewport-limits {
+    opacity:.55;
+  }
   .preview { border:1px dashed var(--divider-color, rgba(0,0,0,.25)); border-radius:10px; padding:10px; }
 
   .ss-style-picker{

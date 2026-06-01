@@ -142,11 +142,13 @@ const viewportPreviewMethods = {
   },
 
   _getAvailableAutoCanvasViewport_(measuredWidth = 1, fallbackHeight = 1) {
-    const width = Math.max(1, this._getEffectivePreviewWidth_?.(measuredWidth) || measuredWidth || 1);
+    const rawWidth = Math.max(1, this._getEffectivePreviewWidth_?.(measuredWidth) || measuredWidth || 1);
     const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
     if (previewHeight > 0) {
-      return { width, height: previewHeight, isPreview: true };
+      return { width: rawWidth, height: previewHeight, isPreview: true };
     }
+    const maxLiveWidth = this._normalizeAutoViewportMaxWidth_?.(this.autoViewportMaxWidth ?? this._config?.auto_viewport_max_width) || 0;
+    const width = maxLiveWidth > 0 ? Math.min(rawWidth, maxLiveWidth) : rawWidth;
   
     let height = 0;
     try {

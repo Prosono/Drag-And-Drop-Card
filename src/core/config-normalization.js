@@ -54,6 +54,18 @@ const configHelperMethods = {
     return this.constructor.normalizeContainerSizeMode(mode);
   },
 
+  _normalizeAutoViewportMaxWidth_(value) {
+    const width = Number(value);
+    if (!Number.isFinite(width) || width <= 0) return 0;
+    return Math.max(240, Math.min(10000, Math.round(width)));
+  },
+
+  _normalizeAutoScaleMax_(value) {
+    const scale = Number(value);
+    if (!Number.isFinite(scale) || scale <= 0) return 0;
+    return Math.max(0.1, Math.min(4, Math.round(scale * 100) / 100));
+  },
+
   _parkedSidebarOptionKeys_() {
     return [
       'sidebar_enabled', 'sidebar_items', 'sidebar_content', 'sidebar_style',
@@ -87,6 +99,20 @@ const configHelperMethods = {
         next.auto_resize_cards = true;
       }
     }
+    if ('autoViewportMaxWidth' in next && !('auto_viewport_max_width' in next)) {
+      next.auto_viewport_max_width = next.autoViewportMaxWidth;
+    }
+    if ('autoScaleMax' in next && !('auto_scale_max' in next)) {
+      next.auto_scale_max = next.autoScaleMax;
+    }
+    if ('auto_viewport_max_width' in next) {
+      next.auto_viewport_max_width = this._normalizeAutoViewportMaxWidth_(next.auto_viewport_max_width);
+    }
+    if ('auto_scale_max' in next) {
+      next.auto_scale_max = this._normalizeAutoScaleMax_(next.auto_scale_max);
+    }
+    delete next.autoViewportMaxWidth;
+    delete next.autoScaleMax;
     return next;
   },
 

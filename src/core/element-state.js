@@ -38,6 +38,8 @@ export function initializeDragAndDropCardInstance(instance) {
   };
   instance.responsiveViewportProfiles = instance._defaultResponsiveViewportProfiles_();
   instance.responsiveViewportAspectLocks = instance._defaultResponsiveViewportAspectLocks_();
+  instance.autoViewportMaxWidth = 0;
+  instance.autoScaleMax = 0;
   instance.__responsiveSwitchSeq = 0;
   instance.__toolbarExpanded = false;
 }

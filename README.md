@@ -238,6 +238,8 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `container_fixed_height`       | number    | `null`                     | Fixed height (px) when `fixed_custom`. |
 | `container_preset`             | string    | `fhd` / `fullhd`           | Device/display preset key (see below) when `preset`. |
 | `container_preset_orientation` | string    | `auto`                     | `auto` \| `portrait` \| `landscape`. |
+| `auto_viewport_max_width`      | number    | `0`                        | Caps the live Auto canvas viewport width in px. `0` or empty keeps the old unlimited behavior. |
+| `auto_scale_max`               | number    | `0`                        | Caps the live Auto canvas scale. `0` or empty keeps the old unlimited behavior. |
 | `container_background`         | string    | `transparent`              | Canvas background (e.g. color/gradient). |
 | `card_background`              | string    | `var(--ha-card-background, var(--card-background-color))` | Default background for wrapped cards. |
 | `disable_overlap`              | boolean   | `false`                    | If `true`, prevents overlapping during edit (experimental - NOT RECCOMENDED WHEN USING TABS!). |
@@ -455,6 +457,8 @@ These are the most important option keys for an LLM to know:
 | `auto_save` | boolean | Save automatically |
 | `auto_save_debounce` | number | Auto-save delay in ms |
 | `container_size_mode` | string | `auto`, `fixed_custom`, `preset` |
+| `auto_viewport_max_width` | number | Maximum live Auto viewport width in px; `0` means unlimited |
+| `auto_scale_max` | number | Maximum live Auto scale; `0` means unlimited |
 | `container_background` | string | Dashboard background color or gradient |
 | `card_background` | string | Default wrapped card background |
 | `card_shadow` | boolean | Enable default card shadows |
