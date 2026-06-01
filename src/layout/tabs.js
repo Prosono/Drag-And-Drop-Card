@@ -19,6 +19,10 @@ const tabsLayoutMethods = {
     const hasLayerMenu = !!this._hasLayerMenu_?.();
     const sidebarNavActive = !!this._isSidebarNavigationActive_?.();
     const shouldRenderTabs = !!tabs.length && !(tabs.length === 1 && this.hideTabsWhenSingle);
+    const previousScrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
+    const previousScrollLeft = Number(previousScrollHost?.scrollLeft || 0) || 0;
+    const shouldPreserveScroll = !!this.__preserveTabsScrollOnNextRender;
+    this.__preserveTabsScrollOnNextRender = false;
     this._syncTabsPlacement_?.();
     if (!shouldRenderTabs && !hasLayerMenu) {
       this._closeLayersMenu_?.({ render: false });
@@ -77,6 +81,9 @@ const tabsLayoutMethods = {
         if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
       } catch {}
         }
+        else {
+          try { this._centerTabButtonInScroller_?.(btn); } catch {}
+        }
       });
       tabScroller.appendChild(btn);
     }
@@ -93,25 +100,26 @@ const tabsLayoutMethods = {
     // with the drag-and-drop container.
     try { this._syncTabsWidth_?.(); } catch {}
 
-    // Ensure the active tab is visible whenever tabs overflow.  Without this
-    // behaviour the bar may keep the active tab partially clipped or hidden
-    // behind the scroll mask.  Always bring the active tab into view
-    // regardless of viewport size if the bar overflows horizontally.  This
-    // uses `scrollIntoView({block:'nearest',inline:'nearest'})` which scrolls
-    // just enough to reveal the element without recentring the entire list.
+    try { this._refreshTabsAlignment_?.(); } catch {}
+
+    // Layer menu toggles re-render the tab bar, but they should not move the
+    // user's horizontal tab position. Real tab changes on mobile center the
+    // active tab, clamped at both ends of the scroll range.
     try {
       const activeBtn = bar.querySelector?.('.ddc-tab.active');
       const scrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
-      if (activeBtn && scrollHost.scrollWidth > scrollHost.clientWidth) {
-        activeBtn.scrollIntoView({
-          behavior: 'auto',
-          block: 'nearest',
-          inline: 'nearest',
+      const maxLeft = Math.max(0, Number(scrollHost.scrollWidth || 0) - Number(scrollHost.clientWidth || 0));
+      const clampLeft = (value) => Math.max(0, Math.min(maxLeft, Number(value || 0)));
+      if (shouldPreserveScroll) {
+        const restoredLeft = Math.max(0, Number(previousScrollLeft || 0));
+        scrollHost.scrollLeft = clampLeft(restoredLeft);
+        requestAnimationFrame(() => {
+          try { scrollHost.scrollLeft = Math.max(0, Math.min(Math.max(0, scrollHost.scrollWidth - scrollHost.clientWidth), restoredLeft)); } catch {}
         });
+      } else if (activeBtn && maxLeft > 0) {
+        this._centerTabButtonInScroller_?.(activeBtn);
       }
     } catch {}
-
-    try { this._refreshTabsAlignment_?.(); } catch {}
   },
 
   _applyActiveTab() {
@@ -538,6 +546,28 @@ const tabsLayoutMethods = {
       const clampedLeft = Math.max(minLeft, Math.min(maxLeft, proposedLeft));
 
       this.style.setProperty('--ddc-left-rail-left', `${Math.round(clampedLeft)}px`);
+    } catch {}
+  },
+
+  _centerTabButtonInScroller_(tabButton) {
+    try {
+      if (!tabButton) return;
+      const bar = this.tabsBar;
+      const scrollHost = tabButton.closest?.('.ddc-tabs-scroller') || bar;
+      if (!scrollHost) return;
+      const maxLeft = Math.max(0, Number(scrollHost.scrollWidth || 0) - Number(scrollHost.clientWidth || 0));
+      if (maxLeft <= 0) return;
+      const viewportWidth = window.visualViewport?.width || window.innerWidth || document.documentElement?.clientWidth || 0;
+      if (viewportWidth && viewportWidth <= 768) {
+        const targetLeft = tabButton.offsetLeft + (tabButton.offsetWidth / 2) - (scrollHost.clientWidth / 2);
+        scrollHost.scrollLeft = Math.max(0, Math.min(maxLeft, targetLeft));
+        return;
+      }
+      tabButton.scrollIntoView({
+        behavior: 'auto',
+        block: 'nearest',
+        inline: 'nearest',
+      });
     } catch {}
   },
 

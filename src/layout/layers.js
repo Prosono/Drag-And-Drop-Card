@@ -221,6 +221,7 @@ const layerMethods = {
     this.__layersMenuOpen = false;
     this._removeLayerMenuDismissHandlers_?.();
     if (render) {
+      this.__preserveTabsScrollOnNextRender = true;
       try { this._renderTabs?.(); } catch {}
     }
   },
@@ -388,6 +389,7 @@ const layerMethods = {
   
     trigger.addEventListener('click', (ev) => {
       ev.stopPropagation();
+      this.__preserveTabsScrollOnNextRender = true;
       this.__layersMenuOpen = !this.__layersMenuOpen;
       this._renderTabs?.();
     });
@@ -401,6 +403,7 @@ const layerMethods = {
         ev.preventDefault();
         ev.stopPropagation();
         if (!this.__layersMenuOpen) {
+          this.__preserveTabsScrollOnNextRender = true;
           this.__layersMenuOpen = true;
           this._renderTabs?.();
         }
