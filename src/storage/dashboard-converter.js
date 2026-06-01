@@ -78,6 +78,12 @@ const converterMethods = {
     return null;
   },
 
+  _dashboardConverterViewLayoutMode_(view = {}) {
+    const type = String(view?.type || '').trim().toLowerCase();
+    if (type === 'panel' || view?.panel === true) return 'panel';
+    return 'grid';
+  },
+
   _collectDashboardConverterCardsForView_(view = {}) {
     const cards = [];
     const badges = Array.isArray(view.badges)
@@ -169,6 +175,27 @@ const converterMethods = {
 
     let globalIndex = 0;
     return Array.from(groups.values()).flatMap((group) => {
+      if (group.some((item) => item.layoutMode === 'panel' || item.panel)) {
+        let y = margin;
+        const width = Math.max(180, Math.round(canvasWidth - margin * 2));
+        return group.map((item) => {
+          const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: false });
+          const minPanelHeight = group.length === 1 ? Math.max(360, Math.round(canvasWidth * 0.42)) : 180;
+          const height = Math.max(120, Math.round(Math.max(Number(estimate.height || 240), minPanelHeight)));
+          const entry = {
+            id: item.id,
+            card: this._cloneJson_?.(item.card) || JSON.parse(JSON.stringify(item.card)),
+            position: { x: margin, y },
+            size: { width, height },
+            z: 6 + globalIndex,
+            tabId: item.tabId,
+          };
+          y += height + gap;
+          globalIndex += 1;
+          return entry;
+        });
+      }
+
       const heights = Array(columns).fill(margin);
       return group.map((item) => {
         const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: item.panel });
@@ -211,6 +238,7 @@ const converterMethods = {
     const items = [];
     views.forEach((view, viewIndex) => {
       const tabId = this._normalizeDashboardConverterTabId_(view, viewIndex, usedTabIds);
+      const layoutMode = this._dashboardConverterViewLayoutMode_(view);
       const title = String(view.title || view.path || `View ${viewIndex + 1}`).trim();
       tabs.push({
         id: tabId,
@@ -223,7 +251,8 @@ const converterMethods = {
           id: this._dashboardConverterCardId_(viewIndex, cardIndex),
           tabId,
           card,
-          panel: String(view.type || '').toLowerCase() === 'panel' && cards.length === 1,
+          layoutMode,
+          panel: layoutMode === 'panel',
         });
       });
     });
