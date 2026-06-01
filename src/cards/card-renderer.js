@@ -28,8 +28,7 @@ const cardBuilderMethods = {
     this._clearSelection?.();
   
     let builtAny = false;
-    const activeTabId = this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.defaultTab;
-    const canDeferInactiveTabs = !this.editMode && Array.isArray(this.tabs) && this.tabs.length > 1;
+    const canDeferCards = !this.editMode && Array.isArray(entries) && entries.length > 0;
     for (const conf of Array.isArray(entries) ? entries : []) {
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
@@ -49,8 +48,7 @@ const cardBuilderMethods = {
         continue;
       }
 
-      const entryTabId = this._normalizeTabId?.(normalized.tabId || this.defaultTab) || this.defaultTab;
-      if (canDeferInactiveTabs && entryTabId !== activeTabId) {
+      if (canDeferCards) {
         const wrap = this._makeDeferredCardWrapper_(normalized);
         this.cardContainer.appendChild(wrap);
         this._initCardInteract(wrap);
@@ -97,6 +95,9 @@ const cardBuilderMethods = {
       this._renderTabs?.();
       this._renderLayersBar_?.();
       this._applyActiveTab?.();
+    } catch {}
+    try {
+      this._hydrateVisibleDeferredCards_?.().catch?.(() => {});
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
   },
@@ -172,8 +173,16 @@ const cardBuilderMethods = {
         return true;
       });
       if (!candidates.length) return 0;
-      const results = await Promise.all(candidates.map((wrap) => this._hydrateDeferredCardWrapper_(wrap)));
-      const count = results.filter(Boolean).length;
+      const batchSize = Math.max(1, Math.min(12, Number(this._config?.dashboard_converter_hydrate_batch_size || 4) || 4));
+      let count = 0;
+      for (let index = 0; index < candidates.length; index += batchSize) {
+        const batch = candidates.slice(index, index + batchSize);
+        const results = await Promise.all(batch.map((wrap) => this._hydrateDeferredCardWrapper_(wrap)));
+        count += results.filter(Boolean).length;
+        if (index + batchSize < candidates.length) {
+          try { await raf(); } catch {}
+        }
+      }
       if (count) {
         try { this._applyVisibility_?.(); } catch {}
         try { this._renderConnectors_?.(); } catch {}

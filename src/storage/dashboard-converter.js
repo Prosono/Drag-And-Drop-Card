@@ -316,13 +316,28 @@ const converterMethods = {
 
   _dashboardConverterViewportWidth_(variantKey = 'desktop_landscape') {
     try {
+      const mode = this._normalizeContainerSizeMode_?.(this.containerSizeMode || this._config?.container_size_mode);
+      if (mode === 'preset' || mode === 'fixed' || mode === 'fixed_custom') {
+        const fixed = this._resolveFixedSize?.();
+        const fixedWidth = Number(fixed?.w || fixed?.width || 0);
+        if (Number.isFinite(fixedWidth) && fixedWidth > 0) return fixedWidth;
+        const size = this._getContainerSize?.() || {};
+        const width = Number(size.w || size.width || 0);
+        if (Number.isFinite(width) && width > 0) return Math.max(500, width);
+      }
+    } catch {}
+    try {
       const { profile, orientation } = this._splitResponsiveLayoutKey_(variantKey);
       const viewport = this._getResponsiveViewportProfile_?.(profile, orientation);
       const width = Number(viewport?.width || 0);
       if (Number.isFinite(width) && width > 0) return width;
     } catch {}
-    const size = this._getContainerSize?.() || {};
-    return Math.max(500, Number(size.w || size.width || 1430) || 1430);
+    try {
+      const size = this._getContainerSize?.() || {};
+      const width = Number(size.w || size.width || 0);
+      if (Number.isFinite(width) && width > 0) return Math.max(500, width);
+    } catch {}
+    return 1430;
   },
 
   _dashboardConverterColumnLayoutMetrics_(layoutOptions = {}, canvasWidth = 1430, fallbackMaxCols = 4) {
