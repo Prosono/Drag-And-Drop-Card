@@ -349,6 +349,118 @@ const converterMethods = {
       || {};
   },
 
+  _dashboardConverterIsAutoEntitiesCard_(card = {}) {
+    return String(card?.type || '').trim().toLowerCase() === 'custom:auto-entities';
+  },
+
+  _dashboardConverterGlobMatches_(value = '', pattern = '') {
+    const raw = String(pattern ?? '').trim();
+    if (!raw || raw === '*') return true;
+    const text = String(value ?? '');
+    if (raw.startsWith('/') && raw.endsWith('/') && raw.length > 2) {
+      try { return new RegExp(raw.slice(1, -1), 'i').test(text); } catch {}
+    }
+    const escaped = raw.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+    return new RegExp(`^${escaped}$`, 'i').test(text);
+  },
+
+  _dashboardConverterValueMatches_(actual, expected) {
+    if (Array.isArray(expected)) return expected.some((item) => this._dashboardConverterValueMatches_(actual, item));
+    if (expected == null) return true;
+    const actualText = String(actual ?? '');
+    const expectedText = String(expected ?? '').trim();
+    if (!expectedText || expectedText === '*') return true;
+    const comparison = expectedText.match(/^(<=|>=|<|>|!=|=)\s*(-?\d+(?:\.\d+)?)$/);
+    if (comparison) {
+      const actualNum = Number(actualText);
+      const expectedNum = Number(comparison[2]);
+      if (!Number.isFinite(actualNum) || !Number.isFinite(expectedNum)) return false;
+      const op = comparison[1];
+      if (op === '<') return actualNum < expectedNum;
+      if (op === '<=') return actualNum <= expectedNum;
+      if (op === '>') return actualNum > expectedNum;
+      if (op === '>=') return actualNum >= expectedNum;
+      if (op === '!=') return actualNum !== expectedNum;
+      return actualNum === expectedNum;
+    }
+    if (expectedText.includes('*') || expectedText.includes('?')) {
+      return this._dashboardConverterGlobMatches_(actualText, expectedText);
+    }
+    return actualText.toLowerCase() === expectedText.toLowerCase();
+  },
+
+  _dashboardConverterEntityMatchesAutoFilter_(stateObj = {}, filter = {}) {
+    if (!stateObj?.entity_id) return false;
+    if (typeof filter === 'string') return this._dashboardConverterGlobMatches_(stateObj.entity_id, filter);
+    if (!filter || typeof filter !== 'object') return false;
+    let checks = 0;
+    let failed = false;
+    const check = (ok) => {
+      checks += 1;
+      if (!ok) failed = true;
+    };
+    const entityId = String(stateObj.entity_id || '');
+    const domain = entityId.split('.')[0] || '';
+    const attrs = stateObj.attributes || {};
+    if (filter.entity_id !== undefined) check(this._dashboardConverterValueMatches_(entityId, filter.entity_id));
+    if (filter.entity !== undefined) check(this._dashboardConverterValueMatches_(entityId, filter.entity));
+    if (filter.domain !== undefined) check(this._dashboardConverterValueMatches_(domain, filter.domain));
+    if (filter.state !== undefined) check(this._dashboardConverterValueMatches_(stateObj.state, filter.state));
+    if (filter.name !== undefined) check(this._dashboardConverterValueMatches_(attrs.friendly_name || entityId, filter.name));
+    if (filter.device_class !== undefined) check(this._dashboardConverterValueMatches_(attrs.device_class, filter.device_class));
+    if (filter.unit_of_measurement !== undefined) check(this._dashboardConverterValueMatches_(attrs.unit_of_measurement, filter.unit_of_measurement));
+    if (filter.attributes && typeof filter.attributes === 'object') {
+      Object.entries(filter.attributes).forEach(([key, value]) => {
+        check(this._dashboardConverterValueMatches_(attrs?.[key], value));
+      });
+    }
+    return checks > 0 && !failed;
+  },
+
+  _dashboardConverterAutoEntitiesCount_(card = {}) {
+    if (!this._dashboardConverterIsAutoEntitiesCard_(card)) return null;
+    const states = this.hass?.states && typeof this.hass.states === 'object' ? Object.values(this.hass.states) : [];
+    if (!states.length) return null;
+    const filter = card.filter || {};
+    const include = Array.isArray(filter.include) ? filter.include : [];
+    if (!include.length) return null;
+    const exclude = Array.isArray(filter.exclude) ? filter.exclude : [];
+    const matches = new Map();
+    include.forEach((rule) => {
+      states.forEach((stateObj) => {
+        if (this._dashboardConverterEntityMatchesAutoFilter_(stateObj, rule)) {
+          matches.set(stateObj.entity_id, stateObj);
+        }
+      });
+    });
+    if (exclude.length && matches.size) {
+      for (const [entityId, stateObj] of Array.from(matches.entries())) {
+        if (exclude.some((rule) => this._dashboardConverterEntityMatchesAutoFilter_(stateObj, rule))) {
+          matches.delete(entityId);
+        }
+      }
+    }
+    return matches.size;
+  },
+
+  _dashboardConverterAutoEntitiesHeightEstimate_(card = {}, width = 300) {
+    if (!this._dashboardConverterIsAutoEntitiesCard_(card)) return null;
+    const count = this._dashboardConverterAutoEntitiesCount_(card);
+    const include = Array.isArray(card?.filter?.include) ? card.filter.include.length : 0;
+    const rows = Number.isFinite(count) ? count : Math.max(8, Math.min(32, include * 6 || 12));
+    const nestedType = String(card?.card?.type || card?.card_param || 'entities').toLowerCase();
+    const titlePad = (card?.card?.title || card?.title) ? 72 : 44;
+    if (nestedType.includes('grid')) {
+      const columns = Math.max(1, Number(card?.card?.columns || (Number(width) > 720 ? 4 : 2)) || 2);
+      return Math.max(180, Math.min(7200, titlePad + Math.ceil(rows / columns) * 170 + 32));
+    }
+    if (nestedType.includes('glance')) {
+      const columns = Number(width) > 720 ? 6 : 3;
+      return Math.max(160, Math.min(7200, titlePad + Math.ceil(rows / columns) * 74 + 32));
+    }
+    return Math.max(180, Math.min(7200, titlePad + rows * 44 + 36));
+  },
+
   _dashboardConverterAspectRatio_(value = null) {
     const raw = String(value ?? '').trim();
     if (!raw) return null;
@@ -449,6 +561,7 @@ const converterMethods = {
     const nestedCount = Array.isArray(card.cards) ? card.cards.length : 0;
     const panel = !!context.panel;
     const hints = this._dashboardConverterCardSizeHints_(card);
+    const autoEntitiesHeight = this._dashboardConverterAutoEntitiesHeightEstimate_(card, hints.width || context.width || 340);
     const withHints = (estimate = {}) => {
       const next = { ...estimate };
       if (hints.gridColumns) next.span = Math.max(Number(next.span || 1), Math.ceil(hints.gridColumns / 4));
@@ -464,6 +577,7 @@ const converterMethods = {
     };
 
     if (panel) return withHints({ span: 4, height: 640, full: true });
+    if (autoEntitiesHeight) return withHints({ span: 1, height: autoEntitiesHeight });
     if (type.includes('picture') || type.includes('map') || type.includes('iframe') || type.includes('webpage')) {
       return withHints({ span: 2, height: 360 });
     }
@@ -491,6 +605,8 @@ const converterMethods = {
     if (hints.explicitHeight) return Math.max(80, Math.round(hints.height));
 
     const currentEstimate = estimate || this._estimateDashboardConverterCardSize_(card, context);
+    const autoEntitiesHeight = this._dashboardConverterAutoEntitiesHeightEstimate_(card, safeWidth);
+    if (autoEntitiesHeight) return Math.max(100, Math.round(autoEntitiesHeight));
     if (currentEstimate?.aspectRatio) {
       return Math.max(80, Math.round(safeWidth / Math.max(0.05, currentEstimate.aspectRatio)));
     }
@@ -896,6 +1012,160 @@ const converterMethods = {
     });
   },
 
+  _dashboardConverterNextFrame_() {
+    return new Promise((resolve) => {
+      const schedule = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback) => setTimeout(callback, 0);
+      schedule(() => resolve());
+    });
+  },
+
+  async _dashboardConverterWaitForMeasuredRender_(delayMs = 0) {
+    await this._dashboardConverterNextFrame_();
+    await this._dashboardConverterNextFrame_();
+    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    await this._dashboardConverterNextFrame_();
+  },
+
+  _dashboardConverterMeasureImportedCardHeight_(wrap) {
+    if (!wrap || wrap.dataset?.ddcDeferred === 'true') return null;
+    const current = Math.max(1, Number.parseFloat(wrap.style.height || '') || wrap.getBoundingClientRect?.().height || 0);
+    const candidates = [wrap.scrollHeight || 0, wrap.getBoundingClientRect?.().height || 0];
+    const cardEl = wrap.firstElementChild;
+    if (cardEl) {
+      candidates.push(cardEl.scrollHeight || 0, cardEl.getBoundingClientRect?.().height || 0);
+      const roots = [cardEl.shadowRoot, cardEl];
+      roots.forEach((root) => {
+        try {
+          const haCard = root?.querySelector?.('ha-card');
+          if (haCard) candidates.push(haCard.scrollHeight || 0, haCard.getBoundingClientRect?.().height || 0);
+          const cardContent = root?.querySelector?.('.card-content, hui-entities-card, hui-grid-card, hui-glance-card');
+          if (cardContent) candidates.push(cardContent.scrollHeight || 0, cardContent.getBoundingClientRect?.().height || 0);
+        } catch {}
+      });
+    }
+    const measured = Math.ceil(Math.max(...candidates.filter((value) => Number.isFinite(value) && value > 0)));
+    if (!Number.isFinite(measured) || measured <= current + 8) return null;
+    const grid = Math.max(1, Number(this.gridSize || this._config?.grid || 10) || 10);
+    return Math.ceil((measured + 8) / grid) * grid;
+  },
+
+  _dashboardConverterEntriesOverlapX_(a = {}, b = {}) {
+    const ax = Number(a?.position?.x || 0) || 0;
+    const bx = Number(b?.position?.x || 0) || 0;
+    const aw = Math.max(1, Number(a?.size?.width || 0) || 0);
+    const bw = Math.max(1, Number(b?.size?.width || 0) || 0);
+    return ax < bx + bw - 4 && bx < ax + aw - 4;
+  },
+
+  _dashboardConverterApplyMeasuredCardHeights_(measurements = new Map(), layoutKey = '') {
+    if (!measurements?.size || !this._responsiveLayouts) return false;
+    const activeKey = layoutKey || this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const sourceEntries = Array.isArray(this._responsiveLayouts?.[activeKey])
+      ? this._responsiveLayouts[activeKey]
+      : [];
+    if (!sourceEntries.length) return false;
+    const entries = sourceEntries.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+    const byId = new Map(entries.map((entry) => [String(entry.id || ''), entry]));
+    const changes = Array.from(measurements.entries())
+      .map(([id, height]) => ({ id: String(id), height: Number(height), entry: byId.get(String(id)) }))
+      .filter((item) => item.entry && Number.isFinite(item.height) && item.height > Number(item.entry.size?.height || 0) + 8)
+      .sort((a, b) => (Number(a.entry.position?.y || 0) - Number(b.entry.position?.y || 0)));
+    if (!changes.length) return false;
+
+    let changed = false;
+    changes.forEach(({ entry, height }) => {
+      const oldHeight = Math.max(1, Number(entry.size?.height || 0) || 1);
+      const nextHeight = Math.max(oldHeight, Math.round(height));
+      const delta = nextHeight - oldHeight;
+      if (delta <= 0) return;
+      const oldBottom = Number(entry.position?.y || 0) + oldHeight;
+      entry.size = { ...(entry.size || {}), height: nextHeight };
+      changed = true;
+      entries.forEach((candidate) => {
+        if (!candidate || candidate.id === entry.id) return;
+        if (String(candidate.tabId || '') !== String(entry.tabId || '')) return;
+        if (!this._dashboardConverterEntriesOverlapX_(entry, candidate)) return;
+        const candidateY = Number(candidate.position?.y || 0) || 0;
+        if (candidateY + 2 < oldBottom) return;
+        candidate.position = {
+          ...(candidate.position || {}),
+          y: Math.round(candidateY + delta),
+        };
+      });
+    });
+    if (!changed) return false;
+
+    this._responsiveLayouts[activeKey] = entries.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+    if (this._shouldUseSharedResponsiveLayout_?.()) {
+      const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || activeKey;
+      const shared = this._responsiveLayouts[activeKey].map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+      (this._responsiveLayoutVariantKeys_?.() || [primaryKey]).forEach((variantKey) => {
+        this._responsiveLayouts[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(this._cloneJson_?.(entry) || entry, entry));
+      });
+    }
+
+    const liveMap = new Map(this._responsiveLayouts[activeKey].map((entry) => [String(entry.id || ''), entry]));
+    this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.forEach((wrap) => {
+      const entry = liveMap.get(String(wrap.dataset?.layoutCardId || ''));
+      if (!entry) return;
+      wrap.style.height = `${entry.size.height}px`;
+      this._setCardPosition?.(wrap, entry.position?.x || 0, entry.position?.y || 0);
+    });
+    return true;
+  },
+
+  _dashboardConverterGrowFixedCanvasToLayouts_() {
+    if (!this._responsiveLayouts || !this._config) return false;
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const primaryCards = this._responsiveLayouts?.[primaryKey] || [];
+    const inflated = this._dashboardConverterInflateCanvasOptions_(this._config, this._responsiveLayouts, primaryCards);
+    const next = inflated.options || this._config;
+    const changed =
+      String(next.container_size_mode || '') !== String(this._config.container_size_mode || '')
+      || Number(next.container_fixed_width || 0) !== Number(this._config.container_fixed_width || 0)
+      || Number(next.container_fixed_height || 0) !== Number(this._config.container_fixed_height || 0);
+    if (!changed) return false;
+    this._config = { ...(this._config || {}), ...next };
+    this.containerSizeMode = this._normalizeContainerSizeMode_?.(next.container_size_mode) || next.container_size_mode || this.containerSizeMode;
+    this.containerFixedWidth = Number(next.container_fixed_width || 0) || this.containerFixedWidth;
+    this.containerFixedHeight = Number(next.container_fixed_height || 0) || this.containerFixedHeight;
+    try {
+      this._applyContainerSizingFromConfig?.(true);
+      this._applyAutoScale?.();
+    } catch {}
+    return true;
+  },
+
+  async _settleDashboardConverterImportedCardHeights_(payload = {}) {
+    if (!this.cardContainer || !this._responsiveLayouts) return false;
+    const activeKey = this._shouldUseSharedResponsiveLayout_?.()
+      ? (this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape')
+      : (this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
+    let changed = false;
+    for (const delay of [0, 120, 320]) {
+      await this._dashboardConverterWaitForMeasuredRender_(delay);
+      const measurements = new Map();
+      this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)').forEach((wrap) => {
+        if (wrap.style.display === 'none' || wrap.classList.contains('ddc-hidden') || wrap.inert === true) return;
+        const id = String(wrap.dataset?.layoutCardId || '').trim();
+        if (!id) return;
+        const height = this._dashboardConverterMeasureImportedCardHeight_(wrap);
+        if (height) measurements.set(id, height);
+      });
+      if (this._dashboardConverterApplyMeasuredCardHeights_(measurements, activeKey)) {
+        changed = true;
+        this._dashboardConverterGrowFixedCanvasToLayouts_();
+        this._resizeContainer?.();
+        this._applyAutoScale?.();
+        try { this._renderConnectors_?.(); } catch {}
+      }
+    }
+    if (changed && payload?.summary) payload.summary.measured_height_adjustments = true;
+    return changed;
+  },
+
   _dispatchDashboardConverterConfigChanged_() {
     const cfg = {
       type: 'custom:drag-and-drop-card',
@@ -1166,6 +1436,7 @@ const converterMethods = {
     try { this._syncTabsPlacement_?.(); this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); } catch {}
     try { this._applyVisibility_?.(); } catch {}
     try { this._syncTabsWidth_?.(); } catch {}
+    try { await this._settleDashboardConverterImportedCardHeights_?.(payload); } catch (err) { console.warn('[drag-and-drop-card] Could not settle imported card heights', err); }
     try { this._renderConnectors_?.(); } catch {}
     try { this._syncEmptyStateUI?.(); } catch {}
     this._restoreDashboardConverterTabAssignments_?.(payload);
