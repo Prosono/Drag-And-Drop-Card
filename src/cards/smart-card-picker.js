@@ -27,6 +27,12 @@ const smartPickerMethods = {
         hint:'Cards in this section are reserved for components that only make sense inside Drag & Drop Card. Connector lines are now drawn directly from the edit toolbar.',
         items:this._dragAndDropCardsCatalog()
       },
+      {
+        id:'imported',
+        name:'Imported cards',
+        hint:'Single-card imports are saved here so you can reuse them without uploading the file again.',
+        items:[]
+      },
       { id:'recent',    name:'Recent',    items:[] },
       { id:'basics',    name:'Basics', items:[
         {type:'entities',          name:'Entities',          icon:'mdi:format-list-bulleted'},
@@ -90,6 +96,20 @@ const smartPickerMethods = {
         description:'Create a pure typography object with font controls, semantic text styles and editorial layout options.'
       }
     ];
+  },
+
+
+  _importedCardTemplatePickerItems_() {
+    const templates = this._getImportedCardTemplates_?.() || [];
+    return templates.map((template) => ({
+      type: `ddc-imported-card:${template.id}`,
+      actualType: template.type || template.payload?.entry?.card?.type || 'custom_card',
+      name: template.name || 'Imported card',
+      icon: template.icon || 'mdi:tray-arrow-down',
+      description: 'Imported single-card template',
+      importedTemplateId: template.id,
+      importedTemplate: template,
+    }));
   },
 
 
@@ -1344,6 +1364,7 @@ const smartPickerMethods = {
     const favSection = catalog.find(c=>c.id==='favorites');
     const recSection = catalog.find(c=>c.id==='recent');
     const ddcSection = catalog.find(c=>c.id==='ddc');
+    const importedSection = catalog.find(c=>c.id==='imported');
     if (ddcSection) {
       const merged = new Map();
       [...this._dragAndDropCardsCatalog(), ...(ddcSection.items || [])].forEach((item) => {
@@ -1352,6 +1373,7 @@ const smartPickerMethods = {
       });
       ddcSection.items = Array.from(merged.values());
     }
+    if (importedSection) importedSection.items = this._importedCardTemplatePickerItems_?.() || [];
     const allItems = catalog.flatMap(c => c.items || []);
     favSection.items = allItems.filter(i => faves.has(i.type));
     recSection.items = recent.map(t => allItems.find(i => i.type===t)).filter(Boolean);
@@ -1386,15 +1408,18 @@ const smartPickerMethods = {
     // type is favorited.  Called whenever the favorites set or currentType changes.
     const updateFavStar = () => {
       if (!favBtn) return;
-      const on = currentType && faves.has(currentType);
+      const favoriteKey = currentPickerType || currentType;
+      const on = favoriteKey && faves.has(favoriteKey);
       const icon = favBtn.querySelector('ha-icon');
       if (icon) icon.setAttribute('icon', on ? 'mdi:star' : 'mdi:star-outline');
     };
     // Function to update the headline text and star icon.  Called from selectType.
     const updateHeader = (type) => {
       if (selInfo) {
-        const item = allItems.find(i => i.type === type);
-        const nm = item ? item.name : (type || '');
+        const item = currentPickerType
+          ? allItems.find(i => i.type === currentPickerType)
+          : allItems.find(i => i.type === type);
+        const nm = currentPickerName || (item ? item.name : (type || ''));
         selInfo.textContent = nm;
       }
       updateFavStar();
@@ -1436,11 +1461,12 @@ const smartPickerMethods = {
       // Clicking the star toggles favorite status for the current card.
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!currentType) return;
-        if (faves.has(currentType)) {
-          faves.delete(currentType);
+        const favoriteKey = currentPickerType || currentType;
+        if (!favoriteKey) return;
+        if (faves.has(favoriteKey)) {
+          faves.delete(favoriteKey);
         } else {
-          faves.add(currentType);
+          faves.add(favoriteKey);
         }
         this._setFaves(faves);
         updateFavStar();
@@ -1522,11 +1548,25 @@ const smartPickerMethods = {
           return {
             ...section,
             items: baseItems.filter(
-              it => !q || it.name.toLowerCase().includes(q) || it.type.toLowerCase().includes(q)
+              it => {
+                const haystack = [
+                  it.name,
+                  it.type,
+                  it.actualType,
+                  it.description,
+                ].filter(Boolean).join(' ').toLowerCase();
+                return !q || haystack.includes(q);
+              }
             )
           };
         })
-        .filter(sec => (sec.items && sec.items.length) || sec.id === 'favorites' || sec.id === 'recent' || (!q && sec.id === 'ddc'));
+        .filter(sec => (
+          (sec.items && sec.items.length)
+          || sec.id === 'favorites'
+          || sec.id === 'recent'
+          || sec.id === 'imported'
+          || (!q && sec.id === 'ddc')
+        ));
     };
 
     const renderLeft = () => {
@@ -1540,13 +1580,15 @@ const smartPickerMethods = {
         h.textContent = cat.name;
         div.appendChild(h);
 
-        if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent' || cat.id==='ddc')) {
+        if (!cat.items.length && (cat.id==='favorites' || cat.id==='recent' || cat.id==='ddc' || cat.id==='imported')) {
           const p = document.createElement('div');
           p.className = 'picker-category-note';
           if (cat.id === 'favorites') {
             p.textContent = 'No favorites yet.';
           } else if (cat.id === 'recent') {
             p.textContent = 'No recent items yet.';
+          } else if (cat.id === 'imported') {
+            p.innerHTML = `<strong>No imported cards yet</strong><span>Import a single-card JSON file and it will appear here for reuse.</span>`;
           } else {
             p.innerHTML = `<strong>Reserved for Drag & Drop Card</strong><span>${cat.hint || 'Cards that only work inside Drag & Drop Card will appear here.'}</span>`;
           }
@@ -1561,7 +1603,7 @@ const smartPickerMethods = {
                 <span class="picker-item-name">${item.name}</span>
                 <span class="picker-item-subtitle">${cat.name}</span>
               </span>`;
-            b.addEventListener('click', async () => { highlight(b); await selectType(item.type, { fromUser: true }); });
+            b.addEventListener('click', async () => { highlight(b); await selectCatalogItem(item, { fromUser: true }); });
             div.appendChild(b);
           });
         }
@@ -1582,6 +1624,9 @@ const smartPickerMethods = {
 
     let currentConfig = null;
     let currentType = null;
+    let currentPickerType = null;
+    let currentPickerName = '';
+    let currentImportedTemplate = null;
     let yamlEditorApi = null;
     let visualEditor = null;
     let editor = null;
@@ -3149,6 +3194,9 @@ const smartPickerMethods = {
     const selectType = async (type, opts = {}) => {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
+      currentPickerType = opts.pickerType || type;
+      currentPickerName = opts.pickerName || '';
+      currentImportedTemplate = opts.importedTemplate || null;
       currentType = type;
       // Update the selected-card headline and favorite star when a new card is chosen
       try {
@@ -3159,7 +3207,12 @@ const smartPickerMethods = {
 
       let cfg = null;
       try {
-        cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
+        cfg = opts.importedTemplate?.payload
+          ? (this._singleCardPayloadBaseEntry_?.(opts.importedTemplate.payload)?.card || null)
+          : null;
+        cfg = cfg
+          ? (this._cloneJson_?.(cfg) || JSON.parse(JSON.stringify(cfg)))
+          : (mode==='edit' && initialCfg && initialCfg.type===type)
           ? { ...initialCfg }
           : await getStub(type);
       } catch (err) {
@@ -3219,6 +3272,18 @@ const smartPickerMethods = {
       }
 
     };
+    const selectCatalogItem = async (item = {}, opts = {}) => {
+      const template = item.importedTemplateId
+        ? (item.importedTemplate || this._getImportedCardTemplateById_?.(item.importedTemplateId))
+        : null;
+      const actualType = template?.type || item.actualType || item.type;
+      await selectType(actualType, {
+        ...opts,
+        pickerType: item.type || actualType,
+        pickerName: item.name || '',
+        importedTemplate: template,
+      });
+    };
     const commit = async () => {
       if (!currentConfig) return;
       try {
@@ -3246,9 +3311,12 @@ const smartPickerMethods = {
       const finalCfg = this._shapeBySchema(currentType, currentConfig);
       if (typeof onCommit === 'function') {
         await onCommit(finalCfg);
+      } else if (currentImportedTemplate && mode !== 'edit') {
+        await this._addImportedCardTemplateToLayout_?.(currentImportedTemplate, finalCfg);
+        this._pushRecent(currentPickerType || (finalCfg||{}).type);
       } else {
         await this._addPickedCardToLayout(finalCfg);
-        this._pushRecent((finalCfg||{}).type);
+        this._pushRecent(currentPickerType || (finalCfg||{}).type);
       }
       close();
     };
@@ -3274,6 +3342,10 @@ const smartPickerMethods = {
       const firstRecent = r.find(Boolean);
       return firstRecent || 'entities';
     };
+    const findPickerItem = (type = '') => {
+      const key = String(type || '');
+      return catalog.flatMap((section) => section.items || []).find((item) => item.type === key) || null;
+    };
 
     // When editing an existing card, load its type immediately instead of
     // selecting a default first. Selecting two card types in succession can
@@ -3285,13 +3357,21 @@ const smartPickerMethods = {
       await selectType(initialCfg.type || 'entities');
       enableCommit(true);
     } else {
-      await selectType(pickDefaultType());
+      const defaultType = pickDefaultType();
+      const defaultItem = findPickerItem(defaultType);
+      if (defaultItem) await selectCatalogItem(defaultItem);
+      else await selectType(defaultType);
       enableCommit(true);
     }
   },
 
   /* ------------------------- Stubs / helpers (cards) ------------------------- */
   async _getStubConfigForType(type) {
+    const importedTemplate = this._getImportedCardTemplateByPickerType_?.(type);
+    if (importedTemplate?.payload) {
+      const card = this._singleCardPayloadBaseEntry_?.(importedTemplate.payload)?.card;
+      if (card) return this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card));
+    }
     // Provide a blank stub when the user selects the "Custom Card" entry.
     // A blank type lets the YAML editor drive the configuration entirely.
     if (type === 'custom_card') return null;

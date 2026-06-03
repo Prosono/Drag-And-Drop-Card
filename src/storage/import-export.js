@@ -151,7 +151,171 @@ const designImportExportMethods = {
       return false;
     },
 
-  
+    _importedCardTemplatesStorageKey_() {
+      return 'ddc_imported_card_templates_v1';
+    },
+
+    _hashImportedCardTemplateSeed_(value = '') {
+      if (typeof this._hashStorageSeed_ === 'function') return this._hashStorageSeed_(value);
+      let hash = 2166136261;
+      const text = String(value || '');
+      for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(36);
+    },
+
+    _singleCardPayloadBaseEntry_(payload = {}) {
+      return payload?.entry?.card
+        ? payload.entry
+        : (payload?.card?.card ? payload.card : payload);
+    },
+
+    _importedCardTemplateName_(entry = {}, payload = {}) {
+      const card = entry?.card || {};
+      const explicit = payload.template_name || payload.templateName || payload.name || entry.name || card.name || card.title;
+      if (explicit) return String(explicit).trim();
+      const type = String(card.type || 'card').replace(/^custom:/i, '').replace(/[-_]+/g, ' ').trim();
+      return type ? `${type.charAt(0).toUpperCase()}${type.slice(1)} card` : 'Imported card';
+    },
+
+    _importedCardTemplateIcon_(type = '') {
+      const value = String(type || '').toLowerCase();
+      if (value.includes('html')) return 'mdi:language-html5';
+      if (value.includes('table')) return 'mdi:table-large';
+      if (value.includes('icon')) return 'mdi:star-four-points-circle';
+      if (value.includes('text')) return 'mdi:format-text';
+      if (value.includes('entities')) return 'mdi:format-list-bulleted';
+      if (value.includes('entity')) return 'mdi:checkbox-blank-circle-outline';
+      if (value.includes('button')) return 'mdi:gesture-tap-button';
+      if (value.includes('tile')) return 'mdi:view-grid-outline';
+      if (value.includes('picture')) return 'mdi:image-outline';
+      if (value.includes('map')) return 'mdi:map';
+      if (value.includes('weather')) return 'mdi:weather-partly-cloudy';
+      return 'mdi:tray-arrow-down';
+    },
+
+    _normalizeImportedCardTemplate_(payload = {}) {
+      if (!this._isSingleCardImportPayload_(payload)) return null;
+      const baseEntry = this._singleCardPayloadBaseEntry_(payload);
+      if (!baseEntry?.card) return null;
+      const cleanPayload = this._cloneJson_?.(payload) || JSON.parse(JSON.stringify(payload));
+      const cleanEntry = this._cloneJson_?.(baseEntry) || JSON.parse(JSON.stringify(baseEntry));
+      const type = String(cleanEntry.card?.type || 'custom_card');
+      const seed = JSON.stringify({
+        card: cleanEntry.card,
+        size: cleanEntry.size || null,
+        style: cleanEntry.card_style || cleanEntry.cardStyle || null,
+        overflow: cleanEntry.overflow || null,
+      });
+      const id = String(payload.template_id || payload.templateId || `imported_${this._hashImportedCardTemplateSeed_(seed)}`).trim();
+      const now = new Date().toISOString();
+      return {
+        id,
+        name: this._importedCardTemplateName_(cleanEntry, payload),
+        type,
+        icon: payload.icon || cleanEntry.card?.icon || this._importedCardTemplateIcon_(type),
+        created_at: payload.created_at || now,
+        updated_at: now,
+        payload: cleanPayload,
+      };
+    },
+
+    _getImportedCardTemplates_() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(this._importedCardTemplatesStorageKey_()) || '[]');
+        return (Array.isArray(raw) ? raw : [])
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const payload = item.payload || item;
+            const normalized = this._normalizeImportedCardTemplate_(payload);
+            if (!normalized) return null;
+            return {
+              ...normalized,
+              ...item,
+              payload: normalized.payload,
+              name: item.name || normalized.name,
+              icon: item.icon || normalized.icon,
+              type: item.type || normalized.type,
+            };
+          })
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    },
+
+    _saveImportedCardTemplates_(templates = []) {
+      try {
+        const clean = (Array.isArray(templates) ? templates : [])
+          .filter((item) => item?.id && item?.payload)
+          .slice(0, 50);
+        localStorage.setItem(this._importedCardTemplatesStorageKey_(), JSON.stringify(clean));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    _rememberImportedCardTemplate_(payload = {}) {
+      const next = this._normalizeImportedCardTemplate_(payload);
+      if (!next) return null;
+      const current = this._getImportedCardTemplates_();
+      const existing = current.find((item) => item.id === next.id);
+      const merged = {
+        ...(existing || {}),
+        ...next,
+        created_at: existing?.created_at || next.created_at,
+        updated_at: new Date().toISOString(),
+      };
+      this._saveImportedCardTemplates_([merged, ...current.filter((item) => item.id !== next.id)]);
+      return merged;
+    },
+
+    _getImportedCardTemplateById_(id = '') {
+      const key = String(id || '').trim();
+      return this._getImportedCardTemplates_().find((item) => item.id === key) || null;
+    },
+
+    _getImportedCardTemplateByPickerType_(type = '') {
+      const value = String(type || '');
+      const prefix = 'ddc-imported-card:';
+      if (!value.startsWith(prefix)) return null;
+      return this._getImportedCardTemplateById_(value.slice(prefix.length));
+    },
+
+    _applyImportedCardTemplateConfigOverride_(payload = {}, cardConfig = null) {
+      const next = this._cloneJson_?.(payload) || JSON.parse(JSON.stringify(payload));
+      if (!cardConfig || typeof cardConfig !== 'object') return next;
+      const cleanCard = this._sanitizeCardConfigForStorage_?.(cardConfig) || cardConfig;
+      const apply = (entry) => {
+        if (!entry?.card) return entry;
+        return { ...entry, card: this._cloneJson_?.(cleanCard) || JSON.parse(JSON.stringify(cleanCard)) };
+      };
+      if (next.entry?.card) next.entry = apply(next.entry);
+      if (next.card?.card) next.card = apply(next.card);
+      if (!next.entry?.card && !next.card?.card && next.card) next.card = this._cloneJson_?.(cleanCard) || JSON.parse(JSON.stringify(cleanCard));
+      const responsive = next.responsive_entries || next.responsiveEntries;
+      if (responsive && typeof responsive === 'object') {
+        Object.keys(responsive).forEach((key) => {
+          if (responsive[key]?.card) responsive[key] = apply(responsive[key]);
+        });
+        next.responsive_entries = responsive;
+        delete next.responsiveEntries;
+      }
+      return next;
+    },
+
+    async _addImportedCardTemplateToLayout_(template = {}, cardConfig = null) {
+      const payload = template?.payload || template;
+      const nextPayload = this._applyImportedCardTemplateConfigOverride_(payload, cardConfig);
+      return await this._importSingleCardPayload_(nextPayload, {
+        rememberTemplate: false,
+        toastMessage: 'Imported card added from picker.',
+      });
+    },
+
     async _createWrapperFromSavedEntry_(entry = {}) {
       const normalized = this._normalizeSavedCardEntry_(entry, entry);
       if (!normalized?.card || (typeof normalized.card === 'object' && Object.keys(normalized.card).length === 0)) {
@@ -188,12 +352,15 @@ const designImportExportMethods = {
     },
 
   
-    async _importSingleCardPayload_(payload = {}) {
+    async _importSingleCardPayload_(payload = {}, options = {}) {
       const baseEntryRaw = payload?.entry?.card ? payload.entry : (payload?.card?.card ? payload.card : payload);
       if (!baseEntryRaw?.card) {
         this._toast?.('Import failed — invalid card file.');
         return false;
       }
+      const rememberedTemplate = options.rememberTemplate === false
+        ? null
+        : this._rememberImportedCardTemplate_?.(payload);
   
       this._persistCurrentResponsiveProfileToMemory_?.();
       if (!this._responsiveLayouts) {
@@ -283,7 +450,7 @@ const designImportExportMethods = {
       try { this._applyVisibility_?.(); } catch {}
       try { this._renderConnectors_?.(); } catch {}
       try { await this._saveLayout(false); } catch { this._queueSave?.('import-card'); }
-      this._toast?.('Card imported.');
+      this._toast?.(options.toastMessage || (rememberedTemplate ? 'Card imported and saved to Add card picker.' : 'Card imported.'));
       return true;
     },
 
