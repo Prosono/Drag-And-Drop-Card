@@ -569,7 +569,8 @@ const cardBuilderMethods = {
   
             this._resizeContainer?.();
   
-            // SAVE -> THEN HARD RELOAD (avoid debounce race)
+            // Save immediately so the edited card is represented in the live
+            // layout without forcing a full page reload.
             try {
               clearTimeout(this._saveTimer);           // cancel debounced save
               try { this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true }); } catch {}
@@ -579,9 +580,8 @@ const cardBuilderMethods = {
               try { await this._persistThisCardConfigToStorage_?.(); } catch (persistErr) {
                 console.warn('[drag-and-drop-card] Could not persist edited card config to Lovelace storage', persistErr);
               }
-            } catch (e) { console.warn('Save before reload failed', e); }
-  
-            window.location.reload();                  // force refresh so edited card appears
+              try { this.requestUpdate?.(); } catch {}
+            } catch (e) { console.warn('Save after card edit failed', e); }
           });
         } else if (act === 'settings') {
           // Open or toggle the per-card settings menu (e.g. overflow options).

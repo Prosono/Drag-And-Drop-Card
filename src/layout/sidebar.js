@@ -1503,24 +1503,6 @@ const sidebarMethods = {
       const anchor = this.__scaleOuter || this.cardContainer;
       if (!host || !root || !anchor) return;
 
-      try {
-        if (bar?.parentNode === host) host.removeChild(bar);
-        Array.from(host.childNodes).forEach((node) => node.remove());
-      } catch {}
-      host.style.display = 'none';
-      host.setAttribute('aria-hidden', 'true');
-      host.style.removeProperty('--ddc-sidebar-canvas-height');
-      host.style.removeProperty('--ddc-sidebar-canvas-frame-height');
-      root.classList.remove('ddc-sidebar-layout');
-      root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
-      root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
-      root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
-      this.sidebarHeaderHost = null;
-      this.sidebarCanvas = null;
-      this._moveTabsBarToRoot_?.();
-      this._syncSidebarClockTimer_?.();
-      return;
-
       const enabled = this._isSidebarEnabled_?.();
       const style = this._normalizeSidebarStyle_(this.sidebarStyle);
       const density = this._normalizeSidebarDensity_(this.sidebarDensity);

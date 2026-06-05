@@ -519,6 +519,69 @@ const converterMethods = {
     };
   },
 
+  _dashboardConverterIsDdcCard_(card = {}) {
+    return String(card?.type || '').trim().toLowerCase() === 'custom:drag-and-drop-card';
+  },
+
+  _dashboardConverterIsStructuralCard_(card = {}) {
+    const type = String(card?.type || '').trim().toLowerCase();
+    return [
+      'conditional',
+      'custom:state-switch',
+      'state-switch',
+      'hui-element',
+    ].includes(type);
+  },
+
+  _dashboardConverterStructuralChildSources_(card = {}) {
+    const sources = [];
+    const collect = (value) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        sources.push(value);
+        return;
+      }
+      if (typeof value !== 'object') return;
+      if (value.type) {
+        sources.push([value]);
+        return;
+      }
+      Object.values(value).forEach(collect);
+    };
+    collect(card.card);
+    collect(card.cards);
+    collect(card.states);
+    collect(card.state);
+    collect(card.default);
+    return sources;
+  },
+
+  _collectDashboardConverterCardsFromList_(sourceCards = [], options = {}) {
+    const out = [];
+    const source = Array.isArray(sourceCards) ? sourceCards : [];
+    source.forEach((card) => {
+      if (!card || typeof card !== 'object') return;
+      if (this._dashboardConverterIsDdcCard_(card)) return;
+
+      const type = String(card.type || '').trim().toLowerCase();
+      if (this._dashboardConverterIsStructuralCard_(card)) {
+        const childSources = this._dashboardConverterStructuralChildSources_(card);
+        if (childSources.length) {
+          childSources.forEach((childSource) => {
+            out.push(...this._collectDashboardConverterCardsFromList_(childSource, options));
+          });
+        } else {
+          out.push(this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card)));
+        }
+        return;
+      }
+
+      const cloned = this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card));
+      if (options.preserveLayoutBreaks || type !== 'custom:layout-break') out.push(cloned);
+    });
+    return out;
+  },
+
   _collectDashboardConverterCardsForView_(view = {}) {
     const cards = [];
     const badges = Array.isArray(view.badges)
@@ -534,7 +597,7 @@ const converterMethods = {
       });
     }
 
-    if (Array.isArray(view.cards)) cards.push(...view.cards);
+    if (Array.isArray(view.cards)) cards.push(...this._collectDashboardConverterCardsFromList_(view.cards, { preserveLayoutBreaks: true }));
 
     if (Array.isArray(view.sections)) {
       view.sections.forEach((section) => {
@@ -545,14 +608,30 @@ const converterMethods = {
             content: `### ${sectionTitle}`,
           });
         }
-        if (Array.isArray(section?.cards)) cards.push(...section.cards);
+        if (Array.isArray(section?.cards)) cards.push(...this._collectDashboardConverterCardsFromList_(section.cards, { preserveLayoutBreaks: true }));
       });
     }
 
-    return cards
-      .filter((card) => card && typeof card === 'object')
-      .filter((card) => String(card.type || '').toLowerCase() !== 'custom:drag-and-drop-card')
-      .map((card) => this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card)));
+    return cards.filter((card) => card && typeof card === 'object');
+  },
+
+  _countDashboardConverterSkippedDdcCards_(view = {}) {
+    let count = 0;
+    const visit = (card) => {
+      if (!card || typeof card !== 'object') return;
+      if (this._dashboardConverterIsDdcCard_(card)) {
+        count += 1;
+        return;
+      }
+      this._dashboardConverterStructuralChildSources_(card).forEach((source) => source.forEach(visit));
+    };
+    if (Array.isArray(view.cards)) view.cards.forEach(visit);
+    if (Array.isArray(view.sections)) {
+      view.sections.forEach((section) => {
+        if (Array.isArray(section?.cards)) section.cards.forEach(visit);
+      });
+    }
+    return count;
   },
 
   _estimateDashboardConverterCardSize_(card = {}, context = {}) {
@@ -1283,9 +1362,9 @@ const converterMethods = {
         const layoutCardMode = this._dashboardConverterLayoutCardMode_(card);
         if (layoutCardMode && Array.isArray(card.cards)) {
           const layoutOptions = this._dashboardConverterLayoutOptions_(card);
-          card.cards.forEach((childCard, childIndex) => {
+          const childCards = this._collectDashboardConverterCardsFromList_(card.cards, { preserveLayoutBreaks: true });
+          childCards.forEach((childCard, childIndex) => {
             if (!childCard || typeof childCard !== 'object') return;
-            if (String(childCard.type || '').toLowerCase() === 'custom:drag-and-drop-card') return;
             const isLayoutBreak = String(childCard.type || '').toLowerCase() === 'custom:layout-break';
             items.push({
               id: this._dashboardConverterCardId_(viewIndex, `${cardIndex}-${childIndex}`),
@@ -1367,13 +1446,7 @@ const converterMethods = {
         cards: visibleItemCount,
         canvas_width: options.container_fixed_width || inflated.bounds?.width || null,
         canvas_height: options.container_fixed_height || inflated.bounds?.height || null,
-        skipped_drag_drop_cards: views.reduce((count, view) => {
-          const all = [
-            ...(Array.isArray(view.cards) ? view.cards : []),
-            ...(Array.isArray(view.sections) ? view.sections.flatMap((section) => Array.isArray(section?.cards) ? section.cards : []) : []),
-          ];
-          return count + all.filter((card) => String(card?.type || '').toLowerCase() === 'custom:drag-and-drop-card').length;
-        }, 0),
+        skipped_drag_drop_cards: views.reduce((count, view) => count + this._countDashboardConverterSkippedDdcCards_(view), 0),
       },
     };
   },
@@ -1404,6 +1477,7 @@ const converterMethods = {
       this.__suppressResponsiveRebuild = previousSuppressResponsiveRebuild;
     }
     this._applyDashboardConverterTabs_?.(options);
+    this.activeTab = this.defaultTab;
     this._responsiveLayouts = this._normalizeResponsiveLayouts_(cards, payload.responsive_layouts || null);
     const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || cards;
     this._config = {
@@ -1414,10 +1488,13 @@ const converterMethods = {
     };
 
     this._applyOptionsToDom?.(this._config);
-    try {
-      this._applyContainerSizingFromConfig?.(true);
-      this._applyAutoScale?.();
-    } catch {}
+    const importContainerMode = this._normalizeContainerSizeMode_?.(this.containerSizeMode || this._config?.container_size_mode);
+    if (importContainerMode !== 'auto') {
+      try {
+        this._applyContainerSizingFromConfig?.(true);
+        this._applyAutoScale?.();
+      } catch {}
+    }
     const previousSuppressResponsiveMemoryPersist = !!this.__suppressResponsiveMemoryPersist;
     this.__suppressResponsiveMemoryPersist = true;
     try {
@@ -1427,8 +1504,7 @@ const converterMethods = {
     }
     const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
     const activeEntries = this._responsiveLayouts?.[activeLayoutKey] || primaryCards;
-    const mountedCards = this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.length || 0;
-    if (!mountedCards && activeEntries.length) {
+    if (activeEntries.length) {
       await this._buildCardsFromEntries_?.(activeEntries);
     }
     this._restoreDashboardConverterTabAssignments_?.(payload);

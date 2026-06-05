@@ -1355,7 +1355,13 @@ const smartPickerMethods = {
     const visHost = modal.querySelector('#visHost');
     const err = modal.querySelector('#err');
     const previewSpin = modal.querySelector('#previewSpin');
-    const enableCommit = (on) => { addTop.disabled = addBottom.disabled = !on; };
+    let commitPending = false;
+    const enableCommit = (on) => { addTop.disabled = addBottom.disabled = commitPending || !on; };
+    const setCommitPending = (on) => {
+      commitPending = !!on;
+      modal.classList.toggle('smart-picker-committing', commitPending);
+      enableCommit(!!currentConfig);
+    };
     const setError = (msg) => { if (!msg){ err.hidden=true; err.textContent=''; } else { err.hidden=false; err.textContent=msg; } };
 
     const faves = this._getFaves();
@@ -1403,6 +1409,7 @@ const smartPickerMethods = {
     const optionsHd = modal.querySelector('#optionsSec .hd');
     // Local references for the header label and star button
     let selInfo;
+    let renameBtn;
     let favBtn;
     // Function to update the star icon state based on whether the current card
     // type is favorited.  Called whenever the favorites set or currentType changes.
@@ -1422,7 +1429,57 @@ const smartPickerMethods = {
         const nm = currentPickerName || (item ? item.name : (type || ''));
         selInfo.textContent = nm;
       }
+      if (renameBtn) {
+        const canRename = !!currentImportedTemplate?.id || String(currentPickerType || '').startsWith('ddc-imported-card:');
+        renameBtn.hidden = !canRename;
+      }
       updateFavStar();
+    };
+    const renameImportedPickerItem = (item = null) => {
+      const id = String(
+        item?.importedTemplateId
+        || currentImportedTemplate?.id
+        || String(currentPickerType || '').replace(/^ddc-imported-card:/, '')
+        || ''
+      ).trim();
+      if (!id) return;
+
+      const currentName = String(item?.name || currentImportedTemplate?.name || currentPickerName || 'Imported card').trim();
+      const nextName = window.prompt('Rename card in picker', currentName);
+      if (nextName === null) return;
+
+      const cleanName = String(nextName || '').trim();
+      if (!cleanName) {
+        this._toast?.('Card name cannot be empty.');
+        return;
+      }
+
+      const renamed = this._renameImportedCardTemplate_?.(id, cleanName);
+      if (!renamed) {
+        this._toast?.('Could not rename card.');
+        return;
+      }
+
+      const applyName = (target) => {
+        if (!target || target.importedTemplateId !== id) return;
+        target.name = renamed.name;
+        if (target.importedTemplate) target.importedTemplate = { ...target.importedTemplate, name: renamed.name };
+      };
+
+      applyName(item);
+      (importedSection?.items || []).forEach(applyName);
+      allItems.forEach(applyName);
+
+      if (currentImportedTemplate?.id === id) {
+        currentImportedTemplate = { ...currentImportedTemplate, name: renamed.name };
+      }
+      if (String(currentPickerType || '') === `ddc-imported-card:${id}`) {
+        currentPickerName = renamed.name;
+      }
+
+      renderLeft();
+      updateHeader(currentType);
+      this._toast?.('Card renamed.');
     };
     // Only initialize the header once.
     if (optionsHd && !optionsHd.querySelector('.sel-info')) {
@@ -1458,6 +1515,30 @@ const smartPickerMethods = {
       });
       favBtn.innerHTML = '<ha-icon icon="mdi:star-outline"></ha-icon>';
       optionsHd.appendChild(favBtn);
+      renameBtn = document.createElement('button');
+      renameBtn.className = 'icon-btn picker-rename-selected';
+      renameBtn.hidden = true;
+      renameBtn.setAttribute('title', 'Rename imported card');
+      renameBtn.setAttribute('aria-label', 'Rename imported card');
+      Object.assign(renameBtn.style, {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '6px',
+        border: '1px solid var(--divider-color)',
+        background: 'var(--primary-background-color)',
+        padding: '0',
+        marginLeft: '4px',
+        cursor: 'pointer'
+      });
+      renameBtn.innerHTML = '<ha-icon icon="mdi:pencil-outline"></ha-icon>';
+      optionsHd.insertBefore(renameBtn, favBtn);
+      renameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        renameImportedPickerItem();
+      });
       // Clicking the star toggles favorite status for the current card.
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1604,7 +1685,25 @@ const smartPickerMethods = {
                 <span class="picker-item-subtitle">${cat.name}</span>
               </span>`;
             b.addEventListener('click', async () => { highlight(b); await selectCatalogItem(item, { fromUser: true }); });
-            div.appendChild(b);
+            if (item.importedTemplateId) {
+              const row = document.createElement('div');
+              row.className = 'picker-item-row';
+              const rename = document.createElement('button');
+              rename.type = 'button';
+              rename.className = 'picker-item-rename';
+              rename.setAttribute('title', 'Rename card');
+              rename.setAttribute('aria-label', `Rename ${item.name}`);
+              rename.innerHTML = '<ha-icon icon="mdi:pencil-outline"></ha-icon>';
+              rename.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                renameImportedPickerItem(item);
+              });
+              row.append(b, rename);
+              div.appendChild(row);
+            } else {
+              div.appendChild(b);
+            }
           });
         }
         left.appendChild(div);
@@ -3285,40 +3384,54 @@ const smartPickerMethods = {
       });
     };
     const commit = async () => {
-      if (!currentConfig) return;
+      if (!currentConfig || commitPending) return;
+      setCommitPending(true);
+      setError('');
       try {
-        let liveConfig = null;
-        if (visualEditor && typeof visualEditor.getConfig === 'function') {
-          liveConfig = visualEditor.getConfig();
-        } else if (
-          visualEditor
-          && String(visualEditor.localName || '').startsWith('ddc-')
-          && visualEditor._config
-          && typeof visualEditor._config === 'object'
-        ) {
-          liveConfig = this._cloneCardConfig_(visualEditor._config);
+        try {
+          let liveConfig = null;
+          if (visualEditor && typeof visualEditor.getConfig === 'function') {
+            liveConfig = visualEditor.getConfig();
+          } else if (
+            visualEditor
+            && String(visualEditor.localName || '').startsWith('ddc-')
+            && visualEditor._config
+            && typeof visualEditor._config === 'object'
+          ) {
+            liveConfig = this._cloneCardConfig_(visualEditor._config);
+          }
+          if (liveConfig && typeof liveConfig === 'object') {
+            const liveType = liveConfig.type || currentType;
+            currentType = liveType;
+            currentConfig = this._shapeBySchema(liveType, {
+              ...(currentConfig && typeof currentConfig === 'object' ? currentConfig : {}),
+              ...liveConfig,
+              type: liveType,
+            });
+          }
+        } catch {}
+
+        const finalCfg = this._shapeBySchema(currentType, currentConfig);
+        let result;
+        if (typeof onCommit === 'function') {
+          result = await onCommit(finalCfg);
+        } else if (currentImportedTemplate && mode !== 'edit') {
+          result = await this._addImportedCardTemplateToLayout_?.(currentImportedTemplate, finalCfg);
+          this._pushRecent(currentPickerType || (finalCfg||{}).type);
+        } else {
+          result = await this._addPickedCardToLayout(finalCfg);
+          this._pushRecent(currentPickerType || (finalCfg||{}).type);
         }
-        if (liveConfig && typeof liveConfig === 'object') {
-          const liveType = liveConfig.type || currentType;
-          currentType = liveType;
-          currentConfig = this._shapeBySchema(liveType, {
-            ...(currentConfig && typeof currentConfig === 'object' ? currentConfig : {}),
-            ...liveConfig,
-            type: liveType,
-          });
+        if (result === false) {
+          setCommitPending(false);
+          return;
         }
-      } catch {}
-      const finalCfg = this._shapeBySchema(currentType, currentConfig);
-      if (typeof onCommit === 'function') {
-        await onCommit(finalCfg);
-      } else if (currentImportedTemplate && mode !== 'edit') {
-        await this._addImportedCardTemplateToLayout_?.(currentImportedTemplate, finalCfg);
-        this._pushRecent(currentPickerType || (finalCfg||{}).type);
-      } else {
-        await this._addPickedCardToLayout(finalCfg);
-        this._pushRecent(currentPickerType || (finalCfg||{}).type);
+        close();
+      } catch (err) {
+        try { console.warn('[drag-and-drop-card] Failed to add/update picker card', err); } catch {}
+        setError(`Could not ${mode === 'edit' ? 'update' : 'add'} card: ${String(err?.message || err)}`);
+        setCommitPending(false);
       }
-      close();
     };
 
     cancelTop.addEventListener('click', close);

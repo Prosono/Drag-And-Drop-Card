@@ -307,6 +307,22 @@ const persistenceMethods = {
   },
 
   async _saveLayout(silent = true) {
+    const previous = this.__saveLayoutChain || Promise.resolve();
+    const current = previous
+      .catch(() => {})
+      .then(() => this._saveLayoutInner_(silent));
+
+    const cleanup = current.catch(() => {}).finally(() => {
+      if (this.__saveLayoutChain === cleanup) {
+        this.__saveLayoutChain = null;
+      }
+    });
+    this.__saveLayoutChain = cleanup;
+
+    return current;
+  },
+
+  async _saveLayoutInner_(silent = true) {
     this._persistCurrentResponsiveProfileToMemory_();
     try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
     this._recordLayoutHistoryCheckpoint_?.('save');

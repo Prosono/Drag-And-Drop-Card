@@ -2056,7 +2056,8 @@ const dashboardSettingsMethods = {
       this._config = rest;
       this.style.setProperty('--ddc-bg-image', 'none');
       this._applyBackgroundFromConfig?.();
-      this._persistThisCardConfigToStorage_?.();
+      this._markDirty?.('settings-background');
+      this._updateApplyBtn?.();
     });
 
     // Close quality improvements
@@ -2468,7 +2469,8 @@ const dashboardSettingsMethods = {
             this._config = rest;
           }
           this._applyBackgroundFromConfig?.();
-          this._persistThisCardConfigToStorage_?.();
+          this._markDirty?.('settings-background');
+          this._updateApplyBtn?.();
         } catch (e) {
           console.warn('[drag-and-drop-card] Failed to clear background image', e);
         }
@@ -3087,32 +3089,6 @@ const dashboardSettingsMethods = {
         }
         this.__ddcTextLockDirty = true;
         this._scheduleTextResizeLockRefresh_?.(true);
-        // Persist changes
-        // Persist changes both to the Lovelace storage (when available) and to the YAML config.
-        // Calling both persistence helpers ensures that any changed settings override the
-        // YAML definitions on reload, and that storage dashboards remain in sync.
-        try {
-          const opts = this._exportableOptions?.() || {};
-          // Attempt to persist this card config into the Lovelace storage (visual editor).
-          const storagePromise = this._persistThisCardConfigToStorage_?.();
-          if (storagePromise && typeof storagePromise.catch === 'function') {
-            storagePromise.catch((err) => {
-              console.warn('[drag-and-drop-card] Storage save failed (is this a YAML dashboard?)', err);
-            });
-          }
-          // Independently persist the updated options into YAML. This is harmless on storage
-          // dashboards and will noop if the YAML is not editable. Suppress downloads to avoid
-          // prompting the user for backups during normal settings changes.
-          const yamlPromise = this._persistOptionsToYaml?.(opts, { noDownload: true });
-          if (yamlPromise && typeof yamlPromise.catch === 'function') {
-            yamlPromise.catch((yamlErr) => {
-              console.warn('[drag-and-drop-card] YAML persist failed', yamlErr);
-            });
-          }
-        } catch (persErr) {
-          console.warn('[drag-and-drop-card] Unexpected error persisting settings', persErr);
-        }
-
         try {
           this._setDashboardPackages_(normalizedPackages);
           await this._saveLayout(true);

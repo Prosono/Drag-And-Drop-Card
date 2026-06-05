@@ -258,6 +258,27 @@ const designImportExportMethods = {
       }
     },
 
+    _renameImportedCardTemplate_(id = '', name = '') {
+      const key = String(id || '').trim();
+      const nextName = String(name || '').trim();
+      if (!key || !nextName) return null;
+
+      const current = this._getImportedCardTemplates_();
+      let renamed = null;
+      const next = current.map((item) => {
+        if (item.id !== key) return item;
+        renamed = {
+          ...item,
+          name: nextName,
+          updated_at: new Date().toISOString(),
+        };
+        return renamed;
+      });
+
+      if (!renamed) return null;
+      return this._saveImportedCardTemplates_(next) ? renamed : null;
+    },
+
     _rememberImportedCardTemplate_(payload = {}) {
       const next = this._normalizeImportedCardTemplate_(payload);
       if (!next) return null;
@@ -310,8 +331,18 @@ const designImportExportMethods = {
     async _addImportedCardTemplateToLayout_(template = {}, cardConfig = null) {
       const payload = template?.payload || template;
       const nextPayload = this._applyImportedCardTemplateConfigOverride_(payload, cardConfig);
+      const placementRect = this.__pendingAddRect
+        ? {
+            x: Number(this.__pendingAddRect.x) || 0,
+            y: Number(this.__pendingAddRect.y) || 0,
+            w: Number(this.__pendingAddRect.w) || 0,
+            h: Number(this.__pendingAddRect.h) || 0,
+          }
+        : null;
+      this.__pendingAddRect = null;
       return await this._importSingleCardPayload_(nextPayload, {
         rememberTemplate: false,
+        placementRect,
         toastMessage: 'Imported card added from picker.',
       });
     },
@@ -378,6 +409,18 @@ const designImportExportMethods = {
       const targetTabId = this._normalizeTabId(this.activeTab || this.defaultTab);
       const importedByVariant = {};
       const connectorIdMap = new Map();
+      const activeLayoutKey = this._shouldUseSharedResponsiveLayout_?.()
+        ? (this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape')
+        : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
+      const rawPlacementRect = options.placementRect || options.rect || null;
+      const placementRect = rawPlacementRect
+        ? {
+            x: Math.round(Number(rawPlacementRect.x) || 0),
+            y: this._clampYToCanvasTop_(Math.round(Number(rawPlacementRect.y) || 0)),
+            w: Math.round(Number(rawPlacementRect.w ?? rawPlacementRect.width) || 0),
+            h: Math.round(Number(rawPlacementRect.h ?? rawPlacementRect.height) || 0),
+          }
+        : null;
       this._ensureResponsiveConnectorsMemory_?.();
   
       variantKeys.forEach((variantKey) => {
@@ -395,11 +438,23 @@ const designImportExportMethods = {
         }, sourceEntry);
         importedEntry.id = newLayoutCardId;
         importedEntry.tabId = targetTabId;
-        importedEntry.position = this._findNextAvailablePositionForEntries_(
-          currentEntries,
-          importedEntry.size,
-          this._getImportViewportBoundsForLayoutVariant_(variantKey)
-        );
+        if (placementRect && variantKey === activeLayoutKey) {
+          importedEntry.position = {
+            x: placementRect.x,
+            y: placementRect.y,
+          };
+          importedEntry.size = {
+            ...(importedEntry.size || {}),
+            width: placementRect.w > 0 ? placementRect.w : (importedEntry.size?.width || 14 * this.gridSize),
+            height: placementRect.h > 0 ? placementRect.h : (importedEntry.size?.height || 10 * this.gridSize),
+          };
+        } else {
+          importedEntry.position = this._findNextAvailablePositionForEntries_(
+            currentEntries,
+            importedEntry.size,
+            this._getImportViewportBoundsForLayoutVariant_(variantKey)
+          );
+        }
         importedEntry.z = Math.max(6, this._getHighestZForEntries_(currentEntries) + 1);
         currentEntries.push(importedEntry);
         this._responsiveLayouts[variantKey] = currentEntries;
@@ -428,9 +483,6 @@ const designImportExportMethods = {
       });
       this._syncConnectorLayoutsToConfig_?.();
   
-      const activeLayoutKey = this._shouldUseSharedResponsiveLayout_?.()
-        ? (this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape')
-        : (this._activeResponsiveLayoutKey || this._getRequestedResponsiveLayoutKey_?.() || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape');
       const activeEntry = importedByVariant[activeLayoutKey] || importedByVariant[this._getPrimaryResponsiveLayoutKey_?.()] || Object.values(importedByVariant)[0];
       if (activeEntry) {
         this._hideEmptyPlaceholder?.();

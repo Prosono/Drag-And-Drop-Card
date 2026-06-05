@@ -57,11 +57,12 @@ export function __ddcHtmlDefaultConfig__() {
 
 return {
   update({ states }) {
-    if (!stateEl) return;
-    const first = Object.keys(states || {})[0];
-    stateEl.textContent = first
-      ? first + ' = ' + ((states[first] && states[first].state) || 'unknown')
-      : 'No live entity yet';
+    if (stateEl) {
+      const first = Object.keys(states || {})[0];
+      stateEl.textContent = first
+        ? first + ' = ' + ((states[first] && states[first].state) || 'unknown')
+        : 'No live entity yet';
+    }
   }
 };`,
     rerun_on_hass_update: false

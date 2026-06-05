@@ -5227,6 +5227,41 @@ export function getDashboardShellTemplate() {
             color:inherit;
             transition: background .16s ease, color .16s ease, transform .12s ease, box-shadow .16s ease;
           }
+          .picker-item-row{
+            display:flex;
+            align-items:center;
+            gap:6px;
+            min-width:0;
+          }
+          .picker-item-row .picker-item{
+            flex:1 1 auto;
+            min-width:0;
+          }
+          .picker-item-rename{
+            flex:0 0 auto;
+            width:34px;
+            height:34px;
+            display:grid;
+            place-items:center;
+            border-radius:12px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, transparent);
+            background:color-mix(in oklab, var(--card-background-color, #111827) 86%, rgba(255,255,255,.06));
+            color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 74%, transparent);
+            cursor:pointer;
+            transition:background .16s ease, border-color .16s ease, color .16s ease;
+          }
+          .picker-item-rename:hover{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 42%, transparent);
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 12%, transparent);
+            color:var(--primary-text-color);
+          }
+          .picker-item-rename ha-icon{
+            --mdc-icon-size:18px;
+          }
+          .smart-picker-committing .picker-btn.primary{
+            opacity:.68;
+            pointer-events:none;
+          }
           .picker-item:hover{
             background:rgba(255,255,255,.045);
             transform:translateX(1px);
@@ -5476,6 +5511,14 @@ export function getDashboardShellTemplate() {
               padding:9px 10px;
               border-radius:12px;
               touch-action:manipulation;
+            }
+            .smart-picker-dialog .picker-item-row{
+              gap:6px;
+            }
+            .smart-picker-dialog .picker-item-rename{
+              width:38px;
+              height:38px;
+              border-radius:12px;
             }
             .smart-picker-dialog .picker-item:hover{
               transform:none;
