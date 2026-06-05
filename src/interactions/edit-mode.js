@@ -569,7 +569,9 @@ const editModeMethods = {
 
   _syncEmptyStateUI() {
     // Show Add button even outside edit mode when empty; style it as a CTA.
-    const empty = this._isLayoutEmpty();
+    const allowEmptyPlaceholder = this._shouldShowEmptyDashboardPlaceholder_?.() !== false;
+    if (!allowEmptyPlaceholder) this._hideEmptyPlaceholder?.();
+    const empty = allowEmptyPlaceholder && this._isLayoutEmpty();
     if (this.addButton) {
       const show = this.editMode || empty;
       this.addButton.style.display = show ? 'inline-flex' : 'none';

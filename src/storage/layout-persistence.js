@@ -329,6 +329,7 @@ const persistenceMethods = {
       this._deleteParkedSidebarOptions_(this._config);
     } catch {}
 
+    try { this._writeRuntimeLayoutCache_?.(payload); } catch {}
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
 
     if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).');

@@ -24,11 +24,42 @@ const cardBuilderMethods = {
   },
 
   async _buildCardsFromEntries_(entries = [], ticket = 0) {
+    let entryList = Array.isArray(entries) ? entries : [];
+    if (!entryList.length && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+      try {
+        const cached = this._readRuntimeLayoutCache_?.();
+        const targetProfile = this._getRequestedResponsiveProfile_?.() || 'desktop';
+        const targetOrientation = this._getRequestedResponsiveOrientation_?.(targetProfile) || 'landscape';
+        const targetLayoutKey =
+          this._getRuntimeResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+          || this._getResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+          || this._getPrimaryResponsiveLayoutKey_?.();
+        const cachedLayouts = cached?.cards?.length
+          ? this._normalizeResponsiveLayouts_?.(cached.cards || [], cached.responsive_layouts || null)
+          : null;
+        entryList = cachedLayouts?.[targetLayoutKey] || cachedLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || [];
+        if (entryList.length) {
+          this._responsiveLayouts = cachedLayouts;
+          this._activeResponsiveLayoutKey = targetLayoutKey;
+          this._activeResponsiveProfile = targetProfile;
+        }
+      } catch {}
+    }
+    if (entryList.length === 0 && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+      this._hideEmptyPlaceholder?.();
+      this._syncEmptyStateUI?.();
+      this._applyAutoScale?.();
+      return;
+    }
+
     this._restoreBackgroundHostToContainer_();
     this._clearSelection?.();
   
     let builtAny = false;
-    for (const conf of Array.isArray(entries) ? entries : []) {
+    const fragment = document.createDocumentFragment();
+    const wrappersToRebuild = [];
+    const wrappersToInit = [];
+    for (const conf of entryList) {
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
       if (!normalized?.card || (typeof normalized.card === 'object' && Object.keys(normalized.card).length === 0)) {
@@ -41,13 +72,14 @@ const cardBuilderMethods = {
         wrap.dataset.layoutCardId = normalized.id;
         wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
         this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
-        this.cardContainer.appendChild(wrap);
-        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+        fragment.appendChild(wrap);
+        wrappersToRebuild.push(wrap);
         builtAny = true;
         continue;
       }
   
       const cardEl = await this._createCard(normalized.card);
+      if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
       if (this.editMode) wrap.classList.add('editing');
       wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
@@ -56,6 +88,7 @@ const cardBuilderMethods = {
       this._setCardPosition(wrap, normalized.position?.x || 0, normalized.position?.y || 0);
       wrap.style.width = `${normalized.size?.width ?? 14 * this.gridSize}px`;
       wrap.style.height = `${normalized.size?.height ?? 10 * this.gridSize}px`;
+      this._syncCompactEditUiForWrapper_?.(wrap);
       if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
       if (normalized.overflow) {
         try {
@@ -67,18 +100,41 @@ const cardBuilderMethods = {
       }
       try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
   
-      this.cardContainer.appendChild(wrap);
-      try { this._rebuildOnce(wrap.firstElementChild); } catch {}
-      this._initCardInteract(wrap);
+      fragment.appendChild(wrap);
+      wrappersToRebuild.push(wrap);
+      wrappersToInit.push(wrap);
       builtAny = true;
     }
   
     if (!builtAny) {
-      this._showEmptyPlaceholder();
+      if (this._shouldShowEmptyDashboardPlaceholder_?.() !== false) {
+        this._showEmptyPlaceholder();
+      } else {
+        this._hideEmptyPlaceholder?.();
+      }
       this._applyAutoScale?.();
     } else {
+      this.cardContainer.appendChild(fragment);
+      wrappersToRebuild.forEach((wrap) => {
+        try { this._rebuildOnce(wrap.firstElementChild); } catch {}
+      });
+      wrappersToInit.forEach((wrap) => {
+        try { this._initCardInteract(wrap); } catch {}
+      });
       this._resizeContainer();
       this._applyAutoScale?.();
+      try {
+        this._writeRuntimeLayoutCache_?.({
+          version: 3,
+          options: this._exportableOptions?.() || {},
+          cards: this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || entryList,
+          responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_?.(
+            this._responsiveLayouts,
+            this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || entryList
+          )),
+          packages: this._exportDashboardPackages_?.() || [],
+        });
+      } catch {}
     }
   
     this._syncEmptyStateUI?.();
@@ -181,6 +237,54 @@ const cardBuilderMethods = {
       return host;
     },
 
+    _syncCompactEditUiForWrapper_(wrap) {
+      if (!wrap) return;
+      try {
+        const rect = wrap.getBoundingClientRect?.() || {};
+        const sx = Math.max(0.0001, Number(this.__pointerScaleX) || 1);
+        const sy = Math.max(0.0001, Number(this.__pointerScaleY) || 1);
+        const width =
+          parseFloat(wrap.style?.width) ||
+          Number(wrap.offsetWidth) ||
+          (Number(rect.width) ? Number(rect.width) / sx : 0);
+        const height =
+          parseFloat(wrap.style?.height) ||
+          Number(wrap.offsetHeight) ||
+          (Number(rect.height) ? Number(rect.height) / sy : 0);
+        const compact = !!(
+          (width && width <= 190) ||
+          (height && height <= 124) ||
+          (width && height && width <= 250 && height <= 96)
+        );
+        const tiny = !!(
+          (width && width <= 112) ||
+          (height && height <= 72) ||
+          (width && height && width <= 132 && height <= 86)
+        );
+        wrap.classList.toggle('ddc-compact-edit-ui', compact);
+        wrap.classList.toggle('ddc-tiny-edit-ui', tiny);
+        if (!compact) {
+          wrap.classList.remove('ddc-compact-actions-open', 'ddc-tiny-edit-ui');
+          if (this.__compactCardActionsMenu?.wrap === wrap) this._closeCompactCardActionsMenu_?.();
+        }
+      } catch {}
+    },
+
+    _runCardQuickAction_(wrap, action) {
+      if (!wrap || !action) return;
+      try {
+        this._closeCardSettingsMenu_?.();
+        this._closeCompactCardActionsMenu_?.();
+        const act = String(action);
+        if (act === 'delete') {
+          wrap.querySelector?.('.delete-handle')?.click?.();
+          return;
+        }
+        const button = wrap.querySelector?.(`.chip button[data-act="${act}"]`);
+        button?.click?.();
+      } catch {}
+    },
+
     _makeWrapper(cardEl, options = {}) {
       const wrap = document.createElement('div');
       wrap.classList.add('card-wrapper');
@@ -233,6 +337,25 @@ const cardBuilderMethods = {
       settingsBtn.setAttribute('aria-label', 'Settings');
       settingsBtn.innerHTML = '<ha-icon icon="mdi:cog"></ha-icon><span>Settings</span>';
       chip.appendChild(settingsBtn);
+
+      const compactActionsBtn = document.createElement('button');
+      compactActionsBtn.type = 'button';
+      compactActionsBtn.className = 'ddc-compact-card-actions';
+      compactActionsBtn.setAttribute('title', 'Card actions');
+      compactActionsBtn.setAttribute('aria-label', 'Card actions');
+      compactActionsBtn.setAttribute('aria-haspopup', 'menu');
+      compactActionsBtn.setAttribute('aria-expanded', 'false');
+      compactActionsBtn.innerHTML = '<ha-icon icon="mdi:dots-grid"></ha-icon>';
+      const stopCompactActionEvent = (ev) => {
+        ev.stopPropagation();
+      };
+      compactActionsBtn.addEventListener('pointerdown', stopCompactActionEvent, true);
+      compactActionsBtn.addEventListener('mousedown', stopCompactActionEvent, true);
+      compactActionsBtn.addEventListener('touchstart', stopCompactActionEvent, true);
+      compactActionsBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._openCompactCardActionsMenu_?.(wrap);
+      });
   
       // Create a dedicated delete handle that sits in the top‑left corner. This
       // replaces the delete button in the chip and mimics the resize handle in
@@ -292,6 +415,7 @@ const cardBuilderMethods = {
             const w2 = this._makeWrapper(dup);
             w2.style.width  = t.style.width;
             w2.style.height = t.style.height;
+            this._syncCompactEditUiForWrapper_?.(w2);
             // Preserve per-card overflow setting on duplicates. Without this
             // duplication would revert to default overflow auto even when the
             // source card had overflow visible or hidden. Copy both the
@@ -476,7 +600,7 @@ const cardBuilderMethods = {
       } catch {}
   
       // include the delete handle before resize handles so it appears beneath them in the DOM
-      wrap.append(cardEl, shield, anchors, chip, delHandle, resizeLeftHandle, resizeRightHandle);
+      wrap.append(cardEl, shield, anchors, chip, compactActionsBtn, delHandle, resizeLeftHandle, resizeRightHandle);
       // DDC patch: trigger one-time rebuild so nested card_mod attaches
       try { this._rebuildOnce(cardEl); } catch {}
       this.__ddcTextLockDirty = true;
@@ -491,13 +615,14 @@ const cardBuilderMethods = {
       wrap.addEventListener('dblclick', (ev) => {
         if (!this.editMode) return;
         // Ignore double clicks originating from controls within the wrapper
-        if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip')) return;
+        if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip') || ev.target.closest('.ddc-compact-card-actions')) return;
         ev.stopPropagation();
         try {
           const btn = wrap.querySelector('.chip button[data-act="edit"]');
           if (btn) btn.click();
         } catch {}
       });
+      requestAnimationFrame(() => this._syncCompactEditUiForWrapper_?.(wrap));
       return wrap;
     },
 

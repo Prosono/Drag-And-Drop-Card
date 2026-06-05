@@ -277,7 +277,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       </div>
 
       <!-- CONTAINER BG -->
-      <div class="setting" role="group" aria-labelledby="lbl-container-bg">
+      <div class="setting color-setting" role="group" aria-labelledby="lbl-container-bg">
         <div class="row">
           <div class="title">
             <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
@@ -309,9 +309,9 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
                 <div class="color-group">
                   <div class="color-group-title">
                     <span>Presets</span>
+                    <span>Named surfaces</span>
                   </div>
-                  <div class="swatches" id="ddc-swatches-containerBg"></div>
-                  <div class="gradients" id="ddc-gradients-containerBg"></div>
+                  <div class="ddc-style-library" id="ddc-style-library-containerBg"></div>
                 </div>
               </div>
             </div>
@@ -334,7 +334,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       </div>
 
       <!-- CARD BG -->
-      <div class="setting" role="group" aria-labelledby="lbl-card-bg">
+      <div class="setting color-setting" role="group" aria-labelledby="lbl-card-bg">
         <div class="row">
           <div class="title">
             <ha-icon icon="mdi:palette-swatch" aria-hidden="true"></ha-icon>
@@ -365,9 +365,9 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
               <div class="color-group">
                 <div class="color-group-title">
                   <span>Presets</span>
+                  <span>Named surfaces</span>
                 </div>
-                <div class="swatches" id="ddc-swatches-cardBg"></div>
-                <div class="gradients" id="ddc-gradients-cardBg"></div>
+                <div class="ddc-style-library" id="ddc-style-library-cardBg"></div>
               </div>
             </div>
           </div>
@@ -784,6 +784,20 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
         </div>
         <div class="hint">Adds polished transitions when cards move or resize.</div>
+      </div>
+
+      <!-- LOADING ANIMATION -->
+      <div class="setting" role="group" aria-labelledby="lbl-loading-animation">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:progress-clock" aria-hidden="true"></ha-icon>
+            <label id="lbl-loading-animation" for="ddc-setting-loadingAnimation">Play Loading animation</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-loadingAnimation"></ha-switch>
+          </div>
+        </div>
+        <div class="hint">Shows a short initial loading reveal when the dashboard page opens.</div>
       </div>
 
       <!-- AUTOSAVE -->

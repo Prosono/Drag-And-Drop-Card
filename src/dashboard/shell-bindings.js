@@ -40,6 +40,7 @@ const dashboardShellBindingMethods = {
     this.layersBar    = this.shadowRoot.querySelector('#layersBar');
     this.sidebarHost  = this.shadowRoot.querySelector('#ddcSidebar');
     this.rootEl       = this.shadowRoot.querySelector('.ddc-root');
+    this.loadingOverlay = this.shadowRoot.querySelector('#ddcLoadingOverlay');
     this.previewModeControls = this.shadowRoot.querySelector('#previewModeControls');
     this.previewModeButtons = Array.from(this.shadowRoot.querySelectorAll('[data-preview-mode]'));
     this.previewMeta = this.shadowRoot.querySelector('#previewModeMeta');

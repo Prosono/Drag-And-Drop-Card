@@ -324,7 +324,7 @@ const designImportExportMethods = {
       // Core + behavior
       'grid','drag_live_snap','auto_save','auto_save_debounce',
       'debug','disable_overlap','card_mod','storage_key',
-      'animate_cards','auto_resize_cards','auto_viewport_max_width','auto_scale_max','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
+      'animate_cards','play-loading_animation','auto_resize_cards','auto_viewport_max_width','auto_scale_max','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
       'connectors','responsive_connectors',
   
       // Visuals
@@ -481,6 +481,7 @@ const designImportExportMethods = {
   
             // Reflect a few toggles to instance fields used elsewhere
             if ('animate_cards' in imported) this.animateCards = !!imported.animate_cards;
+            if ('play-loading_animation' in imported) this.playLoadingAnimation = !!imported['play-loading_animation'];
             if ('auto_resize_cards' in imported) this.autoResizeCards = !!imported.auto_resize_cards;
             if ('optimize_for_mobile' in imported) this.optimizeForMobile = !!imported.optimize_for_mobile;
             if ('mobile_dynamic_behavior' in imported) {
@@ -602,7 +603,32 @@ const designImportExportMethods = {
           json.options?.responsive_viewports || this.responsiveViewportProfiles
         );
         this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
-        await this._syncResponsiveProfileForViewport_({ force: true });
+        {
+          const validTabIds = new Set((this.tabs || []).map((tab) => this._normalizeTabId(tab?.id)));
+          const importedDefaultTab = this._normalizeTabId(runtimeImportedOptions.default_tab || this.defaultTab || compatDefaultTab);
+          if (!validTabIds.size || validTabIds.has(importedDefaultTab)) {
+            this.activeTab = importedDefaultTab;
+            try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, this.activeTab); } catch {}
+          }
+
+          const targetProfile = this._getRequestedResponsiveProfile_?.() || 'desktop';
+          const targetOrientation = this._getRequestedResponsiveOrientation_?.(targetProfile) || 'landscape';
+          const targetLayoutKey =
+            this._getRuntimeResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+            || this._getResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+            || this._getPrimaryResponsiveLayoutKey_?.()
+            || 'desktop_landscape';
+          const primaryLayoutKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+          const entriesToBuild =
+            this._responsiveLayouts?.[targetLayoutKey]
+            || this._responsiveLayouts?.[primaryLayoutKey]
+            || [];
+          this._activeResponsiveProfile = targetProfile;
+          this._activeResponsiveLayoutKey = targetLayoutKey;
+          const ticket = ++this.__responsiveSwitchSeq;
+          await this._buildCardsFromEntries_(entriesToBuild, ticket);
+          if (ticket === this.__responsiveSwitchSeq) this._syncViewportPreviewUI_?.();
+        }
   
         // apply container sizing/appearance and refresh tabs UI now that cards exist
         this._applyOptionsToDom?.(this._config);

@@ -105,6 +105,12 @@ const configHelperMethods = {
     if ('autoScaleMax' in next && !('auto_scale_max' in next)) {
       next.auto_scale_max = next.autoScaleMax;
     }
+    if ('playLoadingAnimation' in next && !Object.prototype.hasOwnProperty.call(next, 'play-loading_animation')) {
+      next['play-loading_animation'] = next.playLoadingAnimation;
+    }
+    if ('play_loading_animation' in next && !Object.prototype.hasOwnProperty.call(next, 'play-loading_animation')) {
+      next['play-loading_animation'] = next.play_loading_animation;
+    }
     if ('auto_viewport_max_width' in next) {
       next.auto_viewport_max_width = this._normalizeAutoViewportMaxWidth_(next.auto_viewport_max_width);
     }
@@ -113,6 +119,8 @@ const configHelperMethods = {
     }
     delete next.autoViewportMaxWidth;
     delete next.autoScaleMax;
+    delete next.playLoadingAnimation;
+    delete next.play_loading_animation;
     return next;
   },
 
@@ -139,6 +147,13 @@ const configHelperMethods = {
 
   _cloneCardConfig_(value = {}) {
     try {
+      if (value?.type === 'custom:ddc-html-card') {
+        const cloned = { ...(value || {}) };
+        if (value.neo_light_config && typeof value.neo_light_config === 'object') {
+          cloned.neo_light_config = { ...value.neo_light_config };
+        }
+        return cloned;
+      }
       if (typeof structuredClone === 'function') return structuredClone(value || {});
       return JSON.parse(JSON.stringify(value || {}));
     } catch {
@@ -190,6 +205,16 @@ const configHelperMethods = {
   },
 
   _sanitizeCardConfigForStorage_(cfg = {}) {
+    if (cfg?.type === 'custom:ddc-html-card') {
+      const clone = this._cloneCardConfig_(cfg);
+      if (clone.card_mod && typeof clone.card_mod === 'object' && 'style' in clone.card_mod) {
+        clone.card_mod = {
+          ...clone.card_mod,
+          style: this._sanitizeCardModStyleValue_(clone.card_mod.style),
+        };
+      }
+      return clone;
+    }
     const clone = this._cloneCardConfig_(cfg);
     const seen = new WeakSet();
     const visit = (node) => {

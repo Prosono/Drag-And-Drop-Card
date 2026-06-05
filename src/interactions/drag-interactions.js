@@ -198,6 +198,7 @@ const interactBehaviorMethods = {
           this.__ddcScaleAfterCardResize = false;
           this.__ddcResizeFromLeft = !!ev?.edges?.left;
           this.cardContainer?.classList?.add?.('ddc-card-resizing');
+          this._freezeCanvasBackgroundDuringResize_?.();
           if (this.__reflowRAF) {
             try { cancelAnimationFrame(this.__reflowRAF); } catch {}
             this.__reflowRAF = null;
@@ -254,6 +255,7 @@ const interactBehaviorMethods = {
           }
           wrap.style.width  = `${nextW}px`;
           wrap.style.height = `${nextH}px`;
+          this._syncCompactEditUiForWrapper_?.(wrap);
           this._resizeContainer();
           this._renderConnectors_?.();
         },
@@ -303,6 +305,7 @@ const interactBehaviorMethods = {
             }
             wrap.style.width  = `${wSnap}px`;
             wrap.style.height = `${hSnap}px`;
+            this._syncCompactEditUiForWrapper_?.(wrap);
           }
 
           this._resizeContainer();
@@ -316,6 +319,7 @@ const interactBehaviorMethods = {
             const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
             if (mode === 'auto' || this.autoResizeCards || needsFinalScale) this._applyAutoScale?.();
           } catch {}
+          this._unfreezeCanvasBackgroundAfterResize_?.();
           this._scheduleConnectorsRender_?.({ syncAnchors: true });
           this._queueSave('resize-end');
         }
@@ -327,7 +331,7 @@ const interactBehaviorMethods = {
       if (!this.editMode) return;
       if (typeof e.button === 'number' && e.button !== 0) return;
       // Ignore clicks on controls: resize handle, delete handle, or chip actions
-      if (e.target.closest('.resize-handle') || e.target.closest('.delete-handle') || e.target.closest('.chip') || e.target.closest('.ddc-card-anchors')) return;
+      if (e.target.closest('.resize-handle') || e.target.closest('.delete-handle') || e.target.closest('.chip') || e.target.closest('.ddc-compact-card-actions') || e.target.closest('.ddc-card-anchors')) return;
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
         e.stopPropagation();
         this._toggleSelection(wrap); // toggle in multi

@@ -536,6 +536,12 @@ const haChromeMethods = {
       this.toggleAttribute?.('ddc-ha-editor-active', !!editorChrome.active);
       this._syncToolbarFollowPosition_?.(Math.max(0, Math.round(top)));
     } catch {}
+    try {
+      if (this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+        this._hideEmptyPlaceholder?.();
+        this._syncEmptyStateUI?.();
+      }
+    } catch {}
   },
 
   _applyHaChromeVisibility_() {

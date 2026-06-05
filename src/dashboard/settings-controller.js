@@ -6,6 +6,7 @@
  */
 
 import { getDashboardSettingsTemplate } from './settings-template.js';
+import { renderStylePresetLibrary, resolveStylePreviewBackground } from './style-presets.js';
 import { getSettingsStyles } from '../styles/dashboard-settings-styles.js';
 
 /* ------------------------ Dashboard Settings ------------------------ */
@@ -145,6 +146,7 @@ const dashboardSettingsMethods = {
     const inpGrid    = modal.querySelector('#ddc-setting-gridSize');
 
     const chkAnim    = modal.querySelector('#ddc-setting-animate');
+    const chkLoadingAnimation = modal.querySelector('#ddc-setting-loadingAnimation');
     const chkHdr     = modal.querySelector('#ddc-setting-hideHdr');
     const chkBar     = modal.querySelector('#ddc-setting-hideSbar');
     const chkSnap    = modal.querySelector('#ddc-setting-dragSnap');
@@ -1357,6 +1359,7 @@ const dashboardSettingsMethods = {
     if (chkAuto)    chkAuto.checked    = !!this.autoResizeCards;
     if (inpGrid)    inpGrid.value      = String(this.gridSize || 100);
     if (chkAnim)    chkAnim.checked    = !!this.animateCards;
+    if (chkLoadingAnimation) chkLoadingAnimation.checked = !!this.playLoadingAnimation;
     if (chkHdr)     chkHdr.checked     = !!this.hideHaHeader;
     if (chkBar)     chkBar.checked     = !!this.hideHaSidebar;
     if (chkSnap)    chkSnap.checked    = !!this.dragLiveSnap;
@@ -1737,16 +1740,6 @@ const dashboardSettingsMethods = {
       });
     });
 
-    // Swatches (theme-friendly set; tweak as you like)
-    const SWATCHES = [
-      '#ffffff','#f5f7fa','#ebeff5','#121212','#1f2937','#334155',
-      '#ff6b6b','#fcbf49','#ffe66d','#4ecdc4','#1a535c','#6b5b95',
-      '#f6f5f5','#00aaff','#ff00ff','#00ff00',
-      'var(--card-background-color)','var(--ha-card-background)','transparent',
-      /* Semi‑transparent glass‑like presets */
-      'rgba(255,255,255,0.4)', 'rgba(0,0,0,0.3)', 'rgba(0,128,255,0.3)',
-      'rgba(255,0,128,0.3)', 'rgba(255,255,0,0.3)', 'rgba(0,255,128,0.3)'
-    ];
     const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
     const randBetween = (min, max, digits = 0) => {
       const value = min + Math.random() * (max - min);
@@ -1780,7 +1773,7 @@ const dashboardSettingsMethods = {
     const syncChoiceGroup = (container, selector, value) => {
       if (!container) return;
       container.querySelectorAll(selector).forEach((el) => {
-        const matches = (el.title || '').trim() === String(value).trim();
+        const matches = (el.dataset?.value || el.title || '').trim() === String(value).trim();
         el.setAttribute('aria-pressed', matches ? 'true' : 'false');
       });
     };
@@ -1791,8 +1784,7 @@ const dashboardSettingsMethods = {
         const hex = (String(value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || [])[0];
         if (hex) picker.value = hex;
       }
-      syncChoiceGroup(input.closest('.color-stack'), '.swatch', value);
-      syncChoiceGroup(input.closest('.color-stack'), '.gradient', value);
+      syncChoiceGroup(input.closest('.color-stack'), '.ddc-color-preset', value);
       try { input.dispatchEvent(new Event('input', { bubbles: true, composed: true })); } catch {}
       try {
         if (kind === 'card') {
@@ -1854,35 +1846,6 @@ const dashboardSettingsMethods = {
         retina_detect: false
       };
     };
-    const buildSwatches = (containerSel, targetInputSel, targetPickerSel) => {
-      const wrap = modal.querySelector(containerSel);
-      const target = modal.querySelector(targetInputSel);
-      const picker = modal.querySelector(targetPickerSel);
-      if (!wrap || !target) return;
-      wrap.innerHTML = '';
-      SWATCHES.forEach((val, i) => {
-        const s = document.createElement('button');
-        s.type = 'button';
-        s.className = 'swatch';
-        s.title = val;
-        s.style.background = val.startsWith('var(') ? getComputedStyle(this).getPropertyValue(val.slice(4,-1)).trim() || '#fff' : val;
-        s.setAttribute('aria-pressed','false');
-        s.addEventListener('click', () => {
-          wrap.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-pressed','false'));
-          s.setAttribute('aria-pressed','true');
-          target.value = val;
-          if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val) && picker) picker.value = val;
-          // Trigger input event so live preview updates for container/card background
-          try { target.dispatchEvent(new Event('input', { bubbles: true, composed: true })); } catch {}
-        });
-        wrap.appendChild(s);
-        // preselect current value if matches
-        if (String(target.value).trim() === val) s.setAttribute('aria-pressed','true');
-      });
-    };
-    buildSwatches('#ddc-swatches-containerBg', '#ddc-setting-containerBg', '#ddc-color-containerBg');
-    buildSwatches('#ddc-swatches-cardBg', '#ddc-setting-cardBg', '#ddc-color-cardBg');
-
     // Color pickers keep in sync with text inputs
     [['#ddc-color-containerBg','#ddc-setting-containerBg'], ['#ddc-color-cardBg','#ddc-setting-cardBg']]
       .forEach(([pickSel, textSel]) => {
@@ -1890,7 +1853,10 @@ const dashboardSettingsMethods = {
         if (!pick || !text) return;
         const hex = (String(text.value||'').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)||[])[0];
         if (hex) pick.value = hex;
-        pick.addEventListener('input', () => { text.value = pick.value; });
+        pick.addEventListener('input', () => {
+          text.value = pick.value;
+          try { text.dispatchEvent(new Event('input', { bubbles: true, composed: true })); } catch {}
+        });
         text.addEventListener('change', () => {
           const h = (String(text.value||'').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)||[])[0];
           if (h) pick.value = h;
@@ -2475,50 +2441,28 @@ const dashboardSettingsMethods = {
       });
     }
 
-    // ===== GRADIENT PRESETS for Container Background =====
-    const GRADIENTS = [
-      'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
-      'linear-gradient(135deg, #111827, #1f2937)',
-      'linear-gradient(135deg, #0f766e, #22c55e)',
-      'linear-gradient(135deg, #7c3aed, #06b6d4)',
-      'linear-gradient(135deg, #f97316, #f43f5e)',
-      'linear-gradient(135deg, #eab308, #22d3ee)',
-      'radial-gradient(circle at 30% 20%, #2dd4bf, #1e293b)',
-      'radial-gradient(circle at 70% 80%, #f59e0b, #7c3aed)',
-    ];
-    const buildGradients = (containerSel, targetInputSel) => {
+    const buildStyleLibrary = (containerSel, targetInputSel, targetPickerSel) => {
       const wrap = modal.querySelector(containerSel);
       const target = modal.querySelector(targetInputSel);
+      const picker = modal.querySelector(targetPickerSel);
       if (!wrap || !target) return;
-      wrap.innerHTML = '';
-      GRADIENTS.forEach(g => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'gradient';
-        b.style.background = g;
-        b.setAttribute('aria-pressed','false');
-        b.title = g;
-        b.addEventListener('click', () => {
-          wrap.querySelectorAll('.gradient').forEach(x => x.setAttribute('aria-pressed','false'));
-          b.setAttribute('aria-pressed','true');
-          target.value = g;                          // write into the same input your save handler already reads
-          // Live apply for preview:
-          try {
-            const isCard = String(targetInputSel || '').toLowerCase().includes('cardbg');
-            if (isCard) {
-              this.cardBackground = g;
-            } else {
-              this.containerBackground = g;
-            }
-            this._applyDashboardThemeStyling_?.();
-          } catch {}
-        });
-        wrap.appendChild(b);
-        if (String(target.value).trim() === g) b.setAttribute('aria-pressed','true');
+      const kind = String(targetInputSel || '').toLowerCase().includes('cardbg') ? 'card' : 'container';
+      renderStylePresetLibrary({
+        container: wrap,
+        disclosureTarget: wrap.closest('.color-group'),
+        currentValue: target.value,
+        getPreviewBackground: (value) => resolveStylePreviewBackground(
+          value,
+          (varName) => getComputedStyle(this).getPropertyValue(varName),
+          '#fff'
+        ),
+        onSelect: (value) => {
+          applyBackgroundValue({ input: target, picker, value, kind });
+        },
       });
     };
-    buildGradients('#ddc-gradients-containerBg', '#ddc-setting-containerBg');
-    buildGradients('#ddc-gradients-cardBg',      '#ddc-setting-cardBg');
+    buildStyleLibrary('#ddc-style-library-containerBg', '#ddc-setting-containerBg', '#ddc-color-containerBg');
+    buildStyleLibrary('#ddc-style-library-cardBg', '#ddc-setting-cardBg', '#ddc-color-cardBg');
     const applyRandomParticlesPreview = () => {
       particlesLiveConfig = normalizeParticleConfig(createRandomParticlesConfig());
       if (selBgMode) selBgMode.value = 'particles';
@@ -2666,6 +2610,7 @@ const dashboardSettingsMethods = {
       const newAuto      = newSize === 'auto' ? true : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
+      const newLoadingAnimation = !!chkLoadingAnimation?.checked;
       const newHideHdr   = !!chkHdr?.checked;
       const newHideBar   = !!chkBar?.checked;
       const newSnap      = !!chkSnap?.checked;
@@ -2940,6 +2885,7 @@ const dashboardSettingsMethods = {
         this.debug = newDebug;
         // Animate cards
         this.animateCards = newAnim;
+        this.playLoadingAnimation = newLoadingAnimation;
         // Hide HA chrome
         this.hideHaHeader  = newHideHdr;
         this.hideHaSidebar = newHideBar;
@@ -3074,6 +3020,7 @@ const dashboardSettingsMethods = {
           this._config.card_shadow_intensity  = this._normalizeCardShadowIntensity_(this.cardShadowIntensity);
           this._config.debug                   = !!this.debug;
           this._config.animate_cards           = !!this.animateCards;
+          this._config['play-loading_animation'] = !!this.playLoadingAnimation;
           this._config.hide_HA_Header          = !!this.hideHaHeader;
           this._config.hide_HA_Sidebar         = !!this.hideHaSidebar;
           // Screen saver config

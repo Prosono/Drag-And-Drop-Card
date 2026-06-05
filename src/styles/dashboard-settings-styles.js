@@ -1476,6 +1476,12 @@ export function getSettingsStyles() {
       display:flex;
       flex-direction:column;
       gap:10px;
+      width:100%;
+      min-width:0;
+    }
+    .setting[data-bg-section] .control {
+      min-width:0;
+      max-width:100%;
     }
     .setting[data-bg-section] .stack input[type="text"],
     .setting[data-bg-section] .stack input[type="number"],
@@ -1488,16 +1494,20 @@ export function getSettingsStyles() {
     }
     .particle-settings-grid{
       display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns:repeat(auto-fit, minmax(min(100%, 320px), 1fr));
       gap:12px;
       margin-top:2px;
+      min-width:0;
     }
     .particle-control{
       min-width:0;
+      max-width:100%;
+      box-sizing:border-box;
       display:flex;
       flex-direction:column;
       gap:8px;
       padding:12px;
+      overflow:hidden;
       border-radius:12px;
       border:1px solid var(--ddc-settings-line, var(--divider-color, rgba(0,0,0,.16)));
       background:
@@ -1519,20 +1529,34 @@ export function getSettingsStyles() {
     .particle-control .row{
       justify-content:space-between;
       gap:10px;
+      min-width:0;
+    }
+    .particle-control .row > *{
+      min-width:0;
+    }
+    .particle-control .row ha-switch{
+      flex:0 0 auto;
     }
     .particle-color-row{
       display:grid;
-      grid-template-columns:48px minmax(0, 1fr);
-      gap:10px;
+      grid-template-columns:50px minmax(0, 1fr);
+      gap:12px;
       align-items:center;
+      min-width:0;
     }
     .particle-color-row input[type="color"]{
-      width:48px;
+      width:50px;
       height:42px;
       padding:2px;
       border-radius:12px;
       border:1px solid var(--ddc-settings-line, var(--divider-color, rgba(0,0,0,.16)));
       background:var(--ddc-settings-field, var(--ha-card-background, #fff));
+    }
+    .particle-color-row select,
+    .particle-control > select{
+      width:100%;
+      min-width:0;
+      box-sizing:border-box;
     }
     .particle-control.is-disabled{
       opacity:.58;
@@ -1544,6 +1568,29 @@ export function getSettingsStyles() {
     .range-wrap output {
       min-width:64px; text-align:right; font-variant-numeric:tabular-nums;
       color:var(--secondary-text-color);
+    }
+    .particle-control .range-wrap{
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) minmax(68px, max-content);
+      gap:12px;
+      align-items:center;
+      width:100%;
+      min-width:0;
+    }
+    .particle-control .range-wrap input[type="range"]{
+      width:100%;
+      min-width:0;
+    }
+    .particle-control .range-wrap output{
+      width:auto;
+      min-width:68px;
+      max-width:86px;
+      box-sizing:border-box;
+      justify-self:end;
+      flex:0 0 auto;
+      padding-inline:10px;
+      text-align:center;
+      white-space:nowrap;
     }
 
     /* Chips row spacing */
@@ -2377,10 +2424,173 @@ export function getSettingsStyles() {
     opacity:1;
     color:var(--ddc-settings-muted);
   }
+  .dialog.modern .setting.color-setting .row{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr);
+    align-items:flex-start;
+    gap:10px;
+  }
+  .dialog.modern .setting.color-setting .title{
+    flex:0 1 auto;
+  }
+  .dialog.modern .setting.color-setting .control{
+    grid-column:1 / -1;
+    flex:1 1 auto;
+    width:100%;
+    max-width:none;
+  }
+  .dialog.modern .setting.color-setting .color-stack{
+    width:100%;
+    max-width:none;
+    gap:10px;
+  }
+  .dialog.modern .setting.color-setting .setting-actions{
+    margin-bottom:2px;
+  }
+  .dialog.modern .setting.color-setting .color-group{
+    padding:10px;
+  }
+  .dialog.modern .setting.color-setting > .hint{
+    margin-left:0;
+    max-width:100%;
+  }
   .swatch,
   .gradient{
     border-color:var(--ddc-settings-line);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .dialog.modern .color-group .ddc-style-library{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(60px, 1fr));
+    gap:10px 8px;
+    margin-top:8px;
+    align-items:start;
+  }
+  .dialog.modern .color-group.ddc-style-library-collapsible:not(.ddc-style-library-expanded) .ddc-color-preset.is-extra-style{
+    display:none;
+  }
+  .dialog.modern .color-group .ddc-color-preset{
+    width:auto;
+    height:auto;
+    min-width:0;
+    display:grid;
+    gap:7px;
+    justify-items:center;
+    align-content:start;
+    padding:0;
+    border:0;
+    border-radius:14px;
+    background:transparent !important;
+    box-shadow:none;
+    color:var(--ddc-settings-muted);
+    text-align:center;
+    cursor:pointer;
+    position:relative;
+  }
+  .dialog.modern .color-group .ddc-color-preset::after{
+    content:none;
+  }
+  .dialog.modern .ddc-color-preset-preview{
+    position:relative;
+    display:block;
+    width:100%;
+    aspect-ratio:1;
+    min-height:42px;
+    overflow:hidden;
+    border-radius:11px;
+    border:1px solid color-mix(in oklab, var(--ddc-settings-line) 86%, rgba(255,255,255,.18));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.22),
+      inset 0 -18px 28px rgba(0,0,0,.12),
+      0 10px 24px rgba(0,0,0,.12);
+    transition:transform .14s ease, border-color .16s ease, box-shadow .16s ease, filter .16s ease;
+  }
+  .dialog.modern .ddc-color-preset[data-value="transparent"] .ddc-color-preset-preview{
+    background:
+      linear-gradient(45deg, color-mix(in oklab, var(--ddc-settings-muted) 18%, transparent) 25%, transparent 25% 75%, color-mix(in oklab, var(--ddc-settings-muted) 18%, transparent) 75%),
+      linear-gradient(45deg, color-mix(in oklab, var(--ddc-settings-muted) 18%, transparent) 25%, transparent 25% 75%, color-mix(in oklab, var(--ddc-settings-muted) 18%, transparent) 75%),
+      var(--ddc-settings-field) !important;
+    background-position:0 0, 8px 8px, 0 0 !important;
+    background-size:16px 16px, 16px 16px, auto !important;
+  }
+  .dialog.modern .ddc-color-preset-label{
+    max-width:100%;
+    min-height:2.25em;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+    color:var(--ddc-settings-muted);
+    font-size:.62rem;
+    line-height:1.14;
+    font-weight:760;
+    letter-spacing:0;
+  }
+  .dialog.modern .ddc-color-preset:hover .ddc-color-preset-preview,
+  .dialog.modern .ddc-color-preset:focus-visible .ddc-color-preset-preview{
+    transform:translateY(-2px);
+    filter:saturate(1.06) brightness(1.03);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 44%, var(--ddc-settings-line));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.28),
+      inset 0 -18px 28px rgba(0,0,0,.14),
+      0 14px 30px rgba(0,0,0,.18);
+  }
+  .dialog.modern .ddc-color-preset:focus-visible{
+    outline:none;
+  }
+  .dialog.modern .ddc-color-preset[aria-pressed="true"] .ddc-color-preset-preview{
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 72%, var(--ddc-settings-line));
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--primary-color, #03a9f4) 72%, transparent),
+      0 0 0 5px color-mix(in oklab, var(--primary-color, #03a9f4) 15%, transparent),
+      inset 0 1px 0 rgba(255,255,255,.28),
+      inset 0 -18px 28px rgba(0,0,0,.14),
+      0 14px 30px rgba(0,0,0,.18);
+  }
+  .dialog.modern .ddc-color-preset[aria-pressed="true"] .ddc-color-preset-label{
+    color:var(--ddc-settings-text);
+  }
+  .dialog.modern .ddc-style-disclosure{
+    width:100%;
+    min-height:38px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-top:12px;
+    padding:0 12px;
+    border-radius:11px;
+    border:1px solid color-mix(in oklab, var(--primary-color, #03a9f4) 28%, var(--ddc-settings-line));
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+      color-mix(in oklab, var(--ddc-settings-surface) 78%, transparent);
+    color:var(--ddc-settings-text);
+    cursor:pointer;
+    font:inherit;
+    font-size:.78rem;
+    font-weight:820;
+    transition:transform .12s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+  }
+  .dialog.modern .ddc-style-disclosure ha-icon{
+    --mdc-icon-size:17px;
+  }
+  .dialog.modern .ddc-style-disclosure small{
+    min-width:0;
+    padding:2px 7px;
+    border-radius:999px;
+    background:color-mix(in oklab, var(--primary-color, #03a9f4) 16%, transparent);
+    color:color-mix(in oklab, var(--primary-color, #03a9f4) 74%, var(--ddc-settings-text));
+    font-size:.68rem;
+    font-weight:850;
+  }
+  .dialog.modern .ddc-style-disclosure:hover,
+  .dialog.modern .ddc-style-disclosure:focus-visible{
+    outline:none;
+    transform:translateY(-1px);
+    border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 48%, var(--ddc-settings-line));
+    background:var(--ddc-settings-accent-soft);
+    box-shadow:0 10px 22px color-mix(in oklab, var(--primary-color, #03a9f4) 10%, transparent);
   }
   .tabs-card .tab-row,
   .layers-card .layer-row,

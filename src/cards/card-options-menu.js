@@ -5,6 +5,8 @@
  * without coupling those actions to the low-level drag renderer.
  */
 
+import { renderStylePresetLibrary, resolveStylePreviewBackground } from '../dashboard/style-presets.js';
+
 /* Per-card style and card settings overlay helpers. */
 const cardSettingsMenuMethods = {
   _normalizePerCardStyle_(style = {}) {
@@ -98,6 +100,142 @@ const cardSettingsMenuMethods = {
     this.__cardSettingsMenu = null;
   },
 
+  _closeCompactCardActionsMenu_() {
+    const state = this.__compactCardActionsMenu;
+    if (!state) return;
+    try { state.cleanup?.(); } catch {}
+    try { state.root?.remove?.(); } catch {}
+    try { state.wrap?.classList?.remove('ddc-compact-actions-open'); } catch {}
+    try { state.trigger?.setAttribute('aria-expanded', 'false'); } catch {}
+    this.__compactCardActionsMenu = null;
+  },
+
+  _positionCompactCardActionsMenu_() {
+    const state = this.__compactCardActionsMenu;
+    if (!state?.menu || !state?.wrap) return;
+    const { menu, trigger, wrap } = state;
+    if (!menu.isConnected || !wrap.isConnected) {
+      this._closeCompactCardActionsMenu_();
+      return;
+    }
+
+    const anchor = (trigger && trigger.isConnected) ? trigger : wrap;
+    const rect = anchor.getBoundingClientRect();
+    const margin = 10;
+    const viewportW = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+    const viewportH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+    const menuW = Math.max(210, menu.offsetWidth || 236);
+    const menuH = Math.max(120, menu.offsetHeight || 320);
+
+    let left = rect.right - menuW;
+    let top = rect.bottom + 8;
+    if (top + menuH > viewportH - margin) {
+      top = rect.top - menuH - 8;
+    }
+
+    left = Math.min(Math.max(margin, left), Math.max(margin, viewportW - menuW - margin));
+    top = Math.min(Math.max(margin, top), Math.max(margin, viewportH - menuH - margin));
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  },
+
+  _openCompactCardActionsMenu_(wrap) {
+    if (!wrap) return;
+    if (this.__compactCardActionsMenu?.wrap === wrap) {
+      this._closeCompactCardActionsMenu_();
+      return;
+    }
+
+    this._closeCompactCardActionsMenu_();
+    this._closeCardSettingsMenu_();
+
+    const root = document.createElement('div');
+    root.className = 'ddc-compact-actions-backdrop';
+    const menu = document.createElement('div');
+    menu.className = 'ddc-compact-actions-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Card actions');
+
+    const stopEvt = (ev) => ev.stopPropagation();
+    menu.addEventListener('pointerdown', stopEvt, true);
+    menu.addEventListener('mousedown', stopEvt, true);
+    menu.addEventListener('touchstart', stopEvt, true);
+
+    const actions = [
+      { action: 'edit', icon: 'mdi:pencil', label: 'Edit' },
+      { action: 'duplicate', icon: 'mdi:content-copy', label: 'Duplicate' },
+      { action: 'export-card', icon: 'mdi:download-box-outline', label: 'Export' },
+      { action: 'settings', icon: 'mdi:cog-outline', label: 'Settings' },
+      { action: 'front', icon: 'mdi:arrange-bring-forward', label: 'Forward' },
+      { action: 'back', icon: 'mdi:arrange-send-backward', label: 'Backward' },
+      { action: 'front-most', icon: 'mdi:arrange-bring-to-front', label: 'To front' },
+      { action: 'back-most', icon: 'mdi:arrange-send-to-back', label: 'To back' },
+      { action: 'delete', icon: 'mdi:trash-can-outline', label: 'Delete', danger: true },
+    ];
+
+    actions.forEach(({ action, icon, label, danger = false }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = danger ? 'danger' : '';
+      btn.dataset.cardQuickAction = action;
+      btn.setAttribute('role', 'menuitem');
+      btn.innerHTML = `<ha-icon icon="${icon}"></ha-icon><span>${label}</span>`;
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (action === 'settings') {
+          this._closeCompactCardActionsMenu_();
+          this._openCardSettingsMenu?.(wrap);
+          return;
+        }
+        this._runCardQuickAction_?.(wrap, action);
+      });
+      menu.appendChild(btn);
+    });
+
+    const overlayRoot = this.shadowRoot || this;
+    root.appendChild(menu);
+    overlayRoot.appendChild(root);
+
+    const trigger = wrap.querySelector?.('.ddc-compact-card-actions');
+    try { trigger?.setAttribute('aria-expanded', 'true'); } catch {}
+    try { wrap.classList?.add('ddc-compact-actions-open'); } catch {}
+
+    const closeOnOutside = (ev) => {
+      if (ev.target === root) this._closeCompactCardActionsMenu_();
+    };
+    const closeOnPointer = (ev) => {
+      const path = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+      if (path.includes(menu) || (trigger && path.includes(trigger))) return;
+      this._closeCompactCardActionsMenu_();
+    };
+    const closeOnEscape = (ev) => {
+      if (ev.key === 'Escape') this._closeCompactCardActionsMenu_();
+    };
+    const reposition = () => this._positionCompactCardActionsMenu_();
+
+    root.addEventListener('pointerdown', closeOnOutside, true);
+    document.addEventListener('pointerdown', closeOnPointer, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+
+    this.__compactCardActionsMenu = {
+      root,
+      menu,
+      wrap,
+      trigger,
+      cleanup: () => {
+        root.removeEventListener('pointerdown', closeOnOutside, true);
+        document.removeEventListener('pointerdown', closeOnPointer, true);
+        document.removeEventListener('keydown', closeOnEscape, true);
+        window.removeEventListener('resize', reposition);
+        window.removeEventListener('scroll', reposition, true);
+      }
+    };
+    requestAnimationFrame(() => this._positionCompactCardActionsMenu_());
+  },
+
   _positionCardSettingsMenu_() {
     const state = this.__cardSettingsMenu;
     if (!state?.menu || !state?.wrap) return;
@@ -139,6 +277,7 @@ const cardSettingsMenuMethods = {
    */
   _openCardSettingsMenu(wrap) {
     if (!wrap) return;
+    this._closeCompactCardActionsMenu_?.();
     if (this.__cardSettingsMenu?.wrap === wrap) {
       this._closeCardSettingsMenu_();
       return;
@@ -246,24 +385,6 @@ const cardSettingsMenuMethods = {
 
     const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_?.();
     const currentCardStyle = this._extractPerCardStyle_(wrap);
-    const quickBackgroundPresets = [
-      'transparent',
-      '#111827',
-      '#1f2937',
-      '#334155',
-      '#0f766e',
-      '#6b5b95',
-      'var(--ha-card-background)',
-      'rgba(255,255,255,0.24)'
-    ];
-    const quickBackgroundGradients = [
-      'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
-      'linear-gradient(135deg, #111827, #1f2937)',
-      'linear-gradient(135deg, #0f766e, #22c55e)',
-      'linear-gradient(135deg, #7c3aed, #06b6d4)',
-      'linear-gradient(135deg, #f97316, #f43f5e)',
-      'radial-gradient(circle at 30% 20%, #2dd4bf, #1e293b)'
-    ];
     const stopInteractive = (el) => {
       if (!el) return el;
       el.addEventListener('pointerdown', stopEvt);
@@ -274,19 +395,6 @@ const cardSettingsMenuMethods = {
     const guessHex = (value, fallback = '#111827') => {
       const match = String(value || '').trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
       return match ? match[0] : fallback;
-    };
-    const resolvePreviewBackground = (value) => {
-      const raw = String(value || '').trim();
-      if (!raw) return 'transparent';
-      if (raw.startsWith('var(')) {
-        try {
-          const varName = raw.slice(4, -1).trim();
-          return getComputedStyle(this).getPropertyValue(varName).trim() || 'transparent';
-        } catch {
-          return 'transparent';
-        }
-      }
-      return raw;
     };
     const saveCardStyle = (patch = {}) => {
       const next = {
@@ -338,6 +446,7 @@ const cardSettingsMenuMethods = {
     };
     const makeStyleField = (labelText, key, placeholder, hintText, options = {}) => {
       const field = document.createElement('div');
+      field.className = 'ddc-card-style-field';
       Object.assign(field.style, {
         display: 'flex',
         flexDirection: 'column',
@@ -374,6 +483,7 @@ const cardSettingsMenuMethods = {
       stopInteractive(resetBtn);
 
       const controls = document.createElement('div');
+      controls.className = 'ddc-card-style-controls';
       Object.assign(controls.style, {
         display: 'flex',
         alignItems: 'center',
@@ -409,8 +519,10 @@ const cardSettingsMenuMethods = {
         font: 'inherit'
       });
       stopInteractive(input);
+      let styleLibrary = null;
       const updatePresetState = () => {
         const current = input.value.trim();
+        styleLibrary?.sync?.(current);
         field.querySelectorAll('[data-card-style-value]').forEach((btn) => {
           const active = btn.getAttribute('data-card-style-value') === current;
           btn.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -454,47 +566,32 @@ const cardSettingsMenuMethods = {
         field.appendChild(hint);
       }
 
-      const appendPresetRow = (values, { gradient = false } = {}) => {
-        if (!Array.isArray(values) || !values.length) return;
-        const row = document.createElement('div');
-        Object.assign(row.style, {
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '6px'
-        });
-
-        values.forEach((value) => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.setAttribute('data-card-style-value', value);
-          btn.setAttribute('aria-pressed', 'false');
-          Object.assign(btn.style, {
-            width: gradient ? '42px' : '26px',
-            height: '26px',
-            borderRadius: gradient ? '8px' : '7px',
-            border: '1px solid rgba(255,255,255,.18)',
-            background: resolvePreviewBackground(value),
-            cursor: 'pointer',
-            padding: '0'
-          });
-          btn.title = value;
-          stopInteractive(btn);
-          btn.addEventListener('click', (ev) => {
-            ev.stopPropagation();
+      if (options.styleLibrary) {
+        const libraryGroup = document.createElement('div');
+        libraryGroup.className = 'ddc-card-style-library-wrap';
+        const library = document.createElement('div');
+        library.className = 'ddc-style-library';
+        libraryGroup.appendChild(library);
+        field.appendChild(libraryGroup);
+        styleLibrary = renderStylePresetLibrary({
+          container: library,
+          disclosureTarget: libraryGroup,
+          currentValue: input.value,
+          getPreviewBackground: (value) => resolveStylePreviewBackground(
+            value,
+            (varName) => getComputedStyle(this).getPropertyValue(varName),
+            'transparent'
+          ),
+          stopInteractive,
+          onSelect: (value, _preset, ev) => {
+            ev?.stopPropagation?.();
             input.value = value;
             const match = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
             if (match) picker.value = match[0];
             saveCardStyle({ [key]: value });
-            updatePresetState();
-          });
-          row.appendChild(btn);
+          },
         });
-
-        field.appendChild(row);
-      };
-
-      appendPresetRow(options.presets || []);
-      appendPresetRow(options.gradients || [], { gradient: true });
+      }
       updatePresetState();
 
       return field;
@@ -655,7 +752,7 @@ const cardSettingsMenuMethods = {
       'background',
       'transparent · #123456 · linear-gradient(...)',
       'Sets the outer wrapper/background around this card.',
-      { presets: quickBackgroundPresets, gradients: quickBackgroundGradients }
+      { styleLibrary: true }
     ));
     styleSection.appendChild(makeStyleField('Text color', 'text_color', '#f8fafc · var(--primary-text-color)', 'Applies to text and icons when the card supports inherited theme vars.'));
     styleSection.appendChild(makeStyleField('Border color', 'border_color', '#38bdf8', 'Adds an optional border color around this card.'));
