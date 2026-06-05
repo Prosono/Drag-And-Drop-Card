@@ -9,6 +9,133 @@ import { __ddcHtmlDefaultConfig__ } from '../../../core/card-defaults.js';
 import { DDC_HTML_CARD_EDITOR_TAG } from '../element-tags.js';
 
 const __DDC_HTML_ASYNC_FUNCTION__ = Object.getPrototypeOf(async function () {}).constructor;
+const __DDC_HTML_CACHE_LIMIT__ = 48;
+const __DDC_HTML_TEMPLATE_CACHE__ = new Map();
+const __DDC_HTML_RUNNER_CACHE__ = new Map();
+const __DDC_HTML_STYLE_SHEET_CACHE__ = new Map();
+const __DDC_HTML_INITIAL_SCRIPT_QUEUE__ = [];
+let __DDC_HTML_INITIAL_SCRIPT_QUEUE_SCHEDULED__ = false;
+
+function __ddcRememberCachedValue__(cache, key, value) {
+  if (!key) return value;
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > __DDC_HTML_CACHE_LIMIT__) {
+    cache.delete(cache.keys().next().value);
+  }
+  return value;
+}
+
+function __ddcTemplateForHtml__(html) {
+  const source = String(html || '');
+  const cached = __DDC_HTML_TEMPLATE_CACHE__.get(source);
+  if (cached) {
+    __DDC_HTML_TEMPLATE_CACHE__.delete(source);
+    __DDC_HTML_TEMPLATE_CACHE__.set(source, cached);
+    return cached;
+  }
+  const template = document.createElement('template');
+  template.innerHTML = source;
+  return __ddcRememberCachedValue__(__DDC_HTML_TEMPLATE_CACHE__, source, template);
+}
+
+function __ddcRunnerForSource__(source) {
+  const cached = __DDC_HTML_RUNNER_CACHE__.get(source);
+  if (cached) {
+    __DDC_HTML_RUNNER_CACHE__.delete(source);
+    __DDC_HTML_RUNNER_CACHE__.set(source, cached);
+    return cached;
+  }
+  const runner = new __DDC_HTML_ASYNC_FUNCTION__(
+    'hass',
+    'states',
+    'config',
+    'root',
+    'host',
+    'helpers',
+    'ddc',
+    'reason',
+    `${source}`
+  );
+  return __ddcRememberCachedValue__(__DDC_HTML_RUNNER_CACHE__, source, runner);
+}
+
+function __ddcStyleSheetForCss__(css) {
+  const source = String(css || '');
+  if (!source.trim()) return null;
+  if (typeof CSSStyleSheet !== 'function' || typeof CSSStyleSheet.prototype?.replaceSync !== 'function') return null;
+  const cached = __DDC_HTML_STYLE_SHEET_CACHE__.get(source);
+  if (cached) {
+    __DDC_HTML_STYLE_SHEET_CACHE__.delete(source);
+    __DDC_HTML_STYLE_SHEET_CACHE__.set(source, cached);
+    return cached;
+  }
+  try {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(source);
+    return __ddcRememberCachedValue__(__DDC_HTML_STYLE_SHEET_CACHE__, source, sheet);
+  } catch {
+    return null;
+  }
+}
+
+function __ddcNow__() {
+  try {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+  } catch {
+    return Date.now();
+  }
+}
+
+function __ddcRemoveQueuedInitialScriptRun__(host) {
+  for (let i = __DDC_HTML_INITIAL_SCRIPT_QUEUE__.length - 1; i >= 0; i -= 1) {
+    if (__DDC_HTML_INITIAL_SCRIPT_QUEUE__[i]?.host === host) __DDC_HTML_INITIAL_SCRIPT_QUEUE__.splice(i, 1);
+  }
+}
+
+function __ddcScheduleInitialScriptQueueFlush__() {
+  if (__DDC_HTML_INITIAL_SCRIPT_QUEUE_SCHEDULED__) return;
+  __DDC_HTML_INITIAL_SCRIPT_QUEUE_SCHEDULED__ = true;
+  const flushWhenIdle = () => {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(__ddcFlushInitialScriptQueue__, { timeout: 180 });
+    } else {
+      setTimeout(() => __ddcFlushInitialScriptQueue__(null), 0);
+    }
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(flushWhenIdle);
+  } else {
+    setTimeout(flushWhenIdle, 0);
+  }
+}
+
+function __ddcFlushInitialScriptQueue__(deadline = null) {
+  __DDC_HTML_INITIAL_SCRIPT_QUEUE_SCHEDULED__ = false;
+  const started = __ddcNow__();
+  let ran = 0;
+  while (__DDC_HTML_INITIAL_SCRIPT_QUEUE__.length) {
+    const job = __DDC_HTML_INITIAL_SCRIPT_QUEUE__.shift();
+    const host = job?.host;
+    if (host?.isConnected) {
+      host._runQueuedInitialUserScript_?.(job.reason || 'connected');
+      ran += 1;
+    }
+    const remaining = typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 0;
+    if (__DDC_HTML_INITIAL_SCRIPT_QUEUE__.length && ran >= 2) break;
+    if (__DDC_HTML_INITIAL_SCRIPT_QUEUE__.length && ran >= 1 && remaining < 6 && __ddcNow__() - started > 6) break;
+  }
+  if (__DDC_HTML_INITIAL_SCRIPT_QUEUE__.length) __ddcScheduleInitialScriptQueueFlush__();
+}
+
+function __ddcQueueInitialScriptRun__(host, reason = 'connected') {
+  if (!host) return;
+  __ddcRemoveQueuedInitialScriptRun__(host);
+  __DDC_HTML_INITIAL_SCRIPT_QUEUE__.push({ host, reason });
+  __ddcScheduleInitialScriptQueueFlush__();
+}
 
 export class DdcHtmlCard extends HTMLElement {
   constructor() {
@@ -16,7 +143,9 @@ export class DdcHtmlCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._config = null;
     this._hass = null;
-    this._styleSig = '';
+    this._templateTitleSig = null;
+    this._templateHtmlSig = null;
+    this._templateCssSig = null;
     this._jsSig = '';
     this._scriptCleanup = null;
     this._scriptUpdate = null;
@@ -29,6 +158,7 @@ export class DdcHtmlCard extends HTMLElement {
     this._editPreviewMode = false;
     this._editHassTimer = 0;
     this._editHassLastFlush = 0;
+    this._runtimeStyleSheet = null;
   }
    static getStubConfig() {
     return __ddcHtmlDefaultConfig__();
@@ -124,15 +254,13 @@ export class DdcHtmlCard extends HTMLElement {
     const hasRunnableScript = String(this._config?.js || '').trim();
     if (pendingReason || (hasRunnableScript && !this._scriptHasRun)) {
       this._pendingScriptReason = '';
-      queueMicrotask(() => {
-        if (!this.isConnected) return;
-        this._runUserScript_(pendingReason || 'connected');
-      });
+      this._scheduleInitialUserScriptRun_(pendingReason || 'connected');
     }
   }
    disconnectedCallback() {
     clearTimeout(this._rerunTimer);
     clearTimeout(this._editHassTimer);
+    this._cancelScheduledInitialUserScriptRun_();
     this._editHassTimer = 0;
     this._pendingScriptReason = '';
     this._scriptHasRun = false;
@@ -255,23 +383,32 @@ export class DdcHtmlCard extends HTMLElement {
    _applyTemplate_() {
     this._renderCardShell_();
     if (!this._contentEl) return;
+    const title = String(this._config?.title || '');
     const html = String(this._config?.html || '');
     const css = String(this._config?.css || '');
     const js = String(this._config?.js || '');
-    const styleSig = JSON.stringify({ title: this._config?.title || '', html, css });
-    const templateChanged = styleSig !== this._styleSig;
+    const templateChanged =
+      title !== this._templateTitleSig
+      || html !== this._templateHtmlSig
+      || css !== this._templateCssSig;
      if (templateChanged) {
-      this._styleSig = styleSig;
-      this._styleEl.textContent = css;
-      this._contentEl.innerHTML = html.trim()
-        ? html
-        : `<div class="empty"><strong>HTML / Web card</strong><span>Add your own HTML, CSS and JavaScript in the visual editor to start building this card.</span></div>`;
+      this._templateTitleSig = title;
+      this._templateHtmlSig = html;
+      this._templateCssSig = css;
+      this._applyRuntimeStyle_(css);
+      if (html.trim()) {
+        this._contentEl.replaceChildren(__ddcTemplateForHtml__(html).content.cloneNode(true));
+      } else {
+        this._contentEl.innerHTML = `<div class="empty"><strong>HTML / Web card</strong><span>Add your own HTML, CSS and JavaScript in the visual editor to start building this card.</span></div>`;
+      }
     }
      if (js !== this._jsSig || templateChanged) {
+      const hadScriptRun = this._scriptHasRun;
       this._jsSig = js;
       this._scriptHasRun = false;
       if (this.isConnected) {
-        this._runUserScript_('config');
+        if (!hadScriptRun && js.trim()) this._scheduleInitialUserScriptRun_('config');
+        else this._runUserScript_('config');
       } else {
         this._pendingScriptReason = 'config';
         this._showRuntimeError_('');
@@ -379,8 +516,39 @@ export class DdcHtmlCard extends HTMLElement {
     this._scriptCleanup = null;
     this._scriptUpdate = null;
   }
+   _applyRuntimeStyle_(css = '') {
+    const source = String(css || '');
+    const sheet = __ddcStyleSheetForCss__(source);
+    if (sheet && this.shadowRoot && 'adoptedStyleSheets' in this.shadowRoot) {
+      if (this._runtimeStyleSheet !== sheet) {
+        const current = Array.from(this.shadowRoot.adoptedStyleSheets || []);
+        const withoutPrevious = current.filter((candidate) => candidate !== this._runtimeStyleSheet);
+        this.shadowRoot.adoptedStyleSheets = [...withoutPrevious, sheet];
+        this._runtimeStyleSheet = sheet;
+      }
+      if (this._styleEl) this._styleEl.textContent = '';
+      return;
+    }
+    if (this._runtimeStyleSheet && this.shadowRoot && 'adoptedStyleSheets' in this.shadowRoot) {
+      const current = Array.from(this.shadowRoot.adoptedStyleSheets || []);
+      this.shadowRoot.adoptedStyleSheets = current.filter((candidate) => candidate !== this._runtimeStyleSheet);
+      this._runtimeStyleSheet = null;
+    }
+    if (this._styleEl && this._styleEl.textContent !== source) this._styleEl.textContent = source;
+  }
+   _cancelScheduledInitialUserScriptRun_() {
+    __ddcRemoveQueuedInitialScriptRun__(this);
+  }
+   _scheduleInitialUserScriptRun_(reason = 'connected') {
+    __ddcQueueInitialScriptRun__(this, reason);
+  }
+   _runQueuedInitialUserScript_(reason = 'connected') {
+    if (!this.isConnected) return;
+    this._runUserScript_(reason);
+  }
    async _runUserScript_(reason = 'config') {
     clearTimeout(this._rerunTimer);
+    this._cancelScheduledInitialUserScriptRun_();
     this._teardownUserScript_();
     this._showRuntimeError_('');
     const source = String(this._config?.js || '').trim();
@@ -392,17 +560,7 @@ export class DdcHtmlCard extends HTMLElement {
     this._scriptHasRun = true;
     const ctx = this._buildRuntimeContext_(reason);
     try {
-      const runner = new __DDC_HTML_ASYNC_FUNCTION__(
-        'hass',
-        'states',
-        'config',
-        'root',
-        'host',
-        'helpers',
-        'ddc',
-        'reason',
-        `${source}`
-      );
+      const runner = __ddcRunnerForSource__(source);
       const result = await runner(ctx.hass, ctx.states, ctx.config, ctx.root, ctx.host, ctx.helpers, ctx.ddc, ctx.reason);
       if (token !== this._scriptToken) return;
        if (Array.isArray(ctx.listeners) && ctx.listeners.length) {

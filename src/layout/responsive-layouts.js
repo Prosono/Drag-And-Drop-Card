@@ -317,7 +317,7 @@ const responsiveModelMethods = {
   },
 
   _normalizeSavedCardEntry_(entry = {}, fallback = null) {
-    const normalized = this._cloneJson_(entry) || {};
+    const normalized = (entry && typeof entry === 'object') ? { ...entry } : {};
     const fallbackEntry = fallback || {};
     const defaultWidth = 14 * Math.max(1, Number(this.gridSize || 10) || 10);
     const defaultHeight = 10 * Math.max(1, Number(this.gridSize || 10) || 10);
@@ -363,7 +363,7 @@ const responsiveModelMethods = {
       delete out.layerIds;
       delete out.layer_ids;
     }
-    if (!out.card && fallbackEntry.card) out.card = this._cloneJson_(fallbackEntry.card);
+    if (!out.card && fallbackEntry.card) out.card = fallbackEntry.card;
     if (out.card && typeof out.card === 'object') out.card = this._sanitizeCardConfigForStorage_(out.card);
     if (out.card?.type === 'custom:ddc-html-card') out.card = this._applyHtmlCardConfigOverride_(out.card);
     if (!out.card_style && fallbackEntry.card_style) out.card_style = this._cloneJson_(fallbackEntry.card_style);
@@ -394,6 +394,7 @@ const responsiveModelMethods = {
       return null;
     };
   
+    const baseById = new Map(baseCards.map((entry) => [entry?.id, entry]));
     const buildVariant = (profile, orientation, fallbacks = []) => {
       const variantKey = this._getResponsiveLayoutKey_(profile, orientation);
       const source = resolveVariantEntries(profile, orientation);
@@ -412,7 +413,7 @@ const responsiveModelMethods = {
     };
   
     const desktopSource = resolveVariantEntries('desktop', 'landscape') || baseCards;
-    normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeSavedCardEntry_(entry));
+    normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeSavedCardEntry_(entry, baseById.get(entry?.id)));
     buildVariant('tablet', 'landscape', ['tablet_portrait', 'desktop_landscape']);
     buildVariant('tablet', 'portrait', ['tablet_landscape', 'desktop_landscape']);
     buildVariant('mobile', 'landscape', ['mobile_portrait', 'desktop_landscape']);
@@ -439,16 +440,62 @@ const responsiveModelMethods = {
       const primaryKey = this._getPrimaryResponsiveLayoutKey_();
       const shared = (normalized[primaryKey] || baseCards || []).map((entry) => this._normalizeSavedCardEntry_(entry, entry));
       variants.forEach((variantKey) => {
-        normalized[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(this._cloneJson_?.(entry) || entry, entry));
+        normalized[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
       });
     }
   
     return normalized;
   },
 
+  _cardConfigsMatchForResponsiveSerialization_(card = null, fallbackCard = null) {
+    if (card === fallbackCard) return true;
+    if (!card || !fallbackCard || typeof card !== 'object' || typeof fallbackCard !== 'object') return false;
+    if (card.type !== fallbackCard.type) return false;
+
+    if (card.type === 'custom:ddc-html-card') {
+      if (String(card.title || '') !== String(fallbackCard.title || '')) return false;
+      if (String(card.html || '') !== String(fallbackCard.html || '')) return false;
+      if (String(card.css || '') !== String(fallbackCard.css || '')) return false;
+      if (String(card.js || '') !== String(fallbackCard.js || '')) return false;
+      if (!!card.rerun_on_hass_update !== !!fallbackCard.rerun_on_hass_update) return false;
+
+      const rest = (source) => {
+        const {
+          type,
+          title,
+          html,
+          css,
+          js,
+          rerun_on_hass_update,
+          ...other
+        } = source || {};
+        return other;
+      };
+      try { return JSON.stringify(rest(card)) === JSON.stringify(rest(fallbackCard)); } catch { return false; }
+    }
+
+    try { return JSON.stringify(card) === JSON.stringify(fallbackCard); } catch { return false; }
+  },
+
+  _compactResponsiveEntriesForSerialization_(entries = [], desktopById = new Map()) {
+    return (Array.isArray(entries) ? entries : []).map((entry) => {
+      const desktopEntry = desktopById.get(entry?.id);
+      const canOmitCard = !!(
+        desktopEntry?.card
+        && entry?.card
+        && this._cardConfigsMatchForResponsiveSerialization_(entry.card, desktopEntry.card)
+      );
+      if (!canOmitCard) return this._cloneJson_(entry);
+
+      const { card, ...rest } = entry || {};
+      return this._cloneJson_(rest);
+    });
+  },
+
   _serializeResponsiveLayouts_(layouts = null, fallbackCards = null) {
     const normalized = this._normalizeResponsiveLayouts_(fallbackCards || [], layouts || this._responsiveLayouts);
     const desktopLandscape = normalized.desktop_landscape || fallbackCards || [];
+    const desktopById = new Map((desktopLandscape || []).map((entry) => [entry?.id, entry]));
     const sharedMode = this._shouldUseSharedResponsiveLayout_?.();
     const tabletLandscape = sharedMode ? desktopLandscape : (normalized.tablet_landscape || desktopLandscape);
     const tabletPortrait = sharedMode ? desktopLandscape : (normalized.tablet_portrait || tabletLandscape);
@@ -456,18 +503,18 @@ const responsiveModelMethods = {
     const mobilePortrait = sharedMode ? desktopLandscape : (normalized.mobile_portrait || mobileLandscape);
     return {
       desktop: {
-        cards: this._cloneJson_(desktopLandscape),
-        landscape: { cards: this._cloneJson_(desktopLandscape) },
+        cards: this._compactResponsiveEntriesForSerialization_(desktopLandscape, desktopById),
+        landscape: { cards: this._compactResponsiveEntriesForSerialization_(desktopLandscape, desktopById) },
       },
       tablet: {
-        cards: this._cloneJson_(tabletLandscape),
-        landscape: { cards: this._cloneJson_(tabletLandscape) },
-        portrait: { cards: this._cloneJson_(tabletPortrait) },
+        cards: this._compactResponsiveEntriesForSerialization_(tabletLandscape, desktopById),
+        landscape: { cards: this._compactResponsiveEntriesForSerialization_(tabletLandscape, desktopById) },
+        portrait: { cards: this._compactResponsiveEntriesForSerialization_(tabletPortrait, desktopById) },
       },
       mobile: {
-        cards: this._cloneJson_(mobileLandscape),
-        landscape: { cards: this._cloneJson_(mobileLandscape) },
-        portrait: { cards: this._cloneJson_(mobilePortrait) },
+        cards: this._compactResponsiveEntriesForSerialization_(mobileLandscape, desktopById),
+        landscape: { cards: this._compactResponsiveEntriesForSerialization_(mobileLandscape, desktopById) },
+        portrait: { cards: this._compactResponsiveEntriesForSerialization_(mobilePortrait, desktopById) },
       },
     };
   },

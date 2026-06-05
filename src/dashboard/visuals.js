@@ -85,12 +85,7 @@ const dashboardVisualMethods = {
       const youtube = cfg.background_youtube || {};
       const themeName = this._getDashboardThemeName_?.() || '';
       const themeDefinition = themeName ? (this._getDashboardThemeDefinition_(themeName) || null) : null;
-      const mode = String(
-        cfg.background_mode
-        || (bg?.src ? 'image'
-          : (youtube && Object.keys(youtube).length ? 'youtube'
-            : (particles && Object.keys(particles).length ? 'particles' : 'none')))
-      ).toLowerCase();
+      const mode = String(this._getDashboardBackgroundMode_?.() || 'none').toLowerCase();
 
       return JSON.stringify({
         dashboardThemeEnabled: !!themeName,
@@ -220,9 +215,12 @@ const dashboardVisualMethods = {
       }
 
       const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_();
+      const mediaBackgroundActive = !!this._isDashboardMediaBackgroundActive_?.();
       host.style.setProperty(
         '--ddc-bg',
-        themeOwnsDesign
+        mediaBackgroundActive
+          ? 'transparent'
+          : themeOwnsDesign
           ? 'var(--lovelace-background, var(--primary-background-color, transparent))'
           : (this.containerBackground ?? 'transparent')
       );

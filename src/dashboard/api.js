@@ -62,6 +62,7 @@ const dashboardApiMethods = {
       dashboard_theme: this.dashboardTheme || undefined,
       dashboard_theme_override_all_design: this.dashboardTheme ? !!this.dashboardThemeOverrideAllDesign : undefined,
       animate_cards: !!this.animateCards,
+      'play-loading_animation': !!this.playLoadingAnimation,
 
       // HA chrome visibility
       hide_HA_Header: !!this.hideHaHeader,
@@ -181,6 +182,7 @@ const dashboardApiMethods = {
       );
     }
     if ('animate_cards' in opts)        this.animateCards = !!opts.animate_cards;
+    if ('play-loading_animation' in opts) this.playLoadingAnimation = !!opts['play-loading_animation'];
     if ('hide_HA_Header' in opts || 'hide_ha_header' in opts) {
       this.hideHaHeader = !!(opts.hide_HA_Header ?? opts.hide_ha_header);
     }
@@ -375,6 +377,7 @@ const dashboardApiMethods = {
       disable_overlap: { type: 'boolean' },
       edit_mode_pin: { type: 'string' },
       animate_cards: { type: 'boolean' },
+      'play-loading_animation': { type: 'boolean' },
       auto_resize_cards: { type: 'boolean' },
       auto_viewport_max_width: { type: 'number' },
       auto_scale_max: { type: 'number' },
@@ -430,6 +433,7 @@ const dashboardApiMethods = {
       disableOverlap: 'disable_overlap',
       editModePin: 'edit_mode_pin',
       animateCards: 'animate_cards',
+      playLoadingAnimation: 'play-loading_animation',
       autoResizeCards: 'auto_resize_cards',
       autoViewportMaxWidth: 'auto_viewport_max_width',
       autoScaleMax: 'auto_scale_max',

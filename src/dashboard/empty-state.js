@@ -6,6 +6,70 @@
  */
 
 const emptyStateMethods = {
+  _isHaEditorBlockingEmptyState_() {
+    try {
+      if (this.__haConfigPreviewMode || this.__haConfigPreviewRendered) return true;
+    } catch {}
+    try {
+      if (this._isInHaEditorPreview?.()) return true;
+    } catch {}
+    try {
+      let node = this;
+      while (node) {
+        const tag = String(node.localName || node.tagName || '').toLowerCase();
+        if (
+          tag === 'hui-card-edit-mode'
+          || tag === 'hui-edit-mode-card'
+          || tag === 'hui-dashboard-editor'
+          || tag === 'hui-view-editor'
+        ) return true;
+        if (
+          node.hasAttribute?.('edit-mode')
+          || node.hasAttribute?.('editing')
+          || node.getAttribute?.('data-mode') === 'edit'
+          || node.getAttribute?.('data-edit-mode') === 'true'
+          || node.classList?.contains?.('edit-mode')
+          || node.classList?.contains?.('editing')
+        ) return true;
+        const root = node.getRootNode?.();
+        node = node.parentElement || (root?.host && root.host !== node ? root.host : null);
+      }
+    } catch {}
+    try {
+      if (this.hasAttribute?.('ddc-ha-editor-active')) return true;
+    } catch {}
+    try {
+      const roots = this._deepQueryAll?.(
+        'ha-panel-lovelace, hui-root, hui-view, hui-panel-view, hui-masonry-view, hui-sections-view, hui-dashboard-editor, hui-view-editor'
+      ) || [];
+      for (const el of roots) {
+        if (!el || this._isOwnChromeElement_?.(el)) continue;
+        const tag = String(el.localName || '').toLowerCase();
+        if (tag === 'hui-dashboard-editor' || tag === 'hui-view-editor') return true;
+        const props = ['editMode', 'isEditing', '_editMode', '_editing', 'editing', 'isEditMode'];
+        for (const prop of props) {
+          try { if (el[prop] === true) return true; } catch {}
+        }
+        try { if (el.lovelace?.editMode === true || el.lovelace?.editing === true) return true; } catch {}
+        try {
+          if (
+            el.hasAttribute?.('edit-mode')
+            || el.hasAttribute?.('editing')
+            || el.getAttribute?.('data-mode') === 'edit'
+            || el.getAttribute?.('data-edit-mode') === 'true'
+            || el.classList?.contains?.('edit-mode')
+            || el.classList?.contains?.('editing')
+          ) return true;
+        } catch {}
+      }
+    } catch {}
+    return false;
+  },
+
+  _shouldShowEmptyDashboardPlaceholder_() {
+    return !this._isHaEditorBlockingEmptyState_?.();
+  },
+
 
   async _applyEmptyDashboardPreset_(presetKey) {
     const preset = this.constructor._sizePresets().find((item) => item.key === presetKey)
@@ -282,6 +346,11 @@ const emptyStateMethods = {
 
 
   _showEmptyPlaceholder() {
+    if (!this.cardContainer) return;
+    if (this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+      this._hideEmptyPlaceholder?.();
+      return;
+    }
     // Avoid creating multiple placeholders
     if (this.cardContainer.querySelector('.ddc-placeholder')) return;
     const metrics = this._emptyPlaceholderMetrics_?.() || { designW: 1180, designH: 740, scale: 1, w: 1180, h: 740 };
@@ -302,11 +371,18 @@ const emptyStateMethods = {
   },
 
   _hideEmptyPlaceholder() {
-    this.cardContainer.querySelectorAll('.ddc-placeholder').forEach(n => n.remove());
+    this.cardContainer?.querySelectorAll?.('.ddc-placeholder')?.forEach(n => n.remove());
     this._removeEmptyPlaceholderCentering_?.();
   },
 
   _ensurePlaceholderIfEmpty() {
+    if (!this.cardContainer) return;
+    if (this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+      this._hideEmptyPlaceholder?.();
+      this._applyAutoScale?.();
+      this._syncEmptyStateUI?.();
+      return;
+    }
     const realCards = this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)');
     if (realCards.length === 0) this._showEmptyPlaceholder();
         this._applyAutoScale?.();
@@ -367,6 +443,10 @@ const emptyStateMethods = {
 
 
   _scheduleEmptyPlaceholderCenter_() {
+    if (this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+      this._hideEmptyPlaceholder?.();
+      return;
+    }
     if (!this.cardContainer?.querySelector?.('.ddc-placeholder')) return;
     this._installEmptyPlaceholderCentering_?.();
     if (this.__emptyPlaceholderCenterRAF) return;

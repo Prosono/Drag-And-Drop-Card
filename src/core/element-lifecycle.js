@@ -253,7 +253,12 @@ const lifecycleMethods = {
             this.__booted = true;
             this._initialLoad(true);
           } else if (this.__booted && this._backendOK && this.storageKey && !this.__booting) {
-            this._initialLoad(true);
+            if (this._isHaEditorBlockingEmptyState_?.()) {
+              this._syncEmptyStateUI?.();
+              this._applyAutoScale?.({ force: true });
+            } else {
+              this._initialLoad(true, { preserveExistingOnEmpty: true, reason: 'hass-refresh' });
+            }
           }
         });
       } else if (!this.__booted && this.__cfgReady && hass) {

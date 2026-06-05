@@ -7,6 +7,67 @@
 
 /* Background image, page background, particles, and YouTube helpers. */
 const backgroundEffectsMethods = {
+  _freezeCanvasBackgroundDuringResize_() {
+    const cont = this.cardContainer;
+    if (!cont) return;
+
+    try {
+      const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+      if (mode !== 'auto') return;
+    } catch {
+      return;
+    }
+
+    try {
+      const scaleX = Math.max(0.0001, Number(this.__pointerScaleX) || 1);
+      const scaleY = Math.max(0.0001, Number(this.__pointerScaleY) || 1);
+      const rect = cont.getBoundingClientRect?.() || {};
+      const width =
+        parseFloat(cont.style?.width) ||
+        (Number(rect.width) ? Number(rect.width) / scaleX : 0) ||
+        cont.scrollWidth ||
+        cont.offsetWidth ||
+        1;
+      const height =
+        parseFloat(cont.style?.height) ||
+        (Number(rect.height) ? Number(rect.height) / scaleY : 0) ||
+        cont.scrollHeight ||
+        cont.offsetHeight ||
+        1;
+
+      cont.style.setProperty('--ddc-resize-bg-width', `${Math.max(1, width)}px`);
+      cont.style.setProperty('--ddc-resize-bg-height', `${Math.max(1, height)}px`);
+      cont.classList.add('ddc-bg-frozen-during-resize');
+    } catch {}
+  },
+
+  _unfreezeCanvasBackgroundAfterResize_() {
+    const cont = this.cardContainer;
+    if (!cont) return;
+    try {
+      cont.classList.remove('ddc-bg-frozen-during-resize');
+      cont.style.removeProperty('--ddc-resize-bg-width');
+      cont.style.removeProperty('--ddc-resize-bg-height');
+      this._layoutYtBackground_?.();
+    } catch {}
+  },
+
+  _getDashboardBackgroundMode_() {
+    try {
+      const cfg = this._config || {};
+      const explicit = String(cfg.background_mode || '').trim().toLowerCase();
+      if (explicit) return explicit;
+      return cfg.background_image?.src ? 'image' : 'none';
+    } catch {
+      return 'none';
+    }
+  },
+
+  _isDashboardMediaBackgroundActive_() {
+    const mode = this._getDashboardBackgroundMode_?.() || 'none';
+    return !!mode && mode !== 'none';
+  },
+
   _applyBackgroundImageFromConfig() {
   // iOS safety: skip applying huge data URLs that can crash WKWebView
   try {
@@ -21,9 +82,10 @@ const backgroundEffectsMethods = {
     const bg = cfg.background_image || cfg.bg_image || null;
     const cont = this.cardContainer;
     if (!cont) return;
+    const mode = this._getDashboardBackgroundMode_?.() || 'none';
     const usePageImageOnly = !!(
       this.applyBackgroundToPage &&
-      (((cfg.background_mode || '').toLowerCase() === 'image') || bg?.src)
+      mode === 'image'
     );
 
     if (bg && bg.src) {
@@ -75,8 +137,8 @@ const backgroundEffectsMethods = {
 
   _applyBackgroundFromConfig() {
     try {
-      const mode = (this._config?.background_mode)
-        || (this._config?.background_image?.src ? 'image' : 'none');
+      const mode = this._getDashboardBackgroundMode_?.() || 'none';
+      try { this._applyDashboardThemeStyling_?.(); } catch {}
 
       if (mode === 'youtube') {
         const cfg = this._config?.background_youtube || {};
@@ -286,7 +348,7 @@ const backgroundEffectsMethods = {
       this.__pageBackgroundRetryT = null;
 
       const enabled = !!this.applyBackgroundToPage;
-      const mode = (this._config?.background_mode) || (this._config?.background_image?.src ? 'image' : 'none');
+      const mode = this._getDashboardBackgroundMode_?.() || 'none';
       const hasDynamicPageLayer = enabled && (mode === 'particles' || mode === 'youtube');
       const visual = enabled ? this._getPageBackgroundVisual_?.() : null;
       if (!enabled) {
@@ -342,8 +404,8 @@ const backgroundEffectsMethods = {
   },
 
   _getPageBackgroundVisual_() {
-    const base = String(this.containerBackground ?? '').trim();
-    const mode = (this._config?.background_mode) || (this._config?.background_image?.src ? 'image' : 'none');
+    const mode = this._getDashboardBackgroundMode_?.() || 'none';
+    const base = mode === 'none' ? String(this.containerBackground ?? '').trim() : '';
 
     if (mode === 'image') {
       const bg = this._config?.background_image || this._config?.bg_image || null;
@@ -354,18 +416,16 @@ const backgroundEffectsMethods = {
         const size = String(bg?.size || 'cover');
         const position = String(bg?.position || 'center center');
         const attachment = String(bg?.attachment || 'scroll');
-        const gradientBase = /gradient\(/i.test(base) ? base : '';
         const layers = [`url("${imageUrl.replace(/"/g, '\\"')}")`];
-        if (gradientBase) layers.push(gradientBase);
         return {
           kind: 'image',
-          backgroundColor: (!gradientBase && base && !/^transparent$/i.test(base)) ? base : '',
+          backgroundColor: '',
           backgroundImage: layers.join(', '),
-          backgroundRepeat: gradientBase ? `${repeat}, no-repeat` : repeat,
-          backgroundSize: gradientBase ? `${size}, auto` : size,
-          backgroundPosition: gradientBase ? `${position}, center center` : position,
-          backgroundAttachment: gradientBase ? `${attachment}, scroll` : attachment,
-          lovelaceBackground: base || imageUrl,
+          backgroundRepeat: repeat,
+          backgroundSize: size,
+          backgroundPosition: position,
+          backgroundAttachment: attachment,
+          lovelaceBackground: imageUrl,
         };
       }
     }
@@ -500,6 +560,94 @@ const backgroundEffectsMethods = {
     return this.__particlesLoadPromise;
   },
 
+  _detachParticlesPointerProxy_() {
+    const proxy = this.__particlesPointerProxy;
+    if (!proxy) return;
+    try {
+      (proxy.events || []).forEach(({ type, listener, options }) => {
+        window.removeEventListener(type, listener, options);
+      });
+    } catch {}
+    this.__particlesPointerProxy = null;
+  },
+
+  _attachParticlesPointerProxy_(inst, canvasEl) {
+    this._detachParticlesPointerProxy_?.();
+    const pJS = inst?.pJS;
+    const mouse = pJS?.interactivity?.mouse;
+    const canvas = canvasEl || pJS?.canvas?.el;
+    if (!pJS || !mouse || !canvas?.getBoundingClientRect) return;
+
+    const setMouseOutside = () => {
+      mouse.pos_x = null;
+      mouse.pos_y = null;
+      pJS.interactivity.status = 'mouseleave';
+    };
+
+    const syncMouse = (event) => {
+      try {
+        const source = event?.touches?.[0] || event?.changedTouches?.[0] || event;
+        const clientX = Number(source?.clientX);
+        const clientY = Number(source?.clientY);
+        if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+
+        const rect = canvas.getBoundingClientRect();
+        const rectW = Number(rect?.width) || 0;
+        const rectH = Number(rect?.height) || 0;
+        if (rectW <= 0 || rectH <= 0) {
+          setMouseOutside();
+          return false;
+        }
+
+        const inside =
+          clientX >= rect.left &&
+          clientX <= rect.right &&
+          clientY >= rect.top &&
+          clientY <= rect.bottom;
+        if (!inside) {
+          setMouseOutside();
+          return false;
+        }
+
+        const canvasW = Number(pJS.canvas?.w) || Number(canvas.width) || rectW;
+        const canvasH = Number(pJS.canvas?.h) || Number(canvas.height) || rectH;
+        const x = (clientX - rect.left) * (canvasW / rectW);
+        const y = (clientY - rect.top) * (canvasH / rectH);
+        mouse.pos_x = Math.max(0, Math.min(canvasW, x));
+        mouse.pos_y = Math.max(0, Math.min(canvasH, y));
+        pJS.interactivity.status = 'mousemove';
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const syncBeforeClick = (event) => {
+      const inside = syncMouse(event);
+      const click = pJS?.interactivity?.events?.onclick;
+      if (!inside && click?.enable) {
+        click.enable = false;
+        setTimeout(() => {
+          try { click.enable = true; } catch {}
+        }, 0);
+      }
+    };
+
+    const events = [
+      { type: 'mousemove', listener: syncMouse, options: false },
+      { type: 'pointermove', listener: syncMouse, options: false },
+      { type: 'mousedown', listener: syncMouse, options: true },
+      { type: 'pointerdown', listener: syncMouse, options: true },
+      { type: 'click', listener: syncBeforeClick, options: true },
+      { type: 'mouseleave', listener: setMouseOutside, options: false },
+      { type: 'blur', listener: setMouseOutside, options: false },
+    ];
+    events.forEach(({ type, listener, options }) => {
+      try { window.addEventListener(type, listener, options); } catch {}
+    });
+    this.__particlesPointerProxy = { events };
+  },
+
   _attachParticlesBackground_(cfg = {}, mountHost = null) {
     const host = mountHost || this._ensureBgHost_?.();
     if (!host) return;
@@ -622,6 +770,12 @@ const backgroundEffectsMethods = {
       // Keep a handle for cleanup
       if (Array.isArray(window.pJSDom) && window.pJSDom.length) {
         this.__particlesInst = window.pJSDom[window.pJSDom.length - 1];
+        if (allowPointer) {
+          this._attachParticlesPointerProxy_?.(
+            this.__particlesInst,
+            this.__particlesInst?.pJS?.canvas?.el || el.querySelector('canvas')
+          );
+        }
       }
     };
 
@@ -630,6 +784,7 @@ const backgroundEffectsMethods = {
   },
 
   _destroyParticles_() {
+    try { this._detachParticlesPointerProxy_?.(); } catch {}
     try {
       if (!Array.isArray(window.pJSDom)) {
         window.pJSDom = [];

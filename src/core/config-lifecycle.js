@@ -106,6 +106,7 @@ const setConfigMethods = {
       // Defaults to false when not specified.  When true, the card wrappers
       // animate into view the moment a tab becomes active or on initial load.
       this.animateCards             = !!config.animate_cards;
+      this.playLoadingAnimation     = !!config['play-loading_animation'];
 
       // Screen saver options
       this.screenSaverEnabled = !!(config.screen_saver_enabled ?? false);
@@ -226,15 +227,29 @@ const setConfigMethods = {
       // For normal config tweaks, just reflow with the new options.
      // Boot/rebuild logic
       this.__cfgReady = true;
+      const haNativeEditActive = !!this._isHaEditorBlockingEmptyState_?.();
+      const hasRenderedCards = !!this.cardContainer?.querySelector?.('.card-wrapper:not(.ddc-placeholder)');
+      const editorLoadOptions = haNativeEditActive
+        ? { preserveExistingOnEmpty: true, reason: 'ha-native-edit' }
+        : undefined;
       if (keyChanged && this.__booted) {
-        this._initialLoad(true);
+        if (haNativeEditActive && hasRenderedCards) {
+          this._syncEmptyStateUI?.();
+          this._applyAutoScale?.({ force: true });
+        } else {
+          this._initialLoad(true, editorLoadOptions);
+        }
       } else if (!this.__booted && this.__probed) {
         this.__booted = true;
-        this._initialLoad();
+        this._initialLoad(false, editorLoadOptions);
       } else {
         this._applyContainerSizingFromConfig(true);
         this._applyAutoScale?.();
         this._resizeContainer();
+        if (!this.__booted && haNativeEditActive) {
+          this.__booted = true;
+          this._initialLoad(false, editorLoadOptions);
+        }
       }
     }
 };

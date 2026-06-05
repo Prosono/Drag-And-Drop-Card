@@ -31,6 +31,9 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__dashboardThemeAppliedVars = [];
   instance.__animatedCardIds = new Set();
   instance.__suppressCardAnimation = false;
+  instance.playLoadingAnimation = false;
+  instance.__ddcLoadingAnimationPlayed = false;
+  instance.__ddcLoadingAnimationToken = 0;
   instance._responsivePreviewOrientations = {
     desktop: 'landscape',
     tablet: 'landscape',

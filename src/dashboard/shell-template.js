@@ -28,6 +28,158 @@ export function getDashboardShellTemplate() {
   container-name: ddc-root;
 }
 
+.ddc-loading-overlay[hidden]{
+  display:none !important;
+}
+.ddc-loading-overlay{
+  position:absolute;
+  inset:0;
+  z-index:10060;
+  min-height:clamp(340px, 72vh, 860px);
+  display:grid;
+  place-items:center;
+  padding:clamp(20px, 5vw, 56px);
+  box-sizing:border-box;
+  color:var(--primary-text-color, #f8fafc);
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--primary-background-color, #07111f) 86%, transparent),
+      color-mix(in oklab, var(--ha-card-background, #111827) 92%, transparent)),
+    radial-gradient(760px 420px at 24% 18%, color-mix(in oklab, var(--primary-color, #03a9f4) 18%, transparent), transparent 72%);
+  backdrop-filter:blur(18px) saturate(1.08);
+  -webkit-backdrop-filter:blur(18px) saturate(1.08);
+  opacity:0;
+  pointer-events:auto;
+  contain:paint;
+}
+.ddc-loading-overlay.is-active{
+  opacity:1;
+  animation:ddc-loading-overlay-in .22s cubic-bezier(.22, 1, .36, 1) both;
+}
+.ddc-loading-overlay.is-leaving{
+  animation:ddc-loading-overlay-out .32s cubic-bezier(.16, 1, .3, 1) both;
+}
+.ddc-loading-surface{
+  width:min(420px, 92vw);
+  display:grid;
+  gap:18px;
+  justify-items:center;
+  text-align:center;
+}
+.ddc-loading-mark{
+  position:relative;
+  width:188px;
+  height:116px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  padding:13px;
+  border-radius:22px;
+  border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 72%, var(--primary-color, #03a9f4) 28%);
+  background:
+    linear-gradient(145deg, color-mix(in oklab, var(--ha-card-background, #121826) 86%, #ffffff 6%), color-mix(in oklab, var(--primary-background-color, #07111f) 90%, var(--primary-color, #03a9f4) 10%));
+  box-shadow:0 24px 90px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.08);
+  overflow:hidden;
+}
+.ddc-loading-mark::before{
+  content:"";
+  position:absolute;
+  inset:-40% auto -40% -36%;
+  width:44%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  transform:skewX(-16deg);
+  animation:ddc-loading-scan 1.15s cubic-bezier(.22, 1, .36, 1) infinite;
+}
+.ddc-loading-tile{
+  border-radius:13px;
+  background:color-mix(in oklab, var(--primary-text-color, #fff) 9%, transparent);
+  border:1px solid rgba(255,255,255,.08);
+  transform:translateY(8px) scale(.96);
+  opacity:.54;
+  animation:ddc-loading-tile-pop 1.45s cubic-bezier(.22, 1, .36, 1) infinite;
+}
+.ddc-loading-tile:nth-child(2){ animation-delay:.08s; }
+.ddc-loading-tile:nth-child(3){ animation-delay:.16s; }
+.ddc-loading-tile:nth-child(4){ animation-delay:.24s; }
+.ddc-loading-title{
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:0;
+  color:color-mix(in oklab, var(--primary-text-color, #fff) 92%, var(--primary-color, #03a9f4) 8%);
+}
+.ddc-loading-title ha-icon{
+  --mdc-icon-size:18px;
+  color:var(--primary-color, #03a9f4);
+}
+.ddc-loading-track{
+  position:relative;
+  width:min(240px, 68vw);
+  height:3px;
+  border-radius:999px;
+  overflow:hidden;
+  background:color-mix(in oklab, var(--divider-color, rgba(255,255,255,.18)) 58%, transparent);
+}
+.ddc-loading-track span{
+  position:absolute;
+  inset:0 auto 0 0;
+  width:44%;
+  border-radius:inherit;
+  background:linear-gradient(90deg, var(--primary-color, #03a9f4), color-mix(in oklab, var(--primary-color, #03a9f4) 52%, #ffffff 48%));
+  animation:ddc-loading-progress 1.02s cubic-bezier(.22, 1, .36, 1) infinite;
+}
+.ddc-root.ddc-loading-active > :not(.ddc-loading-overlay){
+  opacity:0;
+  pointer-events:none;
+}
+.ddc-root.ddc-loading-reveal > :not(.ddc-loading-overlay){
+  animation:ddc-dashboard-reveal .34s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes ddc-loading-overlay-in{
+  from{ opacity:0; }
+  to{ opacity:1; }
+}
+@keyframes ddc-loading-overlay-out{
+  from{ opacity:1; }
+  to{ opacity:0; }
+}
+@keyframes ddc-loading-scan{
+  0%{ transform:translateX(0) skewX(-16deg); opacity:0; }
+  18%{ opacity:1; }
+  74%{ opacity:.86; }
+  100%{ transform:translateX(410%) skewX(-16deg); opacity:0; }
+}
+@keyframes ddc-loading-tile-pop{
+  0%, 100%{ opacity:.5; transform:translateY(7px) scale(.96); }
+  38%, 62%{ opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes ddc-loading-progress{
+  0%{ transform:translateX(-115%); }
+  100%{ transform:translateX(260%); }
+}
+@keyframes ddc-dashboard-reveal{
+  from{ opacity:0; transform:translateY(10px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+@media (prefers-reduced-motion: reduce){
+  .ddc-loading-overlay,
+  .ddc-loading-overlay.is-active,
+  .ddc-loading-overlay.is-leaving,
+  .ddc-loading-mark::before,
+  .ddc-loading-tile,
+  .ddc-loading-track span,
+  .ddc-root.ddc-loading-reveal > :not(.ddc-loading-overlay){
+    animation:none !important;
+    transition:none !important;
+  }
+  .ddc-loading-tile{
+    opacity:.82;
+    transform:none;
+  }
+}
+
 .ddc-root.ddc-sidebar-density-compact{ --ddc-sidebar-width: clamp(92px, 7.5vw, 118px); --ddc-sidebar-gap: clamp(14px, 2vw, 22px); }
 .ddc-root.ddc-sidebar-density-comfortable{ --ddc-sidebar-width: clamp(220px, 18vw, 310px); }
 .ddc-root.ddc-sidebar-density-spacious{ --ddc-sidebar-width: clamp(260px, 22vw, 380px); --ddc-sidebar-gap: clamp(22px, 3vw, 38px); }
@@ -4168,6 +4320,17 @@ export function getDashboardShellTemplate() {
         isolation: isolate; z-index: 0; -webkit-touch-callout: none;
         user-select: none;
       }
+      .ddc-root.ddc-auto-scale-settling > .ddc-scale-outer,
+      .ddc-root.ddc-auto-scale-settling > .card-container,
+      .ddc-root.ddc-auto-scale-settling .card-wrapper{
+        transition: none !important;
+        animation: none !important;
+      }
+      .ddc-root.ddc-auto-scale-boot-hidden > .ddc-scale-outer,
+      .ddc-root.ddc-auto-scale-boot-hidden > .card-container{
+        opacity: 0;
+        pointer-events: none;
+      }
       .card-container::before{
         content:'';
         position:absolute; inset:0;
@@ -4212,6 +4375,14 @@ export function getDashboardShellTemplate() {
         filter: var(--ddc-bg-filter, none);
       }
 
+      .card-container.ddc-bg-frozen-during-resize::after{
+        inset: auto;
+        left: 0;
+        top: 0;
+        width: var(--ddc-resize-bg-width, 100%);
+        height: var(--ddc-resize-bg-height, 100%);
+      }
+
       /* Dynamic background host (particles.js / YouTube) */
       .card-container .ddc-bg-host{
         position: absolute;
@@ -4220,6 +4391,14 @@ export function getDashboardShellTemplate() {
         overflow: hidden;
         pointer-events: none;     /* don’t block card drag/drop */
         opacity: var(--ddc-bg-opacity, 1);
+      }
+
+      .card-container.ddc-bg-frozen-during-resize .ddc-bg-host{
+        inset: auto;
+        left: 0;
+        top: 0;
+        width: var(--ddc-resize-bg-width, 100%);
+        height: var(--ddc-resize-bg-height, 100%);
       }
 
       .card-container .ddc-bg-host > *{
@@ -4289,7 +4468,7 @@ export function getDashboardShellTemplate() {
        * background shown. However, exclude edit-only overlay UI so those
        * layers do not accidentally paint above the actual card contents.
        */
-      .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle):not(.ddc-card-anchors):not(.shield):not(.chip) {
+      .card-wrapper > *:not(.ddc-card-settings):not(.delete-handle):not(.resize-handle):not(.ddc-card-anchors):not(.shield):not(.chip):not(.ddc-compact-card-actions) {
         /* Critical: do NOT give the card a background via this variable.
           Some headers read --ha-card-background when header-color is unset. */
         --ha-card-background: var(--ddc-card-inner-bg, transparent) !important;
@@ -4398,6 +4577,166 @@ export function getDashboardShellTemplate() {
         background:linear-gradient(135deg, rgba(236,72,72,1) 0%, rgba(255,105,97,1) 100%);
       }
       .chip .mini.pill{ padding:0; }
+
+      .ddc-compact-card-actions{
+        display:none;
+        position:absolute;
+        top:6px;
+        right:6px;
+        width:34px;
+        height:34px;
+        padding:0;
+        border:1px solid rgba(255,255,255,.2);
+        border-radius:11px;
+        appearance:none;
+        -webkit-appearance:none;
+        align-items:center;
+        justify-content:center;
+        background:
+          linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.035)),
+          rgba(16, 22, 33, .88);
+        color:#fff;
+        box-shadow:0 8px 22px rgba(0,0,0,.28);
+        backdrop-filter:blur(10px);
+        -webkit-backdrop-filter:blur(10px);
+        cursor:pointer;
+        opacity:0;
+        visibility:hidden;
+        pointer-events:none;
+        z-index:10030;
+        transform:scale(var(--ddc-edit-ui-scale, 1));
+        transform-origin:top right;
+        transition:opacity .12s ease, visibility 0s linear .12s, background .15s ease, box-shadow .15s ease, transform .1s ease;
+      }
+      .ddc-compact-card-actions ha-icon{
+        --mdc-icon-size:20px;
+        width:20px;
+        height:20px;
+        pointer-events:none;
+      }
+      .ddc-compact-card-actions:hover,
+      .ddc-compact-card-actions:focus-visible{
+        outline:none;
+        background:
+          linear-gradient(135deg, rgba(255,255,255,.2), rgba(255,255,255,.05)),
+          color-mix(in oklab, var(--primary-color, #03a9f4) 24%, rgba(16, 22, 33, .9));
+        box-shadow:0 10px 26px rgba(0,0,0,.34);
+        transform:scale(var(--ddc-edit-ui-scale-hover, 1.05));
+      }
+      .card-wrapper.editing.ddc-compact-edit-ui .chip,
+      .card-wrapper.editing.ddc-compact-edit-ui .resize-handle--bl{
+        display:none !important;
+      }
+      .card-wrapper.editing.ddc-tiny-edit-ui .delete-handle{
+        display:none !important;
+      }
+      .card-wrapper.editing.ddc-compact-edit-ui .ddc-compact-card-actions{
+        display:flex;
+      }
+      .card-wrapper.editing.ddc-compact-edit-ui:hover .ddc-compact-card-actions,
+      .card-wrapper.editing.ddc-compact-edit-ui.selected .ddc-compact-card-actions,
+      .card-wrapper.editing.ddc-compact-edit-ui:focus-within .ddc-compact-card-actions,
+      .card-wrapper.editing.ddc-compact-actions-open .ddc-compact-card-actions{
+        opacity:1;
+        visibility:visible;
+        pointer-events:auto;
+        transition-delay:0s;
+      }
+      .card-wrapper.editing.ddc-compact-edit-ui .resize-handle--br{
+        width:32px;
+        height:32px;
+        right:4px;
+        bottom:4px;
+        border-top-left-radius:32px;
+      }
+      .card-wrapper.editing.ddc-compact-edit-ui .resize-handle--br ha-icon{
+        --mdc-icon-size:17px;
+        width:17px;
+        height:17px;
+      }
+
+      .ddc-compact-actions-backdrop{
+        position:fixed;
+        inset:0;
+        z-index:99990;
+        background:transparent;
+        pointer-events:auto;
+      }
+      .ddc-compact-actions-menu{
+        --ddc-compact-actions-accent:var(--primary-color, #03a9f4);
+        position:fixed;
+        width:min(236px, calc(100vw - 20px));
+        max-height:calc(100dvh - 20px);
+        box-sizing:border-box;
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:6px;
+        padding:8px;
+        overflow:auto;
+        border-radius:14px;
+        border:1px solid color-mix(in oklab, var(--ddc-compact-actions-accent) 24%, rgba(255,255,255,.16));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+          color-mix(in oklab, var(--card-background-color, #111827) 88%, rgba(5,8,14,.92));
+        color:var(--primary-text-color, #f8fafc);
+        box-shadow:
+          0 18px 42px rgba(0,0,0,.38),
+          inset 0 1px 0 rgba(255,255,255,.08);
+        backdrop-filter:blur(18px) saturate(1.08);
+        -webkit-backdrop-filter:blur(18px) saturate(1.08);
+      }
+      .ddc-compact-actions-menu button{
+        min-width:0;
+        min-height:38px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:flex-start;
+        gap:7px;
+        padding:0 9px;
+        border:1px solid color-mix(in oklab, rgba(255,255,255,.18) 78%, transparent);
+        border-radius:10px;
+        background:rgba(255,255,255,.055);
+        color:inherit;
+        cursor:pointer;
+        font:800 .78rem/1.1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+        letter-spacing:0;
+        transition:background .14s ease, border-color .14s ease, transform .1s ease, box-shadow .14s ease;
+      }
+      .ddc-compact-actions-menu button:hover,
+      .ddc-compact-actions-menu button:focus-visible{
+        outline:none;
+        border-color:color-mix(in oklab, var(--ddc-compact-actions-accent) 38%, rgba(255,255,255,.16));
+        background:color-mix(in oklab, var(--ddc-compact-actions-accent) 18%, rgba(255,255,255,.07));
+        box-shadow:0 8px 18px rgba(0,0,0,.22);
+        transform:translateY(-1px);
+      }
+      .ddc-compact-actions-menu button ha-icon{
+        --mdc-icon-size:17px;
+        width:17px;
+        height:17px;
+        flex:0 0 auto;
+      }
+      .ddc-compact-actions-menu button span{
+        min-width:0;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .ddc-compact-actions-menu button.danger{
+        grid-column:1 / -1;
+        color:#fff;
+        border-color:color-mix(in oklab, #ef4444 58%, transparent);
+        background:
+          linear-gradient(135deg, rgba(255,255,255,.12), transparent),
+          color-mix(in oklab, #ef4444 76%, #7f1d1d 24%);
+      }
+      .ddc-compact-actions-menu button.danger:hover,
+      .ddc-compact-actions-menu button.danger:focus-visible{
+        border-color:color-mix(in oklab, #fecaca 62%, transparent);
+        background:
+          linear-gradient(135deg, rgba(255,255,255,.16), transparent),
+          color-mix(in oklab, #ef4444 86%, #7f1d1d 14%);
+      }
 
 	      /* Edit highlight */
 	      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; overflow: hidden; }
@@ -4951,7 +5290,7 @@ export function getDashboardShellTemplate() {
       }
       .ddc-card-settings .layer-chip,
       .ddc-card-settings .btn.secondary,
-      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]){
+      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]):not(.ddc-color-preset):not(.ddc-style-disclosure){
         min-height:38px;
         border:1px solid var(--ddc-popup-line);
         border-radius:13px;
@@ -4963,7 +5302,7 @@ export function getDashboardShellTemplate() {
       }
       .ddc-card-settings .layer-chip:hover,
       .ddc-card-settings .btn.secondary:hover,
-      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]):hover{
+      .ddc-card-settings button:not(.ddc-card-settings-close):not([data-card-style-value]):not(.ddc-color-preset):not(.ddc-style-disclosure):hover{
         border-color:color-mix(in oklab, var(--ddc-popup-accent) 34%, var(--ddc-popup-line));
         background:
           linear-gradient(180deg, color-mix(in oklab, var(--ddc-popup-accent) 10%, transparent), rgba(255,255,255,.014)),
@@ -4972,6 +5311,149 @@ export function getDashboardShellTemplate() {
       .ddc-card-settings [data-card-style-value]{
         border-color:color-mix(in oklab, var(--ddc-popup-line) 78%, rgba(255,255,255,.18))!important;
         box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 6px 14px rgba(0,0,0,.16);
+      }
+      .ddc-card-settings .ddc-card-style-field{
+        gap:8px!important;
+      }
+      .ddc-card-settings .ddc-card-style-controls{
+        width:100%;
+        min-width:0;
+      }
+      .ddc-card-settings .ddc-card-style-library-wrap{
+        width:100%;
+        box-sizing:border-box;
+        margin-top:4px;
+        padding:10px;
+        border-radius:14px;
+        border:1px solid color-mix(in oklab, var(--ddc-popup-line) 82%, rgba(255,255,255,.12));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.032), rgba(255,255,255,.01)),
+          color-mix(in oklab, var(--ddc-popup-field) 86%, transparent);
+      }
+      .ddc-card-settings .ddc-card-style-library-wrap.ddc-style-library-collapsible:not(.ddc-style-library-expanded) .ddc-color-preset.is-extra-style{
+        display:none;
+      }
+      .ddc-card-settings .ddc-style-library{
+        display:grid;
+        grid-template-columns:repeat(auto-fill, minmax(54px, 1fr));
+        gap:9px 7px;
+        align-items:start;
+        width:100%;
+      }
+      .ddc-card-settings .ddc-color-preset{
+        width:auto;
+        min-width:0;
+        display:grid;
+        gap:6px;
+        justify-items:center;
+        align-content:start;
+        padding:0;
+        border:0;
+        border-radius:13px;
+        background:transparent;
+        box-shadow:none;
+        color:var(--secondary-text-color, #9ca3af);
+        text-align:center;
+        cursor:pointer;
+      }
+      .ddc-card-settings .ddc-color-preset-preview{
+        position:relative;
+        display:block;
+        width:100%;
+        aspect-ratio:1;
+        min-height:38px;
+        overflow:hidden;
+        border-radius:10px;
+        border:1px solid color-mix(in oklab, var(--ddc-popup-line) 82%, rgba(255,255,255,.18));
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.2),
+          inset 0 -16px 22px rgba(0,0,0,.13),
+          0 8px 18px rgba(0,0,0,.14);
+        transition:transform .14s ease, border-color .16s ease, box-shadow .16s ease, filter .16s ease;
+      }
+      .ddc-card-settings .ddc-color-preset[data-value="transparent"] .ddc-color-preset-preview{
+        background:
+          linear-gradient(45deg, color-mix(in oklab, var(--secondary-text-color, #9ca3af) 18%, transparent) 25%, transparent 25% 75%, color-mix(in oklab, var(--secondary-text-color, #9ca3af) 18%, transparent) 75%),
+          linear-gradient(45deg, color-mix(in oklab, var(--secondary-text-color, #9ca3af) 18%, transparent) 25%, transparent 25% 75%, color-mix(in oklab, var(--secondary-text-color, #9ca3af) 18%, transparent) 75%),
+          var(--ddc-popup-field)!important;
+        background-position:0 0, 7px 7px, 0 0!important;
+        background-size:14px 14px, 14px 14px, auto!important;
+      }
+      .ddc-card-settings .ddc-color-preset-label{
+        max-width:100%;
+        min-height:2.2em;
+        display:-webkit-box;
+        -webkit-line-clamp:2;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+        color:var(--secondary-text-color, #9ca3af);
+        font-size:.58rem;
+        line-height:1.1;
+        font-weight:760;
+        letter-spacing:0;
+      }
+      .ddc-card-settings .ddc-color-preset:hover .ddc-color-preset-preview,
+      .ddc-card-settings .ddc-color-preset:focus-visible .ddc-color-preset-preview{
+        transform:translateY(-1px);
+        filter:saturate(1.05) brightness(1.03);
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 45%, var(--ddc-popup-line));
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.24),
+          inset 0 -16px 22px rgba(0,0,0,.15),
+          0 12px 22px rgba(0,0,0,.2);
+      }
+      .ddc-card-settings .ddc-color-preset:focus-visible{
+        outline:none;
+      }
+      .ddc-card-settings .ddc-color-preset[aria-pressed="true"] .ddc-color-preset-preview{
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 72%, var(--ddc-popup-line));
+        box-shadow:
+          0 0 0 2px color-mix(in oklab, var(--ddc-popup-accent) 70%, transparent),
+          0 0 0 5px color-mix(in oklab, var(--ddc-popup-accent) 14%, transparent),
+          inset 0 1px 0 rgba(255,255,255,.25),
+          inset 0 -16px 22px rgba(0,0,0,.14),
+          0 12px 22px rgba(0,0,0,.19);
+      }
+      .ddc-card-settings .ddc-color-preset[aria-pressed="true"] .ddc-color-preset-label{
+        color:var(--primary-text-color, #f5f5f5);
+      }
+      .ddc-card-settings .ddc-style-disclosure{
+        width:100%;
+        min-height:36px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        margin-top:10px;
+        padding:0 12px;
+        border-radius:11px;
+        border:1px solid color-mix(in oklab, var(--ddc-popup-accent) 30%, var(--ddc-popup-line));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+          color-mix(in oklab, var(--ddc-popup-field) 84%, transparent);
+        color:var(--primary-text-color, #f5f5f5);
+        cursor:pointer;
+        font:inherit;
+        font-size:.78rem;
+        font-weight:820;
+      }
+      .ddc-card-settings .ddc-style-disclosure ha-icon{
+        --mdc-icon-size:17px;
+      }
+      .ddc-card-settings .ddc-style-disclosure small{
+        padding:2px 7px;
+        border-radius:999px;
+        background:color-mix(in oklab, var(--ddc-popup-accent) 16%, transparent);
+        color:color-mix(in oklab, var(--ddc-popup-accent) 76%, var(--primary-text-color, #f5f5f5));
+        font-size:.68rem;
+        font-weight:850;
+      }
+      .ddc-card-settings .ddc-style-disclosure:hover,
+      .ddc-card-settings .ddc-style-disclosure:focus-visible{
+        outline:none;
+        transform:translateY(-1px);
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 48%, var(--ddc-popup-line));
+        background:color-mix(in oklab, var(--ddc-popup-accent) 12%, var(--ddc-popup-field));
       }
       @media (max-width: 640px){
         .ddc-card-settings-backdrop{
@@ -8744,6 +9226,21 @@ export function getDashboardShellTemplate() {
             <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
           </div>
           <aside class="ddc-connector-inspector" id="connectorInspector" hidden aria-live="polite"></aside>
+          <div class="ddc-loading-overlay" id="ddcLoadingOverlay" hidden aria-live="polite" aria-label="Loading dashboard">
+            <div class="ddc-loading-surface">
+              <div class="ddc-loading-mark" aria-hidden="true">
+                <span class="ddc-loading-tile"></span>
+                <span class="ddc-loading-tile"></span>
+                <span class="ddc-loading-tile"></span>
+                <span class="ddc-loading-tile"></span>
+              </div>
+              <div class="ddc-loading-title">
+                <ha-icon icon="mdi:view-dashboard-outline" aria-hidden="true"></ha-icon>
+                <span>Loading dashboard</span>
+              </div>
+              <div class="ddc-loading-track" aria-hidden="true"><span></span></div>
+            </div>
+          </div>
 
 
 

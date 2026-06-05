@@ -6,6 +6,108 @@
  */
 
 const scaleManagerMethods = {
+  _setAutoScaleStartupVisualState_(active = false, { hide = false } = {}) {
+    const root = this.rootEl || this.shadowRoot?.querySelector?.('.ddc-root') || null;
+    const on = !!active;
+    this.__autoScaleStartupSettling = on;
+    try { root?.classList?.toggle?.('ddc-auto-scale-settling', on); } catch {}
+    try { root?.classList?.toggle?.('ddc-auto-scale-boot-hidden', on && !!hide); } catch {}
+  },
+
+  _settleAutoScaleAfterBoot_(options = {}) {
+    const opts = (options && typeof options === 'object') ? options : {};
+    let mode = 'auto';
+    try {
+      mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+    } catch {}
+    if (mode !== 'auto') {
+      this._setAutoScaleStartupVisualState_?.(false);
+      return;
+    }
+
+    const raf = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (cb) => setTimeout(cb, 16);
+    const now = () => {
+      try {
+        return typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now();
+      } catch {
+        return Date.now();
+      }
+    };
+    const token = (this.__autoScaleSettleToken || 0) + 1;
+    const previousSuppressAnimation = Object.prototype.hasOwnProperty.call(opts, 'restoreCardAnimation')
+      ? !!opts.restoreCardAnimation
+      : !!this.__suppressCardAnimation;
+    this.__autoScaleSettleToken = token;
+    this.__autoScaleNeedsPostBoot = false;
+    this.__suppressCardAnimation = true;
+    this._setAutoScaleStartupVisualState_?.(true, { hide: true });
+
+    const run = () => {
+      if (token !== this.__autoScaleSettleToken) return;
+      try { this._resizeContainer?.(); } catch {}
+      try { this._applyAutoScale?.({ force: true }); } catch {}
+      try { this._layoutYtBackground_?.(); } catch {}
+      try { this._syncTabsWidth_?.(); } catch {}
+      try { this._requestGridButtonsUpdateSoon?.(); } catch {}
+      try { this._syncPreviewOutsideCards_?.(); } catch {}
+    };
+
+    const signature = () => {
+      const outer = this.__scaleOuter || null;
+      const c = this.cardContainer || null;
+      return [
+        c?.style?.width || '',
+        c?.style?.height || '',
+        c?.style?.transform || '',
+        outer?.style?.width || '',
+        outer?.style?.height || '',
+        outer?.style?.overflowX || '',
+        outer?.style?.overflowY || '',
+      ].join('|');
+    };
+
+    let finished = false;
+    let lastSignature = '';
+    let stableFrames = 0;
+    const started = now();
+    const finish = () => {
+      if (finished) return;
+      if (token !== this.__autoScaleSettleToken) return;
+      finished = true;
+      run();
+      this.__suppressCardAnimation = previousSuppressAnimation;
+      this._setAutoScaleStartupVisualState_?.(false);
+      if (!previousSuppressAnimation) {
+        raf(() => {
+          if (token !== this.__autoScaleSettleToken) return;
+          try { this._animateCards?.(null, { reason: 'auto-boot-settle' }); } catch {}
+        });
+      }
+    };
+
+    const step = () => {
+      if (finished || token !== this.__autoScaleSettleToken) return;
+      run();
+      const nextSignature = signature();
+      if (nextSignature === lastSignature) stableFrames += 1;
+      else stableFrames = 0;
+      lastSignature = nextSignature;
+      if (stableFrames >= 2 || now() - started > 720) {
+        finish();
+        return;
+      }
+      raf(step);
+    };
+
+    run();
+    raf(step);
+    setTimeout(finish, 900);
+  },
+
   _requestAutoScaleFromObserver_() {
     if (this.__ddcMovingCard) {
       this.__ddcScaleAfterCardMove = true;
@@ -97,7 +199,7 @@ const scaleManagerMethods = {
           if (n && n.classList && n.classList.contains('card-wrapper')) { hit = n; break; }
         }
         if (!hit) return;
-        if (ev.target?.closest?.('.resize-handle')) return;
+        if (ev.target?.closest?.('.resize-handle, .delete-handle, .chip, .ddc-compact-card-actions, .ddc-card-anchors')) return;
         this.__ddcDragPointer = {
           id: ev.pointerId,
           startX: Number(ev.clientX || 0),
@@ -309,7 +411,7 @@ _setEditControlScale_(scale = 1) {
 },
 
 
-_applyAutoScale() {
+_applyAutoScale(options = {}) {
   if (this.__ddcMovingCard) {
     this.__ddcScaleAfterCardMove = true;
     return;
@@ -319,6 +421,7 @@ _applyAutoScale() {
     return;
   }
 
+  const opts = (options && typeof options === 'object') ? options : {};
   let mode = 'auto';
   try {
     mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
@@ -328,11 +431,18 @@ _applyAutoScale() {
   const c = this.cardContainer;
   if (!c) return;
 
+  if (!opts.force && mode === 'auto' && (this.__booting || this._loading)) {
+    this.__autoScaleNeedsPostBoot = true;
+    this._setAutoScaleStartupVisualState_?.(true, { hide: true });
+    return;
+  }
+
   const preview = mode === 'auto' ? this._getViewportPreviewPreset_?.() : null;
   const previewActive = !!(preview?.width && preview?.height);
+  const needsEditViewportWrapper = !!this.editMode && mode !== 'auto';
 
   try {
-    if (this.autoResizeCards || mode === 'auto' || previewActive) {
+    if (this.autoResizeCards || mode === 'auto' || previewActive || needsEditViewportWrapper) {
       if (typeof this._ensureScaleWrapper === 'function') this._ensureScaleWrapper();
     }
   } catch {}
@@ -352,6 +462,27 @@ _applyAutoScale() {
     const sameW = c.style.width === wantW;
     const sameH = c.style.height === wantH;
     const sameT = c.style.transform === 'scale(1)';
+    const syncFixedOuter = () => {
+      if (!this.__scaleOuter) return;
+      const pw =
+        (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
+        (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
+        (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
+        this.offsetWidth || d.w;
+      const outerW = this._getEffectivePreviewWidth_?.(pw) || pw;
+      const wantOuterW = `${Math.max(1, outerW)}px`;
+      const wantOuterH = `${Math.max(1, isPreview ? previewHeight : d.h)}px`;
+      if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
+      if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
+      if (isPreview) this.__scaleOuter.style.overflow = '';
+      this.__scaleOuter.style.overflowX = d.w > outerW ? 'auto' : 'hidden';
+      this.__scaleOuter.style.overflowY = isPreview ? 'auto' : 'hidden';
+      this.__scaleOuter.style.webkitOverflowScrolling = isPreview ? 'touch' : '';
+      this.__scaleOuter.style.overscrollBehavior = isPreview ? 'contain' : '';
+      this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
+      this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
+      this._applyPreviewDeviceFrame_?.(outerW, isPreview ? previewHeight : d.h);
+    };
 
     if (!(sameW && sameH && sameT)) {
       c.style.width = wantW;
@@ -365,28 +496,8 @@ _applyAutoScale() {
       this.__pointerScaleX = 1;
       this.__pointerScaleY = 1;
       this._setEditControlScale_?.(1);
-
-	      if (this.__scaleOuter) {
-	        const pw =
-	          (this.parentElement && this.parentElement.getBoundingClientRect?.().width) ||
-	          (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
-	          (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
-          this.offsetWidth || d.w;
-        const outerW = this._getEffectivePreviewWidth_?.(pw) || pw;
-        const wantOuterW = `${Math.max(1, outerW)}px`;
-	        const wantOuterH = `${Math.max(1, isPreview ? previewHeight : d.h)}px`;
-	        if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;
-	        if (this.__scaleOuter.style.height !== wantOuterH) this.__scaleOuter.style.height = wantOuterH;
-	        if (isPreview) this.__scaleOuter.style.overflow = '';
-	        this.__scaleOuter.style.overflowX = d.w > outerW ? 'auto' : 'hidden';
-	        this.__scaleOuter.style.overflowY = isPreview ? 'auto' : 'hidden';
-	        this.__scaleOuter.style.webkitOverflowScrolling = isPreview ? 'touch' : '';
-        this.__scaleOuter.style.overscrollBehavior = isPreview ? 'contain' : '';
-        this.__scaleOuter.style.marginInline = this._getViewportPreviewPreset_?.() ? 'auto' : '';
-        this.__scaleOuter.style.maxWidth = this._getViewportPreviewPreset_?.() ? '100%' : '';
-        this._applyPreviewDeviceFrame_?.(outerW, isPreview ? previewHeight : d.h);
-      }
     }
+    syncFixedOuter();
 
     try { this._syncTabsWidth_?.(); } catch {}
     try { this._scheduleTextResizeLockRefresh_?.(); } catch {}

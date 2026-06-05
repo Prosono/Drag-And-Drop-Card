@@ -70,7 +70,7 @@ const tabsLayoutMethods = {
           this._closeLayersMenu_?.({ render: false });
           this.activeTab = t.id;
           try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, t.id); } catch {}
-          this._applyActiveTab();
+          this._applyActiveTab({ reason: 'tab-change' });
           this._renderTabs();
           // Reapply visibility for the newly active tab. Visibility must be
           // evaluated after switching tabs so cards with conditions are
@@ -122,12 +122,15 @@ const tabsLayoutMethods = {
     } catch {}
   },
 
-  _applyActiveTab() {
+  _applyActiveTab(options = {}) {
+    const opts = (options && typeof options === 'object') ? options : {};
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
     const becameVisible = [];
+    const visibleAfter = [];
     wraps.forEach(w => {
       const result = this._applyWrapDisplayState_(w, { clearSelectionOnHide: true });
       if (result?.becameVisible) becameVisible.push(w);
+      if (result?.visible) visibleAfter.push(w);
     });
 
     // After switching tabs, reapply sizing based on the current container mode.
@@ -140,7 +143,9 @@ const tabsLayoutMethods = {
     // On tab changes, replay entrance motion only for cards that just became
     // visible. Initial render still uses the one-time mount animation below.
     try {
-      if (becameVisible.length) this._animateCards?.(becameVisible, { replay: true, reason: 'tab-change' });
+      if (opts.reason === 'tab-change') {
+        this._animateCards?.(visibleAfter.length ? visibleAfter : becameVisible, { replay: true, reason: 'tab-change' });
+      } else if (becameVisible.length) this._animateCards?.(becameVisible, { replay: true, reason: 'tab-change' });
       else this._animateCards?.();
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
@@ -194,8 +199,16 @@ const tabsLayoutMethods = {
       if (!replay && animationId && this.__animatedCardIds.has(animationId)) return;
       if (!replay && animationId) this.__animatedCardIds.add(animationId);
 
-      // Preserve any existing transform from layout
-      const base = (cs && cs.transform && cs.transform !== 'none') ? cs.transform : '';
+      const cardEl = w.firstElementChild;
+      const cardCfg = this._extractCardConfig?.(cardEl) || cardEl?.__ddcSourceConfig || cardEl?._config || {};
+      const isHtmlCard = String(cardCfg?.type || '').toLowerCase() === 'custom:ddc-html-card'
+        || String(cardEl?.tagName || '').toLowerCase() === 'ddc-html-card';
+      const motionTarget = isHtmlCard && cardEl ? cardEl : w;
+      const motionStyle = motionTarget === w ? cs : window.getComputedStyle?.(motionTarget);
+
+      // Preserve any existing transform from layout. HTML cards animate their
+      // host element so the wrapper's translate3d(x,y) remains purely positional.
+      const base = (motionStyle && motionStyle.transform && motionStyle.transform !== 'none') ? motionStyle.transform : '';
 
       // Fly-in distance increases with intensity
       const offsetY = 100 * animationIntensity; // % of element height
@@ -205,12 +218,15 @@ const tabsLayoutMethods = {
       // Random delay spread scales with intensity
       const delay = Math.random() * (maxDelay * Math.min(animationIntensity, 2)); // cap at 2x spread
       const restoreWillChange = w.style.willChange || '';
+      const restoreMotionWillChange = motionTarget.style.willChange || '';
+      const restoreTransition = w.style.transition || '';
+      const restoreMotionTransition = motionTarget.style.transition || '';
       const restoreOpacity = w.style.opacity || '';
-      const restoreTransform = w.style.transform || '';
+      const restoreTransform = motionTarget.style.transform || '';
       try {
-        w.getAnimations?.()
+        [w, motionTarget].forEach((target) => target?.getAnimations?.()
           ?.filter((anim) => String(anim?.id || '').startsWith('ddc-card-enter-'))
-          ?.forEach((anim) => anim.cancel());
+          ?.forEach((anim) => anim.cancel()));
       } catch {}
 
       if (reduceMotion) {
@@ -241,7 +257,8 @@ const tabsLayoutMethods = {
       }
 
       try {
-        w.style.willChange = 'opacity, transform';
+        w.style.willChange = motionTarget === w ? 'opacity, transform' : 'opacity';
+        if (motionTarget !== w) motionTarget.style.willChange = 'transform';
 
         const motionEase = 'cubic-bezier(0.4, 0, 0.2, 1)';
         const opacityEase = 'linear';
@@ -254,7 +271,7 @@ const tabsLayoutMethods = {
         fade.id = 'ddc-card-enter-opacity';
 
         // Transform upward flight
-        const motion = w.animate(
+        const motion = motionTarget.animate(
           [{ transform: fromT }, { transform: toT }],
           { duration, delay, easing: motionEase, fill: 'both' }
         );
@@ -263,8 +280,9 @@ const tabsLayoutMethods = {
           try { fade.cancel(); } catch {}
           try { motion.cancel(); } catch {}
           w.style.opacity = restoreOpacity;
-          w.style.transform = restoreTransform;
           w.style.willChange = restoreWillChange;
+          motionTarget.style.transform = restoreTransform;
+          motionTarget.style.willChange = restoreMotionWillChange;
         };
         if (motion.finished && fade.finished) {
           Promise.allSettled([motion.finished, fade.finished]).then(cleanup);
@@ -274,17 +292,25 @@ const tabsLayoutMethods = {
       } catch {
         // Fallback without Web Animations API
         w.style.opacity = '0';
-        w.style.transform = fromT;
-        w.style.willChange = 'opacity, transform';
+        motionTarget.style.transform = fromT;
+        w.style.willChange = motionTarget === w ? 'opacity, transform' : 'opacity';
+        if (motionTarget !== w) motionTarget.style.willChange = 'transform';
         setTimeout(() => {
-          w.style.transition = `opacity ${duration}ms linear, transform ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+          if (motionTarget === w) {
+            w.style.transition = `opacity ${duration}ms linear, transform ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+          } else {
+            w.style.transition = `opacity ${duration}ms linear`;
+            motionTarget.style.transition = `transform ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+          }
           w.style.opacity = '1';
-          w.style.transform = toT;
+          motionTarget.style.transform = toT;
           setTimeout(() => {
-            w.style.transition = '';
+            w.style.transition = restoreTransition;
+            motionTarget.style.transition = restoreMotionTransition;
             w.style.willChange = restoreWillChange;
+            motionTarget.style.willChange = restoreMotionWillChange;
             w.style.opacity = restoreOpacity;
-            w.style.transform = restoreTransform;
+            motionTarget.style.transform = restoreTransform;
           }, duration + 60);
         }, delay);
       }
