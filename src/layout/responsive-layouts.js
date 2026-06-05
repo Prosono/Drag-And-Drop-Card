@@ -846,6 +846,10 @@ const responsiveModelMethods = {
   },
 
   async _syncResponsiveProfileForViewport_({ force = false } = {}) {
+    if (this.__ddcImportingDashboard) {
+      this._syncViewportPreviewUI_?.();
+      return;
+    }
     if (this.__booting) return;
     if (!this._responsiveLayouts && !this.cardContainer?.querySelector?.('.card-wrapper')) {
       this._syncViewportPreviewUI_?.();

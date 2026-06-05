@@ -217,7 +217,11 @@ const scaleManagerMethods = {
 	          const dy = Math.abs(Number(ev.clientY || 0) - pending.startY);
 	          if (Math.max(dx, dy) < 4) return;
 	          this.__ddcDragging = true;
-	          if (this.__scaleOuter && !this._getViewportPreviewPreset_?.()) {
+	          if (
+	            this.__scaleOuter
+	            && !this._getViewportPreviewPreset_?.()
+	            && !this._shouldKeepCanvasOverflowClippedDuringCardDrag_?.()
+	          ) {
 	            this.__prevOverflow = this.__scaleOuter.style.overflow;
 	            this.__scaleOuter.style.overflow = 'visible'; // avoid "ceiling" clipping
 	          }

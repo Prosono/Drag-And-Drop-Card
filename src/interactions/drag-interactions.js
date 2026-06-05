@@ -53,7 +53,8 @@ const interactBehaviorMethods = {
 	          }
 	          try {
 	            this.__prevMoveContainerOverflow = this.cardContainer?.style?.overflow || '';
-	            this.__keepPreviewDragClipped = !!this._getViewportPreviewPreset_?.();
+	            this.__keepPreviewDragClipped = !!this._getViewportPreviewPreset_?.()
+	              || !!this._shouldKeepCanvasOverflowClippedDuringCardDrag_?.();
 	            if (this.cardContainer) {
 	              this.cardContainer.style.overflow = this.__keepPreviewDragClipped ? 'hidden' : 'visible';
 	            }
@@ -198,7 +199,15 @@ const interactBehaviorMethods = {
           this.__ddcScaleAfterCardResize = false;
           this.__ddcResizeFromLeft = !!ev?.edges?.left;
           this.cardContainer?.classList?.add?.('ddc-card-resizing');
+          this._clearGridInteractionVisualState_?.();
+          this._markGridDirty?.();
           this._freezeCanvasBackgroundDuringResize_?.();
+          try {
+            if (this.__ddcFreezeContainerFillBackground && this.cardContainer) {
+              this.__prevResizeContainerOverflow = this.cardContainer.style?.overflow || '';
+              this.cardContainer.style.overflow = 'visible';
+            }
+          } catch {}
           if (this.__reflowRAF) {
             try { cancelAnimationFrame(this.__reflowRAF); } catch {}
             this.__reflowRAF = null;
@@ -256,7 +265,11 @@ const interactBehaviorMethods = {
           wrap.style.width  = `${nextW}px`;
           wrap.style.height = `${nextH}px`;
           this._syncCompactEditUiForWrapper_?.(wrap);
-          this._resizeContainer();
+          if (this.__ddcFreezeContainerFillBackground) {
+            this.__ddcScaleAfterCardResize = true;
+          } else {
+            this._resizeContainer();
+          }
           this._renderConnectors_?.();
         },
         end:()=>{
@@ -309,12 +322,20 @@ const interactBehaviorMethods = {
           }
 
           this._resizeContainer();
+          try {
+            if (this.__prevResizeContainerOverflow !== undefined && this.cardContainer) {
+              this.cardContainer.style.overflow = this.__prevResizeContainerOverflow || 'hidden';
+            }
+          } catch {}
+          this.__prevResizeContainerOverflow = undefined;
           if (this._isContainerFixed()) this._clampAllCardsInside();   // optional safety
           this._syncAnchoredConnectorPointsForCurrentLayout_?.({ reason: null, render: false });
           this.__ddcResizingCard = false;
           this.__ddcScaleAfterCardResize = false;
           this.__ddcResizeFromLeft = false;
           this.cardContainer?.classList?.remove?.('ddc-card-resizing');
+          this._clearGridInteractionVisualState_?.();
+          this._markGridDirty?.();
           try {
             const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
             if (mode === 'auto' || this.autoResizeCards || needsFinalScale) this._applyAutoScale?.();

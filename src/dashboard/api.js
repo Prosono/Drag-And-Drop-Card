@@ -230,7 +230,9 @@ const dashboardApiMethods = {
 
       this._syncViewportPreviewUI_?.();
       this._applyAutoScale?.();
-      try { Promise.resolve(this._syncResponsiveProfileForViewport_?.({ force: true })).catch(() => {}); } catch {}
+      if (!this.__ddcImportingDashboard) {
+        try { Promise.resolve(this._syncResponsiveProfileForViewport_?.({ force: true })).catch(() => {}); } catch {}
+      }
     }
 
     if ('container_fixed_width' in opts)      this.containerFixedWidth  = Number(opts.container_fixed_width)  || null;

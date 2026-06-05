@@ -7,14 +7,53 @@
 
 /* Background image, page background, particles, and YouTube helpers. */
 const backgroundEffectsMethods = {
+  _isCanvasFillBackgroundFreezeCandidate_() {
+    try {
+      const mode = this._getDashboardBackgroundMode_?.() || 'none';
+      if (mode !== 'none' || this.applyBackgroundToPage) return false;
+      const bg = String(this.containerBackground ?? '').trim();
+      return !!bg && !/^transparent$/i.test(bg) && /gradient\(/i.test(bg);
+    } catch {
+      return false;
+    }
+  },
+
+  _shouldKeepCanvasOverflowClippedDuringCardDrag_() {
+    return !!this._isCanvasFillBackgroundFreezeCandidate_?.();
+  },
+
   _freezeCanvasBackgroundDuringResize_() {
     const cont = this.cardContainer;
     if (!cont) return;
+    this.__ddcBackgroundFrozenDuringResize = false;
+    this.__ddcFillBackgroundFrozenDuringResize = false;
+    this.__ddcFreezeContainerImageBackground = false;
+    this.__ddcFreezeContainerFillBackground = false;
 
     try {
       const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
       if (mode !== 'auto') return;
     } catch {
+      return;
+    }
+
+    try {
+      const bgMode = this._getDashboardBackgroundMode_?.() || 'none';
+      const bgImage = String(cont.style.getPropertyValue('--ddc-bg-image') || '').trim();
+      const hasContainerImage = bgMode === 'image'
+        && !this.applyBackgroundToPage
+        && cont.classList?.contains?.('has-bg-image')
+        && bgImage
+        && bgImage !== 'none';
+      const hasContainerFill = !!this._isCanvasFillBackgroundFreezeCandidate_?.();
+      if (!hasContainerImage && !hasContainerFill) {
+        return;
+      }
+      this.__ddcFreezeContainerImageBackground = !!hasContainerImage;
+      this.__ddcFreezeContainerFillBackground = !!hasContainerFill;
+    } catch {
+      this.__ddcBackgroundFrozenDuringResize = false;
+      this.__ddcFillBackgroundFrozenDuringResize = false;
       return;
     }
 
@@ -37,7 +76,14 @@ const backgroundEffectsMethods = {
 
       cont.style.setProperty('--ddc-resize-bg-width', `${Math.max(1, width)}px`);
       cont.style.setProperty('--ddc-resize-bg-height', `${Math.max(1, height)}px`);
-      cont.classList.add('ddc-bg-frozen-during-resize');
+      if (this.__ddcFreezeContainerImageBackground) {
+        cont.classList.add('ddc-bg-frozen-during-resize');
+        this.__ddcBackgroundFrozenDuringResize = true;
+      }
+      if (this.__ddcFreezeContainerFillBackground) {
+        cont.classList.add('ddc-bg-fill-frozen-during-resize');
+        this.__ddcFillBackgroundFrozenDuringResize = true;
+      }
     } catch {}
   },
 
@@ -45,10 +91,16 @@ const backgroundEffectsMethods = {
     const cont = this.cardContainer;
     if (!cont) return;
     try {
+      const wasFrozen = !!this.__ddcBackgroundFrozenDuringResize || cont.classList.contains('ddc-bg-frozen-during-resize');
+      this.__ddcBackgroundFrozenDuringResize = false;
+      this.__ddcFillBackgroundFrozenDuringResize = false;
+      this.__ddcFreezeContainerImageBackground = false;
+      this.__ddcFreezeContainerFillBackground = false;
       cont.classList.remove('ddc-bg-frozen-during-resize');
+      cont.classList.remove('ddc-bg-fill-frozen-during-resize');
       cont.style.removeProperty('--ddc-resize-bg-width');
       cont.style.removeProperty('--ddc-resize-bg-height');
-      this._layoutYtBackground_?.();
+      if (wasFrozen && this._getDashboardBackgroundMode_?.() === 'youtube') this._layoutYtBackground_?.();
     } catch {}
   },
 

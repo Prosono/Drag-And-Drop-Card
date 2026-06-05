@@ -4334,6 +4334,7 @@ export function getDashboardShellTemplate() {
       .card-container::before{
         content:'';
         position:absolute; inset:0;
+        border-radius:inherit;
         background-image:
           linear-gradient(var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
           linear-gradient(90deg, var(--ddc-grid-color, rgba(120,120,120,.25)) 1px, transparent 1px),
@@ -4364,6 +4365,7 @@ export function getDashboardShellTemplate() {
       .card-container::after{
         content:'';
         position:absolute; inset:0;
+        border-radius:inherit;
         pointer-events:none;
         z-index:0;
         opacity: var(--ddc-bg-opacity, 1);
@@ -4382,11 +4384,17 @@ export function getDashboardShellTemplate() {
         width: var(--ddc-resize-bg-width, 100%);
         height: var(--ddc-resize-bg-height, 100%);
       }
+      .card-container.ddc-bg-fill-frozen-during-resize{
+        background-position: 0 0 !important;
+        background-repeat: no-repeat !important;
+        background-size: var(--ddc-resize-bg-width, 100%) var(--ddc-resize-bg-height, 100%) !important;
+      }
 
       /* Dynamic background host (particles.js / YouTube) */
       .card-container .ddc-bg-host{
         position: absolute;
         inset: 0;
+        border-radius:inherit;
         z-index: 0;               /* under grid (::before, z=1) and cards (z=2) */
         overflow: hidden;
         pointer-events: none;     /* don’t block card drag/drop */
@@ -8288,44 +8296,23 @@ export function getDashboardShellTemplate() {
   inset: 0;
   pointer-events: auto;     /* receives events only on empty space since it's behind cards */
   z-index: 5;               /* above visual grid, but behind draggable cards */
-  background:
-    linear-gradient(135deg, rgba(8, 47, 73, .035), rgba(14, 116, 144, .018));
+  background:transparent;
+}
+.card-container.ddc-card-resizing .ddc-grid-canvas{
+  pointer-events:none !important;
+}
+.card-container.ddc-card-resizing .ddc-grid-hover-cell,
+.card-container.ddc-card-resizing .ddc-grid-selection-rect{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
 }
 .ddc-grid-canvas--light{
   --ddc-blueprint-major:rgba(74, 222, 255, .34);
   --ddc-blueprint-minor:rgba(125, 211, 252, .12);
   --ddc-blueprint-dot:rgba(224, 242, 254, .36);
-  background-color:rgba(7, 43, 66, .052);
-  background-image:
-    radial-gradient(circle at 1px 1px, var(--ddc-blueprint-dot) 0 1px, transparent 1.6px),
-    linear-gradient(var(--ddc-blueprint-major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ddc-blueprint-major) 1px, transparent 1px),
-    linear-gradient(rgba(186, 230, 253, .18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(186, 230, 253, .18) 1px, transparent 1px),
-    linear-gradient(var(--ddc-blueprint-minor) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ddc-blueprint-minor) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(8, 47, 73, .16), rgba(14, 116, 144, .034) 52%, transparent 100%);
-  background-size:
-    var(--ddc-grid-major-size, 40px) var(--ddc-grid-major-size, 40px),
-    var(--ddc-grid-major-size, 40px) var(--ddc-grid-major-size, 40px),
-    var(--ddc-grid-major-size, 40px) var(--ddc-grid-major-size, 40px),
-    var(--ddc-grid-super-size, 80px) var(--ddc-grid-super-size, 80px),
-    var(--ddc-grid-super-size, 80px) var(--ddc-grid-super-size, 80px),
-    var(--ddc-grid-cell-size, 10px) var(--ddc-grid-cell-size, 10px),
-    var(--ddc-grid-cell-size, 10px) var(--ddc-grid-cell-size, 10px),
-    100% 100%;
-  background-position:
-    0 0,
-    0 0,
-    0 0,
-    var(--ddc-grid-half-major-offset, 20px) var(--ddc-grid-half-major-offset, 20px),
-    var(--ddc-grid-half-major-offset, 20px) var(--ddc-grid-half-major-offset, 20px),
-    0 0,
-    0 0,
-    0 0;
-  box-shadow:
-    inset 0 0 0 1px rgba(125, 211, 252, .22),
-    inset 0 0 0 2px rgba(8, 47, 73, .14);
+  background:transparent;
+  box-shadow:none;
 }
 .ddc-grid-hover-cell,
 .ddc-grid-selection-rect{

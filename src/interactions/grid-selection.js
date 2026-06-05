@@ -17,24 +17,33 @@ export function installGridSelectPatch(DragAndDropCard) {
       // so that any grid size above 10px will enable the drag‑select overlay.
       const bigEnough = grid >= 10;
       const cont = this.cardContainer;
-      // When not in edit mode or the grid is too small, destroy the overlay
-      // and fall back to the traditional dotted grid lines (grid-on class).
+      // The visible edit-mode grid is always the static CSS grid. The canvas is
+      // only an interaction layer for drag-selecting empty cells.
+      if (cont) cont.classList.toggle('grid-on', inEdit);
       if (!inEdit || !bigEnough) {
         this._destroyGridCanvas();
-        // restore underlying grid lines only when editing
-        if (cont) cont.classList.toggle('grid-on', inEdit);
         return;
       }
-      // In edit mode with a sufficiently large grid, build or update the
-      // selection overlay.  Hide the underlying CSS grid lines to avoid
-      // misaligned double grids.
       this._buildOrUpdateGridCanvas();
-      if (cont) cont.classList.remove('grid-on');
     },
 
     _requestGridButtonsUpdateSoon() {
       clearTimeout(this._gridLayoutT);
       this._gridLayoutT = setTimeout(() => this._updateGridButtonsVisibility(), 50);
+    },
+
+    _isGridInteractionSuspended_() {
+      return !!this.__ddcResizingCard || !!this.cardContainer?.classList?.contains?.('ddc-card-resizing');
+    },
+
+    _clearGridInteractionVisualState_() {
+      this._gridDown = false;
+      this._gridPointerId = null;
+      this._gridHoverCol = this._gridHoverRow = -1;
+      this._gridStartCol = this._gridStartRow = -1;
+      this._gridCurrCol = this._gridCurrRow = -1;
+      this._positionGridDomOverlay_?.(this._gridHoverEl, false);
+      this._positionGridDomOverlay_?.(this._gridSelectionEl, false);
     },
 
     _buildOrUpdateGridCanvas() {
@@ -269,6 +278,10 @@ export function installGridSelectPatch(DragAndDropCard) {
 
     _renderGridCanvas_() {
       const c = this._gridCanvas; if (!c) return;
+      const interactionsSuspended = !!this._isGridInteractionSuspended_?.();
+      if (interactionsSuspended) {
+        this._clearGridInteractionVisualState_?.();
+      }
       if (this._gridLightMode) {
         this._updateGridDomOverlays_();
         return;
@@ -279,30 +292,8 @@ export function installGridSelectPatch(DragAndDropCard) {
       const grid = this._gridCellSize || 10;
 
       ctx.clearRect(0, 0, c.width, c.height);
-      ctx.save();
-      ctx.scale(dpr, dpr);
-      ctx.fillStyle = 'rgba(8, 47, 73, 0.035)';
-      ctx.fillRect(0, 0, c.width / dpr, c.height / dpr);
-      ctx.restore();
 
-      if (this._gridTile) {
-        const pat = ctx.createPattern(this._gridTile, 'repeat');
-        // Offset the pattern by the container's padding so the rendered
-        // squares align perfectly with the underlying CSS grid lines.
-        // Draw the grid pattern starting at the canvas origin (0,0).
-        // The selectable cells use the same grid origin (0,0) relative to
-        // the canvas, so aligning the pattern origin with the canvas
-        // origin ensures that the visual grid exactly matches the
-        // interactive grid.  No translation is needed; simply fill the
-        // entire canvas with the repeating pattern.
-        ctx.save();
-        ctx.scale(dpr, dpr);
-        ctx.fillStyle = pat;
-        ctx.fillRect(0, 0, c.width / dpr, c.height / dpr);
-        ctx.restore();
-      }
-
-      if (this._gridHoverCol >= 0 && this._gridHoverRow >= 0) {
+      if (!interactionsSuspended && this._gridHoverCol >= 0 && this._gridHoverRow >= 0) {
         ctx.save();
         ctx.scale(dpr, dpr);
 
@@ -322,7 +313,7 @@ export function installGridSelectPatch(DragAndDropCard) {
       }
 
       // Selection rectangle – full grid cells, no insets
-      if (this._gridDown && this._gridStartCol >= 0 && this._gridStartRow >= 0 &&
+      if (!interactionsSuspended && this._gridDown && this._gridStartCol >= 0 && this._gridStartRow >= 0 &&
           this._gridCurrCol  >= 0 && this._gridCurrRow  >= 0) {
 
         const minCol = Math.min(this._gridStartCol, this._gridCurrCol);
@@ -400,6 +391,11 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     _onGridPointerDown(ev) {
+      if (this._isGridInteractionSuspended_?.()) {
+        this._clearGridInteractionVisualState_?.();
+        this._markGridDirty();
+        return;
+      }
       if (ev.pointerType === 'mouse' && ev.button !== 0) {
         this._gridDown = false;
         this._gridPointerId = null;
@@ -421,6 +417,11 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     _onGridPointerMove(ev) {
+      if (this._isGridInteractionSuspended_?.()) {
+        this._clearGridInteractionVisualState_?.();
+        this._markGridDirty();
+        return;
+      }
       if (this.__middleMousePanState || (ev.pointerType === 'mouse' && (ev.buttons & 4))) return;
       const { col: hcol, row: hrow } = this._locToCell_(ev.clientX, ev.clientY);
       if (hcol !== this._gridHoverCol || hrow !== this._gridHoverRow) {
@@ -439,6 +440,11 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     async _onGridPointerUp(ev) {
+      if (this._isGridInteractionSuspended_?.()) {
+        this._clearGridInteractionVisualState_?.();
+        this._markGridDirty();
+        return;
+      }
       if (ev?.pointerType === 'mouse' && ev.button !== 0) {
         this._onGridPointerCancel();
         return;

@@ -38,6 +38,10 @@ const smartPickerMethods = {
         // NEW: allow adding an empty custom card that the user can edit manually
         {type:'custom_card',       name:'Custom Card',       icon:'mdi:puzzle-outline'},
       ]},
+      { id:'layout', name:'Layout', items:[
+        {type:'vertical-stack',     name:'Vertical stack',    icon:'mdi:view-sequential-outline'},
+        {type:'horizontal-stack',   name:'Horizontal stack',  icon:'mdi:view-column-outline'},
+      ]},
 
       { id:'sensors',   name:'Sensors', items:[
         {type:'sensor',            name:'Sensor',            icon:'mdi:antenna'},
@@ -358,6 +362,42 @@ const smartPickerMethods = {
       'iframe': S({ fields:[ {key:'url', type:'text', label:'URL'} ]}),
       'area': S({ fields:[ {key:'area', type:'text', label:'Area ID'} ]}),
     })[type] || { fields: [] };
+  },
+
+  _isNativeStackCardType_(type) {
+    return type === 'vertical-stack' || type === 'horizontal-stack';
+  },
+
+  _getLovelaceForCardEditor_() {
+    try {
+      if (this.lovelace) return this.lovelace;
+      if (typeof this._getLovelace === 'function') {
+        const ll = this._getLovelace();
+        if (ll?.config) return ll.config;
+        if (ll) return ll;
+      }
+    } catch {}
+    try {
+      let hop = 0, host = this;
+      while (host && hop++ < 20) {
+        const root = host.getRootNode?.();
+        const rootHost = root?.host;
+        if (rootHost?.tagName === 'HUI-ROOT') return rootHost.lovelace?.config || rootHost.lovelace;
+        host = rootHost || host.parentElement;
+      }
+      const seen = new Set();
+      const queue = [document];
+      while (queue.length) {
+        const node = queue.shift();
+        if (!node || seen.has(node)) continue;
+        seen.add(node);
+        if (node.host?.tagName === 'HUI-ROOT') return node.host.lovelace?.config || node.host.lovelace;
+        if (node.tagName === 'HUI-ROOT') return node.lovelace?.config || node.lovelace;
+        if (node.shadowRoot) queue.push(node.shadowRoot);
+        if (node.children) for (const child of node.children) queue.push(child);
+      }
+    } catch {}
+    return undefined;
   },
 
 
@@ -3024,6 +3064,10 @@ const smartPickerMethods = {
     
       try {
         editor.hass = this.hass;
+        try {
+          const lovelaceConfig = this._getLovelaceForCardEditor_?.();
+          if (lovelaceConfig) editor.lovelace = lovelaceConfig;
+        } catch {}
         if (!editor.isConnected) editorHost.appendChild(editor);
 
         // small yield before setConfig to help late-attaching internals
@@ -3295,6 +3339,10 @@ const smartPickerMethods = {
     // Provide a blank stub when the user selects the "Custom Card" entry.
     // A blank type lets the YAML editor drive the configuration entirely.
     if (type === 'custom_card') return null;
+    if (this._isNativeStackCardType_(type)) return {
+      type,
+      cards: [],
+    };
     if (type === 'custom:ddc-line-card') return {
       type: 'custom:ddc-line-card',
       title: '',

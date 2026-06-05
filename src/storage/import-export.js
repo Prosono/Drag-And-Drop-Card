@@ -353,6 +353,8 @@ const designImportExportMethods = {
     inp.onchange = async () => {
       const file = inp.files?.[0]; if (!file) return;
       const txt = await file.text();
+      let dashboardImportStarted = false;
+      let previousDashboardImporting = false;
   
       try {
         const json = JSON.parse(txt);
@@ -360,6 +362,9 @@ const designImportExportMethods = {
           await this._importSingleCardPayload_(json);
           return;
         }
+        previousDashboardImporting = !!this.__ddcImportingDashboard;
+        dashboardImportStarted = true;
+        this.__ddcImportingDashboard = true;
         const prevStorageKey = this.storageKey || this._config?.storage_key || null;
         this._setDashboardPackages_(json.packages || []);
   
@@ -543,6 +548,48 @@ const designImportExportMethods = {
         if (!this.defaultTab) this.defaultTab = compatDefaultTab;
         if (this.hideTabsWhenSingle === undefined) this.hideTabsWhenSingle = compatHideSingle;
         this._syncTabsPlacement_?.();
+
+        // Prepare the imported layout before saving HA config. Home Assistant may
+        // re-run setConfig during saveConfig; seeding config/local cache first
+        // prevents that refresh from briefly resurrecting the old card list.
+        this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
+          runtimeImportedOptions.responsive_viewports
+          || json.options?.responsive_viewports
+          || this.responsiveViewportProfiles
+        );
+        this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
+        {
+          const primaryLayoutKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+          const primaryCards = this._responsiveLayouts?.[primaryLayoutKey] || json.cards || [];
+          const serializedResponsiveLayouts = this._cloneJson_(
+            this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards)
+          );
+          const importedSnapshot = {
+            version: 3,
+            updated_at: new Date().toISOString(),
+            options: this._exportableOptions?.() || runtimeImportedOptions,
+            cards: this._cloneJson_(primaryCards),
+            responsive_layouts: serializedResponsiveLayouts,
+            packages: this._exportDashboardPackages_?.() || [],
+          };
+          this._config = {
+            ...(this._config || {}),
+            cards: this._cloneJson_(primaryCards),
+            responsive_layouts: this._cloneJson_(serializedResponsiveLayouts),
+          };
+          this._deleteParkedSidebarOptions_(this._config);
+          try {
+            const snapshot = this._cloneJson_(importedSnapshot);
+            if (!globalThis.__ddcRuntimeLayoutCache) globalThis.__ddcRuntimeLayoutCache = new Map();
+            for (const key of this._runtimeLayoutCacheKeys_?.() || []) {
+              if (key) globalThis.__ddcRuntimeLayoutCache.set(key, snapshot);
+            }
+            globalThis.__ddcLastRuntimeLayoutPayload = snapshot;
+          } catch {
+            try { this._writeRuntimeLayoutCache_?.(importedSnapshot); } catch {}
+          }
+          try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(importedSnapshot)); } catch {}
+        }
   
         // ---- PERSIST IMPORTED OPTIONS TO YAML (replace semantics) ----
         try {
@@ -599,10 +646,6 @@ const designImportExportMethods = {
         }
   
         // ---- BUILD CARDS ----
-        this.responsiveViewportProfiles = this._normalizeResponsiveViewportProfiles_(
-          json.options?.responsive_viewports || this.responsiveViewportProfiles
-        );
-        this._responsiveLayouts = this._normalizeResponsiveLayouts_(json.cards || [], json.responsive_layouts || null);
         {
           const validTabIds = new Set((this.tabs || []).map((tab) => this._normalizeTabId(tab?.id)));
           const importedDefaultTab = this._normalizeTabId(runtimeImportedOptions.default_tab || this.defaultTab || compatDefaultTab);
@@ -626,7 +669,7 @@ const designImportExportMethods = {
           this._activeResponsiveProfile = targetProfile;
           this._activeResponsiveLayoutKey = targetLayoutKey;
           const ticket = ++this.__responsiveSwitchSeq;
-          await this._buildCardsFromEntries_(entriesToBuild, ticket);
+          await this._buildCardsFromEntries_(entriesToBuild, ticket, { replaceExisting: true });
           if (ticket === this.__responsiveSwitchSeq) this._syncViewportPreviewUI_?.();
         }
   
@@ -658,6 +701,8 @@ const designImportExportMethods = {
       } catch (e) {
         console.error('Import failed', e);
         this._toast?.('Import failed — invalid file.');
+      } finally {
+        if (dashboardImportStarted) this.__ddcImportingDashboard = previousDashboardImporting;
       }
     };
   

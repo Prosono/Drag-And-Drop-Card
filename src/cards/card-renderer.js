@@ -23,9 +23,10 @@ const cardBuilderMethods = {
     this._ensureConnectorsLayer_();
   },
 
-  async _buildCardsFromEntries_(entries = [], ticket = 0) {
+  async _buildCardsFromEntries_(entries = [], ticket = 0, options = {}) {
     let entryList = Array.isArray(entries) ? entries : [];
-    if (!entryList.length && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+    const replaceExisting = !!options?.replaceExisting;
+    if (!entryList.length && !replaceExisting && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
       try {
         const cached = this._readRuntimeLayoutCache_?.();
         const targetProfile = this._getRequestedResponsiveProfile_?.() || 'desktop';
@@ -45,7 +46,7 @@ const cardBuilderMethods = {
         }
       } catch {}
     }
-    if (entryList.length === 0 && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
+    if (entryList.length === 0 && !replaceExisting && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
       this._hideEmptyPlaceholder?.();
       this._syncEmptyStateUI?.();
       this._applyAutoScale?.();
