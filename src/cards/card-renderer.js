@@ -9,6 +9,188 @@ const raf = () => new Promise((resolve) => requestAnimationFrame(() => resolve()
 
 /* Card creation, wrapper controls, card config extraction, and layout insertion helpers. */
 const cardBuilderMethods = {
+  _isBubblePopupCardConfig_(cfg = {}, depth = 0) {
+    try {
+      if (!cfg || typeof cfg !== 'object' || depth > 6) return false;
+      const type = String(cfg?.type || '').trim().toLowerCase();
+      const cardType = String(cfg?.card_type ?? cfg?.cardType ?? '').trim().toLowerCase();
+      if (type === 'custom:bubble-pop-up') return true;
+      if (type === 'custom:bubble-card' && cardType === 'pop-up') return true;
+      const nestedCards = Array.isArray(cfg?.cards) ? cfg.cards : [];
+      if (nestedCards.some((child) => this._isBubblePopupCardConfig_(child, depth + 1))) return true;
+      if (cfg?.card && typeof cfg.card === 'object') {
+        return this._isBubblePopupCardConfig_(cfg.card, depth + 1);
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  _normalizeBubblePopupHash_(value = '') {
+    const hash = String(value || '').trim();
+    if (!hash) return '';
+    return hash.replace(/^#/, '').trim().toLowerCase();
+  },
+
+  _collectBubblePopupHashes_(cfg = {}, depth = 0, out = new Set()) {
+    try {
+      if (!cfg || typeof cfg !== 'object' || depth > 6) return out;
+      if (this._isBubblePopupCardConfig_(cfg, depth)) {
+        const hash = this._normalizeBubblePopupHash_(cfg.hash || cfg.popup_hash || cfg.popupHash || '');
+        if (hash) out.add(hash);
+      }
+      const nestedCards = Array.isArray(cfg?.cards) ? cfg.cards : [];
+      nestedCards.forEach((child) => this._collectBubblePopupHashes_(child, depth + 1, out));
+      if (cfg?.card && typeof cfg.card === 'object') {
+        this._collectBubblePopupHashes_(cfg.card, depth + 1, out);
+      }
+    } catch {}
+    return out;
+  },
+
+  _patchBubblePopupShadowStyles_(wrap) {
+    try {
+      if (!wrap) return;
+      const css = `
+        .bubble-pop-up:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog){
+          --ddc-bubble-popup-radius:var(--bubble-pop-up-content-border-radius, var(--bubble-pop-up-border-radius, var(--bubble-border-radius, 42px)));
+          height:auto !important;
+          max-height:min(78vh, calc(100vh - 96px)) !important;
+          top:clamp(48px, 6vh, 88px) !important;
+          bottom:auto !important;
+          border-radius:var(--ddc-bubble-popup-radius) !important;
+          overflow:hidden !important;
+          z-index:2147482600 !important;
+        }
+        .bubble-pop-up.is-popup-closed:not(.editor):not(.is-opening):not(.is-closing){
+          visibility:hidden !important;
+          opacity:0 !important;
+          pointer-events:none !important;
+          transform:translate3d(0, calc(100vh + 160px), 0) !important;
+        }
+        .bubble-pop-up:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog) > .bubble-pop-up-container{
+          height:auto !important;
+          max-height:calc(min(78vh, calc(100vh - 96px)) - 56px) !important;
+          overflow:auto !important;
+          padding-bottom:18px !important;
+          border-radius:var(--ddc-bubble-popup-radius) !important;
+          -webkit-clip-path:inset(0 round var(--ddc-bubble-popup-radius)) !important;
+          clip-path:inset(0 round var(--ddc-bubble-popup-radius)) !important;
+        }
+        .bubble-pop-up:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog) > .bubble-pop-up-background{
+          border-radius:var(--ddc-bubble-popup-radius) !important;
+        }
+      `;
+      const patchRoot = (root) => {
+        if (!root || root.querySelector?.('#ddcBubblePopupStylePatch')) return;
+        const style = document.createElement('style');
+        style.id = 'ddcBubblePopupStylePatch';
+        style.textContent = css;
+        root.appendChild(style);
+      };
+      const walk = (node, depth = 0, seen = new Set()) => {
+        if (!node || depth > 10 || seen.has(node)) return;
+        seen.add(node);
+        if (node.shadowRoot) {
+          patchRoot(node.shadowRoot);
+          walk(node.shadowRoot, depth + 1, seen);
+        }
+        const children = node.childNodes ? Array.from(node.childNodes) : [];
+        children.forEach((child) => walk(child, depth + 1, seen));
+      };
+      walk(wrap);
+      requestAnimationFrame(() => walk(wrap));
+      setTimeout(() => walk(wrap), 160);
+    } catch {}
+  },
+
+  _syncBubblePopupWrappers_() {
+    try {
+      const wraps = Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)') || []);
+      let hasBubblePopupWrapper = false;
+      wraps.forEach((wrap) => {
+        let cfg = null;
+        try {
+          cfg = wrap.dataset?.cfg ? JSON.parse(wrap.dataset.cfg) : this._extractCardConfig?.(wrap.firstElementChild);
+        } catch {
+          cfg = this._extractCardConfig?.(wrap.firstElementChild) || null;
+        }
+        const isBubblePopupWrapper = this._isBubblePopupCardConfig_(cfg || {});
+        const wasBubblePopupWrapper = wrap.classList.contains('ddc-bubble-popup-wrapper')
+          || wrap.dataset?.bubblePopupWrapper === 'true';
+        if (!isBubblePopupWrapper) {
+          wrap.classList.remove('ddc-bubble-popup-wrapper');
+          delete wrap.dataset.bubblePopupWrapper;
+          if (wasBubblePopupWrapper) {
+            this._setCardPosition?.(
+              wrap,
+              parseFloat(wrap.getAttribute('data-x')) || 0,
+              parseFloat(wrap.getAttribute('data-y')) || 0
+            );
+          }
+          return;
+        }
+        wrap.classList.add('ddc-bubble-popup-wrapper');
+        wrap.dataset.bubblePopupWrapper = 'true';
+        hasBubblePopupWrapper = true;
+        this._patchBubblePopupShadowStyles_?.(wrap);
+        if (!wasBubblePopupWrapper) {
+          this._setCardPosition?.(
+            wrap,
+            parseFloat(wrap.getAttribute('data-x')) || 0,
+            parseFloat(wrap.getAttribute('data-y')) || 0
+          );
+        }
+      });
+      if (hasBubblePopupWrapper) this._ensureBubblePopupHashListeners_?.();
+      this._syncBubblePopupActiveState_?.();
+    } catch {}
+  },
+
+  _ensureBubblePopupHashListeners_() {
+    try {
+      if (this.__ddcBubblePopupHashListenersInstalled) return;
+      this.__ddcBubblePopupHashListenersInstalled = true;
+      this.__ddcBubblePopupHashHandler = this.__ddcBubblePopupHashHandler || (() => {
+        try { requestAnimationFrame(() => this._syncBubblePopupActiveState_?.()); } catch {}
+      });
+      window.addEventListener('hashchange', this.__ddcBubblePopupHashHandler);
+      window.addEventListener('popstate', this.__ddcBubblePopupHashHandler);
+      window.addEventListener('location-changed', this.__ddcBubblePopupHashHandler);
+    } catch {}
+  },
+
+  _clearBubblePopupHashListeners_() {
+    try {
+      if (!this.__ddcBubblePopupHashListenersInstalled || !this.__ddcBubblePopupHashHandler) return;
+      window.removeEventListener('hashchange', this.__ddcBubblePopupHashHandler);
+      window.removeEventListener('popstate', this.__ddcBubblePopupHashHandler);
+      window.removeEventListener('location-changed', this.__ddcBubblePopupHashHandler);
+      this.__ddcBubblePopupHashListenersInstalled = false;
+    } catch {}
+  },
+
+  _syncBubblePopupActiveState_() {
+    try {
+      const wraps = Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper.ddc-bubble-popup-wrapper') || []);
+      const hasBubblePopupWrapper = !!wraps.length;
+      const activeHash = this._normalizeBubblePopupHash_(window.location?.hash || '');
+      const configuredHashes = new Set();
+      wraps.forEach((wrap) => {
+        try {
+          const cfg = wrap.dataset?.cfg ? JSON.parse(wrap.dataset.cfg) : this._extractCardConfig?.(wrap.firstElementChild);
+          this._collectBubblePopupHashes_(cfg || {}, 0, configuredHashes);
+        } catch {}
+      });
+      const hashMatchesPopup = configuredHashes.size ? configuredHashes.has(activeHash) : !!activeHash;
+      const active = hasBubblePopupWrapper && !!activeHash && hashMatchesPopup && !this.editMode;
+      this.toggleAttribute?.('ddc-bubble-popup-active', active);
+      this.rootEl?.classList?.toggle?.('ddc-bubble-popup-active', active);
+      this.cardContainer?.classList?.toggle?.('ddc-bubble-popup-active', active);
+    } catch {}
+  },
+
   _restoreBackgroundHostToContainer_() {
     if (!this.cardContainer) return;
     let bgHost = this.cardContainer.querySelector('#ddcBgHost');
@@ -18,8 +200,16 @@ const cardBuilderMethods = {
       bgHost.id = 'ddcBgHost';
       bgHost.setAttribute('aria-hidden', 'true');
     }
+    let bubbleShade = this.cardContainer.querySelector('#ddcBubblePopupShade');
+    if (!bubbleShade) {
+      bubbleShade = document.createElement('div');
+      bubbleShade.className = 'ddc-bubble-popup-shade';
+      bubbleShade.id = 'ddcBubblePopupShade';
+      bubbleShade.setAttribute('aria-hidden', 'true');
+    }
     this.cardContainer.innerHTML = '';
     this.cardContainer.appendChild(bgHost);
+    this.cardContainer.appendChild(bubbleShade);
     this._ensureConnectorsLayer_();
   },
 
@@ -143,6 +333,7 @@ const cardBuilderMethods = {
       this._renderTabs?.();
       this._renderLayersBar_?.();
       this._applyActiveTab?.();
+      this._syncBubblePopupWrappers_?.();
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
   },
@@ -587,11 +778,13 @@ const cardBuilderMethods = {
       resizeRightHandle.innerHTML = `<ha-icon icon="mdi:resize-bottom-right"></ha-icon>`;
   
       // cache the card config on the wrapper
+      let cachedCfg = null;
       try {
         const cfg = this._sanitizeCardConfigForStorage_(
           cardEl.__ddcSourceConfig || cardEl._config || cardEl.config
         );
         if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+          cachedCfg = cfg;
           wrap.dataset.cfg = JSON.stringify(cfg);
           cardEl.__ddcSourceConfig = cfg;
   
@@ -599,6 +792,12 @@ const cardBuilderMethods = {
           if (this._hasCardModDeep(cfg)) { wrap.dataset.needsCardMod = 'true'; }
         }
       } catch {}
+
+      if (this._isBubblePopupCardConfig_?.(cachedCfg || {})) {
+        wrap.classList.add('ddc-bubble-popup-wrapper');
+        wrap.dataset.bubblePopupWrapper = 'true';
+        requestAnimationFrame(() => this._patchBubblePopupShadowStyles_?.(wrap));
+      }
   
       // include the delete handle before resize handles so it appears beneath them in the DOM
       wrap.append(cardEl, shield, anchors, chip, compactActionsBtn, delHandle, resizeLeftHandle, resizeRightHandle);

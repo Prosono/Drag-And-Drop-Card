@@ -174,6 +174,7 @@ const lifecycleMethods = {
       if (this.__dashboardApiRequestHandler) {
         this.removeEventListener('ddc-api-request', this.__dashboardApiRequestHandler);
       }
+      try { this._clearBubblePopupHashListeners_?.(); } catch {}
 
       try {
         if (this._screensaverTimer) { clearTimeout(this._screensaverTimer); this._screensaverTimer = null; }

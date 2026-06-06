@@ -35,7 +35,15 @@ const layoutGeometryMethods = {
   _setCardPosition(el, x, y) {
     const nx = Math.round(x);
     const ny = Math.max(0, Math.round(y));
-    el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+    if (el?.classList?.contains?.('ddc-bubble-popup-wrapper') || el?.dataset?.bubblePopupWrapper === 'true') {
+      el.style.left = `${nx}px`;
+      el.style.top = `${ny}px`;
+      el.style.transform = 'none';
+    } else {
+      el.style.removeProperty('left');
+      el.style.removeProperty('top');
+      el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+    }
     el.setAttribute('data-x', String(nx));
     el.setAttribute('data-y', String(ny));
     this._scheduleConnectorsRender_?.();

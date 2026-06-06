@@ -27,6 +27,10 @@ export function getDashboardShellTemplate() {
   container-type: inline-size;
   container-name: ddc-root;
 }
+:host([ddc-bubble-popup-active]){
+  position:relative;
+  z-index:2147483000 !important;
+}
 
 .ddc-loading-overlay[hidden]{
   display:none !important;
@@ -4460,6 +4464,39 @@ export function getDashboardShellTemplate() {
          * remain interactive without requiring the user to add multiple cards.
          */
         z-index:6;
+      }
+      .card-wrapper.ddc-bubble-popup-wrapper{
+        overflow:visible !important;
+        contain:none !important;
+      }
+      .card-container .ddc-bubble-popup-shade{
+        display:none;
+        position:fixed;
+        inset:0;
+        z-index:2147482000;
+        pointer-events:none;
+        background:rgba(0,0,0,.62);
+        backdrop-filter:blur(1px);
+        -webkit-backdrop-filter:blur(1px);
+      }
+      .ddc-root.ddc-bubble-popup-active .card-container{
+        overflow:visible;
+      }
+      .ddc-root.ddc-bubble-popup-active .card-container .ddc-bubble-popup-shade{
+        display:block;
+      }
+      .ddc-root.ddc-bubble-popup-active .card-wrapper.ddc-bubble-popup-wrapper{
+        z-index:2147482500 !important;
+      }
+      .ddc-root.ddc-bubble-popup-active .card-wrapper.ddc-bubble-popup-wrapper::after{
+        content:'';
+        position:fixed;
+        inset:0;
+        z-index:2147482400;
+        pointer-events:none;
+        background:rgba(0,0,0,.62);
+        backdrop-filter:blur(1px);
+        -webkit-backdrop-filter:blur(1px);
       }
       .card-wrapper.dragging{ cursor:grabbing; touch-action: none; will-change:transform; }
       .card-wrapper.editing.selected{
@@ -9211,6 +9248,7 @@ export function getDashboardShellTemplate() {
           <div class="card-container" id="cardContainer">
             <!-- host for particles.js / YouTube backgrounds -->
             <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
+            <div class="ddc-bubble-popup-shade" id="ddcBubblePopupShade" aria-hidden="true"></div>
           </div>
           <aside class="ddc-connector-inspector" id="connectorInspector" hidden aria-live="polite"></aside>
           <div class="ddc-loading-overlay" id="ddcLoadingOverlay" hidden aria-live="polite" aria-label="Loading dashboard">

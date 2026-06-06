@@ -333,6 +333,8 @@ const editModeMethods = {
       this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper.dragging')
         ?.forEach?.(w => w.classList.remove('dragging'));
     }
+    try { this._syncBubblePopupWrappers_?.(); } catch {}
+    try { this._syncBubblePopupActiveState_?.(); } catch {}
     this._syncConnectorUiState_?.();
   
     if (wasOff) {
