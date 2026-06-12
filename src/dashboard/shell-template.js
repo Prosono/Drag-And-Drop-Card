@@ -2270,6 +2270,12 @@ export function getDashboardShellTemplate() {
     width: 100% !important;
     max-width: 100% !important;
   }
+
+  :host([ddc-bottom-tabs-fixed-canvas]) .ddc-tabs.ddc-tabs-bottom,
+  .ddc-root.ddc-fixed-canvas-tabs-bottom > .ddc-tabs.ddc-tabs-bottom{
+    bottom: max(env(safe-area-inset-bottom, 0px), var(--ddc-visual-viewport-bottom, 0px), 8px) !important;
+    z-index: 10020 !important;
+  }
 }
 /* ===== DDC Toolbar and tabs when auto sieze is off END ===== */
 
@@ -7017,6 +7023,43 @@ export function getDashboardShellTemplate() {
   justify-content: center;
   padding: 10px clamp(12px, 2vw, 18px);
   z-index: 6;
+}
+
+:host([ddc-tabs-fixed-canvas]){
+  overflow: visible !important;
+}
+
+:host([ddc-tabs-fixed-canvas]) .ddc-root{
+  overflow: visible;
+}
+
+:host([ddc-top-tabs-fixed-canvas]) .ddc-tabs:not(.ddc-tabs-bottom):not(.ddc-tabs-left),
+.ddc-root.ddc-fixed-canvas-tabs-top > .ddc-tabs:not(.ddc-tabs-bottom):not(.ddc-tabs-left){
+  position: fixed !important;
+  left: calc(var(--ddc-left-gutter, 0px) + 50%) !important;
+  right: auto !important;
+  top: calc(var(--ddc-visual-viewport-top, 0px) + var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px)) !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px) !important;
+  z-index: 10020 !important;
+}
+
+.ddc-root.ddc-fixed-canvas-tabs-top > .ddc-scale-outer,
+.ddc-root.ddc-fixed-canvas-tabs-top > .card-container{
+  margin-top: 86px;
+}
+
+:host([ddc-bottom-tabs-fixed-canvas]) .ddc-tabs.ddc-tabs-bottom,
+.ddc-root.ddc-fixed-canvas-tabs-bottom > .ddc-tabs.ddc-tabs-bottom{
+  position: fixed !important;
+  left: calc(var(--ddc-left-gutter, 0px) + 50%) !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: max(env(safe-area-inset-bottom, 0px), var(--ddc-visual-viewport-bottom, 0px), 12px) !important;
+  transform: translateX(-50%) !important;
+  max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px) !important;
+  z-index: 10020 !important;
 }
 
 .ddc-tabs.ddc-tabs-left::before,

@@ -113,7 +113,7 @@ const lifecycleMethods = {
       }
 
       this.__ddcOnWinResize = this.__ddcOnWinResize || (() => {
-        if (this.hasAttribute('ddc-fixed-ui')) {
+        if (this.hasAttribute('ddc-fixed-ui') || this.hasAttribute('ddc-tabs-fixed-canvas')) {
           try { this._computeHaSidebarGutters_?.(); } catch {}
         }
         try { this._computeHaTopGutter_?.(); } catch {}
@@ -124,12 +124,7 @@ const lifecycleMethods = {
       });
 
       try {
-        const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-        if (this.autoResizeCards || mode === 'auto') {
-          window.addEventListener('resize', this.__ddcOnWinResize);
-        } else {
-          window.removeEventListener('resize', this.__ddcOnWinResize);
-        }
+        window.addEventListener('resize', this.__ddcOnWinResize);
       } catch {}
 
       try { this.__ddcBindPointerListeners?.(); } catch {}
@@ -198,6 +193,10 @@ const lifecycleMethods = {
 
       if (this.__ddcOnWinResize) {
         window.removeEventListener('resize', this.__ddcOnWinResize);
+        try {
+          window.visualViewport?.removeEventListener?.('resize', this.__ddcOnWinResize);
+          window.visualViewport?.removeEventListener?.('scroll', this.__ddcOnWinResize);
+        } catch {}
         this.__ddcOnWinResize = null;
       }
 

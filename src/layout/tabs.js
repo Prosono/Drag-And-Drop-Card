@@ -29,6 +29,12 @@ const tabsLayoutMethods = {
       bar.style.display = 'none';
       this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
       this.rootEl?.classList?.remove?.('ddc-tabs-bottom-layout');
+      this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs');
+      this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs-top');
+      this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs-bottom');
+      try { this.removeAttribute?.('ddc-tabs-fixed-canvas'); } catch {}
+      try { this.removeAttribute?.('ddc-top-tabs-fixed-canvas'); } catch {}
+      try { this.removeAttribute?.('ddc-bottom-tabs-fixed-canvas'); } catch {}
       this._renderSidebar_?.();
       return;
     }
@@ -505,6 +511,54 @@ const tabsLayoutMethods = {
       const anchor = this.__scaleOuter || this.cardContainer;
       const sidebarActive = this._isSidebarEnabled_?.();
       const sidebarNavActive = this._isSidebarNavigationActive_?.();
+      const syncFixedTabsState = () => {
+        let mode = 'auto';
+        let fixedTabs = false;
+        let fixedTop = false;
+        let fixedBottom = false;
+        try {
+          mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+          fixedTabs = mode !== 'auto'
+            && !sidebarNavActive
+            && !this._isExplicitViewportPreview_?.();
+          fixedTop = fixedTabs && this.tabsPosition !== 'bottom';
+          fixedBottom = fixedTabs && this.tabsPosition === 'bottom';
+        } catch {}
+        root?.classList?.toggle?.('ddc-fixed-canvas-tabs', !!fixedTabs);
+        root?.classList?.toggle?.('ddc-fixed-canvas-tabs-top', !!fixedTop);
+        root?.classList?.toggle?.('ddc-fixed-canvas-tabs-bottom', !!fixedBottom);
+        try { this.toggleAttribute?.('ddc-tabs-fixed-canvas', !!fixedTabs); } catch {}
+        try { this.toggleAttribute?.('ddc-top-tabs-fixed-canvas', !!fixedTop); } catch {}
+        try { this.toggleAttribute?.('ddc-bottom-tabs-fixed-canvas', !!fixedBottom); } catch {}
+        if (fixedTabs) {
+          try { this._computeHaSidebarGutters_?.(); } catch {}
+          try { this._computeHaTopGutter_?.(); } catch {}
+        }
+        try {
+          if (this.__ddcOnWinResize) {
+            const vv = window.visualViewport;
+            if (fixedTabs) {
+              window.addEventListener('resize', this.__ddcOnWinResize);
+              vv?.addEventListener?.('resize', this.__ddcOnWinResize);
+              vv?.addEventListener?.('scroll', this.__ddcOnWinResize);
+            }
+            else {
+              vv?.removeEventListener?.('resize', this.__ddcOnWinResize);
+              vv?.removeEventListener?.('scroll', this.__ddcOnWinResize);
+            }
+          }
+        } catch {}
+        try {
+          const vv = window.visualViewport;
+          const viewportTop = vv ? Math.max(0, vv.offsetTop || 0) : 0;
+          const viewportBottom = vv
+            ? Math.max(0, (window.innerHeight || document.documentElement?.clientHeight || 0) - (vv.offsetTop || 0) - (vv.height || 0))
+            : 0;
+          this.style?.setProperty?.('--ddc-visual-viewport-top', `${Math.round(viewportTop)}px`);
+          this.style?.setProperty?.('--ddc-visual-viewport-bottom', `${Math.round(viewportBottom)}px`);
+        } catch {}
+      };
+      syncFixedTabsState();
       if (!bar || !root || !anchor || anchor.parentNode !== root) {
         root?.classList?.toggle?.('ddc-sidebar-layout', !!sidebarActive);
         root?.classList?.toggle?.('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
