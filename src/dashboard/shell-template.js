@@ -6587,6 +6587,63 @@ export function getDashboardShellTemplate() {
             letter-spacing:0;
             color:var(--primary-text-color, #f8fafc);
           }
+          .ddc-empty-hads-row{
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:8px;
+            margin:17px 0 0;
+            max-width:680px;
+            color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 72%, transparent);
+            font-size:1.02rem;
+            line-height:1.38;
+            font-weight:760;
+          }
+          .ddc-empty-hads-chip{
+            appearance:none;
+            -webkit-appearance:none;
+            min-height:38px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            padding:0 14px 0 13px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--ddc-empty-accent) 64%, rgba(255,255,255,.18));
+            background:
+              linear-gradient(180deg, color-mix(in oklab, var(--ddc-empty-accent) 86%, #fff 14%), color-mix(in oklab, var(--ddc-empty-accent) 70%, #042033 30%));
+            color:#04121c;
+            box-shadow:
+              0 12px 26px color-mix(in oklab, var(--ddc-empty-accent) 22%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.32);
+            font:inherit;
+            font-size:.92rem;
+            font-weight:900;
+            letter-spacing:.03em;
+            cursor:pointer;
+            transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease, filter .18s ease;
+          }
+          .ddc-empty-hads-chip ha-icon{
+            --mdc-icon-size:18px;
+          }
+          .ddc-empty-hads-chip:hover{
+            transform:translateY(-1px);
+            border-color:color-mix(in oklab, var(--ddc-empty-accent) 82%, rgba(255,255,255,.26));
+            filter:saturate(1.08);
+            box-shadow:
+              0 16px 32px color-mix(in oklab, var(--ddc-empty-accent) 27%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.38);
+          }
+          .ddc-empty-hads-chip:focus-visible{
+            outline:none;
+            box-shadow:
+              0 0 0 3px color-mix(in oklab, var(--ddc-empty-accent) 28%, transparent),
+              0 16px 32px color-mix(in oklab, var(--ddc-empty-accent) 27%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.38);
+          }
+          .ddc-empty-hads-store{
+            color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 78%, transparent);
+          }
           .ddc-empty-sub{
             margin:18px 0 0;
             max-width:650px;

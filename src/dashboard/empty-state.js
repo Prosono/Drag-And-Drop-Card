@@ -201,7 +201,13 @@ const emptyStateMethods = {
     content.className = 'ddc-empty-content';
     content.innerHTML = `
       <div class="ddc-empty-kicker"><ha-icon icon="mdi:creation-outline"></ha-icon><span>Start here</span></div>
-      <h2 class="ddc-empty-title">Build your first dashboard canvas.</h2>
+      <h2 class="ddc-empty-title">Build your first dashboard.</h2>
+      <div class="ddc-empty-hads-row" aria-label="Explore HADS - The Home Assistant Dashboard Store">
+        <button type="button" class="ddc-empty-hads-chip" data-ddc-empty-action="hads">
+          <ha-icon icon="mdi:storefront-outline"></ha-icon><span>or Explore HADS</span>
+        </button>
+        <span class="ddc-empty-hads-store">- The Home Assistant Dashboard Store</span>
+      </div>
       <p class="ddc-empty-sub">Choose how the canvas should behave, add your first card, then shape the dashboard visually on the grid.</p>
       <div class="ddc-empty-steps" aria-label="Getting started steps">
         <div class="ddc-empty-step"><strong>1. Pick a mode</strong><span>Use a fixed Full HD canvas or let Auto scale to the viewport.</span></div>
@@ -248,6 +254,8 @@ const emptyStateMethods = {
         this._openDashboardSettings?.();
       } else if (action === 'docs') {
         window.open('https://hads.smarti.dev/wiki/start-here', '_blank', 'noopener,noreferrer');
+      } else if (action === 'hads') {
+        window.open('https://hads.smarti.dev/', '_blank', 'noopener,noreferrer');
       } else if (action === 'size-mode') {
         await this._applyEmptyDashboardSizeMode_(btn.dataset.sizeMode || 'fixed-fhd');
       } else if (action === 'preset') {
