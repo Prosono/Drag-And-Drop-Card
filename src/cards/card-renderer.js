@@ -49,10 +49,281 @@ const cardBuilderMethods = {
     return out;
   },
 
+  _ensureBubblePopupPortal_() {
+    try {
+      let portal = this.__ddcBubblePopupPortal || this.rootEl?.querySelector?.('#ddcBubblePopupPortal');
+      if (!portal) {
+        portal = document.createElement('div');
+        portal.className = 'ddc-bubble-popup-portal';
+        portal.id = 'ddcBubblePopupPortal';
+        portal.setAttribute('aria-hidden', 'true');
+      }
+      if (!portal.parentNode) {
+        (this.rootEl || this.shadowRoot)?.appendChild?.(portal);
+      }
+      this.__ddcBubblePopupPortal = portal;
+      return portal;
+    } catch {
+      return null;
+    }
+  },
+
+  _getBubblePopupWrappers_() {
+    const seen = new Set();
+    const out = [];
+    const add = (wrap) => {
+      if (!wrap || seen.has(wrap)) return;
+      seen.add(wrap);
+      out.push(wrap);
+    };
+    try {
+      this.cardContainer?.querySelectorAll?.('.card-wrapper.ddc-bubble-popup-wrapper')?.forEach(add);
+    } catch {}
+    try {
+      this.__ddcBubblePopupPortal?.querySelectorAll?.('.card-wrapper.ddc-bubble-popup-wrapper')?.forEach(add);
+    } catch {}
+    return out;
+  },
+
+  _getBubblePopupPortalNodes_() {
+    try {
+      return Array.from(this.__ddcBubblePopupPortal?.querySelectorAll?.('.bubble-pop-up.ddc-bubble-popup-node-portaled') || []);
+    } catch {
+      return [];
+    }
+  },
+
+  _getBubblePopupNodesInWrap_(wrap) {
+    const out = [];
+    const seen = new Set();
+    const walk = (node, depth = 0) => {
+      if (!node || depth > 10 || seen.has(node)) return;
+      seen.add(node);
+      try {
+        if (node.nodeType === 1 && node.matches?.('.bubble-pop-up, #root.bubble-pop-up')) out.push(node);
+      } catch {}
+      try {
+        node.querySelectorAll?.('.bubble-pop-up, #root.bubble-pop-up')?.forEach((el) => {
+          if (!seen.has(el)) out.push(el);
+        });
+      } catch {}
+      try { if (node.shadowRoot) walk(node.shadowRoot, depth + 1); } catch {}
+      try { Array.from(node.childNodes || []).forEach((child) => walk(child, depth + 1)); } catch {}
+    };
+    walk(wrap);
+    return out;
+  },
+
+  _getBubblePopupNodesForWrap_(wrap) {
+    const out = [];
+    const seen = new Set();
+    const add = (node) => {
+      if (!node || seen.has(node)) return;
+      seen.add(node);
+      out.push(node);
+    };
+    try {
+      (this._getBubblePopupNodesInWrap_?.(wrap) || []).forEach(add);
+      (this._getBubblePopupPortalNodes_?.() || []).forEach((node) => {
+        if (node.__ddcBubblePopupSourceWrap === wrap) add(node);
+      });
+    } catch {}
+    return out;
+  },
+
+  _isBubblePopupNodeActive_(node) {
+    try {
+      return !!node && (
+        node.classList?.contains?.('is-popup-opened')
+        || node.classList?.contains?.('is-opening')
+        || node.classList?.contains?.('is-closing')
+      );
+    } catch {
+      return false;
+    }
+  },
+
+  _isBubblePopupNodeFullyClosed_(node) {
+    try {
+      return !!node
+        && node.classList?.contains?.('is-popup-closed')
+        && !this._isBubblePopupNodeActive_?.(node);
+    } catch {
+      return false;
+    }
+  },
+
+  _isBubblePopupWrapVisiblyClosed_(wrap) {
+    try {
+      const nodes = this._getBubblePopupNodesForWrap_?.(wrap) || [];
+      if (!nodes.length) return false;
+      return nodes.every((node) => this._isBubblePopupNodeFullyClosed_?.(node));
+    } catch {
+      return false;
+    }
+  },
+
+  _setBubblePopupPortalActive_(active) {
+    try {
+      const on = !!active;
+      this.toggleAttribute?.('ddc-bubble-popup-active', on);
+      this.rootEl?.classList?.toggle?.('ddc-bubble-popup-active', on);
+      this.cardContainer?.classList?.toggle?.('ddc-bubble-popup-active', on);
+      this.__ddcBubblePopupPortal?.setAttribute?.('aria-hidden', on ? 'false' : 'true');
+    } catch {}
+  },
+
+  _setupBubblePopupPortalNodeObserver_(node) {
+    try {
+      if (!node || node.__ddcBubblePopupPortalObserver) return;
+      const check = () => {
+        try {
+          if (!node.isConnected || !node.classList?.contains?.('ddc-bubble-popup-node-portaled')) return;
+          if (this._isBubblePopupNodeActive_?.(node)) {
+            node.__ddcBubblePopupPortalSeenOpen = true;
+            return;
+          }
+          if (node.__ddcBubblePopupPortalSeenOpen && this._isBubblePopupNodeFullyClosed_?.(node)) {
+            this._restoreBubblePopupPortaledWrappers_?.();
+          }
+        } catch {}
+      };
+      const obs = new MutationObserver(check);
+      obs.observe(node, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+      node.__ddcBubblePopupPortalObserver = obs;
+      setTimeout(check, 120);
+      setTimeout(check, 360);
+    } catch {}
+  },
+
+  _portalBubblePopupWrappers_(wraps = []) {
+    const portal = this._ensureBubblePopupPortal_?.();
+    if (!portal) return;
+    const nodesToPortal = [];
+    const seen = new Set();
+    wraps.forEach((wrap) => {
+      if (!wrap || wrap.dataset?.placeholder) return;
+      this._patchBubblePopupShadowStyles_?.(wrap);
+      (this._getBubblePopupNodesForWrap_?.(wrap) || []).forEach((node) => {
+        if (!node || seen.has(node)) return;
+        seen.add(node);
+        node.__ddcBubblePopupSourceWrap = wrap;
+        nodesToPortal.push(node);
+      });
+    });
+    if (!nodesToPortal.length) return 0;
+    this._setBubblePopupPortalActive_?.(true);
+    nodesToPortal.forEach((node) => {
+      if (!node.__ddcBubblePopupNodeHome) {
+        const marker = document.createComment('ddc-bubble-popup-node-home');
+        const parent = node.parentNode;
+        const nextSibling = node.nextSibling;
+        try { parent?.insertBefore?.(marker, node); } catch {}
+        node.__ddcBubblePopupNodeHome = { parent, nextSibling, marker };
+      }
+      if (node.parentNode !== portal) {
+        try { portal.appendChild(node); } catch {}
+      }
+      node.classList.add('ddc-bubble-popup-node-portaled');
+      this._setupBubblePopupPortalNodeObserver_?.(node);
+    });
+    return nodesToPortal.length;
+  },
+
+  _restoreBubblePopupPortaledWrappers_(keepSet = null) {
+    try {
+      const portal = this.__ddcBubblePopupPortal;
+      const keep = keepSet instanceof Set ? keepSet : null;
+      const nodes = Array.from(portal?.querySelectorAll?.('.bubble-pop-up.ddc-bubble-popup-node-portaled') || []);
+      nodes.forEach((node) => {
+        if (keep?.has(node)) return;
+        const home = node.__ddcBubblePopupNodeHome || {};
+        const parent = home.marker?.parentNode || (home.parent?.isConnected ? home.parent : null);
+        if (parent) {
+          const next = home.marker?.parentNode === parent
+            ? home.marker
+            : (home.nextSibling?.parentNode === parent ? home.nextSibling : null);
+          try { parent.insertBefore(node, next); } catch { try { parent.appendChild(node); } catch {} }
+        }
+        try { node.__ddcBubblePopupPortalObserver?.disconnect?.(); } catch {}
+        delete node.__ddcBubblePopupPortalObserver;
+        delete node.__ddcBubblePopupPortalSeenOpen;
+        delete node.__ddcBubblePopupNodeHome;
+        delete node.__ddcBubblePopupSourceWrap;
+        try { home.marker?.remove?.(); } catch {}
+        node.classList.remove('ddc-bubble-popup-node-portaled');
+      });
+
+      const wraps = Array.from(portal?.querySelectorAll?.('.card-wrapper.ddc-bubble-popup-portaled') || []);
+      wraps.forEach((wrap) => {
+        if (keep?.has(wrap)) return;
+        const home = wrap.__ddcBubblePopupHome || {};
+        const parent = home.marker?.parentNode || (home.parent?.isConnected ? home.parent : this.cardContainer);
+        if (parent) {
+          const next = home.marker?.parentNode === parent
+            ? home.marker
+            : (home.nextSibling?.parentNode === parent ? home.nextSibling : null);
+          try { parent.insertBefore(wrap, next); } catch { try { parent.appendChild(wrap); } catch {} }
+        }
+        try { wrap.__ddcBubblePopupPortalObserver?.disconnect?.(); } catch {}
+        delete wrap.__ddcBubblePopupPortalObserver;
+        delete wrap.__ddcBubblePopupPortalSeenOpen;
+        try { home.marker?.remove?.(); } catch {}
+        wrap.classList.remove('ddc-bubble-popup-portaled');
+        try { wrap.firstElementChild?.removeAttribute?.('data-ddc-bubble-popup-portaled'); } catch {}
+        if (home.display != null) wrap.style.display = home.display;
+        wrap.inert = !!home.inert;
+        wrap.classList.toggle('ddc-hidden', !!home.hidden);
+        delete wrap.__ddcBubblePopupHome;
+        try { this._applyWrapDisplayState_?.(wrap); } catch {}
+      });
+      const remaining = portal?.querySelector?.('.bubble-pop-up.ddc-bubble-popup-node-portaled, .card-wrapper.ddc-bubble-popup-portaled');
+      this._setBubblePopupPortalActive_?.(!!remaining);
+    } catch {}
+  },
+
   _patchBubblePopupShadowStyles_(wrap) {
     try {
       if (!wrap) return;
       const css = `
+        :host([data-ddc-bubble-popup-portaled]){
+          display:block !important;
+          width:100vw !important;
+          min-height:100dvh !important;
+          background:transparent !important;
+          border:0 !important;
+          box-shadow:none !important;
+          pointer-events:none !important;
+        }
+        :host([data-ddc-bubble-popup-portaled]) ha-card,
+        :host([data-ddc-bubble-popup-portaled]) .card-content{
+          display:block !important;
+          width:100% !important;
+          min-height:100dvh !important;
+          padding:0 !important;
+          margin:0 !important;
+          background:transparent !important;
+          border:0 !important;
+          box-shadow:none !important;
+          overflow:visible !important;
+          pointer-events:none !important;
+        }
+        :host([data-ddc-bubble-popup-portaled]) #root.is-popup-closed,
+        :host([data-ddc-bubble-popup-portaled]) #root.is-popup-closed *,
+        :host([data-ddc-bubble-popup-portaled]) .bubble-pop-up.is-popup-closed,
+        :host([data-ddc-bubble-popup-portaled]) .bubble-pop-up.is-popup-closed *{
+          visibility:hidden !important;
+          pointer-events:none !important;
+        }
+        :host([data-ddc-bubble-popup-portaled]) .bubble-pop-up{
+          pointer-events:auto !important;
+        }
+        :host([data-ddc-bubble-popup-portaled]) .bubble-backdrop,
+        :host([data-ddc-bubble-popup-portaled]) .bubble-backdrop-host,
+        :host([data-ddc-bubble-popup-portaled]) .bubble-pop-up-blur-layer,
+        :host([data-ddc-bubble-popup-portaled]) .bubble-card-scroll-lock-layer{
+          pointer-events:auto !important;
+        }
         .bubble-pop-up:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog){
           --ddc-bubble-popup-radius:var(--bubble-pop-up-content-border-radius, var(--bubble-pop-up-border-radius, var(--bubble-border-radius, 42px)));
           height:auto !important;
@@ -83,7 +354,12 @@ const cardBuilderMethods = {
         }
       `;
       const patchRoot = (root) => {
-        if (!root || root.querySelector?.('#ddcBubblePopupStylePatch')) return;
+        if (!root) return;
+        const existing = root.querySelector?.('#ddcBubblePopupStylePatch');
+        if (existing) {
+          if (existing.textContent !== css) existing.textContent = css;
+          return;
+        }
         const style = document.createElement('style');
         style.id = 'ddcBubblePopupStylePatch';
         style.textContent = css;
@@ -107,9 +383,11 @@ const cardBuilderMethods = {
 
   _syncBubblePopupWrappers_() {
     try {
+      if (this.editMode) this._restoreBubblePopupPortaledWrappers_?.();
       const wraps = Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)') || []);
       let hasBubblePopupWrapper = false;
       wraps.forEach((wrap) => {
+        try { wrap.firstElementChild?.removeAttribute?.('data-ddc-bubble-popup-portaled'); } catch {}
         let cfg = null;
         try {
           cfg = wrap.dataset?.cfg ? JSON.parse(wrap.dataset.cfg) : this._extractCardConfig?.(wrap.firstElementChild);
@@ -154,6 +432,8 @@ const cardBuilderMethods = {
       this.__ddcBubblePopupHashListenersInstalled = true;
       this.__ddcBubblePopupHashHandler = this.__ddcBubblePopupHashHandler || (() => {
         try { requestAnimationFrame(() => this._syncBubblePopupActiveState_?.()); } catch {}
+        try { setTimeout(() => this._syncBubblePopupActiveState_?.(), 90); } catch {}
+        try { setTimeout(() => this._syncBubblePopupActiveState_?.(), 260); } catch {}
       });
       window.addEventListener('hashchange', this.__ddcBubblePopupHashHandler);
       window.addEventListener('popstate', this.__ddcBubblePopupHashHandler);
@@ -168,26 +448,54 @@ const cardBuilderMethods = {
       window.removeEventListener('popstate', this.__ddcBubblePopupHashHandler);
       window.removeEventListener('location-changed', this.__ddcBubblePopupHashHandler);
       this.__ddcBubblePopupHashListenersInstalled = false;
+      this._restoreBubblePopupPortaledWrappers_?.();
     } catch {}
   },
 
   _syncBubblePopupActiveState_() {
     try {
-      const wraps = Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper.ddc-bubble-popup-wrapper') || []);
+      const wraps = this._getBubblePopupWrappers_?.() || [];
       const hasBubblePopupWrapper = !!wraps.length;
       const activeHash = this._normalizeBubblePopupHash_(window.location?.hash || '');
       const configuredHashes = new Set();
+      const matchingWraps = [];
       wraps.forEach((wrap) => {
         try {
           const cfg = wrap.dataset?.cfg ? JSON.parse(wrap.dataset.cfg) : this._extractCardConfig?.(wrap.firstElementChild);
-          this._collectBubblePopupHashes_(cfg || {}, 0, configuredHashes);
+          const wrapHashes = this._collectBubblePopupHashes_(cfg || {}, 0, new Set());
+          wrapHashes.forEach((hash) => configuredHashes.add(hash));
+          if (activeHash && (wrapHashes.size ? wrapHashes.has(activeHash) : false)) {
+            matchingWraps.push(wrap);
+          }
         } catch {}
       });
       const hashMatchesPopup = configuredHashes.size ? configuredHashes.has(activeHash) : !!activeHash;
       const active = hasBubblePopupWrapper && !!activeHash && hashMatchesPopup && !this.editMode;
-      this.toggleAttribute?.('ddc-bubble-popup-active', active);
-      this.rootEl?.classList?.toggle?.('ddc-bubble-popup-active', active);
-      this.cardContainer?.classList?.toggle?.('ddc-bubble-popup-active', active);
+      if (active) {
+        const targetWraps = matchingWraps.length ? matchingWraps : (configuredHashes.size ? [] : wraps);
+        const keep = new Set();
+        targetWraps.forEach((wrap) => {
+          (this._getBubblePopupNodesForWrap_?.(wrap) || []).forEach((node) => keep.add(node));
+        });
+        if (targetWraps.length) {
+          this._restoreBubblePopupPortaledWrappers_?.(keep);
+          const portaledCount = this._portalBubblePopupWrappers_?.(targetWraps) || 0;
+          this._setBubblePopupPortalActive_?.(portaledCount > 0 || keep.size > 0);
+        } else {
+          this._restoreBubblePopupPortaledWrappers_?.();
+        }
+      } else {
+        const keep = new Set(
+          (this._getBubblePopupPortalNodes_?.() || [])
+            .filter((node) => this._isBubblePopupNodeActive_?.(node) && !this._isBubblePopupNodeFullyClosed_?.(node))
+        );
+        if (keep.size) {
+          this._restoreBubblePopupPortaledWrappers_?.(keep);
+          this._setBubblePopupPortalActive_?.(true);
+        } else {
+          this._restoreBubblePopupPortaledWrappers_?.();
+        }
+      }
     } catch {}
   },
 

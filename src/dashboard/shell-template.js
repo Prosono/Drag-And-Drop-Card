@@ -30,6 +30,11 @@ export function getDashboardShellTemplate() {
 :host([ddc-bubble-popup-active]){
   position:relative;
   z-index:2147483000 !important;
+  overflow:visible !important;
+  contain:none !important;
+}
+.ddc-root.ddc-bubble-popup-active{
+  overflow:visible !important;
 }
 
 .ddc-loading-overlay[hidden]{
@@ -4476,33 +4481,99 @@ export function getDashboardShellTemplate() {
         contain:none !important;
       }
       .card-container .ddc-bubble-popup-shade{
+        display:none !important;
+      }
+      .ddc-root.ddc-bubble-popup-active .card-container{
+        overflow:visible;
+      }
+      .ddc-bubble-popup-portal{
         display:none;
         position:fixed;
         inset:0;
         z-index:2147482000;
         pointer-events:none;
-        background:rgba(0,0,0,.62);
-        backdrop-filter:blur(1px);
-        -webkit-backdrop-filter:blur(1px);
-      }
-      .ddc-root.ddc-bubble-popup-active .card-container{
         overflow:visible;
+        isolation:isolate;
       }
-      .ddc-root.ddc-bubble-popup-active .card-container .ddc-bubble-popup-shade{
+      .ddc-root.ddc-bubble-popup-active .ddc-bubble-popup-portal{
         display:block;
       }
-      .ddc-root.ddc-bubble-popup-active .card-wrapper.ddc-bubble-popup-wrapper{
-        z-index:2147482500 !important;
-      }
-      .ddc-root.ddc-bubble-popup-active .card-wrapper.ddc-bubble-popup-wrapper::after{
+      .ddc-bubble-popup-portal::before{
         content:'';
         position:fixed;
         inset:0;
-        z-index:2147482400;
+        z-index:0;
         pointer-events:none;
         background:rgba(0,0,0,.62);
         backdrop-filter:blur(1px);
         -webkit-backdrop-filter:blur(1px);
+      }
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper{
+        position:fixed;
+        inset:0;
+        left:0 !important;
+        top:0 !important;
+        width:100vw !important;
+        height:100dvh !important;
+        min-width:100vw !important;
+        min-height:100vh !important;
+        z-index:1 !important;
+        transform:none !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:transparent !important;
+        box-shadow:none !important;
+        overflow:visible !important;
+        contain:none !important;
+        pointer-events:none;
+        touch-action:auto;
+      }
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > *:not(.shield):not(.chip):not(.delete-handle):not(.resize-handle):not(.ddc-card-anchors):not(.ddc-compact-card-actions){
+        display:block;
+        width:100%;
+        min-height:100%;
+        pointer-events:auto;
+      }
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .shield,
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .chip,
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .delete-handle,
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .resize-handle,
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .ddc-card-anchors,
+      .ddc-bubble-popup-portal > .card-wrapper.ddc-bubble-popup-wrapper > .ddc-compact-card-actions{
+        display:none !important;
+      }
+      .ddc-bubble-popup-portal > .bubble-pop-up.ddc-bubble-popup-node-portaled{
+        position:fixed !important;
+        z-index:1 !important;
+        pointer-events:auto !important;
+        contain:none !important;
+      }
+      .ddc-bubble-popup-portal > .bubble-pop-up.ddc-bubble-popup-node-portaled.is-popup-closed:not(.is-opening):not(.is-closing){
+        visibility:hidden !important;
+        opacity:0 !important;
+        pointer-events:none !important;
+        transform:translate3d(0, calc(100vh + 160px), 0) !important;
+      }
+      .ddc-bubble-popup-portal > .bubble-pop-up.ddc-bubble-popup-node-portaled:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog){
+        --ddc-bubble-popup-radius:var(--bubble-pop-up-content-border-radius, var(--bubble-pop-up-border-radius, var(--bubble-border-radius, 42px)));
+        height:auto !important;
+        max-height:min(78vh, calc(100vh - 96px)) !important;
+        top:clamp(48px, 6vh, 88px) !important;
+        bottom:auto !important;
+        border-radius:var(--ddc-bubble-popup-radius) !important;
+        overflow:hidden !important;
+      }
+      .ddc-bubble-popup-portal > .bubble-pop-up.ddc-bubble-popup-node-portaled:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog) > .bubble-pop-up-container{
+        height:auto !important;
+        max-height:calc(min(78vh, calc(100vh - 96px)) - 56px) !important;
+        overflow:auto !important;
+        padding-bottom:18px !important;
+        border-radius:var(--ddc-bubble-popup-radius) !important;
+        -webkit-clip-path:inset(0 round var(--ddc-bubble-popup-radius)) !important;
+        clip-path:inset(0 round var(--ddc-bubble-popup-radius)) !important;
+      }
+      .ddc-bubble-popup-portal > .bubble-pop-up.ddc-bubble-popup-node-portaled:not(.editor):not(.popup-mode-fit-content):not(.popup-mode-centered):not(.popup-mode-adaptive-dialog) > .bubble-pop-up-background{
+        border-radius:var(--ddc-bubble-popup-radius) !important;
       }
       .card-wrapper.dragging{ cursor:grabbing; touch-action: none; will-change:transform; }
       .card-wrapper.editing.selected{
@@ -9350,6 +9421,7 @@ export function getDashboardShellTemplate() {
             <div class="ddc-bg-host" id="ddcBgHost" aria-hidden="true"></div>
             <div class="ddc-bubble-popup-shade" id="ddcBubblePopupShade" aria-hidden="true"></div>
           </div>
+          <div class="ddc-bubble-popup-portal" id="ddcBubblePopupPortal" aria-hidden="true"></div>
           <aside class="ddc-connector-inspector" id="connectorInspector" hidden aria-live="polite"></aside>
           <div class="ddc-loading-overlay" id="ddcLoadingOverlay" hidden aria-live="polite" aria-label="Loading dashboard">
             <div class="ddc-loading-surface">
