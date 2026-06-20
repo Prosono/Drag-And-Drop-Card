@@ -13,6 +13,12 @@ const tabsLayoutMethods = {
     return (tabId && valid.includes(tabId)) ? tabId : (this.defaultTab || valid[0]);
   },
 
+  _shouldRenderTabBar_() {
+    const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+    const shouldRenderTabs = !!tabs.length && !(tabs.length === 1 && this.hideTabsWhenSingle);
+    return shouldRenderTabs || !!this._hasLayerMenu_?.();
+  },
+
   _renderTabs() {
     const bar = this.tabsBar; if (!bar) return;
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
@@ -24,7 +30,7 @@ const tabsLayoutMethods = {
     const shouldPreserveScroll = !!this.__preserveTabsScrollOnNextRender;
     this.__preserveTabsScrollOnNextRender = false;
     this._syncTabsPlacement_?.();
-    if (!shouldRenderTabs && !hasLayerMenu) {
+    if (!this._shouldRenderTabBar_()) {
       this._closeLayersMenu_?.({ render: false });
       bar.style.display = 'none';
       this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
@@ -518,7 +524,8 @@ const tabsLayoutMethods = {
         let fixedBottom = false;
         try {
           mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-          fixedTabs = mode !== 'auto'
+          fixedTabs = this._shouldRenderTabBar_()
+            && mode !== 'auto'
             && !sidebarNavActive
             && !this._isExplicitViewportPreview_?.();
           fixedTop = fixedTabs && this.tabsPosition !== 'bottom';
