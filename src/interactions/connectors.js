@@ -311,7 +311,10 @@ const connectorMethods = {
     ];
     const sourceWrap = sourceCardId ? this._getWrapperByLayoutCardId_(sourceCardId) : null;
     const targetWrap = targetCardId ? this._getWrapperByLayoutCardId_(targetCardId) : null;
-    const useCardEdge = !draft && !this.editMode;
+    // Saved connectors should terminate at the card frame, not at the edit
+    // handle that sits inside the wrapper. Otherwise arrowheads disappear
+    // behind cards while editing.
+    const useCardEdge = !draft;
     const startAnchor = sourceWrap && sourceAnchor ? this._getCardAnchorPoint_(sourceWrap, sourceAnchor, { edge: useCardEdge }) : null;
     const endAnchor = targetWrap && targetAnchor ? this._getCardAnchorPoint_(targetWrap, targetAnchor, { edge: useCardEdge }) : null;
     const start = startAnchor ? { x: startAnchor.x, y: startAnchor.y } : points[0];
@@ -891,6 +894,44 @@ const connectorMethods = {
     return points
       .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Number(point.x) || 0} ${Number(point.y) || 0}`)
       .join(' ');
+  },
+
+  _trimConnectorPolylineForArrowheads_(points = [], { start = 0, end = 0 } = {}) {
+    const clean = (Array.isArray(points) ? points : [])
+      .map((point) => this._normalizeConnectorPoint_(point))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (clean.length < 2) return clean;
+
+    const trimEndpoint = (list, fromStart, amount) => {
+      const next = list.map((point) => ({ ...point }));
+      let remaining = Math.max(0, Number(amount) || 0);
+      while (next.length > 1 && remaining > 0.001) {
+        const endpointIndex = fromStart ? 0 : next.length - 1;
+        const neighborIndex = fromStart ? 1 : next.length - 2;
+        const endpoint = next[endpointIndex];
+        const neighbor = next[neighborIndex];
+        const dx = (Number(neighbor.x) || 0) - (Number(endpoint.x) || 0);
+        const dy = (Number(neighbor.y) || 0) - (Number(endpoint.y) || 0);
+        const len = Math.hypot(dx, dy);
+        if (len < 0.001) {
+          if (fromStart) next.shift();
+          else next.pop();
+          continue;
+        }
+        const trim = Math.min(remaining, Math.max(0, len - 0.001));
+        next[endpointIndex] = {
+          x: endpoint.x + ((dx / len) * trim),
+          y: endpoint.y + ((dy / len) * trim),
+        };
+        break;
+      }
+      return next;
+    };
+
+    let next = clean;
+    if (start > 0) next = trimEndpoint(next, true, start);
+    if (end > 0) next = trimEndpoint(next, false, end);
+    return next.length >= 2 ? next : clean;
   },
 
   _buildConnectorArrowHeadPath_(tip = {}, from = {}, { size = 12, width = 8 } = {}) {
@@ -2234,7 +2275,7 @@ const connectorMethods = {
               <input id="connectorZIndex" class="input" type="number" min="1" max="9999" step="1" value="${connectorZ}" />
             </label>
           </div>
-          <p class="ddc-connector-help">Corner handles are always shown for selected routed lines. Layer order controls how lines stack against other lines.</p>
+          <p class="ddc-connector-help">Corner handles are always shown for selected routed lines. Layer order controls how lines stack against cards and other lines.</p>
         </section>
   
         <div class="ddc-connector-footer-actions">
@@ -2634,6 +2675,14 @@ const connectorMethods = {
             ? `0 ${Math.max(8, thickness * 1.35)}`
             : '');
       const d = this._buildConnectorPathData_(points);
+      const arrowLineTrim = Math.max(arrowSize * 0.74, thickness * 0.7);
+      const visiblePoints = hasVisibleArrow
+        ? this._trimConnectorPolylineForArrowheads_(points, {
+            start: showStartArrow ? arrowLineTrim : 0,
+            end: showEndArrow ? arrowLineTrim : 0,
+          })
+        : points;
+      const visibleD = this._buildConnectorPathData_(visiblePoints) || d;
       const selected = this._selectedConnectorId === connector.id;
       const connectorZ = draft ? 100000 : this._getConnectorZ_(connector);
       const surface = createConnectorSurface(
@@ -2650,7 +2699,7 @@ const connectorMethods = {
         const selectionColor = String(connector.active_color || this._defaultConnectorConfig_().active_color);
         const selection = document.createElementNS(svgNs, 'path');
         selection.setAttribute('class', 'ddc-connector-selection');
-        selection.setAttribute('d', d);
+        selection.setAttribute('d', visibleD);
         selection.setAttribute('stroke', selectionColor);
         selection.setAttribute('color', selectionColor);
         selection.setAttribute('stroke-width', String(Math.max(thickness + 10, thickness * 2.05)));
@@ -2662,7 +2711,7 @@ const connectorMethods = {
       if (!hideBaseStroke) {
         const track = document.createElementNS(svgNs, 'path');
         track.setAttribute('class', 'ddc-connector-track');
-        track.setAttribute('d', d);
+        track.setAttribute('d', visibleD);
         track.setAttribute('stroke-width', String(thickness));
         track.setAttribute('stroke-linecap', connectorStrokeLinecap);
         track.setAttribute('stroke-linejoin', strokeLinejoin);
@@ -2671,7 +2720,7 @@ const connectorMethods = {
   
         const line = document.createElementNS(svgNs, 'path');
         line.setAttribute('class', `ddc-connector-line ${connector.glow !== false ? 'is-glow' : ''}`);
-        line.setAttribute('d', d);
+        line.setAttribute('d', visibleD);
         line.setAttribute('stroke', color);
         line.setAttribute('color', color);
         line.setAttribute('stroke-width', String(thickness));
@@ -2720,7 +2769,7 @@ const connectorMethods = {
         const appendFlow = () => {
           const flow = document.createElementNS(svgNs, 'path');
           flow.setAttribute('class', `ddc-connector-flow ${state.reverse ? 'reverse' : 'forward'}`);
-          flow.setAttribute('d', d);
+          flow.setAttribute('d', visibleD);
           flow.setAttribute('stroke-width', String(Math.max(2, thickness * 0.48)));
           flow.setAttribute('stroke-linecap', connectorStrokeLinecap);
           flow.setAttribute('stroke-linejoin', strokeLinejoin);
@@ -2732,7 +2781,7 @@ const connectorMethods = {
         const appendPulse = () => {
           const pulse = document.createElementNS(svgNs, 'path');
           pulse.setAttribute('class', 'ddc-connector-pulse');
-          pulse.setAttribute('d', d);
+          pulse.setAttribute('d', visibleD);
           pulse.setAttribute('stroke', color);
           pulse.setAttribute('color', color);
           pulse.setAttribute('stroke-width', String(Math.max(thickness + 4, thickness * 1.55)));
@@ -2762,7 +2811,7 @@ const connectorMethods = {
             movingArrow.setAttribute('stroke-width', String(Math.max(0.8, Math.min(1.4, thickness * 0.12))));
             movingArrow.setAttribute('stroke-linejoin', 'round');
             const motion = document.createElementNS(svgNs, 'animateMotion');
-            motion.setAttribute('path', d);
+            motion.setAttribute('path', visibleD);
             motion.setAttribute('dur', `${movingDuration}s`);
             motion.setAttribute('repeatCount', 'indefinite');
             motion.setAttribute('calcMode', 'linear');
@@ -2776,7 +2825,7 @@ const connectorMethods = {
         };
         const appendParticles = () => {
           let seed = 2166136261;
-          const seedText = `${connector.id || 'connector'}:${d}:${points.length}`;
+          const seedText = `${connector.id || 'connector'}:${visibleD}:${visiblePoints.length}`;
           for (let i = 0; i < seedText.length; i += 1) {
             seed ^= seedText.charCodeAt(i);
             seed = Math.imul(seed, 16777619) >>> 0;
@@ -2807,7 +2856,7 @@ const connectorMethods = {
             particle.setAttribute('stroke', 'rgba(255,255,255,.66)');
             particle.setAttribute('stroke-width', String(Math.max(0.35, Math.min(1.05, thickness * 0.075 * radiusScale))));
             const motion = document.createElementNS(svgNs, 'animateMotion');
-            motion.setAttribute('path', d);
+            motion.setAttribute('path', visibleD);
             motion.setAttribute('dur', `${particleDuration}s`);
             motion.setAttribute('repeatCount', 'indefinite');
             motion.setAttribute('calcMode', 'linear');
