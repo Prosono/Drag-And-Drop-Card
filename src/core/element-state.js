@@ -34,6 +34,9 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.playLoadingAnimation = false;
   instance.__ddcLoadingAnimationPlayed = false;
   instance.__ddcLoadingAnimationToken = 0;
+  instance.__backendProbePending = false;
+  instance.__backendRefreshPending = false;
+  instance.__helpersPreloadQueued = false;
   instance._responsivePreviewOrientations = {
     desktop: 'landscape',
     tablet: 'landscape',

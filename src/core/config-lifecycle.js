@@ -209,10 +209,8 @@ const setConfigMethods = {
         s.onload = () => this._initInteract();
         document.head.appendChild(s);
       }
-      // preload helpers early to avoid lag on first pick
-      this._helpersPromise = (typeof window.loadCardHelpers === 'function')
-        ? window.loadCardHelpers().catch(()=>null)
-        : Promise.resolve(null);
+      this._helpersPromise = null;
+      this.__helpersPreloadQueued = false;
 
       this._buildDashboardShellOnce_();
 
@@ -240,6 +238,12 @@ const setConfigMethods = {
           this._initialLoad(true, editorLoadOptions);
         }
       } else if (!this.__booted && this.__probed) {
+        const shouldWaitForBackendSnapshot = !!(
+          this.__backendProbePending
+          && this.storageKey
+          && !this._hasFastInitialLayout_?.()
+        );
+        if (shouldWaitForBackendSnapshot) return;
         this.__booted = true;
         this._initialLoad(false, editorLoadOptions);
       } else {

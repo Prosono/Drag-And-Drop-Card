@@ -188,11 +188,26 @@ const designImportExportMethods = {
     },
 
   
-    async _importSingleCardPayload_(payload = {}) {
+    async _importSingleCardPayload_(payload = {}, options = {}) {
       const baseEntryRaw = payload?.entry?.card ? payload.entry : (payload?.card?.card ? payload.card : payload);
       if (!baseEntryRaw?.card) {
         this._toast?.('Import failed — invalid card file.');
         return false;
+      }
+      const normalizePickerPlacement = (rect = null) => {
+        if (!rect || typeof rect !== 'object') return null;
+        const x = Math.round(Number(rect.x) || 0);
+        const y = Math.round(Number(rect.y) || 0);
+        const width = Math.max(1, Math.round(Number(rect.w ?? rect.width) || 350));
+        const height = Math.max(1, Math.round(Number(rect.h ?? rect.height) || 350));
+        return { x, y, width, height };
+      };
+      const usePickerPlacement = !!options.usePickerPlacement;
+      const pickerPlacement = usePickerPlacement
+        ? normalizePickerPlacement(this.__pendingAddRect || { x: 0, y: 0, width: 350, height: 350 })
+        : null;
+      if (usePickerPlacement && this.__pendingAddRect) {
+        this.__pendingAddRect = null;
       }
   
       this._persistCurrentResponsiveProfileToMemory_?.();
@@ -228,11 +243,23 @@ const designImportExportMethods = {
         }, sourceEntry);
         importedEntry.id = newLayoutCardId;
         importedEntry.tabId = targetTabId;
-        importedEntry.position = this._findNextAvailablePositionForEntries_(
-          currentEntries,
-          importedEntry.size,
-          this._getImportViewportBoundsForLayoutVariant_(variantKey)
-        );
+        if (pickerPlacement) {
+          importedEntry.position = {
+            x: pickerPlacement.x,
+            y: this._clampYToCanvasTop_?.(pickerPlacement.y) ?? pickerPlacement.y,
+          };
+          importedEntry.size = {
+            ...(importedEntry.size || {}),
+            width: pickerPlacement.width,
+            height: pickerPlacement.height,
+          };
+        } else {
+          importedEntry.position = this._findNextAvailablePositionForEntries_(
+            currentEntries,
+            importedEntry.size,
+            this._getImportViewportBoundsForLayoutVariant_(variantKey)
+          );
+        }
         importedEntry.z = Math.max(6, this._getHighestZForEntries_(currentEntries) + 1);
         currentEntries.push(importedEntry);
         this._responsiveLayouts[variantKey] = currentEntries;

@@ -1535,7 +1535,11 @@ const dashboardSettingsMethods = {
           host.appendChild(picker);
           picker.addEventListener('value-changed', (ev) => {
             ev.stopPropagation();
-            const nextValue = String(ev.detail?.value || ev.detail || ev.target?.value || '').trim();
+            const detail = ev.detail;
+            const rawValue = detail && typeof detail === 'object' && Object.prototype.hasOwnProperty.call(detail, 'value')
+              ? detail.value
+              : (ev.target?.value ?? detail);
+            const nextValue = this._screenSaverEntityIdFromValue_?.(rawValue) || '';
             screenSaverEntityDrafts[index].entity = nextValue;
             updateLiveScreenSaverEntities();
           });
@@ -1549,7 +1553,7 @@ const dashboardSettingsMethods = {
         input.setAttribute('aria-label', `${item.title || 'Status'} entity`);
         host.appendChild(input);
         input.addEventListener('input', () => {
-          screenSaverEntityDrafts[index].entity = String(input.value || '').trim();
+          screenSaverEntityDrafts[index].entity = this._screenSaverEntityIdFromValue_?.(input.value) || '';
           updateLiveScreenSaverEntities();
         });
       };

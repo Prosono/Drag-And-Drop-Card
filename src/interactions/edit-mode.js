@@ -308,7 +308,8 @@ const editModeMethods = {
         handle.style.display = this.editMode ? 'flex' : 'none';
       });
       if (!w.dataset.placeholder && window.interact) {
-        window.interact(w).draggable(this.editMode).resizable(this.editMode);
+        if (this.editMode) this._initCardInteract?.(w);
+        this._setCardInteractEnabled_?.(w, this.editMode);
       }
       w.style.touchAction = this.editMode ? 'none' : 'auto';
     });

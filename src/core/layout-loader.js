@@ -135,6 +135,37 @@ const initialLoadMethods = {
     }
   },
 
+  _readLocalLayoutSnapshot_() {
+    if (!this.storageKey) return null;
+    try {
+      return this._normalizeDashboardPayload_(
+        JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null')
+      );
+    } catch {
+      return null;
+    }
+  },
+
+  _hasFastInitialLayout_() {
+    try {
+      const cache = globalThis.__ddcRuntimeLayoutCache;
+      for (const key of this._runtimeLayoutCacheKeys_?.() || []) {
+        if (!cache?.has?.(key)) continue;
+        const cached = cache.get(key);
+        const normalized = this._normalizeDashboardPayload_?.(cached) || null;
+        if (normalized?.cards?.length) return true;
+      }
+    } catch {}
+    try {
+      if (this._readLocalLayoutSnapshot_?.()?.cards?.length) return true;
+    } catch {}
+    try {
+      if (Array.isArray(this._config?.cards) && this._config.cards.length) return true;
+      if (Array.isArray(this.config?.cards) && this.config.cards.length) return true;
+    } catch {}
+    return false;
+  },
+
   _writeRuntimeLayoutCache_(payload = null) {
     try {
       const normalized = this._normalizeDashboardPayload_?.(payload) || null;
@@ -190,9 +221,7 @@ const initialLoadMethods = {
         }
 
         if (this.storageKey) {
-          try {
-            local = this._normalizeDashboardPayload_(JSON.parse(localStorage.getItem(`ddc_local_${this.storageKey}`) || 'null'));
-          } catch {}
+          local = this._readLocalLayoutSnapshot_?.();
         }
 
         if (saved && local) {
@@ -394,6 +423,29 @@ const initialLoadMethods = {
           this._setAutoScaleStartupVisualState_?.(false);
         }
         await this._finishDashboardLoadingAnimation_?.(loadingAnimation);
+        this._scheduleCardHelpersPreload_?.();
+        const shouldRefreshBackend = !!(
+          this.__backendRefreshPending
+          && this._backendOK
+          && this.storageKey
+        );
+        this.__backendRefreshPending = false;
+        if (shouldRefreshBackend) {
+          setTimeout(() => {
+            try {
+              if (this.__booting || !this.isConnected) return;
+              if (this._isHaEditorBlockingEmptyState_?.()) {
+                this._syncEmptyStateUI?.();
+                this._applyAutoScale?.({ force: true });
+              } else {
+                this._initialLoad(true, {
+                  preserveExistingOnEmpty: true,
+                  reason: 'backend-probe-refresh',
+                });
+              }
+            } catch {}
+          }, 0);
+        }
       }
     }
 };

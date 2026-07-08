@@ -9,12 +9,22 @@
 const interactBehaviorMethods = {
   _initInteract() {
     const wraps = this.cardContainer.querySelectorAll('.card-wrapper');
-    wraps.forEach((w) => this._initCardInteract(w));
+    if (this.editMode) wraps.forEach((w) => this._initCardInteract(w));
     this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper')?.forEach((w) => this._initSidebarCardInteract_(w));
+  },
+
+  _setCardInteractEnabled_(wrap, enabled) {
+    if (!window.interact || !wrap || wrap.dataset.placeholder || !wrap.__ddcInteractReady) return;
+    try { window.interact(wrap).draggable(!!enabled).resizable(!!enabled); } catch {}
   },
 
   _initCardInteract(wrap) {
     if (!window.interact || wrap.dataset.placeholder) return;
+    if (wrap.__ddcInteractReady) {
+      this._setCardInteractEnabled_(wrap, this.editMode);
+      return;
+    }
+    if (!this.editMode) return;
     const gs = this.gridSize, live = !!this.dragLiveSnap;
 
     // DRAG (supports multi‑select move with optional live snap)
@@ -363,6 +373,7 @@ const interactBehaviorMethods = {
         }
       }
     });
+    wrap.__ddcInteractReady = true;
   },
 
   _resizeContainer() {

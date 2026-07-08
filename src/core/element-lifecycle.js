@@ -247,18 +247,34 @@ const lifecycleMethods = {
       const hassApiReady = !!(hass && typeof hass.callApi === 'function');
       if (!this.__probed && hassApiReady) {
         this.__probed = true;
+        this.__backendProbePending = true;
+        if (!this.__booted && this.__cfgReady && this._hasFastInitialLayout_?.()) {
+          this.__booted = true;
+          this._initialLoad(false);
+        }
         this._probeBackend().then(() => {
           this.__probed = true;
+          this.__backendProbePending = false;
           if (!this.__booted && this.__cfgReady) {
             this.__booted = true;
             this._initialLoad(true);
-          } else if (this.__booted && this._backendOK && this.storageKey && !this.__booting) {
+          } else if (this.__booted && this._backendOK && this.storageKey) {
+            if (this.__booting) {
+              this.__backendRefreshPending = true;
+              return;
+            }
             if (this._isHaEditorBlockingEmptyState_?.()) {
               this._syncEmptyStateUI?.();
               this._applyAutoScale?.({ force: true });
             } else {
               this._initialLoad(true, { preserveExistingOnEmpty: true, reason: 'hass-refresh' });
             }
+          }
+        }).catch(() => {
+          this.__backendProbePending = false;
+          if (!this.__booted && this.__cfgReady) {
+            this.__booted = true;
+            this._initialLoad(true);
           }
         });
       } else if (!this.__booted && this.__cfgReady && hass) {

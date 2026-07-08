@@ -5098,6 +5098,111 @@ export function getDashboardShellTemplate() {
         letter-spacing:.01em;
         white-space:nowrap;
       }
+      .picker-mode-tabs{
+        flex:0 0 min(294px, 32vw);
+        width:min(294px, 32vw);
+        max-width:min(294px, 32vw);
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        align-items:center;
+        gap:6px;
+        padding:5px;
+        border-radius:18px;
+        border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 28%, var(--divider-color, rgba(255,255,255,.12)));
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+          color-mix(in oklab, var(--primary-background-color, #0f172a) 82%, rgba(0,0,0,.12));
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.06),
+          0 12px 28px rgba(0,0,0,.18);
+        overflow-x:auto;
+        scrollbar-width:none;
+      }
+      .picker-mode-tabs::-webkit-scrollbar{
+        display:none;
+      }
+      .picker-mode-tab{
+        width:100%;
+        min-width:0;
+        position:relative;
+        min-height:42px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:9px;
+        padding:9px 14px;
+        border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 62%, transparent);
+        border-radius:13px;
+        background:rgba(255,255,255,.035);
+        color:color-mix(in oklab, var(--primary-text-color, #fff) 86%, transparent);
+        font-size:.88rem;
+        font-weight:800;
+        white-space:nowrap;
+        cursor:pointer;
+        transition:transform .14s ease, color .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+      }
+      .picker-mode-tab span{
+        min-width:0;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+      .picker-mode-tab ha-icon{
+        --mdc-icon-size:20px;
+      }
+      .picker-mode-tab em{
+        flex:0 0 auto;
+        min-height:22px;
+        display:inline-flex;
+        align-items:center;
+        padding:3px 8px;
+        border-radius:999px;
+        background:color-mix(in oklab, var(--primary-color, #ff9800) 82%, #fff 8%);
+        color:#fff;
+        box-shadow:0 6px 14px color-mix(in oklab, var(--primary-color, #ff9800) 28%, transparent);
+        font-size:.68rem;
+        font-style:normal;
+        font-weight:900;
+        line-height:1;
+      }
+      .picker-mode-tab:hover,
+      .picker-mode-tab:focus-visible{
+        transform:translateY(-1px);
+        color:var(--primary-text-color, #fff);
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 44%, rgba(255,255,255,.16));
+        background:rgba(255,255,255,.07);
+        box-shadow:0 10px 22px rgba(0,0,0,.2);
+      }
+      .picker-mode-tab.active{
+        color:#fff;
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 68%, rgba(255,255,255,.16));
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #ff9800) 74%, #fff 8%), color-mix(in oklab, var(--primary-color, #ff9800) 86%, #000 4%));
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.18),
+          0 12px 24px color-mix(in oklab, var(--primary-color, #ff9800) 25%, transparent);
+      }
+      .picker-mode-tab--hads{
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 40%, rgba(255,255,255,.12));
+        background:
+          linear-gradient(135deg, color-mix(in oklab, var(--primary-color, #ff9800) 16%, transparent), rgba(255,255,255,.045)),
+          rgba(255,255,255,.035);
+        color:var(--primary-text-color, #fff);
+        box-shadow:
+          inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent),
+          0 8px 22px color-mix(in oklab, var(--primary-color, #ff9800) 10%, transparent);
+      }
+      .picker-mode-tab--hads:not(.active) ha-icon{
+        color:color-mix(in oklab, var(--primary-color, #ff9800) 86%, #fff 10%);
+      }
+      .picker-mode-tab--hads:not(.active):hover{
+        border-color:color-mix(in oklab, var(--primary-color, #ff9800) 64%, rgba(255,255,255,.18));
+        background:
+          linear-gradient(135deg, color-mix(in oklab, var(--primary-color, #ff9800) 24%, transparent), rgba(255,255,255,.06)),
+          rgba(255,255,255,.045);
+        box-shadow:
+          inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #ff9800) 24%, transparent),
+          0 14px 30px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent);
+      }
       .smart-picker-dialog .dlg-foot{
         align-items:center;
         gap:12px;
@@ -5691,6 +5796,14 @@ export function getDashboardShellTemplate() {
 
           /* picker layout */
           .layout{display:grid;height:min(84vh,820px);grid-template-columns:280px 1fr}
+          .layout.hads-store-active{
+            grid-template-columns:1fr;
+          }
+          .smart-picker-dialog #leftPane[hidden],
+          .smart-picker-dialog #rightPane[hidden],
+          .smart-picker-dialog #hadsStorePane[hidden]{
+            display:none !important;
+          }
           #leftPane{
             border-right:1px solid var(--divider-color);
             overflow:auto;
@@ -5717,6 +5830,498 @@ export function getDashboardShellTemplate() {
             overflow-y:auto;
             overflow-x:hidden;
             background:var(--primary-background-color);
+          }
+          .hads-store-pane{
+            min-height:0;
+            overflow:auto;
+            padding:18px;
+            background:
+              radial-gradient(900px 300px at 12% 0%, color-mix(in oklab, var(--primary-color, #03a9f4) 12%, transparent), transparent 62%),
+              color-mix(in oklab, var(--primary-background-color, #0f172a) 94%, rgba(255,255,255,.025));
+          }
+          .hads-store-hero{
+            display:flex;
+            align-items:flex-end;
+            justify-content:space-between;
+            gap:16px;
+            margin:0 0 16px;
+            padding:4px 2px 14px;
+            border-bottom:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+          }
+          .hads-store-kicker{
+            display:inline-flex;
+            align-items:center;
+            min-height:24px;
+            padding:3px 8px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #03a9f4) 34%, transparent);
+            color:color-mix(in oklab, var(--primary-color, #03a9f4) 88%, var(--primary-text-color, #fff));
+            background:color-mix(in oklab, var(--primary-color, #03a9f4) 9%, transparent);
+            font-size:.72rem;
+            font-weight:780;
+            text-transform:uppercase;
+            letter-spacing:.055em;
+          }
+          .hads-store-hero h4{
+            margin:8px 0 4px;
+            color:var(--primary-text-color, #fff);
+            font-size:clamp(1.15rem, 2vw, 1.7rem);
+            line-height:1.12;
+            font-weight:800;
+            letter-spacing:0;
+          }
+          .hads-store-hero p{
+            margin:0;
+            color:var(--secondary-text-color, #94a3b8);
+            font-size:.91rem;
+          }
+          .hads-store-statusline{
+            margin-top:10px;
+            display:flex;
+            align-items:center;
+            gap:8px;
+            color:color-mix(in oklab, var(--secondary-text-color, #94a3b8) 88%, var(--primary-text-color, #fff));
+            font-size:.78rem;
+            font-weight:720;
+          }
+          .hads-store-statusline > span{
+            min-height:24px;
+            display:inline-flex;
+            align-items:center;
+            padding:3px 8px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            background:rgba(255,255,255,.035);
+          }
+          .hads-store-refresh{
+            min-height:24px;
+            padding:3px 8px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 36%, transparent);
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 10%, transparent);
+            color:color-mix(in oklab, var(--primary-color, #ff9800) 86%, var(--primary-text-color, #fff));
+            font-size:.72rem;
+            font-weight:820;
+            cursor:pointer;
+          }
+          .hads-store-account{
+            min-width:min(360px, 42%);
+            display:grid;
+            grid-template-columns:auto minmax(0, 1fr) auto auto;
+            align-items:center;
+            gap:10px;
+            padding:10px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 26%, var(--divider-color, rgba(255,255,255,.12)));
+            border-radius:16px;
+            background:
+              linear-gradient(135deg, color-mix(in oklab, var(--primary-color, #ff9800) 11%, transparent), rgba(255,255,255,.035)),
+              color-mix(in oklab, var(--card-background-color, #111827) 88%, transparent);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 26px rgba(0,0,0,.16);
+          }
+          .hads-store-account.is-connected{
+            border-color:color-mix(in oklab, var(--success-color, #4caf50) 36%, var(--divider-color, rgba(255,255,255,.12)));
+            background:
+              linear-gradient(135deg, color-mix(in oklab, var(--success-color, #4caf50) 10%, transparent), rgba(255,255,255,.035)),
+              color-mix(in oklab, var(--card-background-color, #111827) 88%, transparent);
+          }
+          .hads-store-account-icon{
+            width:36px;
+            height:36px;
+            display:grid;
+            place-items:center;
+            border-radius:12px;
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent);
+            color:color-mix(in oklab, var(--primary-color, #ff9800) 88%, #fff);
+          }
+          .hads-store-account-icon ha-icon{
+            --mdc-icon-size:20px;
+          }
+          .hads-store-account-copy{
+            min-width:0;
+            display:flex;
+            flex-direction:column;
+            gap:2px;
+          }
+          .hads-store-account-copy strong{
+            color:var(--primary-text-color, #fff);
+            font-size:.92rem;
+            line-height:1.2;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+          }
+          .hads-store-account-copy small{
+            color:var(--secondary-text-color, #94a3b8);
+            font-size:.75rem;
+            line-height:1.25;
+          }
+          .hads-store-account-btn{
+            min-height:34px;
+            padding:7px 10px;
+            border-radius:11px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 48%, rgba(255,255,255,.12));
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 78%, #fff 7%);
+            color:#fff;
+            font-size:.78rem;
+            font-weight:840;
+            cursor:pointer;
+            white-space:nowrap;
+          }
+          .hads-store-account-btn.ghost{
+            border-color:color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, transparent);
+            background:rgba(255,255,255,.04);
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 86%, transparent);
+          }
+          .hads-store-account-btn:disabled{
+            opacity:.68;
+            cursor:wait;
+          }
+          .hads-store-notice{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:0 0 14px;
+            padding:10px 12px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 30%, var(--divider-color, rgba(255,255,255,.12)));
+            border-radius:14px;
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 86%, transparent);
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 8%, rgba(255,255,255,.025));
+            font-size:.82rem;
+          }
+          .hads-store-notice ha-icon{
+            flex:0 0 auto;
+            --mdc-icon-size:18px;
+            color:color-mix(in oklab, var(--primary-color, #ff9800) 86%, #fff);
+          }
+          .hads-store-detail{
+            display:grid;
+            grid-template-columns:minmax(240px, 38%) minmax(0, 1fr);
+            gap:16px;
+            margin:0 0 16px;
+            padding:12px;
+            border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 34%, var(--divider-color, rgba(255,255,255,.12)));
+            border-radius:18px;
+            background:
+              linear-gradient(135deg, color-mix(in oklab, var(--primary-color, #ff9800) 10%, transparent), rgba(255,255,255,.028)),
+              color-mix(in oklab, var(--card-background-color, #111827) 92%, transparent);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 18px 38px rgba(0,0,0,.18);
+          }
+          .hads-store-detail-media{
+            position:relative;
+            min-height:190px;
+            border-radius:14px;
+            overflow:hidden;
+            background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.025));
+          }
+          .hads-store-detail-media img{
+            width:100%;
+            height:100%;
+            min-height:190px;
+            display:block;
+            object-fit:cover;
+          }
+          .hads-store-detail-media > ha-icon{
+            position:absolute;
+            inset:0;
+            margin:auto;
+            width:54px;
+            height:54px;
+            --mdc-icon-size:54px;
+            color:color-mix(in oklab, var(--primary-color, #ff9800) 82%, #fff);
+          }
+          .hads-store-detail-copy{
+            min-width:0;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+            padding:4px 4px 2px;
+          }
+          .hads-store-detail-topline{
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+          }
+          .hads-store-detail-topline span{
+            min-height:24px;
+            display:inline-flex;
+            align-items:center;
+            padding:3px 8px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            background:rgba(255,255,255,.04);
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 82%, transparent);
+            font-size:.7rem;
+            font-weight:780;
+          }
+          .hads-store-detail-copy h5{
+            margin:0;
+            color:var(--primary-text-color, #fff);
+            font-size:clamp(1.12rem, 1.8vw, 1.45rem);
+            line-height:1.12;
+            font-weight:840;
+            letter-spacing:0;
+            overflow-wrap:anywhere;
+          }
+          .hads-store-detail-copy p{
+            margin:0;
+            max-width:62ch;
+            color:var(--secondary-text-color, #94a3b8);
+            font-size:.9rem;
+            line-height:1.42;
+          }
+          .hads-store-detail-actions{
+            margin-top:auto;
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+          }
+          .hads-store-detail-btn{
+            min-height:40px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            padding:8px 12px;
+            border-radius:12px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 78%, transparent);
+            background:rgba(255,255,255,.04);
+            color:var(--primary-text-color, #fff);
+            font-size:.82rem;
+            font-weight:820;
+            cursor:pointer;
+            transition:transform .14s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+          }
+          .hads-store-detail-btn ha-icon{
+            --mdc-icon-size:18px;
+          }
+          .hads-store-detail-btn:hover,
+          .hads-store-detail-btn:focus-visible{
+            transform:translateY(-1px);
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 45%, rgba(255,255,255,.16));
+            background:rgba(255,255,255,.07);
+            box-shadow:0 10px 22px rgba(0,0,0,.16);
+          }
+          .hads-store-detail-btn.primary{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 64%, rgba(255,255,255,.12));
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 80%, #fff 8%);
+            color:#fff;
+            box-shadow:0 12px 24px color-mix(in oklab, var(--primary-color, #ff9800) 22%, transparent);
+          }
+          .hads-store-detail-btn.ghost{
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 78%, transparent);
+          }
+          .hads-store-detail-btn:disabled{
+            opacity:.68;
+            cursor:wait;
+            transform:none;
+          }
+          .hads-store-section{
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+          }
+          .hads-store-section + .hads-store-section{
+            margin-top:18px;
+          }
+          .hads-store-section-head{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            padding:0 2px;
+          }
+          .hads-store-section-head span{
+            color:var(--primary-text-color, #fff);
+            font-size:.92rem;
+            font-weight:840;
+            letter-spacing:.01em;
+          }
+          .hads-store-section-head small{
+            min-height:24px;
+            display:inline-flex;
+            align-items:center;
+            padding:3px 8px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            color:color-mix(in oklab, var(--secondary-text-color, #94a3b8) 92%, var(--primary-text-color, #fff));
+            background:rgba(255,255,255,.035);
+            font-size:.72rem;
+            font-weight:760;
+          }
+          .hads-store-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+            gap:14px;
+          }
+          .hads-store-card{
+            min-width:0;
+            display:flex;
+            flex-direction:column;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            border-radius:16px;
+            overflow:hidden;
+            background:
+              linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
+              color-mix(in oklab, var(--card-background-color, #111827) 92%, transparent);
+            color:var(--primary-text-color, #fff);
+            text-align:left;
+            transition:transform .16s ease, border-color .16s ease, background .16s ease;
+          }
+          .hads-store-card-preview{
+            min-width:0;
+            display:grid;
+            grid-template-rows:auto 1fr;
+            border:0;
+            padding:0;
+            background:transparent;
+            color:inherit;
+            text-align:left;
+            cursor:pointer;
+          }
+          .hads-store-card:hover{
+            transform:translateY(-2px);
+            border-color:color-mix(in oklab, var(--primary-color, #03a9f4) 42%, transparent);
+            background:
+              linear-gradient(180deg, color-mix(in oklab, var(--primary-color, #03a9f4) 7%, transparent), rgba(255,255,255,.02)),
+              color-mix(in oklab, var(--card-background-color, #111827) 92%, transparent);
+          }
+          .hads-store-card.is-selected{
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 58%, rgba(255,255,255,.14));
+            box-shadow:
+              inset 0 0 0 1px color-mix(in oklab, var(--primary-color, #ff9800) 26%, transparent),
+              0 14px 26px color-mix(in oklab, var(--primary-color, #ff9800) 12%, transparent);
+          }
+          .hads-store-image{
+            position:relative;
+            display:block;
+            aspect-ratio:16 / 9;
+            overflow:hidden;
+            background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+          }
+          .hads-store-image img{
+            width:100%;
+            height:100%;
+            display:block;
+            object-fit:cover;
+            transform:scale(1.01);
+            transition:transform .28s ease, filter .28s ease;
+          }
+          .hads-store-card:hover .hads-store-image img{
+            transform:scale(1.045);
+            filter:saturate(1.08) contrast(1.04);
+          }
+          .hads-store-image > ha-icon{
+            position:absolute;
+            inset:0;
+            margin:auto;
+            width:42px;
+            height:42px;
+            --mdc-icon-size:42px;
+            color:color-mix(in oklab, var(--primary-color, #03a9f4) 82%, var(--primary-text-color, #fff));
+          }
+          .hads-store-overlay{
+            position:absolute;
+            inset:auto 0 0;
+            height:42%;
+            background:linear-gradient(180deg, transparent, rgba(0,0,0,.48));
+            pointer-events:none;
+          }
+          .hads-store-copy{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            padding:12px;
+            min-width:0;
+          }
+          .hads-store-chips{
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+          }
+          .hads-store-chips span{
+            min-height:22px;
+            display:inline-flex;
+            align-items:center;
+            padding:3px 7px;
+            border-radius:999px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 78%, transparent);
+            background:rgba(255,255,255,.035);
+            font-size:.68rem;
+            font-weight:740;
+          }
+          .hads-store-copy strong{
+            color:var(--primary-text-color, #fff);
+            font-size:1rem;
+            line-height:1.2;
+            font-weight:760;
+            overflow-wrap:anywhere;
+          }
+          .hads-store-copy small{
+            color:var(--secondary-text-color, #94a3b8);
+            font-size:.8rem;
+            line-height:1.38;
+          }
+          .hads-store-card-actions{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:0 12px 12px;
+            margin-top:auto;
+          }
+          .hads-store-card-action{
+            min-width:0;
+            min-height:38px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            padding:8px 10px;
+            border-radius:12px;
+            border:1px solid color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            background:rgba(255,255,255,.04);
+            color:var(--primary-text-color, #fff);
+            font-size:.78rem;
+            font-weight:840;
+            cursor:pointer;
+            white-space:nowrap;
+            transition:transform .14s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+          }
+          .hads-store-card-action.primary{
+            flex:1 1 auto;
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 54%, rgba(255,255,255,.12));
+            background:color-mix(in oklab, var(--primary-color, #ff9800) 78%, #fff 8%);
+            color:#fff;
+            box-shadow:0 10px 20px color-mix(in oklab, var(--primary-color, #ff9800) 18%, transparent);
+          }
+          .hads-store-card-action.ghost{
+            flex:0 0 38px;
+            width:38px;
+            padding:0;
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 78%, transparent);
+          }
+          .hads-store-card-action:hover,
+          .hads-store-card-action:focus-visible{
+            transform:translateY(-1px);
+            border-color:color-mix(in oklab, var(--primary-color, #ff9800) 45%, rgba(255,255,255,.16));
+            background:rgba(255,255,255,.07);
+          }
+          .hads-store-card-action:disabled{
+            opacity:.68;
+            cursor:wait;
+            transform:none;
+          }
+          .hads-store-card-action ha-icon{
+            --mdc-icon-size:17px;
+          }
+          .hads-store-empty{
+            min-height:180px;
+            display:grid;
+            place-items:center;
+            gap:8px;
+            color:var(--secondary-text-color, #94a3b8);
+            border:1px dashed color-mix(in oklab, var(--divider-color, rgba(255,255,255,.12)) 74%, transparent);
+            border-radius:16px;
           }
           .rightGrid{
             display:grid;grid-template-columns:540px 1fr;grid-template-rows:auto auto 1fr;gap:12px;padding:12px;height:100%;box-sizing:border-box;position:relative;
@@ -5845,6 +6450,7 @@ export function getDashboardShellTemplate() {
             flex-direction:column;
             gap:2px;
             min-width:0;
+            flex:1 1 auto;
           }
           .picker-item-name{
             font-size:.98rem;
@@ -5975,6 +6581,7 @@ export function getDashboardShellTemplate() {
               grid-template-columns:minmax(0, 1fr) auto;
               grid-template-areas:
                 "title actions"
+                "tabs tabs"
                 "search search";
               align-items:center;
               gap:10px 12px;
@@ -5991,6 +6598,17 @@ export function getDashboardShellTemplate() {
               text-overflow:ellipsis;
               font-size:1.04rem;
               line-height:1.18;
+            }
+            .smart-picker-dialog .picker-mode-tabs{
+              grid-area:tabs;
+              width:100%;
+              max-width:none;
+              box-sizing:border-box;
+            }
+            .smart-picker-dialog .picker-mode-tab{
+              flex:1 0 max-content;
+              min-height:40px;
+              padding:8px 11px;
             }
             .smart-picker-dialog .picker-search-wrap{
               grid-area:search;
@@ -6050,6 +6668,67 @@ export function getDashboardShellTemplate() {
               background:
                 linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01)),
                 var(--primary-background-color);
+            }
+            .smart-picker-dialog .layout.hads-store-active{
+              grid-template-rows:minmax(0, 1fr);
+            }
+            .smart-picker-dialog .hads-store-pane{
+              min-height:0;
+              padding:12px;
+            }
+            .smart-picker-dialog .hads-store-hero{
+              align-items:flex-start;
+              flex-direction:column;
+              gap:12px;
+              margin-bottom:12px;
+              padding-bottom:12px;
+            }
+            .smart-picker-dialog .hads-store-hero .hads-store-open-all{
+              width:100%;
+              min-height:44px;
+            }
+            .smart-picker-dialog .hads-store-statusline{
+              flex-wrap:wrap;
+            }
+            .smart-picker-dialog .hads-store-account{
+              width:100%;
+              min-width:0;
+              box-sizing:border-box;
+              grid-template-columns:auto minmax(0, 1fr);
+            }
+            .smart-picker-dialog .hads-store-account-btn{
+              grid-column:1 / -1;
+              width:100%;
+            }
+            .smart-picker-dialog .hads-store-detail{
+              grid-template-columns:1fr;
+              gap:12px;
+              padding:10px;
+            }
+            .smart-picker-dialog .hads-store-detail-media,
+            .smart-picker-dialog .hads-store-detail-media img{
+              min-height:170px;
+            }
+            .smart-picker-dialog .hads-store-detail-actions{
+              display:grid;
+              grid-template-columns:1fr;
+            }
+            .smart-picker-dialog .hads-store-detail-btn{
+              width:100%;
+              min-height:44px;
+            }
+            .smart-picker-dialog .hads-store-grid{
+              grid-template-columns:1fr;
+              gap:12px;
+            }
+            .smart-picker-dialog .hads-store-card{
+              border-radius:15px;
+            }
+            .smart-picker-dialog .hads-store-image{
+              aspect-ratio:16 / 8.8;
+            }
+            .smart-picker-dialog .hads-store-copy{
+              padding:12px;
             }
             .smart-picker-dialog .picker-category{
               min-width:0;
@@ -6250,6 +6929,7 @@ export function getDashboardShellTemplate() {
             grid-template-columns:minmax(0, 1fr) auto;
             grid-template-areas:
               "title actions"
+              "tabs tabs"
               "search search";
             align-items:center;
             gap:10px 12px;
@@ -6266,6 +6946,17 @@ export function getDashboardShellTemplate() {
             text-overflow:ellipsis;
             font-size:1.04rem;
             line-height:1.18;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-mode-tabs{
+            grid-area:tabs;
+            width:100%;
+            max-width:none;
+            box-sizing:border-box;
+          }
+          .smart-picker-modal.smart-picker-mobile .picker-mode-tab{
+            flex:1 0 max-content;
+            min-height:40px;
+            padding:8px 11px;
           }
           .smart-picker-modal.smart-picker-mobile .picker-search-wrap{
             grid-area:search;
@@ -6309,6 +7000,68 @@ export function getDashboardShellTemplate() {
             -webkit-overflow-scrolling:touch;
             overscroll-behavior:contain;
             background:var(--primary-background-color);
+          }
+          .smart-picker-modal.smart-picker-mobile .layout.hads-store-active{
+            display:block;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-pane{
+            min-height:100%;
+            padding:12px;
+            box-sizing:border-box;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-hero{
+            align-items:flex-start;
+            flex-direction:column;
+            gap:12px;
+            margin-bottom:12px;
+            padding-bottom:12px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-hero .hads-store-open-all{
+            width:100%;
+            min-height:44px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-statusline{
+            flex-wrap:wrap;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-account{
+            width:100%;
+            min-width:0;
+            box-sizing:border-box;
+            grid-template-columns:auto minmax(0, 1fr);
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-account-btn{
+            grid-column:1 / -1;
+            width:100%;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-detail{
+            grid-template-columns:1fr;
+            gap:12px;
+            padding:10px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-detail-media,
+          .smart-picker-modal.smart-picker-mobile .hads-store-detail-media img{
+            min-height:170px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-detail-actions{
+            display:grid;
+            grid-template-columns:1fr;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-detail-btn{
+            width:100%;
+            min-height:44px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-grid{
+            grid-template-columns:1fr;
+            gap:12px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-card{
+            border-radius:15px;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-image{
+            aspect-ratio:16 / 8.8;
+          }
+          .smart-picker-modal.smart-picker-mobile .hads-store-copy{
+            padding:12px;
           }
           .smart-picker-modal.smart-picker-mobile #leftPane{
             display:block;

@@ -953,6 +953,10 @@ This card can import designs from HADS:
 
 > https://hads.smarti.dev/
 
+For the deeper in-card marketplace integration, see the proposed HADS API contract:
+
+> docs/hads-ddc-integration-api.md
+
 ---
 
 ## 🛠 Troubleshooting

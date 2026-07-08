@@ -83,6 +83,33 @@ const coreMethods = {
     } catch {}
   },
 
+  _getCardHelpers_() {
+    if (!this._helpersPromise) {
+      this._helpersPromise = (typeof window.loadCardHelpers === 'function')
+        ? window.loadCardHelpers().catch(() => null)
+        : Promise.resolve(null);
+    }
+    return this._helpersPromise;
+  },
+
+  _scheduleCardHelpersPreload_() {
+    if (this.__helpersPreloadQueued || this._helpersPromise) return;
+    this.__helpersPreloadQueued = true;
+    const run = () => {
+      this.__helpersPreloadQueued = false;
+      if (!this._helpersPromise) this._getCardHelpers_();
+    };
+    try {
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(run, { timeout: 3000 });
+      } else {
+        setTimeout(run, 1000);
+      }
+    } catch {
+      setTimeout(run, 1000);
+    }
+  },
+
   get ddc() {
     return this._getDashboardLocalApi_?.();
   },

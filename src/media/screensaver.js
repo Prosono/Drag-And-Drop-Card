@@ -164,6 +164,23 @@ const screenSaverMethods = {
     ];
   },
 
+  _screenSaverEntityIdFromValue_(value) {
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text || text === '[object Object]' || text === 'undefined' || text === 'null') return '';
+      return text;
+    }
+    if (value && typeof value === 'object') {
+      for (const key of ['entity', 'entity_id', 'entityId', 'value']) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+        const next = this._screenSaverEntityIdFromValue_?.(value[key]) || '';
+        if (next) return next;
+        if (value[key] === '' || value[key] == null) return '';
+      }
+    }
+    return '';
+  },
+
   _normalizeScreenSaverEntities_(value) {
     const slots = this._getScreenSaverEntitySlots_?.() || [];
     const input = value ?? [];
@@ -184,7 +201,7 @@ const screenSaverMethods = {
         const slot = slots[index] || {};
         const arrayKey = legacyArrayKeys[index] || slot.key || `status_${index + 1}`;
         if (typeof item === 'string') {
-          byKey.set(normalizeKey(arrayKey), { entity: item });
+          byKey.set(normalizeKey(arrayKey), { entity: this._screenSaverEntityIdFromValue_?.(item) || '' });
           return;
         }
         if (item && typeof item === 'object') {
@@ -195,14 +212,16 @@ const screenSaverMethods = {
     } else if (input && typeof input === 'object') {
       Object.entries(input).forEach(([key, item]) => {
         const normalizedKey = normalizeKey(key);
-        if (typeof item === 'string') byKey.set(normalizedKey, { entity: item });
+        if (typeof item === 'string') {
+          byKey.set(normalizedKey, { entity: this._screenSaverEntityIdFromValue_?.(item) || '' });
+        }
         else if (item && typeof item === 'object') byKey.set(normalizedKey, { ...item, key: normalizedKey });
       });
     }
 
     return slots.map((slot, index) => {
       const raw = byKey.get(slot.key) || {};
-      const entity = String(raw.entity || raw.entity_id || '').trim();
+      const entity = this._screenSaverEntityIdFromValue_?.(raw.entity ?? raw.entity_id ?? raw.entityId ?? '') || '';
       return {
         key: slot.key,
         title: slot.title,

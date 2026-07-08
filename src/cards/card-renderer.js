@@ -689,7 +689,7 @@ const cardBuilderMethods = {
         el.hass = this.hass;
         return el;
       }
-      const helpers = (await this._helpersPromise) || await window.loadCardHelpers();
+      const helpers = (await this._getCardHelpers_?.()) || await window.loadCardHelpers();
       const el = helpers.createCardElement(runtimeCfg);
       el.__ddcSourceConfig = sourceCfg;
       el.hass = this.hass;
@@ -1233,28 +1233,9 @@ const cardBuilderMethods = {
       this._hideEmptyPlaceholder();
       const cardEl = await this._createCard(cardConfig);
       const wrap = this._makeWrapper(cardEl);
-      const next = this._getNextAvailablePosition();
-      this._setCardPosition(wrap, next.x, next.y);
-      const type = String(cardConfig?.type || '');
-      if (type === 'custom:ddc-line-card') {
-        const isVerticalish = ['vertical', 'diagonal-up', 'diagonal-down'].includes(String(cardConfig?.direction || '').toLowerCase());
-        wrap.style.width  = `${(isVerticalish ? 5 : 16) * this.gridSize}px`;
-        wrap.style.height = `${(isVerticalish ? 14 : 4) * this.gridSize}px`;
-      } else if (type === 'custom:ddc-table-card') {
-        const cols = Math.max(1, Number(cardConfig?.columns || 3) || 3);
-        const rows = Math.max(1, Number(cardConfig?.rows || 3) || 3);
-        wrap.style.width  = `${Math.max(12, Math.min(24, cols * 5)) * this.gridSize}px`;
-        wrap.style.height = `${Math.max(7, Math.min(18, rows * 3 + (cardConfig?.title ? 2 : 1))) * this.gridSize}px`;
-      } else if (type === 'custom:ddc-icon-card') {
-        wrap.style.width  = `${6 * this.gridSize}px`;
-        wrap.style.height = `${6 * this.gridSize}px`;
-      } else if (type === 'custom:ddc-text-card') {
-        wrap.style.width  = `${14 * this.gridSize}px`;
-        wrap.style.height = `${5 * this.gridSize}px`;
-      } else {
-        wrap.style.width  = `${14*this.gridSize}px`;
-        wrap.style.height = `${10*this.gridSize}px`;
-      }
+      this._setCardPosition(wrap, 0, 0);
+      wrap.style.width = '350px';
+      wrap.style.height = '350px';
       // Assign a z-index for the new card that is at least 6.  Without
       // clamping the first few cards could be placed behind the grid overlay.
       {
