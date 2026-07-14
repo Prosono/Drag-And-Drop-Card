@@ -163,6 +163,7 @@ const connectorMethods = {
     const wraps = Array.from(this.cardContainer.querySelectorAll('.card-wrapper:not(.ddc-placeholder)'));
     wraps.forEach((wrap) => {
       if (!wrap?.dataset?.layoutCardId) return;
+      if (wrap.classList?.contains?.('ddc-connector-anchors-disabled')) return;
       if (exclude?.cardId && String(wrap.dataset.layoutCardId) === String(exclude.cardId)) {
         if (!exclude.allowSameCard) return;
       }
@@ -1829,6 +1830,7 @@ const connectorMethods = {
   },
 
   _startConnectorAnchorDrag_(wrap, anchor = 'right', ev = null) {
+    if (wrap?.classList?.contains?.('ddc-connector-anchors-disabled')) return;
     if (!this.editMode || !wrap?.dataset?.layoutCardId) return;
     ev?.preventDefault?.();
     ev?.stopPropagation?.();

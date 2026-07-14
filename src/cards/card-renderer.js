@@ -729,7 +729,7 @@ const cardBuilderMethods = {
         btn.addEventListener('mousedown', stop);
         btn.addEventListener('click', stop);
         btn.addEventListener('pointerdown', (ev) => {
-          if (!this.editMode) return;
+          if (!this.editMode || wrap?.classList?.contains('ddc-connector-anchors-disabled')) return;
           this._startConnectorAnchorDrag_?.(wrap, anchor, ev);
         });
         host.appendChild(btn);
@@ -1040,19 +1040,27 @@ const cardBuilderMethods = {
   
             this._resizeContainer?.();
   
-            // SAVE -> THEN HARD RELOAD (avoid debounce race)
+            // Persist immediately, but keep the dashboard mounted. The edited
+            // card has already been replaced above, so a page reload only adds
+            // latency and disrupts the user's current tab/editing context.
             try {
               clearTimeout(this._saveTimer);           // cancel debounced save
               try { this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true }); } catch {}
               try { this._updateCardConfigAcrossResponsiveLayouts_?.(wrap.dataset.layoutCardId, cleanCfg); } catch {}
               try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
-              await this._saveLayout(true);            // flush save now
-              try { await this._persistThisCardConfigToStorage_?.(); } catch (persistErr) {
-                console.warn('[drag-and-drop-card] Could not persist edited card config to Lovelace storage', persistErr);
-              }
-            } catch (e) { console.warn('Save before reload failed', e); }
-  
-            window.location.reload();                  // force refresh so edited card appears
+              // Silent layout persistence updates the DDC backend/local cache.
+              // Writing the entire Lovelace config here emits a dashboard-wide
+              // update in Home Assistant, defeating the in-place card swap.
+              await this._saveLayout(true);
+            } catch (e) {
+              console.warn('[drag-and-drop-card] Edited card is live, but persistence failed', e);
+            }
+
+            try { this._syncCompactEditUiForWrapper_?.(wrap); } catch {}
+            try { this._applyWrapDisplayState_?.(wrap); } catch {}
+            try { this._applyAutoScale?.(); } catch {}
+            try { this._scheduleConnectorsRender_?.({ syncAnchors: true, settle: true }); } catch {}
+            try { this._toast?.('Card updated.'); } catch {}
           });
         } else if (act === 'settings') {
           // Open or toggle the per-card settings menu (e.g. overflow options).

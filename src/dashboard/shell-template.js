@@ -4765,11 +4765,17 @@ export function getDashboardShellTemplate() {
         transition-delay:0s;
       }
       .card-wrapper.editing.ddc-compact-edit-ui .resize-handle--br{
-        width:32px;
-        height:32px;
-        right:4px;
-        bottom:4px;
-        border-top-left-radius:32px;
+        display:flex !important;
+        width:36px;
+        height:36px;
+        right:0;
+        bottom:0;
+        border-top-left-radius:36px;
+        opacity:1 !important;
+        visibility:visible !important;
+        pointer-events:auto !important;
+        z-index:10040;
+        transition-delay:0s;
       }
       .card-wrapper.editing.ddc-compact-edit-ui .resize-handle--br ha-icon{
         --mdc-icon-size:17px;
@@ -4903,6 +4909,9 @@ export function getDashboardShellTemplate() {
       .card-wrapper.editing .ddc-card-anchors{
         display:block;
       }
+      .card-wrapper.ddc-connector-anchors-disabled .ddc-card-anchors{
+        display:none !important;
+      }
       .card-wrapper.editing:hover .ddc-card-anchors,
       .card-wrapper.editing.selected .ddc-card-anchors,
       .card-wrapper.editing:focus-within .ddc-card-anchors,
@@ -4992,8 +5001,11 @@ export function getDashboardShellTemplate() {
       .resize-handle{
         display:none; position:absolute; bottom: 6px; width:40px; height:40px;
         background: #27BEF5 !important; color:#fff;
-        z-index:9999; box-shadow:0 3px 8px rgba(0,0,0,.28);
+        z-index:10040; box-shadow:0 3px 8px rgba(0,0,0,.28);
         align-items:center; justify-content:center;
+        touch-action:none;
+        user-select:none;
+        -webkit-user-select:none;
         transform:scale(var(--ddc-edit-ui-scale, 1));
         transition:background .15s, transform .1s, box-shadow .15s, opacity .12s ease, visibility 0s linear .12s;
       }

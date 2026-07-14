@@ -17,7 +17,7 @@ const cardSettingsMenuMethods = {
       const trimmed = String(value).trim();
       if (trimmed) out[key] = trimmed;
     }
-    for (const key of ['animate_cards', 'card_shadow']) {
+    for (const key of ['animate_cards', 'card_shadow', 'connector_anchors']) {
       const value = String(style?.[key] || '').trim().toLowerCase();
       if (value === 'on' || value === 'off') out[key] = value;
     }
@@ -67,6 +67,11 @@ const cardSettingsMenuMethods = {
     } else {
       wrap.style.removeProperty('--ddc-card-local-shadow');
     }
+
+    // Connector endpoints are an editing affordance only. Keep saved
+    // connectors attached while allowing individual compact cards to opt out
+    // of the four interactive anchor buttons.
+    wrap.classList.toggle('ddc-connector-anchors-disabled', next.connector_anchors === 'off');
 
     const textProps = [
       '--primary-text-color',
@@ -407,11 +412,11 @@ const cardSettingsMenuMethods = {
       this._applyPerCardStyle_(wrap, next);
       try { this._queueSave('card-style-change'); } catch {}
     };
-    const makeOverrideRow = (labelText, key, hintText) => {
+    const makeOverrideRow = (labelText, key, hintText, options = {}) => {
       const sel = document.createElement('select');
       applySelectStyle(sel);
       [
-        { value: '', label: 'Dashboard default' },
+        { value: '', label: options.defaultLabel || 'Dashboard default' },
         { value: 'on', label: 'Enabled' },
         { value: 'off', label: 'Disabled' }
       ].forEach(({ value, label }) => {
@@ -746,6 +751,12 @@ const cardSettingsMenuMethods = {
       color: 'var(--secondary-text-color, #9ca3af)'
     });
     visibilitySection.appendChild(ovHint);
+    visibilitySection.appendChild(makeOverrideRow(
+      'Connector anchors',
+      'connector_anchors',
+      'Disable the four connector points for this card. Existing connectors stay attached.',
+      { defaultLabel: 'Enabled (default)' }
+    ));
 
     styleSection.appendChild(makeStyleField(
       'Card background',

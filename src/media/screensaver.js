@@ -938,13 +938,13 @@ const screenSaverMethods = {
     if (!this._shouldUseScreensaver()) {
       // If a screensaver is currently active but conditions no longer allow it, hide it
       if (this.screensaverActive) {
-        this._deactivateScreenSaver();
+        this._deactivateScreenSaver({ reschedule: false });
       }
       return;
     }
     // Hide screensaver if active before scheduling a new one
     if (this.screensaverActive) {
-      this._deactivateScreenSaver();
+      this._deactivateScreenSaver({ reschedule: false });
     }
     const delay = Number(this.screenSaverDelay) || (5 * 60000);
     this._screensaverTimer = setTimeout(() => {
@@ -969,8 +969,6 @@ const screenSaverMethods = {
     // Hide the tabs bar while screensaver is active
     try {
       if (this.tabsBar) {
-        // Save current display property to restore later
-        this.__savedTabsDisplay = this.tabsBar.style.display;
         this.tabsBar.style.display = 'none';
       }
     } catch {}
@@ -982,29 +980,48 @@ const screenSaverMethods = {
   },
 
   /**
+   * Restore dashboard chrome after the full-screen overlay closes. The tab
+   * bar owns its visibility through _renderTabs(); restoring a previously
+   * captured inline display value can therefore preserve a stale "none"
+   * after a render or a Home Assistant WebView resume.
+   */
+  _restoreDashboardAfterScreenSaver_() {
+    const restore = () => {
+      try {
+        const currentTabsBar = this.shadowRoot?.querySelector?.('#tabsBar') || this.tabsBar;
+        if (currentTabsBar) {
+          this.tabsBar = currentTabsBar;
+          currentTabsBar.style?.removeProperty?.('display');
+        }
+        this._renderTabs?.();
+        this._syncTabsPlacement_?.();
+        this._syncTabsWidth_?.();
+      } catch {}
+    };
+
+    restore();
+    const schedule = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (callback) => callback();
+    schedule(restore);
+  },
+
+  /**
    * Deactivate the screensaver overlay, clear clock interval and
    * schedule a new idle timer if appropriate.
    */
-  _deactivateScreenSaver() {
-    if (!this.screensaverActive) return;
+  _deactivateScreenSaver(options = {}) {
+    const reschedule = options?.reschedule !== false;
+    const wasActive = !!this.screensaverActive;
     this.screensaverActive = false;
     if (this.screenSaverOverlay) this.screenSaverOverlay.classList.remove('active');
     if (this._clockInterval) {
       clearInterval(this._clockInterval);
       this._clockInterval = null;
     }
-    // Restore tabs bar when screensaver deactivates
-    try {
-      if (this.tabsBar) {
-        if (this.__savedTabsDisplay != null) {
-          this.tabsBar.style.display = this.__savedTabsDisplay;
-        } else {
-          this.tabsBar.style.display = '';
-        }
-      }
-    } catch {}
+    this._restoreDashboardAfterScreenSaver_?.();
     // When user interacts, restart the timer to count idle time again
-    this._resetScreensaverTimer();
+    if (wasActive && reschedule) this._resetScreensaverTimer();
   },
 
   /**

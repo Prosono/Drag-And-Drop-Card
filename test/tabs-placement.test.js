@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installTabsLayoutMethods } from '../src/layout/tabs.js';
+import { installTabsLayoutMethods, moveTabById } from '../src/layout/tabs.js';
 
 class TabsHarness {}
 installTabsLayoutMethods(TabsHarness.prototype);
@@ -71,4 +71,23 @@ test('layer menu keeps the tab bar fixed when the only tab is hidden', () => {
 
   assert.equal(classes.has('ddc-fixed-canvas-tabs-top'), true);
   assert.equal(attributes.has('ddc-top-tabs-fixed-canvas'), true);
+});
+
+test('tabs can be moved earlier and later without mutating the source list', () => {
+  const source = [{ id: 'home' }, { id: 'energy' }, { id: 'media' }];
+
+  const movedEarlier = moveTabById(source, 'media', -1);
+  const movedLater = moveTabById(movedEarlier, 'home', 1);
+
+  assert.deepEqual(source.map((tab) => tab.id), ['home', 'energy', 'media']);
+  assert.deepEqual(movedEarlier.map((tab) => tab.id), ['home', 'media', 'energy']);
+  assert.deepEqual(movedLater.map((tab) => tab.id), ['media', 'home', 'energy']);
+});
+
+test('tab moves at list boundaries are safe no-ops', () => {
+  const source = [{ id: 'home' }, { id: 'energy' }];
+
+  assert.deepEqual(moveTabById(source, 'home', -1), source);
+  assert.deepEqual(moveTabById(source, 'energy', 1), source);
+  assert.deepEqual(moveTabById(source, 'missing', 1), source);
 });

@@ -5,6 +5,17 @@
  * saved active-tab state, and toolbar layout.
  */
 
+export function moveTabById(tabs = [], tabId = '', offset = 0) {
+  const next = Array.isArray(tabs) ? tabs.slice() : [];
+  const from = next.findIndex((tab) => String(tab?.id || '') === String(tabId || ''));
+  const direction = Number(offset) < 0 ? -1 : (Number(offset) > 0 ? 1 : 0);
+  const to = from + direction;
+  if (from < 0 || !direction || to < 0 || to >= next.length) return next;
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 /* Tab accessibility, placement, sizing, and alignment helpers. */
 const tabsLayoutMethods = {
   _normalizeTabId(tabId) {

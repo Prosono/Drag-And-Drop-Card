@@ -8,6 +8,7 @@
 import { getDashboardSettingsTemplate } from './settings-template.js';
 import { renderStylePresetLibrary, resolveStylePreviewBackground } from './style-presets.js';
 import { getSettingsStyles } from '../styles/dashboard-settings-styles.js';
+import { moveTabById } from '../layout/tabs.js';
 
 /* ------------------------ Dashboard Settings ------------------------ */
   /**
@@ -2310,6 +2311,7 @@ const dashboardSettingsMethods = {
       tabs.forEach((t, idx) => {
         const row = document.createElement('div');
         row.className = 'tab-row';
+        row.dataset.tabId = t.id;
 
         // default selector
         const radio = document.createElement('input');
@@ -2382,9 +2384,42 @@ const dashboardSettingsMethods = {
         modes.appendChild(mkMode('text', 'Text'));
         modes.appendChild(mkMode('both', 'Both'));
 
-        // actions (delete)
+        // actions (reorder + delete)
         const actions = document.createElement('div');
         actions.className = 'tab-actions';
+        const orderActions = document.createElement('div');
+        orderActions.className = 'tab-order-actions';
+        const makeOrderButton = (direction, label, icon, disabled) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'icon-btn tab-order-btn';
+          button.dataset.tabOrderMove = String(direction);
+          button.disabled = disabled;
+          button.title = label;
+          button.setAttribute('aria-label', `${label}: ${t.label || t.id}`);
+          button.innerHTML = `<ha-icon icon="${icon}"></ha-icon>`;
+          button.addEventListener('click', async () => {
+            const nextTabs = moveTabById(readTabs(), t.id, direction);
+            button.disabled = true;
+            await writeTabs(nextTabs, def);
+            renderTabs();
+            const schedule = typeof requestAnimationFrame === 'function'
+              ? requestAnimationFrame
+              : (callback) => callback();
+            schedule(() => {
+              const movedRow = Array.from(tabsListEl.querySelectorAll('.tab-row'))
+                .find((candidate) => candidate.dataset.tabId === t.id);
+              const preferred = movedRow?.querySelector?.(`[data-tab-order-move="${direction}"]:not(:disabled)`)
+                || movedRow?.querySelector?.('[data-tab-order-move]:not(:disabled)')
+                || movedRow?.querySelector?.('input, button');
+              try { preferred?.focus?.({ preventScroll: true }); } catch {}
+            });
+          });
+          return button;
+        };
+        orderActions.appendChild(makeOrderButton(-1, 'Move tab up', 'mdi:chevron-up', idx === 0));
+        orderActions.appendChild(makeOrderButton(1, 'Move tab down', 'mdi:chevron-down', idx === tabs.length - 1));
+
         const delBtn = document.createElement('button');
         delBtn.className = 'icon-btn danger';
         delBtn.innerHTML = '<ha-icon icon="mdi:trash-can-outline"></ha-icon>';
@@ -2398,6 +2433,7 @@ const dashboardSettingsMethods = {
           renderTabs();
         });
 
+        actions.appendChild(orderActions);
         actions.appendChild(modes);
         actions.appendChild(delBtn);
 

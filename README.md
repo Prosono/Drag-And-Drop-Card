@@ -184,6 +184,7 @@ hide_tabs_when_single: true
 ```
 
 - The card remembers the **last active tab** per `storage_key`.
+- Reorder tabs with the up/down controls in **Dashboard Settings → Tabs**.
 - When there is only one tab and `hide_tabs_when_single: true`, the tab bar is hidden.
 
 ---
@@ -425,7 +426,9 @@ Each dashboard item is stored as a layout entry:
   "z": 6,
   "tabId": "overview",
   "layerIds": ["standard"],
-  "card_style": {},
+  "card_style": {
+    "connector_anchors": "off"
+  },
   "overflow": "visible"
 }
 ```
@@ -437,7 +440,7 @@ Each dashboard item is stored as a layout entry:
 - `z` should usually start at `6` or higher.
 - `tabId` controls which tab the card belongs to.
 - `layerIds` is optional. If omitted, the card remains visible for backward compatibility.
-- `card_style` is optional and contains per-card design overrides.
+- `card_style` is optional and contains per-card design overrides. Set `connector_anchors` to `off` to hide that card's four editing anchors without removing existing connectors.
 
 ### Responsive layouts
 
@@ -693,6 +696,7 @@ Each connector entry looks like this:
 - `sourceCardId` and `targetCardId` should match the first and last endpoint owners when the line connects two cards.
 - `layerIds` should be included when the line belongs to specific layers; omit it only when the line should follow layer visibility from the owning card(s).
 - Use `entity` + `active_states` when the line should animate or change color based on Home Assistant state.
+- Connector anchors can be disabled for individual cards under **Card Settings → Connector anchors**. Saved connectors remain attached.
 
 ### Supported built-in DDC custom cards
 
@@ -928,6 +932,8 @@ Do **not** model connectors as normal cards in new dashboards. Use `responsive_c
 - **Exit Edit**: Press **Esc** or use the **Exit** button.
 - **Apply**: **Ctrl/Cmd + S** in edit mode or click **Apply**.
 - **Multi-select**: Drag a selection marquee; use **Shift/Ctrl/Cmd** to extend selection.
+- **Small-card resize**: Compact cards keep the bottom-right resize control visible while editing.
+- **Edit a card**: Saving card code updates that card in place; the dashboard and active tab stay mounted.
 - **Toolbar**:
   - Add
   - Reload

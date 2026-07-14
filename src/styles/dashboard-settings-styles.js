@@ -549,6 +549,16 @@ export function getSettingsStyles() {
     .tabs-card .tab-name { flex:1; display:flex; align-items:center; gap:8px; }
     .tabs-card .tab-name input { flex:1; padding:6px 8px; border:1px solid var(--divider-color, rgba(0,0,0,.25)); border-radius:8px; background:var(--ha-card-background, #fff); }
     .tabs-card .tab-actions { display:flex; align-items:center; gap:8px; }
+    .tabs-card .tab-order-actions{ display:flex; align-items:center; gap:4px; }
+    .tabs-card .tab-order-btn{
+      width:38px;
+      height:38px;
+      flex:0 0 38px;
+      border:1px solid var(--divider-color, rgba(0,0,0,.18));
+      border-radius:10px;
+      background:color-mix(in oklab, var(--ha-card-background, #fff) 88%, transparent);
+    }
+    .tabs-card .tab-order-btn:disabled{ opacity:.38; cursor:not-allowed; }
     .sidebar-item-grid{
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
@@ -2821,6 +2831,11 @@ export function getSettingsStyles() {
     .package-tools{ flex-direction:column; align-items:stretch; }
     .layers-card .layer-row{ grid-template-columns:1fr; gap:8px; }
     .layers-card .layer-actions{ flex-wrap:wrap; }
+    .tabs-card .tab-row{ align-items:flex-start; flex-wrap:wrap; }
+    .tabs-card .tab-name{ flex:1 1 calc(100% - 42px); min-width:0; flex-wrap:wrap; }
+    .tabs-card .tab-icon-wrap{ min-width:0; flex:1 1 220px; }
+    .tabs-card .tab-icon-wrap input{ width:min(160px, 100%) !important; min-width:0; }
+    .tabs-card .tab-actions{ width:100%; justify-content:space-between; flex-wrap:wrap; }
   }
   `;
 }
