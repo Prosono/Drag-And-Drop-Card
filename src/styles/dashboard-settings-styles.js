@@ -1661,6 +1661,32 @@ export function getSettingsStyles() {
       background-size: cover; background-position: center center;
       border: 1px solid var(--divider-color, rgba(0,0,0,.25));
     }
+    .setting[aria-labelledby="lbl-ss-image"] .control {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .setting[aria-labelledby="lbl-ss-image"] .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      min-width: 0;
+    }
+    .ss-image-file + input[type="text"] {
+      width: 100%;
+    }
+    .ss-image-thumb {
+      width: 92px;
+      height: 56px;
+      background:
+        linear-gradient(135deg, rgba(3,169,244,.14), transparent 48%),
+        color-mix(in oklab, var(--ha-card-background, #fff) 84%, var(--primary-color, #03a9f4) 8%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .ss-image-thumb.has-image {
+      background-size: cover;
+      background-position: center center;
+    }
 
     .default-bg-gallery {
       display:grid;

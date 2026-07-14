@@ -1,84 +1,113 @@
-# The Drag & Drop Card for Home Assistant
+<div align="center">
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Demo of Drag and Drop Card" width="100%">
+<h1>Drag &amp; Drop Card for Home Assistant</h1>
+
+<p><strong>Build responsive Home Assistant dashboards visually — drag, resize, layer, and arrange Lovelace cards exactly where you want them.</strong></p>
+
+<p>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Prosono/Drag-And-Drop-Card?display_name=tag&amp;sort=semver&amp;style=for-the-badge&amp;logo=github"></a>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Prosono/Drag-And-Drop-Card?style=for-the-badge&amp;logo=github"></a>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/forks"><img alt="GitHub forks" src="https://img.shields.io/github/forks/Prosono/Drag-And-Drop-Card?style=for-the-badge&amp;logo=github"></a>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/Prosono/Drag-And-Drop-Card?style=for-the-badge&amp;logo=github"></a>
 </p>
 
-[![Watch the video of our latest release here on YouTube](https://img.youtube.com/vi/Z8PyYaySCxM/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z8PyYaySCxM)
+<p>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/Prosono/Drag-And-Drop-Card?style=for-the-badge"></a>
+  <a href="https://github.com/Prosono/Drag-And-Drop-Card/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Prosono/Drag-And-Drop-Card?style=for-the-badge"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/Prosono/Drag-And-Drop-Card?style=for-the-badge"></a>
+  <a href="#installation"><img alt="HACS custom repository" src="https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&amp;logo=homeassistant&amp;logoColor=white"></a>
+  <a href="hacs.json"><img alt="Home Assistant 2025.8 or newer" src="https://img.shields.io/badge/Home_Assistant-2025.8%2B-41BDF5?style=for-the-badge&amp;logo=homeassistant&amp;logoColor=white"></a>
+</p>
 
-▶️ Click the image above to watch the video of the latest release of the card
+<p>
+  <a href="https://hads.smarti.dev/wiki/start-here"><strong>Start guide</strong></a>
+  · <a href="#installation">Installation</a>
+  · <a href="#configuration-options">Configuration</a>
+  · <a href="https://hads.smarti.dev/">HADS</a>
+  · <a href="https://github.com/Prosono/Drag-And-Drop-Card/releases">Releases</a>
+</p>
 
-> **Start here:** The clearest walkthrough is the HADS start guide: https://hads.smarti.dev/wiki/start-here. It has pictures, step-by-step setup, video, and the fastest path to getting the card working.
->
-> Use the rest of this README when you want to go deeper into configuration details and advanced options.
+</div>
 
-A freeform **drag / resize / snap-to-grid** canvas for Lovelace cards.  
-Arrange any Lovelace cards visually, save the layout (auto-save or manual), export/import full designs, and quickly prototype dashboards with device-size presets.
+<p align="center">
+  <img src="assets/demo.gif" alt="Drag & Drop Card dashboard editor demo" width="100%">
+</p>
 
-> **License**
-> This project is licensed under the **MIT License**.
-> Third-party notices are listed in **THIRD_PARTY_NOTICES.md**.
+Drag & Drop Card is a freeform canvas for the Home Assistant Lovelace UI. Arrange any compatible card visually, create responsive layouts for different devices, save or share complete designs, and turn a dashboard into a polished full-screen experience.
+
+> **New here?** Follow the illustrated [HADS start guide](https://hads.smarti.dev/wiki/start-here) for the fastest path from installation to your first dashboard. This README is the detailed reference for configuration and advanced features.
+
+## 📑 Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Persistence backend](#persistence-backend)
+- [Quick start](#quick-start)
+- [Dashboard mode](#dashboard-mode)
+- [Configuration options](#configuration-options)
+- [LLM dashboard authoring](#llm-dashboard-authoring)
+- [Editor shortcuts](#editor-shortcuts)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Support the project](#support-the-project)
 
 ---
+
+<a id="features"></a>
 
 ## ✨ Features
 
-- **Drag & resize** any Lovelace card on a free-positioned canvas.
-- **Snap-to-grid** editing (configurable grid size, live snapping).
-- **Auto-save** (configurable debounce) or manual “Apply layout”.
-- **Export / Import** designs as JSON (positions, sizes, z-order, options).
-- **Device size presets** (phones, tablets, desktops) + flexible container sizing.
-- **Multiple tabs per canvas** (top/bottom tabs, optional configurable Sidebar, per-layout last-tab memory).
-- **Optional card auto-resize**:
-  - In `auto` mode, cards scale as one responsive surface.
-  - In other modes you can opt in/out via `auto_resize_cards`.
-- **Rich backgrounds**:
-  - Static image
-  - Particle background
-  - YouTube video background
-  - Or plain (`none`)
-- **Screen saver mode** to dim/blank the canvas after inactivity.
-- **Batch select** & group actions (selection marquee, multi-select).
-- **Long-press or double-click** to enter Edit mode; **Esc** to exit.
-- **Toolbar shortcuts** (Add, Reload, Diagnostics, Import/Export, Apply, Exit).
-- **Optional hidden HA header/sidebar** for “full app” dashboards.
-- **Card-mod compatible**: preserves and applies `card_mod` on the main card.
-- **No external CDNs**: bundles `interactjs` and `js-yaml`.
+- **Visual editing:** drag, resize, stack, multi-select, and snap Lovelace cards to a configurable grid.
+- **Responsive layouts:** design for desktop, tablet, mobile, portrait, and landscape from the same dashboard.
+- **Tabs, layers, and Sidebar:** organize large dashboards without giving up a free-positioned canvas.
+- **Fast editing workflow:** auto-save or apply manually, use keyboard shortcuts, undo layout changes, and edit through the built-in toolbar.
+- **Portable designs:** export and import complete JSON layouts, individual cards, options, responsive variants, and Home Assistant packages.
+- **Rich presentation:** use images, particles, YouTube backgrounds, animated connectors, card entrance animations, and an optional screen saver.
+- **Home Assistant integration:** add the card through the native card picker or register it as a discoverable community dashboard on supported Home Assistant versions.
+- **Design ecosystem:** browse and import community designs from HADS and style the outer card with `card-mod`.
+- **Self-contained bundle:** `interactjs` and `js-yaml` are bundled; no runtime CDN is required.
 
 ---
 
+<a id="installation"></a>
+
 ## 📦 Installation
 
-### Option A: HACS (Recommended)
+### Option A: HACS (recommended)
 
-1. Add this repository as a **Custom Repository** in HACS. Select "Dashboard" As type.
-2. Search for "Drag and Drop Card" in HACS
-3. Click the download button. ⬇️
-4. The card is now available as a custom card in the Native Home Assistant Card Selector when adding new cards to a dashboard. 
-5. On Home Assistant 2026.5 or newer, it also appears in the **Add dashboard** dialog under **Community dashboards** as **Drag & Drop Dashboard**.
+1. In HACS, open the menu and choose **Custom repositories**.
+2. Add `https://github.com/Prosono/Drag-And-Drop-Card` with **Dashboard** as the category.
+3. Search for **Drag & Drop Card**, open it, and select **Download**.
+4. Reload Home Assistant and hard-refresh the browser if the card does not appear immediately.
+
+The card is now available in Home Assistant's native card picker. On Home Assistant 2026.5 or newer, it also appears under **Settings → Dashboards → Add dashboard → Community dashboards** as **Drag & Drop Dashboard**.
 
 ### Option B: Manual
 
-1. Copy `drag-and-drop-card.js` to `/config/www/drag-and-drop-card.js`.
-2. Add a Lovelace resource:
-   ```yaml
-   url: /local/drag-and-drop-card.js
-   type: module
-   ```
+1. Download the compiled [`dist/drag-and-drop-card.js`](dist/drag-and-drop-card.js) file.
+2. Copy it to `/config/www/drag-and-drop-card.js`.
+3. Add it under **Settings → Dashboards → Resources**, or add the Lovelace resource in YAML:
+
+```yaml
+url: /local/drag-and-drop-card.js
+type: module
+```
 
 > After adding a new resource, **clear browser cache** or hard-reload to ensure the module loads.
 
 ---
 
-## 🔁 Persistence backend (IMPORTANT)
+<a id="persistence-backend"></a>
 
-To make changes **persistent** when you add / edit / remove cards within the drag-and-drop card, you **must** install the backend integration:
+## 🔁 Persistence backend
 
-> https://github.com/Prosono/Drag-And-Drop-Card-Backend
+> **Recommended:** Install the [Drag & Drop Card Backend](https://github.com/Prosono/Drag-And-Drop-Card-Backend) to keep editor changes in Home Assistant, make layouts available across browsers and devices, and sync optional packages.
 
-Without this, a simple browser refresh or Home Assistant restart can wipe your configuration.
+Without the backend, the card falls back to browser `localStorage`. That is useful for testing, but the layout remains tied to that browser profile and can be lost when site data is cleared.
 
 ---
+
+<a id="quick-start"></a>
 
 ## 🚀 Quick Start
 
@@ -105,6 +134,8 @@ Now:
 - Use the **toolbar** to **Add** cards, **Import/Export**, **Apply**, or **Exit** edit mode.
 - **Ctrl/Cmd + S** applies (saves) the layout while in edit mode.
 - **Esc** exits edit mode.
+
+<a id="dashboard-mode"></a>
 
 ## 🧩 Add as a Dashboard
 
@@ -216,11 +247,14 @@ Optional screen saver that activates after inactivity:
 ```yaml
 screen_saver_enabled: true
 screen_saver_delay: 300000   # milliseconds (e.g. 300000 = 5 minutes)
+screen_saver_image: /local/screensaver.jpg
 ```
 
-When enabled, the card will enter a “screen saver” state after the delay. The exact visual behavior may evolve, but the intent is to avoid burn-in and reduce visual noise when idle.
+When enabled, the card will enter a “screen saver” state after the delay. You can use the built-in visual presets or set `screen_saver_image` to replace the preset background with your own uploaded image, Home Assistant media URL, or external image URL.
 
 ---
+
+<a id="configuration-options"></a>
 
 ## ⚙️ Configuration Options
 
@@ -250,6 +284,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `background_youtube`           | object    | _none_                     | YouTube background settings when `background_mode: youtube`. |
 | `screen_saver_enabled`         | boolean   | `false`                    | Enable screen saver mode. |
 | `screen_saver_delay`           | number    | `300000`                   | Screen saver delay in ms (fallback to 5 minutes if invalid). |
+| `screen_saver_image`           | string    | _none_                     | Optional custom screen saver background image URL or uploaded data URL. |
 | `tabs`                         | array     | `[]`                       | Tab definitions (see Tabs section). |
 | `default_tab`                  | string    | first tab id / `'default'` | Default tab id when the card loads. |
 | `hide_tabs_when_single`        | boolean   | `true`                     | Hide tab bar when there is only one tab. |
@@ -294,6 +329,8 @@ Each added card is wrapped in a draggable/resizable container that participates 
 - **Import** reads JSON, applies `options` (including `card_mod`, tab definitions, etc.), rebuilds the canvas, and keeps your `storage_key` intact.
 
 ---
+
+<a id="llm-dashboard-authoring"></a>
 
 ## 🤖 LLM Dashboard Authoring Reference
 
@@ -883,6 +920,8 @@ Do **not** model connectors as normal cards in new dashboards. Use `responsive_c
 
 ---
 
+<a id="editor-shortcuts"></a>
+
 ## 🧑‍🏫 Editor UX & Shortcuts
 
 - **Enter Edit**: Long-press on blank canvas (~1s) or **double-click** an empty area.
@@ -949,15 +988,15 @@ card_mod:
 
 ## HADS – Home Assistant Dashboard Store
 
-This card can import designs from HADS:
-
-> https://hads.smarti.dev/
+This card can browse and import community dashboard designs from [HADS](https://hads.smarti.dev/). Start with the [HADS walkthrough](https://hads.smarti.dev/wiki/start-here) if you want a guided setup.
 
 For the deeper in-card marketplace integration, see the proposed HADS API contract:
 
-> docs/hads-ddc-integration-api.md
+> [`docs/hads-ddc-integration-api.md`](docs/hads-ddc-integration-api.md)
 
 ---
+
+<a id="troubleshooting"></a>
 
 ## 🛠 Troubleshooting
 
@@ -969,31 +1008,68 @@ For the deeper in-card marketplace integration, see the proposed HADS API contra
 
 ---
 
-## 📷 Screenshots
+## 🎬 More demos
 
-_Add screenshots or GIFs here._
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=Z8PyYaySCxM">
+    <img src="https://img.youtube.com/vi/Z8PyYaySCxM/maxresdefault.jpg" alt="Watch the latest Drag & Drop Card release walkthrough on YouTube" width="80%">
+  </a>
+</p>
+
+<p align="center"><em>Click the preview to watch the latest release walkthrough.</em></p>
+
+For another hands-on preview, [open the extended demo GIF](assets/demo2.gif) (24 MB).
 
 ---
 
+<a id="contributing"></a>
+
 ## 🤝 Contributing
 
-1. Read **LICENSE** and **THIRD_PARTY_NOTICES.md**.
-2. Open issues for bugs/requests.  
-3. PRs: keep style, no CDN deps, test with **card-mod**.
+Issues, feature proposals, documentation improvements, and pull requests are welcome.
+
+1. Check the [open issues](https://github.com/Prosono/Drag-And-Drop-Card/issues) before starting larger changes.
+2. Fork the repository and create a focused branch.
+3. Install dependencies, run the tests, and build the production bundle:
+
+```bash
+npm install
+npm test
+npm run build
+```
+
+4. Test the result in Home Assistant, including `card-mod` compatibility when your change affects styling.
+5. Open a pull request that explains what changed and how it was verified.
+
+Please keep the project self-contained: runtime dependencies must be bundled, not loaded from an external CDN. By contributing, you agree that your contribution is provided under the project's MIT license.
+
+---
+
+<a id="support-the-project"></a>
+
+## ☕ Support the project
+
+If Drag & Drop Card saves you time, you can support the project by [starring the repository](https://github.com/Prosono/Drag-And-Drop-Card), sharing your dashboards, reporting useful feedback, or buying me a coffee.
+
+<p align="center">
+  <a href="https://buymeacoffee.com/prosono">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="217" height="60">
+  </a>
+</p>
 
 ---
 
 ## 📄 License
 
-MIT License.
-Copyright (c) 2025 SMARTI AS.
-See **LICENSE** and **THIRD_PARTY_NOTICES.md**.
+Released under the [MIT License](LICENSE). Copyright (c) 2025 SMARTI AS.
+
+Third-party licenses and bundled dependency notices are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ---
 
 ## 🧾 Release Notes
 
-The bundle logs the version in the browser console:
+See [GitHub Releases](https://github.com/Prosono/Drag-And-Drop-Card/releases) for version history, highlights, and upgrade notes. The installed bundle also logs its version in the browser console:
 
 ```text
 drag-and-drop-card vX.Y.Z
@@ -1001,9 +1077,8 @@ drag-and-drop-card vX.Y.Z
 
 ---
 
-## 🧾 Known bugs
+## ⚠️ Known limitations
 
-A couple of bugs are already known:
+Known issues are tracked in the [GitHub issue tracker](https://github.com/Prosono/Drag-And-Drop-Card/issues). One current limitation is worth highlighting:
 
-1. Card-mod support **inside** nested cards is still limited and may not behave as expected.
-2. …probably more 🙂
+- `card-mod` support **inside nested cards** is still limited and may not behave as expected. The outer Drag & Drop Card supports `card_mod` directly.

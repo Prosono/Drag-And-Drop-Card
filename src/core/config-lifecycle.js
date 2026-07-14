@@ -114,6 +114,7 @@ const setConfigMethods = {
       const ssDelay = Number(config.screen_saver_delay);
       this.screenSaverDelay = Number.isFinite(ssDelay) && ssDelay > 0 ? ssDelay : (5 * 60000);
       this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(config.screen_saver_style ?? config.screensaver_style ?? config.screen_saver_variant) || 'visionos_glass';
+      this.screenSaverImage = String(config.screen_saver_image ?? config.screensaver_image ?? config.screen_saver_background_image ?? config.screenSaverImage ?? '').trim();
       this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(config.screen_saver_entities ?? config.screensaver_entities ?? []) || [];
 
       if ((this.autoResizeCards || this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode)==='auto')) this._startScaleWatch?.(); else this._stopScaleWatch?.();

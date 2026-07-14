@@ -957,6 +957,29 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Choose the full-screen idle experience. Each preview is rendered from the actual design preset.</div>
       </div>
 
+      <!-- Custom background image -->
+      <div class="setting" role="group" aria-labelledby="lbl-ss-image">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:image-plus" aria-hidden="true"></ha-icon>
+            <label id="lbl-ss-image" for="ddc-setting-screenSaverImage">Custom background image</label>
+          </div>
+          <div class="control">
+            <div class="stack">
+              <div class="input-file ss-image-file">
+                <div class="thumb ss-image-thumb" id="ddc-screenSaverImageThumb" aria-hidden="true"></div>
+                <label class="file-btn" for="ddc-screenSaverImageUpload">Upload</label>
+                <input type="file" id="ddc-screenSaverImageUpload" accept="image/*" />
+                <button type="button" class="btn secondary" id="ddc-screenSaverBrowseMedia">Browse Media</button>
+                <button type="button" class="btn secondary" id="ddc-screenSaverClearImage">Delete</button>
+              </div>
+              <input type="text" id="ddc-setting-screenSaverImage" placeholder="https://example.com/image.jpg or upload a file" autocomplete="off" />
+            </div>
+          </div>
+        </div>
+        <div class="hint">Optional image that replaces the selected preset background while keeping the same screen saver layout.</div>
+      </div>
+
       <!-- Status entities -->
       <div class="setting" role="group" aria-labelledby="lbl-ss-entities">
         <div class="row">

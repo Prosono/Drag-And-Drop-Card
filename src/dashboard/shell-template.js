@@ -6505,6 +6505,49 @@ export function getDashboardShellTemplate() {
             display: block;
             min-height: 0;
           }
+          .ddc-sub-element-editor {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+          }
+          .ddc-sub-element-editor-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--divider-color, rgba(148,163,184,.22));
+          }
+          .ddc-sub-element-editor-head strong {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .ddc-sub-element-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 34px;
+            padding: 0 10px;
+            border: 1px solid var(--divider-color, rgba(148,163,184,.32));
+            border-radius: 8px;
+            background: var(--ha-card-background, var(--card-background-color, rgba(255,255,255,.06)));
+            color: var(--primary-text-color, inherit);
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+          }
+          .ddc-sub-element-back ha-icon {
+            --mdc-icon-size: 18px;
+          }
+          .ddc-sub-element-editor-body {
+            min-width: 0;
+          }
+          .ddc-sub-element-error {
+            color: var(--error-color, #db4437);
+            font-size: .9rem;
+          }
 
           #quickFillSec { 
             display: flex; 

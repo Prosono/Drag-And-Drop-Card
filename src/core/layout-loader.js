@@ -307,7 +307,7 @@ const initialLoadMethods = {
           // including these keys, the screensaver delay can become stuck because the overlay
           // of YAML values never occurs. Adding them keeps behaviour consistent with other
           // settings like disable_overlap.
-          'screen_saver_enabled', 'screen_saver_delay', 'screen_saver_style', 'screen_saver_entities'
+          'screen_saver_enabled', 'screen_saver_delay', 'screen_saver_style', 'screen_saver_image', 'screensaver_image', 'screen_saver_background_image', 'screen_saver_entities'
         ];
         const cfgOpts = {};
         for (const k of overrideKeys) {

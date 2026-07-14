@@ -95,6 +95,7 @@ const dashboardApiMethods = {
       screen_saver_enabled: !!this.screenSaverEnabled,
       screen_saver_delay: this.screenSaverDelay,
       screen_saver_style: this._normalizeScreenSaverStyle_?.(this.screenSaverStyle) || 'visionos_glass',
+      screen_saver_image: this._getScreenSaverCustomImage_?.() || this.screenSaverImage || undefined,
       screen_saver_entities: (this._normalizeScreenSaverEntities_?.(this.screenSaverEntities) || [])
         .filter((item) => item.entity || item.label)
         .map(({ key, entity, label, icon, tone }) => ({ key, entity, label, icon, tone })),
@@ -267,10 +268,13 @@ const dashboardApiMethods = {
     if ('screen_saver_style' in opts || 'screensaver_style' in opts || 'screen_saver_variant' in opts) {
       this.screenSaverStyle = this._normalizeScreenSaverStyle_?.(opts.screen_saver_style ?? opts.screensaver_style ?? opts.screen_saver_variant) || 'visionos_glass';
     }
+    if ('screen_saver_image' in opts || 'screensaver_image' in opts || 'screen_saver_background_image' in opts) {
+      this.screenSaverImage = String(opts.screen_saver_image ?? opts.screensaver_image ?? opts.screen_saver_background_image ?? '').trim();
+    }
     if ('screen_saver_entities' in opts || 'screensaver_entities' in opts) {
       this.screenSaverEntities = this._normalizeScreenSaverEntities_?.(opts.screen_saver_entities ?? opts.screensaver_entities ?? []) || [];
     }
-    if ('screen_saver_enabled' in opts || 'screen_saver_delay' in opts || 'screen_saver_style' in opts || 'screensaver_style' in opts || 'screen_saver_variant' in opts || 'screen_saver_entities' in opts || 'screensaver_entities' in opts) {
+    if ('screen_saver_enabled' in opts || 'screen_saver_delay' in opts || 'screen_saver_style' in opts || 'screensaver_style' in opts || 'screen_saver_variant' in opts || 'screen_saver_image' in opts || 'screensaver_image' in opts || 'screen_saver_background_image' in opts || 'screen_saver_entities' in opts || 'screensaver_entities' in opts) {
       if (typeof this._updateScreensaverSettings === 'function') this._updateScreensaverSettings();
     }
 
@@ -420,6 +424,7 @@ const dashboardApiMethods = {
       screen_saver_enabled: { type: 'boolean' },
       screen_saver_delay: { type: 'number' },
       screen_saver_style: { type: 'string' },
+      screen_saver_image: { type: 'string' },
       screen_saver_entities: { type: 'array' },
     };
   },
@@ -485,6 +490,10 @@ const dashboardApiMethods = {
       screensaverDelay: 'screen_saver_delay',
       screenSaverStyle: 'screen_saver_style',
       screensaverStyle: 'screen_saver_style',
+      screenSaverImage: 'screen_saver_image',
+      screensaverImage: 'screen_saver_image',
+      screenSaverBackgroundImage: 'screen_saver_image',
+      screensaverBackgroundImage: 'screen_saver_image',
       screenSaverEntities: 'screen_saver_entities',
       screensaverEntities: 'screen_saver_entities',
     };

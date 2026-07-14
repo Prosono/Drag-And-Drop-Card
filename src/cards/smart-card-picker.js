@@ -1577,6 +1577,7 @@ const smartPickerMethods = {
           window.visualViewport?.removeEventListener?.('resize', updateSmartPickerMobileMode);
         }
       } catch {}
+      try { subElementCleanup?.(); } catch {}
       modal.remove();
     };
     const modal = document.createElement('div'); modal.className='modal smart-picker-modal';
@@ -1727,6 +1728,46 @@ const smartPickerMethods = {
     const pickerFootnote = modal.querySelector('.picker-footnote');
     const enableCommit = (on) => { addTop.disabled = addBottom.disabled = !on; };
     const setError = (msg) => { if (!msg){ err.hidden=true; err.textContent=''; } else { err.hidden=false; err.textContent=msg; } };
+    const featureEditorTagForType = (type = '') => {
+      const normalized = String(type || '').trim().replace(/^custom:/, '').replace(/_/g, '-');
+      return normalized ? `hui-${normalized}-card-feature` : '';
+    };
+    const getFeatureConfigEditor = async (featureConfig = {}) => {
+      const featureType = String(featureConfig?.type || '').trim();
+      const featureTag = featureEditorTagForType(featureType);
+      const featureClass = featureTag ? customElements.get(featureTag) : null;
+      if (featureClass?.getConfigElement) {
+        return await featureClass.getConfigElement();
+      }
+      if (featureClass?.getConfigForm) {
+        try {
+          if (!customElements.get('ha-form')) await customElements.whenDefined('ha-form');
+        } catch {}
+        if (!customElements.get('ha-form')) return null;
+        const formInfo = await featureClass.getConfigForm();
+        if (formInfo?.schema) {
+          const formEl = document.createElement('ha-form');
+          formEl.hass = this.hass;
+          formEl.schema = Array.isArray(formInfo.schema)
+            ? formInfo.schema.map((schema) => ({ ...schema }))
+            : formInfo.schema;
+          if (typeof formInfo.computeLabel === 'function') formEl.computeLabel = formInfo.computeLabel.bind(featureClass);
+          if (typeof formInfo.computeHelper === 'function') formEl.computeHelper = formInfo.computeHelper.bind(featureClass);
+          formEl.data = { ...(featureConfig || {}) };
+          formEl.setConfig = (nextConfig = {}) => { formEl.data = { ...(nextConfig || {}) }; };
+          formEl.addEventListener('value-changed', (ev) => {
+            ev.stopPropagation();
+            formEl.dispatchEvent(new CustomEvent('config-changed', {
+              detail: { config: { ...(featureConfig || {}), ...(ev.detail?.value || {}), type: featureType } },
+              bubbles: true,
+              composed: true,
+            }));
+          });
+          return formEl;
+        }
+      }
+      return null;
+    };
 
     const faves = this._getFaves();
     const recent = this._getRecent();
@@ -2364,6 +2405,10 @@ const smartPickerMethods = {
     let previewSeq = 0;
     let __previewTimer = null;
     let __lastPreviewCfgJSON = '';
+    let subElementShell = null;
+    let subElementParentEditor = null;
+    let subElementCleanup = null;
+    let subElementParentSyncPending = false;
     pickerCardsTab?.addEventListener('click', () => setPickerMode('cards'));
     pickerHadsTab?.addEventListener('click', () => setPickerMode('hads'));
 
@@ -3757,10 +3802,130 @@ const smartPickerMethods = {
       }, 150); // 150–250ms is a sweet spot
     };
 
+    const cleanupSubElementEditor = () => {
+      try { subElementCleanup?.(); } catch {}
+      subElementCleanup = null;
+      if (subElementParentEditor) {
+        try { subElementParentEditor.style.display = ''; } catch {}
+      }
+      subElementParentEditor = null;
+      try { subElementShell?.remove(); } catch {}
+      subElementShell = null;
+    };
+
+    const getSubElementTitle = (detail = {}) => {
+      const type = String(detail?.config?.type || '').trim();
+      if (detail?.type === 'feature' && type) {
+        const localized = this.hass?.localize?.(`ui.panel.lovelace.editor.features.types.${type}.label`);
+        if (localized) return `Edit ${localized}`;
+        return `Edit ${type.replace(/[-_]+/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase())}`;
+      }
+      return 'Edit item';
+    };
+
+    const showSubElementEditor = async (detail = {}, parentEditor = null) => {
+      if (!detail || typeof detail !== 'object') return;
+      cleanupSubElementEditor();
+      const featureConfig = detail.config || detail.elementConfig || {};
+      let activeFeatureConfig = { ...(featureConfig || {}) };
+      const featureType = String(featureConfig?.type || '').trim();
+      subElementParentEditor = parentEditor || visualEditor || editor || null;
+      if (subElementParentEditor) {
+        try { subElementParentEditor.style.display = 'none'; } catch {}
+      }
+
+      const shell = document.createElement('div');
+      shell.className = 'ddc-sub-element-editor';
+      shell.innerHTML = `
+        <div class="ddc-sub-element-editor-head">
+          <button type="button" class="ddc-sub-element-back">
+            <ha-icon icon="mdi:arrow-left"></ha-icon><span>Back</span>
+          </button>
+          <strong>${escapePickerHtml(getSubElementTitle({ ...detail, config: featureConfig }))}</strong>
+        </div>
+        <div class="ddc-sub-element-editor-body"></div>
+        <div class="ddc-sub-element-error" hidden></div>
+      `;
+      editorHost.appendChild(shell);
+      subElementShell = shell;
+      const body = shell.querySelector('.ddc-sub-element-editor-body');
+      const errorEl = shell.querySelector('.ddc-sub-element-error');
+      const setSubError = (msg = '') => {
+        if (!errorEl) return;
+        errorEl.hidden = !msg;
+        errorEl.textContent = msg || '';
+      };
+      shell.querySelector('.ddc-sub-element-back')?.addEventListener('click', cleanupSubElementEditor);
+
+      const commitFeatureConfig = (next = {}) => {
+        if (!next || typeof next !== 'object') return;
+        const merged = {
+          ...(activeFeatureConfig || {}),
+          ...next,
+          type: next.type || featureType || featureConfig.type,
+        };
+        activeFeatureConfig = merged;
+        subElementParentSyncPending = true;
+        try { detail.saveConfig?.(merged); } catch (err) {
+          subElementParentSyncPending = false;
+          setSubError(`Could not save feature: ${String(err?.message || err)}`);
+          return;
+        }
+        enableCommit(true);
+      };
+
+      try {
+        let featureEditor = null;
+        if (detail.type === 'feature' && featureType) {
+          featureEditor = await getFeatureConfigEditor(featureConfig);
+        }
+        if (featureEditor) {
+          featureEditor.hass = this.hass;
+          featureEditor.context = detail.context || {};
+          try {
+            const lovelaceConfig = this._getLovelaceForCardEditor_?.();
+            if (lovelaceConfig) featureEditor.lovelace = lovelaceConfig;
+          } catch {}
+          body.appendChild(featureEditor);
+          await Promise.resolve();
+          try { featureEditor.setConfig?.(featureConfig); } catch {}
+          const onFeatureEditorChange = (ev) => {
+            ev.stopPropagation();
+            const next = ev.detail?.config ?? ev.detail?.value;
+            commitFeatureConfig(next);
+          };
+          featureEditor.addEventListener('config-changed', onFeatureEditorChange);
+          subElementCleanup = () => {
+            try { featureEditor.removeEventListener('config-changed', onFeatureEditorChange); } catch {}
+          };
+          setSubError('');
+          return;
+        }
+
+        const yamlApi = await this._mountYamlEditor(
+          body,
+          activeFeatureConfig,
+          (parsed) => {
+            if (!parsed || typeof parsed !== 'object') {
+              setSubError('Feature YAML must be an object.');
+              return;
+            }
+            setSubError('');
+            commitFeatureConfig(parsed);
+          },
+          (err) => setSubError(`Invalid feature YAML: ${String(err?.message || err)}`)
+        );
+        subElementCleanup = () => { try { yamlApi?.setValue?.(activeFeatureConfig); } catch {} };
+      } catch (err) {
+        setSubError(`Feature editor could not be opened: ${String(err?.message || err)}`);
+      }
+    };
+
       const mountVisualEditor = async (cfg) => {
         const seq = ++pickSeq;
         editorSpin.hidden = false;
         editorHost.innerHTML = '';
+        cleanupSubElementEditor();
         await idle();
 
         const wantType = cfg.type || currentType;
@@ -3836,6 +4001,9 @@ const smartPickerMethods = {
           visualEditor.removeEventListener('config-changed', this.__onEditorChange);
           visualEditor.removeEventListener('value-changed', this.__onEditorChange);
         }
+        if (visualEditor && this.__onEditorSubElement) {
+          visualEditor.removeEventListener('edit-sub-element', this.__onEditorSubElement);
+        }
     
         const onChange = async (e) => {
           const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
@@ -3847,6 +4015,10 @@ const smartPickerMethods = {
             ...next,
             type: nextType,
           });
+          if (subElementParentSyncPending) {
+            subElementParentSyncPending = false;
+            try { editor?.setConfig?.(currentConfig); } catch {}
+          }
     
           setError('');
           enableCommit(true);
@@ -3858,6 +4030,12 @@ const smartPickerMethods = {
         this.__onEditorChange = onChange;
         editor.addEventListener('config-changed', onChange);
         editor.addEventListener('value-changed', onChange);
+        const onSubElementEdit = (e) => {
+          e.stopPropagation();
+          showSubElementEditor(e.detail || {}, editor);
+        };
+        this.__onEditorSubElement = onSubElementEdit;
+        editor.addEventListener('edit-sub-element', onSubElementEdit);
     
         visualEditor = editor;
     

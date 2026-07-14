@@ -41,6 +41,19 @@ const screenSaverMethods = {
     return this._getScreenSaverBackgroundImages_?.()?.[styleId] || '';
   },
 
+  _getScreenSaverCustomImage_() {
+    return String(
+      this.screenSaverImage
+      ?? this._config?.screen_saver_image
+      ?? this._config?.screensaver_image
+      ?? this._config?.screen_saver_background_image
+      ?? this.config?.screen_saver_image
+      ?? this.config?.screensaver_image
+      ?? this.config?.screen_saver_background_image
+      ?? ''
+    ).trim();
+  },
+
   _screenSaverCssUrl_(url = '') {
     return `url("${String(url).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
   },
@@ -76,14 +89,16 @@ const screenSaverMethods = {
     const overlay = this.screenSaverOverlay;
     if (!overlay) return;
     const styleId = this._normalizeScreenSaverStyle_?.(style) || 'visionos_glass';
-    const url = this._getScreenSaverBackgroundImage_(styleId);
+    const customUrl = this._getScreenSaverCustomImage_?.() || '';
+    const url = customUrl || this._getScreenSaverBackgroundImage_(styleId);
+    const source = customUrl ? 'custom' : 'postimg';
     const token = `${styleId}:${url}`;
     this.__screenSaverBgToken = token;
 
     const applyLoaded = () => {
       overlay.style.setProperty('--ss-bg-image', this._screenSaverCssUrl_(url));
       overlay.dataset.ssBgReady = '1';
-      overlay.dataset.ssBgSource = 'postimg';
+      overlay.dataset.ssBgSource = source;
     };
     const applyFallback = () => {
       overlay.style.removeProperty('--ss-bg-image');
