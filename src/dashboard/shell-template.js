@@ -2198,13 +2198,15 @@ export function getDashboardShellTemplate() {
 :host([ddc-fixed-ui]) .ddc-toolbar,
 :host([ddc-fixed-ui]) .ddc-tabs {
   position: fixed;
-  /* Keep clear of HA's left navigation bar; computed in JS, fallback 56px desktop / 0 mobile */
-  left: calc(var(--ddc-left-gutter, 56px) + 50%);
-  transform: translateX(-50%);
-  width: var(--ddc-ui-width, auto);
+  /* Center inside the usable viewport between Home Assistant's side gutters. */
+  left: calc(var(--ddc-left-gutter, 56px) + 12px);
+  right: calc(var(--ddc-right-gutter, 0px) + 12px);
+  transform: none;
+  width: var(--ddc-ui-width, fit-content);
   max-width: calc(100vw - var(--ddc-left-gutter, 56px) - var(--ddc-right-gutter, 0px));
   box-sizing: border-box;
   pointer-events: auto;
+  margin-inline: auto;
 }
 
 /* Vertical placement */
@@ -4460,7 +4462,7 @@ export function getDashboardShellTemplate() {
         border:2px solid var(--ddc-card-border-color, transparent);
         background:var(--ddc-card-local-bg, var(--ddc-card-bg, var(--card-background-color)));
         cursor:grab;
-        overflow:auto;
+        overflow:var(--ddc-card-overflow, auto);
         border-radius:14px;
         /* Allow a custom drop shadow via --ddc-card-shadow. Fallback to the HA default if unset */
         box-shadow: var(--ddc-card-local-shadow, var(--ddc-card-shadow, var(--ha-card-box-shadow,0 2px 12px rgba(0,0,0,.18))));
@@ -4867,7 +4869,13 @@ export function getDashboardShellTemplate() {
       }
 
 	      /* Edit highlight */
-	      .card-wrapper.editing{ border-color:var(--primary-color,#03a9f4); touch-action: none; overflow: hidden; }
+	      .card-wrapper.editing{
+	        border-color:var(--primary-color,#03a9f4);
+	        touch-action:none;
+	        /* Keep the dashboard/per-card overflow preference active while editing.
+	         * Large custom-card modules can otherwise be clipped only in DDC edit mode. */
+	        overflow:var(--ddc-card-overflow, auto);
+	      }
 	      .card-wrapper.editing::after{
 	        content:""; position:absolute; inset:0; border:1px dashed var(--primary-color,#03a9f4);
 	        border-radius:12px; pointer-events:none; opacity:.35; z-index:5; box-sizing:border-box;
@@ -7762,12 +7770,12 @@ export function getDashboardShellTemplate() {
   display: flex;
   align-items: center;
   justify-content: center;
-  column-gap: clamp(10px, 1.5vw, 16px);
+  column-gap: clamp(var(--ddc-tabs-gap, 10px), 1.5vw, 16px);
   width: fit-content;
   max-width: min(100%, calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px));
   box-sizing: border-box;
-  padding: 10px clamp(12px, 2vw, 18px);
-  border-radius: 28px;
+  padding: var(--ddc-tabs-padding-block, 10px) clamp(12px, 2vw, 18px);
+  border-radius: var(--ddc-tabs-dock-radius, 28px);
   background: transparent;
   border: 0;
   box-shadow: none;
@@ -7841,16 +7849,16 @@ export function getDashboardShellTemplate() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-width: clamp(56px, 5vw, 64px);
+  gap: var(--ddc-tabs-gap, 10px);
+  min-width: var(--ddc-tabs-button-min-width, 56px);
   max-width: min(260px, 46vw);
-  height: 56px;
-  padding: 0 16px;
+  height: var(--ddc-tabs-button-height, 56px);
+  padding: 0 var(--ddc-tabs-button-padding-inline, 16px);
   border: 0;
-  border-radius: 20px;
+  border-radius: var(--ddc-tabs-button-radius, 20px);
   scroll-snap-align: start;
 
-  font: 600 14px/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font: 600 var(--ddc-tabs-font-size, 14px)/1 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   letter-spacing: .02em;
   color: color-mix(in oklab, var(--tab-dock-fg) 92%, rgba(0,0,0,.18));
   cursor: pointer;
@@ -7868,7 +7876,7 @@ export function getDashboardShellTemplate() {
 }
 
 .ddc-tab ha-icon{
-  --mdc-icon-size: 24px;
+  --mdc-icon-size: var(--ddc-tabs-icon-size, 24px);
   opacity: .96;
 }
 
@@ -7879,8 +7887,8 @@ export function getDashboardShellTemplate() {
 }
 
 .ddc-tab.ddc-tab--has-icon{
-  width: 56px;
-  min-width: 56px;
+  width: var(--ddc-tabs-button-min-width, 56px);
+  min-width: var(--ddc-tabs-button-min-width, 56px);
   padding: 0;
 }
 
@@ -7949,15 +7957,16 @@ export function getDashboardShellTemplate() {
 
 .ddc-tabs.ddc-tabs-bottom{
   position: fixed;
-  left: calc(var(--ddc-left-gutter, 0px) + 50%);
-  right: auto;
+  left: calc(var(--ddc-left-gutter, 0px) + 12px);
+  right: calc(var(--ddc-right-gutter, 0px) + 12px);
   top: auto;
   bottom: max(env(safe-area-inset-bottom, 0px), 12px);
-  transform: translateX(-50%);
+  transform: none;
   width: fit-content;
   max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px);
   justify-content: center;
-  padding: 10px clamp(12px, 2vw, 18px);
+  padding: var(--ddc-tabs-padding-block, 10px) clamp(12px, 2vw, 18px);
+  margin-inline: auto;
   z-index: 6;
 }
 
@@ -7972,28 +7981,30 @@ export function getDashboardShellTemplate() {
 :host([ddc-top-tabs-fixed-canvas]) .ddc-tabs:not(.ddc-tabs-bottom):not(.ddc-tabs-left),
 .ddc-root.ddc-fixed-canvas-tabs-top > .ddc-tabs:not(.ddc-tabs-bottom):not(.ddc-tabs-left){
   position: fixed !important;
-  left: calc(var(--ddc-left-gutter, 0px) + 50%) !important;
-  right: auto !important;
+  left: calc(var(--ddc-left-gutter, 0px) + 12px) !important;
+  right: calc(var(--ddc-right-gutter, 0px) + 12px) !important;
   top: calc(var(--ddc-visual-viewport-top, 0px) + var(--ddc-top-gutter, 0px) + max(env(safe-area-inset-top, 0px), 0px) + var(--ddc-toolbar-height, 0px)) !important;
   bottom: auto !important;
-  transform: translateX(-50%) !important;
+  transform: none !important;
+  margin-inline: auto !important;
   max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px) !important;
   z-index: 10020 !important;
 }
 
 .ddc-root.ddc-fixed-canvas-tabs-top > .ddc-scale-outer,
 .ddc-root.ddc-fixed-canvas-tabs-top > .card-container{
-  margin-top: 86px;
+  margin-top: calc(var(--ddc-tabs-button-height, 56px) + 30px);
 }
 
 :host([ddc-bottom-tabs-fixed-canvas]) .ddc-tabs.ddc-tabs-bottom,
 .ddc-root.ddc-fixed-canvas-tabs-bottom > .ddc-tabs.ddc-tabs-bottom{
   position: fixed !important;
-  left: calc(var(--ddc-left-gutter, 0px) + 50%) !important;
-  right: auto !important;
+  left: calc(var(--ddc-left-gutter, 0px) + 12px) !important;
+  right: calc(var(--ddc-right-gutter, 0px) + 12px) !important;
   top: auto !important;
   bottom: max(env(safe-area-inset-bottom, 0px), var(--ddc-visual-viewport-bottom, 0px), 12px) !important;
-  transform: translateX(-50%) !important;
+  transform: none !important;
+  margin-inline: auto !important;
   max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px) !important;
   z-index: 10020 !important;
 }
@@ -8433,7 +8444,7 @@ export function getDashboardShellTemplate() {
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    padding: 10px 12px;
+    padding: var(--ddc-tabs-padding-block, 10px) 12px;
     overflow: visible;
     margin-inline: auto;
     z-index: 5;
@@ -8447,13 +8458,13 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tabs.ddc-tabs-left .ddc-tab{
-    min-width: 56px;
+    min-width: var(--ddc-tabs-button-min-width, 56px);
     width: auto;
-    min-height: 56px;
-    height: 56px;
-    padding: 0 16px;
+    min-height: var(--ddc-tabs-button-height, 56px);
+    height: var(--ddc-tabs-button-height, 56px);
+    padding: 0 var(--ddc-tabs-button-padding-inline, 16px);
     flex-direction: row;
-    gap: 10px;
+    gap: var(--ddc-tabs-gap, 10px);
     color: color-mix(in oklab, var(--tab-dock-fg) 92%, rgba(0,0,0,.18));
   }
 
@@ -8466,8 +8477,8 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tabs.ddc-tabs-left .ddc-tab.ddc-tab--has-icon{
-    width: 56px;
-    min-width: 56px;
+    width: var(--ddc-tabs-button-min-width, 56px);
+    min-width: var(--ddc-tabs-button-min-width, 56px);
     align-self: auto;
   }
 }
@@ -8525,9 +8536,9 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tab{
-    min-width: 56px;
-    height: 54px;
-    padding-inline: 14px;
+    min-width: var(--ddc-tabs-button-min-width, 56px);
+    height: var(--ddc-tabs-mobile-button-height, 54px);
+    padding-inline: var(--ddc-tabs-button-padding-inline, 14px);
   }
 }
 
@@ -9216,14 +9227,14 @@ export function getDashboardShellTemplate() {
   .ddc-tabs-left .ddc-layer-trigger,
   .ddc-tabs-left .ddc-layer-trigger.details,
   .ddc-root.ddc-preview-docked-tabs > .ddc-tabs.ddc-tabs-left .ddc-layer-trigger{
-    width:54px !important;
-    min-width:54px !important;
-    max-width:54px !important;
-    height:54px !important;
-    min-height:54px !important;
+    width:var(--ddc-tabs-mobile-button-height, 54px) !important;
+    min-width:var(--ddc-tabs-mobile-button-height, 54px) !important;
+    max-width:var(--ddc-tabs-mobile-button-height, 54px) !important;
+    height:var(--ddc-tabs-mobile-button-height, 54px) !important;
+    min-height:var(--ddc-tabs-mobile-button-height, 54px) !important;
     padding:0 !important;
     gap:0 !important;
-    border-radius:18px !important;
+    border-radius:var(--ddc-tabs-mobile-button-radius, 18px) !important;
     overflow:visible;
   }
 
@@ -9232,10 +9243,10 @@ export function getDashboardShellTemplate() {
   }
 
   .ddc-tabs .ddc-layer-trigger ha-icon{
-    --mdc-icon-size:23px;
-    width:36px;
-    height:36px;
-    border-radius:14px;
+    --mdc-icon-size:var(--ddc-tabs-icon-size, 23px);
+    width:var(--ddc-tabs-layer-icon-box, 36px);
+    height:var(--ddc-tabs-layer-icon-box, 36px);
+    border-radius:var(--ddc-tabs-layer-icon-radius, 14px);
   }
 
   .ddc-tabs .ddc-layer-trigger-copy,

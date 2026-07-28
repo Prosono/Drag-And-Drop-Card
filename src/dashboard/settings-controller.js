@@ -173,6 +173,7 @@ const dashboardSettingsMethods = {
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
     const chkApplyPageBg = modal.querySelector('#ddc-setting-applyPageBackground');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
+    const selCardOverflow = modal.querySelector('#ddc-setting-cardOverflow');
     const btnRandomAllStyle     = modal.querySelector('#ddc-randomize-allStyle');
     const btnRandomContainerBg = modal.querySelector('#ddc-randomize-containerBg');
     const btnRandomCardBg      = modal.querySelector('#ddc-randomize-cardBg');
@@ -248,6 +249,8 @@ const dashboardSettingsMethods = {
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    const rngTabsSize        = modal.querySelector('#ddc-setting-tabsSize');
+    const outTabsSize        = modal.querySelector('#ddc-tabsSizeOut');
     const chkSidebarEnabled  = modal.querySelector('#ddc-setting-sidebarEnabled');
     const inpSidebarCanvasHeight = modal.querySelector('#ddc-setting-sidebarCanvasHeight');
     const sidebarItemInputs = Array.from(modal.querySelectorAll('[id^="ddc-setting-sidebarItem"]'));
@@ -1179,6 +1182,16 @@ const dashboardSettingsMethods = {
     };
     writeParticleControlsFromConfig();
     if (selTabsPosition) selTabsPosition.value = this._normalizeTabsPosition_(this.tabsPosition || 'top');
+    if (rngTabsSize) {
+      const syncTabsSizeOutput = () => {
+        const value = this._normalizeTabsSize_(rngTabsSize.value);
+        rngTabsSize.value = String(value);
+        if (outTabsSize) outTabsSize.textContent = `${value}%`;
+      };
+      rngTabsSize.value = String(this._normalizeTabsSize_(this.tabsSize));
+      rngTabsSize.addEventListener('input', syncTabsSizeOutput);
+      syncTabsSizeOutput();
+    }
     const sidebarItemsForSettings = this._normalizeSidebarItems_(this.sidebarItems, { enabled: !!this.sidebarEnabled });
     if (chkSidebarEnabled) chkSidebarEnabled.checked = !!this.sidebarEnabled;
     const sidebarHeaderForSettings = this._normalizeSidebarHeader_(this.sidebarHeader);
@@ -1423,6 +1436,9 @@ const dashboardSettingsMethods = {
     if (inpCBg)     inpCBg.value       = String(this.containerBackground || '');
     if (chkApplyPageBg) chkApplyPageBg.checked = !!this.applyBackgroundToPage;
     if (inpCardBg)  inpCardBg.value    = String(this.cardBackground || '');
+    if (selCardOverflow) {
+      selCardOverflow.value = this._normalizeCardOverflow_(this.cardOverflow);
+    }
     if (inpBgImg)   {
       const bgObj = (this._config?.background_image ?? this._config?.bg_image) || {};
       inpBgImg.value = bgObj.src ? String(bgObj.src) : '';
@@ -2735,6 +2751,7 @@ const dashboardSettingsMethods = {
       const newCBg       = (inpCBg?.value || '').trim();
       const newApplyPageBg = !!chkApplyPageBg?.checked;
       const newCardBg    = (inpCardBg?.value || '').trim();
+      const newCardOverflow = this._normalizeCardOverflow_(selCardOverflow?.value || this.cardOverflow);
       const newBgImg     = (inpBgImg?.value || '').trim();
       const newDebug     = !!chkDebug?.checked;
       const newEditPin  = (inpEditPin?.value || '').trim();
@@ -2753,6 +2770,7 @@ const dashboardSettingsMethods = {
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
+      const newTabsSize = this._normalizeTabsSize_(rngTabsSize?.value ?? this.tabsSize);
       const newLayersEnabled = !!chkLayersEnabled?.checked;
       const newLayersButtonDetails = !!chkLayersButtonDetails?.checked;
       const normalizedLayers = normalizeLayerDrafts(
@@ -2914,6 +2932,8 @@ const dashboardSettingsMethods = {
         this._resizeContainer?.();
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
+        this.tabsSize = newTabsSize;
+        this._syncTabsSize_?.();
         this.sidebarEnabled = false;
         this.sidebarItems = [];
         this.sidebarCards = [];
@@ -2922,6 +2942,8 @@ const dashboardSettingsMethods = {
           this._config.options = {
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
+            tabs_size: this.tabsSize,
+            card_overflow: newCardOverflow,
             layers_enabled: !!this.layersEnabled,
             layers_button_details: !!this.layersButtonDetails,
             layers: this._cloneJson_(normalizedLayers),
@@ -2929,6 +2951,7 @@ const dashboardSettingsMethods = {
           this._deleteParkedSidebarOptions_(this._config.options);
         }
         this._config.tabs_position = this.tabsPosition;
+        this._config.tabs_size = this.tabsSize;
         this._deleteParkedSidebarOptions_(this._config);
         this._config.layers_enabled = !!this.layersEnabled;
         this._config.layers_button_details = !!this.layersButtonDetails;
@@ -2967,6 +2990,9 @@ const dashboardSettingsMethods = {
           this._config = this._config || {};
           this._config.card_background = this.cardBackground;
         }
+        this.cardOverflow = newCardOverflow;
+        this._config.card_overflow = this.cardOverflow;
+        this._syncCardOverflow_?.();
         this._config.dashboard_theme_enabled = undefined;
         this._config.theme_enabled = undefined;
         this._config.dashboard_theme = this.dashboardTheme || undefined;
@@ -3117,6 +3143,8 @@ const dashboardSettingsMethods = {
           } else if (this._config) {
             delete this._config.card_background;
           }
+          this._config.card_overflow = this._normalizeCardOverflow_(this.cardOverflow);
+          this._config.tabs_size = this._normalizeTabsSize_(this.tabsSize);
           // Persist card shadow setting
           this._config.card_shadow            = !!this.cardShadowEnabled;
           this._config.card_shadow_intensity  = this._normalizeCardShadowIntensity_(this.cardShadowIntensity);

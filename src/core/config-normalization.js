@@ -22,6 +22,17 @@ const configStaticMethods = {
   },
 };
 
+export function normalizeTabsSize(value) {
+  const size = Number(value);
+  if (!Number.isFinite(size)) return 100;
+  return Math.max(80, Math.min(140, Math.round(size)));
+}
+
+export function normalizeCardOverflow(value) {
+  const mode = String(value ?? '').trim().toLowerCase();
+  return ['auto', 'hidden', 'visible'].includes(mode) ? mode : 'auto';
+}
+
 const configHelperMethods = {
   _hashStorageSeed_(value = '') {
     const text = String(value || '');
@@ -64,6 +75,14 @@ const configHelperMethods = {
     const scale = Number(value);
     if (!Number.isFinite(scale) || scale <= 0) return 0;
     return Math.max(0.1, Math.min(4, Math.round(scale * 100) / 100));
+  },
+
+  _normalizeTabsSize_(value) {
+    return normalizeTabsSize(value);
+  },
+
+  _normalizeCardOverflow_(value) {
+    return normalizeCardOverflow(value);
   },
 
   _parkedSidebarOptionKeys_() {
@@ -117,8 +136,30 @@ const configHelperMethods = {
     if ('auto_scale_max' in next) {
       next.auto_scale_max = this._normalizeAutoScaleMax_(next.auto_scale_max);
     }
+    if ('tabsSize' in next && !('tabs_size' in next)) {
+      next.tabs_size = next.tabsSize;
+    }
+    if ('tabs_size' in next) {
+      next.tabs_size = this._normalizeTabsSize_(next.tabs_size);
+    }
+    if ('default_card_overflow' in next && !('card_overflow' in next)) {
+      next.card_overflow = next.default_card_overflow;
+    }
+    if ('cardOverflow' in next && !('card_overflow' in next)) {
+      next.card_overflow = next.cardOverflow;
+    }
+    if ('defaultCardOverflow' in next && !('card_overflow' in next)) {
+      next.card_overflow = next.defaultCardOverflow;
+    }
+    if ('card_overflow' in next) {
+      next.card_overflow = this._normalizeCardOverflow_(next.card_overflow);
+    }
     delete next.autoViewportMaxWidth;
     delete next.autoScaleMax;
+    delete next.tabsSize;
+    delete next.cardOverflow;
+    delete next.defaultCardOverflow;
+    delete next.default_card_overflow;
     delete next.playLoadingAnimation;
     delete next.play_loading_animation;
     return next;

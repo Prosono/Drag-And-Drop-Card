@@ -17,6 +17,8 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.activeLayerIds = [];
   instance.layersEnabled = false;
   instance.layersButtonDetails = false;
+  instance.tabsSize = 100;
+  instance.cardOverflow = 'auto';
   instance.sidebarEnabled = false;
   instance.sidebarItems = ['navigation'];
   instance.sidebarStyle = 'glass';

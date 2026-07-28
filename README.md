@@ -277,6 +277,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `auto_scale_max`               | number    | `0`                        | Caps the live Auto canvas scale. `0` or empty keeps the old unlimited behavior. |
 | `container_background`         | string    | `transparent`              | Canvas background (e.g. color/gradient). |
 | `card_background`              | string    | `var(--ha-card-background, var(--card-background-color))` | Default background for wrapped cards. |
+| `card_overflow`                | string    | `auto`                     | Dashboard-wide card overflow default: `auto`, `hidden`, or `visible`. Per-card settings override it. |
 | `disable_overlap`              | boolean   | `false`                    | If `true`, prevents overlapping during edit (experimental - NOT RECCOMENDED WHEN USING TABS!). |
 | `animate_cards`                | boolean   | `false`                    | If `true`, cards animate in when switching tabs or loading. |
 | `background_mode`              | string    | `none`                     | `none` \| `image` \| `particles` \| `youtube`. |
@@ -287,6 +288,8 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `screen_saver_delay`           | number    | `300000`                   | Screen saver delay in ms (fallback to 5 minutes if invalid). |
 | `screen_saver_image`           | string    | _none_                     | Optional custom screen saver background image URL or uploaded data URL. |
 | `tabs`                         | array     | `[]`                       | Tab definitions (see Tabs section). |
+| `tabs_position`                | string    | `top`                      | Place the tab bar at the `top` or `bottom` of the viewport. |
+| `tabs_size`                    | number    | `100`                      | Tab bar scale as a percentage from `80` to `140`. |
 | `default_tab`                  | string    | first tab id / `'default'` | Default tab id when the card loads. |
 | `hide_tabs_when_single`        | boolean   | `true`                     | Hide tab bar when there is only one tab. |
 | `card_shadow`                  | boolean   | `false`                    | Apply a drop shadow to card wrappers. |

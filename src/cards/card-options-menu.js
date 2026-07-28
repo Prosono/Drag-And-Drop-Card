@@ -710,8 +710,14 @@ const cardSettingsMenuMethods = {
 
     const overflowSelect = document.createElement('select');
     applySelectStyle(overflowSelect);
+    const dashboardOverflow = this._normalizeCardOverflow_?.(this.cardOverflow) || 'auto';
+    const dashboardOverflowLabel = {
+      auto: 'Scroll',
+      hidden: 'Hidden',
+      visible: 'Visible'
+    }[dashboardOverflow] || 'Scroll';
     const modes = [
-      { value: '', label: 'Default' },
+      { value: '', label: `Dashboard default (${dashboardOverflowLabel})` },
       { value: 'visible', label: 'Visible' },
       { value: 'hidden', label: 'Hidden' },
       { value: 'auto', label: 'Scroll' }

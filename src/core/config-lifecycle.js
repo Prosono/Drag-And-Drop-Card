@@ -42,6 +42,8 @@ const setConfigMethods = {
       this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
       this.containerBackground      = config.container_background ?? 'transparent';
       this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+      this.cardOverflow             = this._normalizeCardOverflow_(config.card_overflow);
+      this._syncCardOverflow_?.();
       this.applyBackgroundToPage    = !!(config.apply_background_to_page ?? config.applyBackgroundToPage ?? false);
       this.dashboardTheme           = String(config.dashboard_theme ?? config.theme_name ?? '').trim();
       this.dashboardThemeEnabled    = !!this.dashboardTheme || !!(config.dashboard_theme_enabled ?? config.theme_enabled ?? false);
@@ -131,6 +133,8 @@ const setConfigMethods = {
         const hasSidebarEnabled = Object.prototype.hasOwnProperty.call(config, 'sidebar_enabled');
         const legacyLeftRail = tabsPosition === 'left' && !hasSidebarEnabled;
         this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
+        this.tabsSize = this._normalizeTabsSize_(config.tabs_size);
+        this._syncTabsSize_?.();
         this.sidebarEnabled = hasSidebarEnabled ? !!config.sidebar_enabled : legacyLeftRail;
         this.sidebarItems = this._normalizeSidebarItems_(config.sidebar_items ?? config.sidebar_content, {
           enabled: this.sidebarEnabled,

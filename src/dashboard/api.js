@@ -57,6 +57,7 @@ const dashboardApiMethods = {
       container_background: this.containerBackground,
       apply_background_to_page: !!this.applyBackgroundToPage,
       card_background: this.cardBackground,
+      card_overflow: this._normalizeCardOverflow_(this.cardOverflow),
       card_shadow: !!this.cardShadowEnabled,
       card_shadow_intensity: this._normalizeCardShadowIntensity_(this.cardShadowIntensity),
       dashboard_theme: this.dashboardTheme || undefined,
@@ -71,6 +72,7 @@ const dashboardApiMethods = {
       // Tabs (from the modal section)
       tabs: this.tabs,
       tabs_position: this._normalizeTabsPosition_(this.tabsPosition),
+      tabs_size: this._normalizeTabsSize_(this.tabsSize),
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
       layers_enabled: !!this.layersEnabled,
@@ -176,6 +178,10 @@ const dashboardApiMethods = {
     if ('container_background' in opts) this.containerBackground = opts.container_background ?? 'transparent';
     if ('apply_background_to_page' in opts) this.applyBackgroundToPage = !!opts.apply_background_to_page;
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
+    if ('card_overflow' in opts) {
+      this.cardOverflow = this._normalizeCardOverflow_(opts.card_overflow);
+      this._syncCardOverflow_?.();
+    }
     if ('card_shadow' in opts)          this.cardShadowEnabled = !!opts.card_shadow;
     if ('card_shadow_intensity' in opts || 'cardShadowIntensity' in opts || 'shadow_intensity' in opts || 'shadowIntensity' in opts) {
       this.cardShadowIntensity = this._normalizeCardShadowIntensity_(
@@ -334,6 +340,10 @@ const dashboardApiMethods = {
       this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
       this._syncTabsPlacement_?.();
     }
+    if ('tabs_size' in opts) {
+      this.tabsSize = this._normalizeTabsSize_(opts.tabs_size);
+      this._syncTabsSize_?.();
+    }
     if (Array.isArray(this.tabs) && this.tabs.length) {
       const validTabIds = new Set(this.tabs.map((tab) => tab.id));
       if (!validTabIds.has(this.defaultTab)) this.defaultTab = this.tabs[0]?.id || 'default';
@@ -357,7 +367,7 @@ const dashboardApiMethods = {
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'sidebar_enabled' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
+    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'sidebar_enabled' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
       this._renderTabs?.();
       this._renderSidebar_?.();
       this._applyActiveTab?.();
@@ -399,6 +409,7 @@ const dashboardApiMethods = {
       container_background: { type: 'string' },
       apply_background_to_page: { type: 'boolean' },
       card_background: { type: 'string' },
+      card_overflow: { type: 'string' },
       card_shadow: { type: 'boolean' },
       card_shadow_intensity: { type: 'number' },
       dashboard_theme: { type: 'string' },
@@ -410,6 +421,7 @@ const dashboardApiMethods = {
       container_preset_orientation: { type: 'string' },
       tabs: { type: 'array' },
       tabs_position: { type: 'string' },
+      tabs_size: { type: 'number' },
       default_tab: { type: 'string' },
       hide_tabs_when_single: { type: 'boolean' },
       layers_enabled: { type: 'boolean' },
@@ -455,6 +467,9 @@ const dashboardApiMethods = {
       containerBackground: 'container_background',
       applyBackgroundToPage: 'apply_background_to_page',
       cardBackground: 'card_background',
+      cardOverflow: 'card_overflow',
+      defaultCardOverflow: 'card_overflow',
+      default_card_overflow: 'card_overflow',
       cardShadow: 'card_shadow',
       cardShadowIntensity: 'card_shadow_intensity',
       shadowIntensity: 'card_shadow_intensity',
@@ -466,6 +481,7 @@ const dashboardApiMethods = {
       containerPreset: 'container_preset',
       containerPresetOrientation: 'container_preset_orientation',
       tabsPosition: 'tabs_position',
+      tabsSize: 'tabs_size',
       defaultTab: 'default_tab',
       hideTabsWhenSingle: 'hide_tabs_when_single',
       layersEnabled: 'layers_enabled',

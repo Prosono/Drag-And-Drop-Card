@@ -785,7 +785,14 @@ const cardBuilderMethods = {
       } catch {}
     },
 
+    _syncCardOverflow_() {
+      const mode = this._normalizeCardOverflow_?.(this.cardOverflow) || 'auto';
+      this.cardOverflow = mode;
+      this.style?.setProperty?.('--ddc-card-overflow', mode);
+    },
+
     _makeWrapper(cardEl, options = {}) {
+      this._syncCardOverflow_?.();
       const wrap = document.createElement('div');
       wrap.classList.add('card-wrapper');
       wrap.dataset.tabId = this._normalizeTabId(this.activeTab || this.defaultTab);

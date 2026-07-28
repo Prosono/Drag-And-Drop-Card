@@ -5,6 +5,8 @@
  * saved active-tab state, and toolbar layout.
  */
 
+import { normalizeTabsSize } from '../core/config-normalization.js';
+
 export function moveTabById(tabs = [], tabId = '', offset = 0) {
   const next = Array.isArray(tabs) ? tabs.slice() : [];
   const from = next.findIndex((tab) => String(tab?.id || '') === String(tabId || ''));
@@ -30,8 +32,32 @@ const tabsLayoutMethods = {
     return shouldRenderTabs || !!this._hasLayerMenu_?.();
   },
 
+  _syncTabsSize_() {
+    const size = normalizeTabsSize(this.tabsSize);
+    const scale = size / 100;
+    const setLength = (name, base) => {
+      this.style?.setProperty?.(name, `${Math.round(base * scale * 100) / 100}px`);
+    };
+    this.tabsSize = size;
+    this.style?.setProperty?.('--ddc-tabs-size-percent', String(size));
+    setLength('--ddc-tabs-padding-block', 10);
+    setLength('--ddc-tabs-button-height', 56);
+    setLength('--ddc-tabs-mobile-button-height', 54);
+    setLength('--ddc-tabs-button-min-width', 56);
+    setLength('--ddc-tabs-button-padding-inline', 16);
+    setLength('--ddc-tabs-button-radius', 20);
+    setLength('--ddc-tabs-mobile-button-radius', 18);
+    setLength('--ddc-tabs-dock-radius', 28);
+    setLength('--ddc-tabs-icon-size', 24);
+    setLength('--ddc-tabs-layer-icon-box', 36);
+    setLength('--ddc-tabs-layer-icon-radius', 14);
+    setLength('--ddc-tabs-font-size', 14);
+    setLength('--ddc-tabs-gap', 10);
+  },
+
   _renderTabs() {
     const bar = this.tabsBar; if (!bar) return;
+    this._syncTabsSize_?.();
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
     const hasLayerMenu = !!this._hasLayerMenu_?.();
     const sidebarNavActive = !!this._isSidebarNavigationActive_?.();

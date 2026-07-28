@@ -375,6 +375,24 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Sets the base surface behind every draggable card.</div>
       </div>
 
+      <!-- CARD OVERFLOW -->
+      <div class="setting" role="group" aria-labelledby="lbl-card-overflow">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:page-layout-body" aria-hidden="true"></ha-icon>
+            <label id="lbl-card-overflow" for="ddc-setting-cardOverflow">Card overflow</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-cardOverflow">
+              <option value="auto">Scroll when needed</option>
+              <option value="hidden">Hidden</option>
+              <option value="visible">Visible</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Sets the dashboard default for every card. A card-specific overflow setting still takes priority.</div>
+      </div>
+
       <!-- CARD SHADOW -->
       <div class="setting" role="group" aria-labelledby="lbl-card-shadow">
         <div class="row">
@@ -1015,6 +1033,22 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
         </div>
         <div class="hint">Controls where the regular tabs bar sits around the dashboard.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-tabs-size">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:resize" aria-hidden="true"></ha-icon>
+            <label id="lbl-tabs-size" for="ddc-setting-tabsSize">Tab bar size</label>
+          </div>
+          <div class="control">
+            <div class="range-wrap">
+              <input type="range" id="ddc-setting-tabsSize" min="80" max="140" step="5" />
+              <output id="ddc-tabsSizeOut" for="ddc-setting-tabsSize">100%</output>
+            </div>
+          </div>
+        </div>
+        <div class="hint">Scales the tab controls while preserving touch-friendly sizing and viewport alignment.</div>
       </div>
 
       <!-- Current tabs list -->

@@ -12,6 +12,41 @@ const idle = () => new Promise((resolve) => (
   window.requestIdleCallback ? window.requestIdleCallback(() => resolve()) : window.setTimeout(resolve, 0)
 ));
 
+/**
+ * Prepare and connect a card preview in the same order Home Assistant uses for
+ * live Lovelace cards.
+ *
+ * `helpers.createCardElement(config)` already calls `setConfig` for HA/custom
+ * cards. DDC's own preview elements are created directly and still need their
+ * config applied here. In both cases `hass` must be assigned before the element
+ * is connected: cards such as Bubble Card start loading modules from
+ * `connectedCallback()` and need the HA WebSocket API at that point.
+ */
+export function mountCardPreviewElement({
+  host,
+  element,
+  config,
+  hass,
+  configAlreadyApplied = false,
+}) {
+  if (!host || !element) throw new Error('A preview host and card element are required.');
+
+  if (!configAlreadyApplied) {
+    element.setConfig?.(config);
+  }
+  if (hass !== undefined) {
+    element.hass = hass;
+  }
+
+  if (typeof host.replaceChildren === 'function') {
+    host.replaceChildren(element);
+  } else {
+    host.innerHTML = '';
+    host.appendChild(element);
+  }
+  return element;
+}
+
 const smartPickerMethods = {
 
   /* ------------------------------- Picker UI ------------------------------- */
@@ -1619,7 +1654,7 @@ const smartPickerMethods = {
                 <div class="spin-center picker-preview-spinner" id="previewSpin" hidden>
                   <ha-circular-progress indeterminate></ha-circular-progress>
                 </div>
-                <div class="bd" style="min-height:0"><div id="cardHost"></div></div>
+                <div class="bd" style="min-height:0"><div id="cardHost" class="element-preview ddc-element-preview"></div></div>
               </div>
 
               <div class="sec" id="optionsSec" style="grid-column:1;grid-row:2;min-height:0;position:relative">
@@ -3759,12 +3794,12 @@ const smartPickerMethods = {
       __previewTimer = setTimeout(async () => {
         const seq = ++previewSeq;
         previewSpin.hidden = false;
-        cardHost.innerHTML = '';
         cardHost.classList.remove('has-ddc-preview', 'has-ddc-table-preview');
         await raf();
         try {
           if (seq !== previewSeq) return;
           let temp = null;
+          let configAlreadyApplied = false;
           const type = String(cfg?.type || '');
           if (type === 'custom:ddc-html-card') {
             temp = await createDdcPreviewElement('ddc-html-card', cfg);
@@ -3785,11 +3820,16 @@ const smartPickerMethods = {
             const helpers = (await this._getCardHelpers_?.()) || await window.loadCardHelpers();
             if (seq !== previewSeq) return;
             temp = helpers.createCardElement(cfg);
+            configAlreadyApplied = true;
           }
           if (seq !== previewSeq) return;
-          cardHost.appendChild(temp);
-          try { temp.setConfig?.(cfg); } catch {}
-          try { temp.hass = this.hass; } catch {}
+          mountCardPreviewElement({
+            host: cardHost,
+            element: temp,
+            config: cfg,
+            hass: this.hass,
+            configAlreadyApplied,
+          });
           __lastPreviewCfgJSON = cfgJSON;
         } catch (err) {
           if (seq === previewSeq) {
