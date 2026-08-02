@@ -1084,6 +1084,13 @@ export class DdcHtmlCardEditor extends HTMLElement {
           --ddc-editor-surface:color-mix(in oklab, var(--ha-card-background, #111827) 88%, transparent);
           --ddc-editor-border:color-mix(in oklab, var(--divider-color, rgba(148,163,184,.28)) 72%, transparent);
           --ddc-editor-muted:var(--secondary-text-color, #94a3b8);
+          /* Code stays dark in every editor theme so syntax colors retain
+           * their intended contrast and the workspace reads as code. */
+          --ddc-code-surface:#090d12;
+          --ddc-code-surface-raised:#111821;
+          --ddc-code-border:rgba(148,163,184,.22);
+          --ddc-code-text:#e7edf5;
+          --ddc-code-muted:#8f9cad;
         }
         .editor{
           display:grid;
@@ -1167,20 +1174,22 @@ export class DdcHtmlCardEditor extends HTMLElement {
           display:grid;
           border-radius:8px;
           overflow:hidden;
-          border:1px solid var(--ddc-editor-border);
-          background:color-mix(in oklab, var(--ha-card-background, #111827) 88%, #000);
+          border:1px solid var(--ddc-code-border);
+          background:var(--ddc-code-surface);
+          color:var(--ddc-code-text);
+          color-scheme:dark;
         }
         .code-tabs{
           display:grid;
           grid-template-columns:repeat(3, minmax(0, 1fr));
-          border-bottom:1px solid var(--ddc-editor-border);
-          background:rgba(127,127,127,.045);
+          border-bottom:1px solid var(--ddc-code-border);
+          background:var(--ddc-code-surface-raised);
         }
         .code-tab-item{
           display:grid;
           grid-template-columns:minmax(0, 1fr) 38px;
           min-width:0;
-          border-right:1px solid var(--ddc-editor-border);
+          border-right:1px solid var(--ddc-code-border);
         }
         .code-tab-item:last-child{
           border-right:0;
@@ -1196,23 +1205,23 @@ export class DdcHtmlCardEditor extends HTMLElement {
           padding:9px 12px;
           border:0;
           background:transparent;
-          color:var(--ddc-editor-muted);
+          color:var(--ddc-code-muted);
           cursor:pointer;
           font:inherit;
           text-align:left;
           transition:background .16s ease, color .16s ease, box-shadow .16s ease;
         }
         .code-tab:hover{
-          background:rgba(127,127,127,.07);
-          color:var(--primary-text-color);
+          background:rgba(148,163,184,.1);
+          color:var(--ddc-code-text);
         }
         .code-tab:focus-visible{
           outline:2px solid color-mix(in oklab, var(--primary-color, #ff9800) 72%, transparent);
           outline-offset:-2px;
         }
         .code-tab.is-active{
-          background:color-mix(in oklab, var(--primary-color, #ff9800) 14%, transparent);
-          color:var(--primary-text-color);
+          background:color-mix(in oklab, var(--primary-color, #ff9800) 15%, var(--ddc-code-surface-raised));
+          color:var(--ddc-code-text);
           box-shadow:inset 0 -2px 0 var(--primary-color, #ff9800);
         }
         .code-tab-label{
@@ -1247,13 +1256,13 @@ export class DdcHtmlCardEditor extends HTMLElement {
         }
         .code-tab small{
           flex:0 0 auto;
-          color:var(--ddc-editor-muted);
+          color:var(--ddc-code-muted);
           font-size:.72rem;
           font-weight:750;
           white-space:nowrap;
         }
         .code-tab.is-active small{
-          color:var(--primary-text-color);
+          color:var(--ddc-code-text);
         }
         .code-expand{
           appearance:none;
@@ -1262,16 +1271,16 @@ export class DdcHtmlCardEditor extends HTMLElement {
           min-width:0;
           min-height:54px;
           border:0;
-          border-left:1px solid var(--ddc-editor-border);
+          border-left:1px solid var(--ddc-code-border);
           background:transparent;
-          color:var(--ddc-editor-muted);
+          color:var(--ddc-code-muted);
           cursor:pointer;
           transition:background .16s ease, color .16s ease;
         }
         .code-expand:hover,
         .code-expand:focus-visible{
           background:color-mix(in oklab, var(--primary-color, #ff9800) 12%, transparent);
-          color:var(--primary-text-color);
+          color:var(--ddc-code-text);
           outline:none;
         }
         .code-expand ha-icon{
@@ -1279,6 +1288,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
         }
         .code-body{
           min-height:318px;
+          background:var(--ddc-code-surface);
         }
         .code-pane{
           display:grid;
@@ -1296,10 +1306,12 @@ export class DdcHtmlCardEditor extends HTMLElement {
         }
         .code-pane-head strong{
           font-size:.9rem;
+          color:var(--ddc-code-text);
         }
         .code-pane-head .hint{
           max-width:56%;
           text-align:right;
+          color:var(--ddc-code-muted);
         }
         .code-editor{
           display:grid;
@@ -1307,8 +1319,8 @@ export class DdcHtmlCardEditor extends HTMLElement {
           min-height:286px;
           border-radius:8px;
           overflow:hidden;
-          border:1px solid color-mix(in oklab, var(--ddc-editor-border) 82%, transparent);
-          background:color-mix(in oklab, var(--ha-card-background, #111827) 80%, #000);
+          border:1px solid var(--ddc-code-border);
+          background:var(--ddc-code-surface);
         }
         .code-editor.is-expanded{
           min-height:0;
@@ -1316,9 +1328,9 @@ export class DdcHtmlCardEditor extends HTMLElement {
         }
         .code-gutter{
           overflow:hidden;
-          border-right:1px solid var(--ddc-editor-border);
-          background:rgba(127,127,127,.06);
-          color:color-mix(in oklab, var(--ddc-editor-muted) 78%, transparent);
+          border-right:1px solid var(--ddc-code-border);
+          background:var(--ddc-code-surface-raised);
+          color:var(--ddc-code-muted);
           user-select:none;
         }
         .code-gutter pre,
@@ -1356,7 +1368,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
           overflow:visible;
           pointer-events:none;
           white-space:pre;
-          color:var(--primary-text-color);
+          color:var(--ddc-code-text);
           will-change:transform;
         }
         .code-highlight code{
@@ -1372,7 +1384,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
           overflow:auto;
           white-space:pre;
           color:transparent;
-          caret-color:var(--primary-text-color);
+          caret-color:var(--ddc-code-text);
           background:transparent;
           border:0;
           box-shadow:none;
@@ -1399,7 +1411,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
         }
         .code-dialog-body::-webkit-scrollbar-track,
         .code-editor textarea::-webkit-scrollbar-track{
-          background:rgba(127,127,127,.055);
+          background:var(--ddc-code-surface-raised);
         }
         .tok-tag{ color:#fb923c; }
         .tok-attr{ color:#38bdf8; }
@@ -1411,9 +1423,9 @@ export class DdcHtmlCardEditor extends HTMLElement {
         .tok-selector{ color:#c4b5fd; }
         .tok-color{ color:#fda4af; }
         .tok-var{ color:#f0abfc; }
-        .tok-ident{ color:var(--primary-text-color); }
-        .tok-punc{ color:color-mix(in oklab, var(--primary-text-color) 66%, transparent); }
-        .tok-muted{ color:var(--ddc-editor-muted); }
+        .tok-ident{ color:var(--ddc-code-text); }
+        .tok-punc{ color:color-mix(in oklab, var(--ddc-code-text) 72%, transparent); }
+        .tok-muted{ color:var(--ddc-code-muted); }
         .code-modal{
           position:fixed;
           inset:0;
@@ -1431,8 +1443,10 @@ export class DdcHtmlCardEditor extends HTMLElement {
           grid-template-rows:auto minmax(0, 1fr);
           border-radius:10px;
           overflow:hidden;
-          border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 24%, var(--ddc-editor-border));
-          background:var(--ha-card-background, #111827);
+          border:1px solid color-mix(in oklab, var(--primary-color, #ff9800) 24%, var(--ddc-code-border));
+          background:var(--ddc-code-surface);
+          color:var(--ddc-code-text);
+          color-scheme:dark;
           box-shadow:0 24px 80px rgba(0,0,0,.44);
         }
         .code-dialog-head{
@@ -1441,8 +1455,8 @@ export class DdcHtmlCardEditor extends HTMLElement {
           justify-content:space-between;
           gap:14px;
           padding:14px 16px;
-          border-bottom:1px solid var(--ddc-editor-border);
-          background:rgba(127,127,127,.055);
+          border-bottom:1px solid var(--ddc-code-border);
+          background:var(--ddc-code-surface-raised);
         }
         .code-dialog-head > div:first-child{
           display:grid;
@@ -1453,7 +1467,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
           font-size:1rem;
         }
         .code-dialog-head span{
-          color:var(--ddc-editor-muted);
+          color:var(--ddc-code-muted);
           font-size:.82rem;
           font-weight:650;
         }
@@ -1469,9 +1483,9 @@ export class DdcHtmlCardEditor extends HTMLElement {
           align-items:center;
           padding:0 10px;
           border-radius:999px;
-          border:1px solid var(--ddc-editor-border);
-          background:rgba(127,127,127,.07);
-          color:var(--ddc-editor-muted);
+          border:1px solid var(--ddc-code-border);
+          background:rgba(148,163,184,.08);
+          color:var(--ddc-code-muted);
           font-size:.8rem;
           font-weight:750;
         }
@@ -1482,14 +1496,14 @@ export class DdcHtmlCardEditor extends HTMLElement {
           display:grid;
           place-items:center;
           border-radius:8px;
-          border:1px solid var(--ddc-editor-border);
-          background:rgba(127,127,127,.07);
-          color:var(--primary-text-color);
+          border:1px solid var(--ddc-code-border);
+          background:rgba(148,163,184,.08);
+          color:var(--ddc-code-text);
           cursor:pointer;
         }
         .code-dialog-close:hover,
         .code-dialog-close:focus-visible{
-          border-color:color-mix(in oklab, var(--primary-color, #ff9800) 42%, var(--ddc-editor-border));
+          border-color:color-mix(in oklab, var(--primary-color, #ff9800) 42%, var(--ddc-code-border));
           outline:none;
         }
         .code-dialog-close ha-icon{
@@ -1502,6 +1516,7 @@ export class DdcHtmlCardEditor extends HTMLElement {
           overscroll-behavior:contain;
           scrollbar-gutter:stable;
           padding:14px;
+          background:var(--ddc-code-surface);
         }
         .switch{
           display:inline-flex;

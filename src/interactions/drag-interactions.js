@@ -5,6 +5,24 @@
  * modules use for autosave, connectors, and responsive layout updates.
  */
 
+export function getRigidGroupDragOffset(
+  leaderStart = { x: 0, y: 0 },
+  rawDx = 0,
+  rawDy = 0,
+  liveSnap = false,
+  gridSize = 1,
+) {
+  const startX = Number(leaderStart?.x) || 0;
+  const startY = Number(leaderStart?.y) || 0;
+  const dx = Number(rawDx) || 0;
+  const dy = Number(rawDy) || 0;
+  const gs = Math.max(1, Number(gridSize) || 1);
+  return {
+    dx: liveSnap ? (Math.round((startX + dx) / gs) * gs) - startX : dx,
+    dy: liveSnap ? (Math.round((startY + dy) / gs) * gs) - startY : dy,
+  };
+}
+
 /* Drag, resize, dynamic container sizing, and overlap helpers. */
 const interactBehaviorMethods = {
   _initInteract() {
@@ -112,8 +130,10 @@ const interactBehaviorMethods = {
           const dxLead   = curLeadX - srL.x;
           const dyLead   = curLeadY - srL.y;
 
-          // Build proposed positions for all selected cards
-          const proposed = this.__groupDrag.members.map(m => {
+          // Build raw positions with one shared pointer delta. For multi-select
+          // we also derive one shared display delta from the leader, so grid
+          // snapping cannot move each card by a different amount.
+          let proposed = this.__groupDrag.members.map(m => {
             const sr = this.__groupDrag.startRaw.get(m);
             const rawX  = sr.x + dxLead;
             const rawY  = sr.y + dyLead;
@@ -121,7 +141,51 @@ const interactBehaviorMethods = {
             const snapY = live ? Math.round(rawY / gs) * gs : rawY;
             return { el: m, rawX, rawY, snapX, snapY, w: sr.w, h: sr.h };
           });
-          this._constrainProposedCardsToCanvas_?.(proposed, live, gs);
+          if (proposed.length > 1) {
+            this._constrainProposedCardsToCanvas_?.(
+              proposed,
+              false,
+              gs,
+              { preserveGroupOffsets: true }
+            );
+            const constrainedLeader = proposed.find((item) => item.el === lead) || proposed[0];
+            const constrainedRawDx = constrainedLeader.rawX - srL.x;
+            const constrainedRawDy = constrainedLeader.rawY - srL.y;
+            const displayOffset = getRigidGroupDragOffset(
+              srL,
+              constrainedRawDx,
+              constrainedRawDy,
+              live,
+              gs
+            );
+            const visible = this.__groupDrag.members.map((m) => {
+              const sr = this.__groupDrag.startRaw.get(m);
+              const x = sr.x + displayOffset.dx;
+              const y = sr.y + displayOffset.dy;
+              return { el: m, rawX: x, rawY: y, snapX: x, snapY: y, w: sr.w, h: sr.h };
+            });
+            this._constrainProposedCardsToCanvas_?.(
+              visible,
+              false,
+              gs,
+              { preserveGroupOffsets: true }
+            );
+            const visibleLeader = visible.find((item) => item.el === lead) || visible[0];
+            const boundaryDx = visibleLeader.rawX - (srL.x + displayOffset.dx);
+            const boundaryDy = visibleLeader.rawY - (srL.y + displayOffset.dy);
+            const storedRawDx = constrainedRawDx + boundaryDx;
+            const storedRawDy = constrainedRawDy + boundaryDy;
+            visible.forEach((item) => {
+              const sr = this.__groupDrag.startRaw.get(item.el);
+              item.snapX = item.rawX;
+              item.snapY = item.rawY;
+              item.rawX = sr.x + storedRawDx;
+              item.rawY = sr.y + storedRawDy;
+            });
+            proposed = visible;
+          } else {
+            this._constrainProposedCardsToCanvas_?.(proposed, live, gs);
+          }
 
           // If overlap protection is on, restore other cards and push them out of the way
           if (this.disableOverlap) {
@@ -141,8 +205,9 @@ const interactBehaviorMethods = {
           if (!this.__groupDrag) return;
           const gs = this.gridSize;
 
-          // Gather final positions (unsnapped and snapped) for the dragged group
-          const endRects = this.__groupDrag.members.map(m => {
+          // Gather final positions. Multi-select uses one final grid delta from
+          // the leader to preserve the exact formation of the group.
+          let endRects = this.__groupDrag.members.map(m => {
             const rawX = this._numberOr_(m.getAttribute('data-x-raw'), this._numberOr_(m.getAttribute('data-x'), 0));
             const rawY = this._numberOr_(m.getAttribute('data-y-raw'), this._numberOr_(m.getAttribute('data-y'), 0));
             const snapX = Math.round(rawX / gs) * gs;
@@ -151,7 +216,32 @@ const interactBehaviorMethods = {
             const h  = parseFloat(m.style.height) || m.getBoundingClientRect().height;
             return { el: m, rawX, rawY, snapX, snapY, w, h };
           });
-          this._constrainProposedCardsToCanvas_?.(endRects, true, gs);
+          if (endRects.length > 1) {
+            const lead = this.__groupDrag.leader;
+            const srL = this.__groupDrag.startRaw.get(lead);
+            const leadEnd = endRects.find((item) => item.el === lead) || endRects[0];
+            const finalOffset = getRigidGroupDragOffset(
+              srL,
+              leadEnd.rawX - srL.x,
+              leadEnd.rawY - srL.y,
+              true,
+              gs
+            );
+            endRects = this.__groupDrag.members.map((m) => {
+              const sr = this.__groupDrag.startRaw.get(m);
+              const x = sr.x + finalOffset.dx;
+              const y = sr.y + finalOffset.dy;
+              return { el: m, rawX: x, rawY: y, snapX: x, snapY: y, w: sr.w, h: sr.h };
+            });
+            this._constrainProposedCardsToCanvas_?.(
+              endRects,
+              false,
+              gs,
+              { preserveGroupOffsets: true }
+            );
+          } else {
+            this._constrainProposedCardsToCanvas_?.(endRects, true, gs);
+          }
 
           // On end, do a final restore/push to prevent leftover overlaps
           if (this.disableOverlap) {
@@ -187,7 +277,7 @@ const interactBehaviorMethods = {
 	          } catch {}
 	          this.__prevMoveContainerOverflow = undefined;
 	          this.__keepPreviewDragClipped = false;
-          if (this._isContainerFixed()) this._clampAllCardsInside();
+          if (this._isContainerFixed() && this.__groupDrag.members.length <= 1) this._clampAllCardsInside();
           this._settleLayoutAfterCardMove_?.({ syncAnchors: true });
           this._queueSave(this.__groupDrag.members.length > 1 ? 'group-drag-end' : 'drag-end');
           this.__groupDrag = null;

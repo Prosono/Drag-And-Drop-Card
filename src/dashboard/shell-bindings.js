@@ -28,6 +28,7 @@ const dashboardShellBindingMethods = {
     this.exploreBtn    = this.shadowRoot.querySelector('#exploreBtn');
     this.applyLayoutBtn= this.shadowRoot.querySelector('#applyLayoutBtn');
     this.toolbarAutoSaveBtn = this.shadowRoot.querySelector('#toolbarAutoSaveBtn');
+    this.editorThemeBtn = this.shadowRoot.querySelector('#editorThemeBtn');
     this.toolbarToggleBtn = this.shadowRoot.querySelector('#toolbarToggleBtn');
     // Copy and Paste buttons (for edit mode)
     this.copyBtn      = this.shadowRoot.querySelector('#copyBtn');
@@ -55,6 +56,7 @@ const dashboardShellBindingMethods = {
       } catch {}
     });
     try { this._syncToolbarAutoSaveState_?.(); } catch {}
+    try { this._syncEditorThemeButton_?.(); } catch {}
     const toolbarSegmentButtons = Array.from(this.shadowRoot.querySelectorAll('[data-toolbar-segment]'));
     toolbarSegmentButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -132,6 +134,7 @@ const dashboardShellBindingMethods = {
       this.importBtn?.addEventListener('click', () => this._importDesign());
       this.applyLayoutBtn?.addEventListener('click', () => this._saveLayout(false));
       this.toolbarAutoSaveBtn?.addEventListener('click', () => this._setToolbarAutoSave_?.(!this.autoSave));
+      this.editorThemeBtn?.addEventListener('click', () => this._cycleEditorThemeMode_?.());
       this.copyBtn?.addEventListener('click', () => this._copySelection());
       this.pasteBtn?.addEventListener('click', () => this._pasteClipboard());
       this.undoBtn?.addEventListener('click', () => this._undoLayoutHistory_?.());

@@ -6,6 +6,13 @@
  */
 
 /* Viewport preview, device frame, responsive viewport fields, and mobile scaling helpers. */
+export function formatLiveViewportMeta({ width = 1, height = 1, profileLabel = 'Desktop', maxWidth = 0 } = {}) {
+  const liveWidth = Math.max(1, Math.round(Number(width) || 1));
+  const liveHeight = Math.max(1, Math.round(Number(height) || 1));
+  const cap = Math.max(0, Math.round(Number(maxWidth) || 0));
+  return `Live · ${liveWidth}×${liveHeight} CSS px · ${profileLabel}${cap ? ` · width cap ${cap}px` : ''}`;
+}
+
 const viewportPreviewMethods = {
   _applyGridVars() {
     const sz = `${this.gridSize || 10}px`;
@@ -707,13 +714,23 @@ const viewportPreviewMethods = {
       const viewport = this._getResponsiveViewportProfile_(activeProfile, activeOrientation);
       const frameLock = this._getPreviewDeviceFrameLock_?.(activeProfile, viewport.width, viewport.height, { orientation: activeOrientation });
       const aspectLocked = this._isResponsiveViewportAspectLocked_?.(activeProfile) !== false;
-      if (activeEl !== widthInput) widthInput.value = String(Math.round(viewport.width));
-      if (activeEl !== heightInput) heightInput.value = String(Math.round(viewport.height));
-  
       const isLive = !editingProfile;
+      const liveViewport = isLive
+        ? (this._getRealViewportMetrics_?.() || viewport)
+        : viewport;
+      if (activeEl !== widthInput) widthInput.value = String(Math.round(liveViewport.width));
+      if (activeEl !== heightInput) heightInput.value = String(Math.round(liveViewport.height));
+
       const canRotate = !!editingProfile && editingProfile !== 'desktop';
       widthInput.disabled = isLive;
       heightInput.disabled = isLive;
+      if (isLive) {
+        widthInput.title = 'Actual browser viewport width in CSS pixels';
+        heightInput.title = 'Actual browser viewport height in CSS pixels';
+      } else {
+        widthInput.removeAttribute('title');
+        heightInput.removeAttribute('title');
+      }
       if (ratioLockButton) {
         ratioLockButton.disabled = isLive;
         ratioLockButton.classList.toggle('is-disabled', isLive);
@@ -735,7 +752,14 @@ const viewportPreviewMethods = {
       }
       if (meta) {
         meta.textContent = isLive
-          ? `Auto: ${this._getResponsiveProfileLabel_(this._getActualResponsiveProfile_?.() || 'desktop')}`
+          ? formatLiveViewportMeta({
+              width: liveViewport.width,
+              height: liveViewport.height,
+              profileLabel: this._getResponsiveProfileLabel_(this._getActualResponsiveProfile_?.() || 'desktop'),
+              maxWidth: this._normalizeAutoViewportMaxWidth_?.(
+                this.autoViewportMaxWidth ?? this._config?.auto_viewport_max_width
+              ) || 0,
+            })
           : `Editing ${this._getResponsiveProfileLabel_(editingProfile)} · ${frameLock?.orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${Math.round(viewport.width)}×${Math.round(viewport.height)} · ${aspectLocked ? 'linked ratio' : 'free ratio'}`;
       }
     } catch {}

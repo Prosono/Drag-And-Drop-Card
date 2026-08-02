@@ -48,6 +48,7 @@ const layoutGeometryMethods = {
     el.setAttribute('data-y', String(ny));
     this._scheduleConnectorsRender_?.();
     this._requestPreviewOutsideCardsSync_?.();
+    this._scheduleSelectionArrangeToolbarPosition_?.();
     // Do NOT touch data-*-raw here; drag/resize
   },
 
@@ -64,9 +65,10 @@ const layoutGeometryMethods = {
   },
 
 
-  _constrainProposedCardsToCanvas_(proposed = [], liveSnap = false, gridSize = this.gridSize) {
+  _constrainProposedCardsToCanvas_(proposed = [], liveSnap = false, gridSize = this.gridSize, options = {}) {
     const items = Array.isArray(proposed) ? proposed : [];
     if (!items.length) return items;
+    const preserveGroupOffsets = !!options?.preserveGroupOffsets && items.length > 1;
     const gs = Math.max(1, Number(gridSize || this.gridSize || 1) || 1);
     const edgeBuffer = this._getCanvasEdgeBufferPx_?.() || 0;
     const numberOr = (value, fallback = 0) => {
@@ -125,6 +127,19 @@ const layoutGeometryMethods = {
           shift(groupHeight <= availableHeight ? maxBottom - bounds.maxY : edgeBuffer - bounds.minY, 0);
         }
       } catch {}
+    }
+    if (preserveGroupOffsets) {
+      // The group-level shifts above already keep every item inside the
+      // available canvas whenever the group fits. Do not clamp or snap each
+      // item separately: doing so changes the spacing between selected cards.
+      items.forEach((item) => {
+        if (!item) return;
+        item.rawX = numberOr(item.rawX, edgeBuffer);
+        item.rawY = this._clampYToCanvasTop_(numberOr(item.rawY, edgeBuffer));
+        item.snapX = item.rawX;
+        item.snapY = item.rawY;
+      });
+      return items;
     }
     items.forEach((item) => {
       if (!item) return;

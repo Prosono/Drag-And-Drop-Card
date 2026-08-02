@@ -185,6 +185,7 @@ const setConfigMethods = {
       } catch {}
 
       // selection state
+      try { this._destroySelectionArrangeToolbar_?.(); } catch {}
       this._selection = new Set();
       this.__groupDrag = null;
 

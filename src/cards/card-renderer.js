@@ -711,6 +711,53 @@ const cardBuilderMethods = {
       return el;
     },
 
+    async _replaceEditedCardElement_(wrap, cardConfig = {}) {
+      if (!wrap) return null;
+      const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+      const oldEl = wrap.firstElementChild;
+      const newEl = await this._createCard(cleanConfig);
+
+      // Give the new card its live HA state before connection when possible,
+      // then once more after connection for cards whose setter initializes Lit.
+      try { newEl.hass = this.hass; } catch {}
+      try {
+        wrap.dataset.cfg = JSON.stringify(cleanConfig);
+        if (this._hasCardModDeep?.(cleanConfig)) wrap.dataset.needsCardMod = 'true';
+        else delete wrap.dataset.needsCardMod;
+      } catch {}
+      try { newEl.__ddcSourceConfig = this._cloneCardConfig_(cleanConfig); } catch {}
+      try {
+        const overflow = wrap.dataset?.overflow || wrap.style?.overflow;
+        if (overflow && newEl.style) newEl.style.overflow = overflow;
+      } catch {}
+
+      if (oldEl) wrap.replaceChild(newEl, oldEl);
+      else wrap.prepend(newEl);
+
+      await raf();
+      try {
+        newEl.hass = this.hass;
+        newEl.requestUpdate?.();
+        if (newEl.updateComplete) {
+          try { await newEl.updateComplete; } catch {}
+        }
+      } catch {}
+
+      // `ll-rebuild` intentionally is not dispatched here. It bubbles to the
+      // outer Lovelace card and can restore the pre-save layout before the
+      // edited config has been persisted, making a manual page refresh appear
+      // necessary even though the new value was already saved.
+      const isBubblePopup = !!this._isBubblePopupCardConfig_?.(cleanConfig);
+      wrap.classList?.toggle?.('ddc-bubble-popup-wrapper', isBubblePopup);
+      if (isBubblePopup) {
+        wrap.dataset.bubblePopupWrapper = 'true';
+        try { requestAnimationFrame(() => this._patchBubblePopupShadowStyles_?.(wrap)); } catch {}
+      } else {
+        try { delete wrap.dataset.bubblePopupWrapper; } catch {}
+      }
+      return newEl;
+    },
+
     _createCardAnchors_(wrap) {
       const host = document.createElement('div');
       host.className = 'ddc-card-anchors';
@@ -763,10 +810,6 @@ const cardBuilderMethods = {
         );
         wrap.classList.toggle('ddc-compact-edit-ui', compact);
         wrap.classList.toggle('ddc-tiny-edit-ui', tiny);
-        if (!compact) {
-          wrap.classList.remove('ddc-compact-actions-open', 'ddc-tiny-edit-ui');
-          if (this.__compactCardActionsMenu?.wrap === wrap) this._closeCompactCardActionsMenu_?.();
-        }
       } catch {}
     },
 
@@ -783,6 +826,56 @@ const cardBuilderMethods = {
         const button = wrap.querySelector?.(`.chip button[data-act="${act}"]`);
         button?.click?.();
       } catch {}
+    },
+
+    _createCardEditActions_(wrap) {
+      const host = document.createElement('div');
+      host.className = 'ddc-card-edit-actions';
+
+      const menuButton = document.createElement('button');
+      menuButton.type = 'button';
+      menuButton.className = 'ddc-compact-card-actions';
+      menuButton.setAttribute('title', 'Open card menu');
+      menuButton.setAttribute('aria-label', 'Open card menu');
+      menuButton.setAttribute('aria-haspopup', 'menu');
+      menuButton.setAttribute('aria-expanded', 'false');
+      menuButton.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
+
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'ddc-card-edit-shortcut';
+      editButton.setAttribute('title', 'Edit card');
+      editButton.setAttribute('aria-label', 'Edit card');
+      editButton.innerHTML = '<ha-icon icon="mdi:pencil-outline"></ha-icon>';
+
+      const stopActionEvent = (event) => event.stopPropagation();
+      [menuButton, editButton].forEach((button) => {
+        button.addEventListener('pointerdown', stopActionEvent, true);
+        button.addEventListener('mousedown', stopActionEvent, true);
+        button.addEventListener('touchstart', stopActionEvent, true);
+      });
+      menuButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this._openCompactCardActionsMenu_?.(wrap);
+      });
+      editButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this._runCardQuickAction_?.(wrap, 'edit');
+      });
+
+      const showForPointer = (event) => {
+        if (event?.pointerType === 'touch') return;
+        host.classList.add('ddc-card-edit-actions-visible');
+      };
+      const hideForPointer = () => {
+        host.classList.remove('ddc-card-edit-actions-visible');
+      };
+      wrap.addEventListener('pointerenter', showForPointer);
+      wrap.addEventListener('pointerleave', hideForPointer);
+      wrap.addEventListener('pointercancel', hideForPointer);
+
+      host.append(menuButton, editButton);
+      return host;
     },
 
     _syncCardOverflow_() {
@@ -845,32 +938,21 @@ const cardBuilderMethods = {
       settingsBtn.innerHTML = '<ha-icon icon="mdi:cog"></ha-icon><span>Settings</span>';
       chip.appendChild(settingsBtn);
 
-      const compactActionsBtn = document.createElement('button');
-      compactActionsBtn.type = 'button';
-      compactActionsBtn.className = 'ddc-compact-card-actions';
-      compactActionsBtn.setAttribute('title', 'Card actions');
-      compactActionsBtn.setAttribute('aria-label', 'Card actions');
-      compactActionsBtn.setAttribute('aria-haspopup', 'menu');
-      compactActionsBtn.setAttribute('aria-expanded', 'false');
-      compactActionsBtn.innerHTML = '<ha-icon icon="mdi:dots-grid"></ha-icon>';
-      const stopCompactActionEvent = (ev) => {
-        ev.stopPropagation();
-      };
-      compactActionsBtn.addEventListener('pointerdown', stopCompactActionEvent, true);
-      compactActionsBtn.addEventListener('mousedown', stopCompactActionEvent, true);
-      compactActionsBtn.addEventListener('touchstart', stopCompactActionEvent, true);
-      compactActionsBtn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        this._openCompactCardActionsMenu_?.(wrap);
-      });
+      const editActions = this._createCardEditActions_(wrap);
   
       // Create a dedicated delete handle that sits in the top‑left corner. This
       // replaces the delete button in the chip and mimics the resize handle in
       // style. Clicking it will remove the card (or multiple cards if a group
       // selection exists).
-      const delHandle = document.createElement('div');
+      const delHandle = document.createElement('button');
+      delHandle.type = 'button';
       delHandle.className = 'delete-handle';
+      delHandle.setAttribute('title', 'Delete card');
+      delHandle.setAttribute('aria-label', 'Delete card');
       delHandle.innerHTML = `<ha-icon icon="mdi:close-thick"></ha-icon>`;
+      ['pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
+        delHandle.addEventListener(type, (event) => event.stopPropagation(), true);
+      });
       delHandle.addEventListener('click', (e) => {
         e.stopPropagation();
         // When multiple cards are selected and the current wrapper is among them,
@@ -972,11 +1054,19 @@ const cardBuilderMethods = {
           this._resizeContainer();
           this._queueSave('duplicate');
         } else if (act === 'front') {
-          // Bring forward by one layer
-          this._adjustZ(wrap, +1);
+          const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
+          targets.forEach((target) => {
+            const current = parseInt(target.style.zIndex || '1', 10);
+            target.style.zIndex = String(Math.max(1, Math.min(9999, current + 1)));
+          });
+          this._queueSave('z-change');
         } else if (act === 'back')  {
-          // Send backward by one layer
-          this._adjustZ(wrap, -1);
+          const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
+          targets.forEach((target) => {
+            const current = parseInt(target.style.zIndex || '1', 10);
+            target.style.zIndex = String(Math.max(1, Math.min(9999, current - 1)));
+          });
+          this._queueSave('z-change');
         } else if (act === 'front-most') {
           // Bring selected card(s) to the very front (highest z-index)
           const targets = (this._selection.size > 1 && this._selection.has(wrap)) ? Array.from(this._selection) : [wrap];
@@ -1020,31 +1110,8 @@ const cardBuilderMethods = {
           await this._openSmartPicker('edit', cfg, async (newCfg) => {
             const cleanCfg = this._sanitizeCardConfigForStorage_(newCfg || {});
             try { this._rememberHtmlCardConfigOverride_?.(cfg, cleanCfg); } catch {}
-            const oldEl = wrap.firstElementChild;
-            const newEl = await this._createCard(cleanCfg);
-  
-            // persist cfg on wrapper (and card-mod flag if you use it)
-            try {
-              wrap.dataset.cfg = JSON.stringify(cleanCfg);
-              if (this._hasCardModDeep?.(cleanCfg)) wrap.dataset.needsCardMod = 'true';
-              else delete wrap.dataset.needsCardMod;
-            } catch {}
+            await this._replaceEditedCardElement_(wrap, cleanCfg);
             try { this._updateCardConfigAcrossResponsiveLayouts_?.(wrap.dataset.layoutCardId, cleanCfg); } catch {}
-  
-            // swap the element
-            wrap.replaceChild(newEl, oldEl);
-  
-            // ensure connected before driving updates (important for Lit cards)
-            await raf();
-            try {
-              newEl.hass = this.hass;
-              newEl.requestUpdate?.();
-              if (newEl.updateComplete) { try { await newEl.updateComplete; } catch {} }
-            } catch {}
-  
-            try { this._rebuildOnce(newEl); } catch {}
-            try { newEl.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true })); } catch {}
-  
             this._resizeContainer?.();
   
             // Persist immediately, but keep the dashboard mounted. The edited
@@ -1123,7 +1190,7 @@ const cardBuilderMethods = {
       }
   
       // include the delete handle before resize handles so it appears beneath them in the DOM
-      wrap.append(cardEl, shield, anchors, chip, compactActionsBtn, delHandle, resizeLeftHandle, resizeRightHandle);
+      wrap.append(cardEl, shield, anchors, chip, editActions, delHandle, resizeLeftHandle, resizeRightHandle);
       // DDC patch: trigger one-time rebuild so nested card_mod attaches
       try { this._rebuildOnce(cardEl); } catch {}
       this.__ddcTextLockDirty = true;
@@ -1138,7 +1205,7 @@ const cardBuilderMethods = {
       wrap.addEventListener('dblclick', (ev) => {
         if (!this.editMode) return;
         // Ignore double clicks originating from controls within the wrapper
-        if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip') || ev.target.closest('.ddc-compact-card-actions')) return;
+        if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip') || ev.target.closest('.ddc-card-edit-actions')) return;
         ev.stopPropagation();
         try {
           const btn = wrap.querySelector('.chip button[data-act="edit"]');

@@ -131,6 +131,7 @@ const lifecycleMethods = {
     },
 
   disconnectedCallback() {
+      try { this._clearEditorAppearance_?.(); } catch {}
       try { this._uninstallGridObservers_(); } catch {}
       try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
       try { this._applyHaChromeVisibility_?.(); } catch {}
@@ -205,6 +206,7 @@ const lifecycleMethods = {
       this.__streamlinedToolbarROTarget = null;
       try { this._removeToolbarFollowListeners_?.(); } catch {}
       try { this._removeEmptyPlaceholderCentering_?.(); } catch {}
+      try { this._destroySelectionArrangeToolbar_?.(); } catch {}
 
       if (this.__lpInstalled && this.__lpHandlers) {
         const cont = this.cardContainer;

@@ -5,8 +5,116 @@
  * theme-derived variables, and animated card presentation state.
  */
 
-/* Dashboard theme, shadows, and visual refresh helpers. */
+const EDITOR_THEME_MODES = new Set(['light', 'dark', 'dashboard']);
+
+export function normalizeEditorThemeMode(value = 'light') {
+  const mode = String(value || '').trim().toLowerCase();
+  if (mode === 'follow-dashboard' || mode === 'follow_dashboard' || mode === 'auto') return 'dashboard';
+  return EDITOR_THEME_MODES.has(mode) ? mode : 'light';
+}
+
+/* Dashboard theme, editor appearance, shadows, and visual refresh helpers. */
 const dashboardVisualMethods = {
+  _normalizeEditorThemeMode_(value = 'light') {
+    return normalizeEditorThemeMode(value);
+  },
+
+  _getEditorThemeStorageKey_() {
+    const dashboardKey = String(this.storageKey || this._config?.storage_key || 'default').trim() || 'default';
+    return `ddc_editor_theme_mode_${dashboardKey}`;
+  },
+
+  _getEditorThemeMode_() {
+    const preferenceKey = this._getEditorThemeStorageKey_();
+    if (this.__editorThemePreferenceLoadedForKey !== preferenceKey) {
+      let storedMode = null;
+      try { storedMode = localStorage.getItem(preferenceKey); } catch {}
+      this.editorThemeMode = normalizeEditorThemeMode(storedMode ?? 'light');
+      this.__editorThemePreferenceLoadedForKey = preferenceKey;
+    }
+    return normalizeEditorThemeMode(this.editorThemeMode);
+  },
+
+  _getResolvedEditorThemeMode_() {
+    const mode = this._getEditorThemeMode_();
+    return mode === 'dashboard'
+      ? (this._getEffectiveDashboardThemeMode_?.() === 'dark' ? 'dark' : 'light')
+      : mode;
+  },
+
+  _syncEditorThemeButton_() {
+    const button = this.editorThemeBtn || this.shadowRoot?.querySelector?.('#editorThemeBtn');
+    if (!button) return;
+    const mode = this._getEditorThemeMode_();
+    const resolved = this._getResolvedEditorThemeMode_();
+    const meta = mode === 'dashboard'
+      ? { icon: 'mdi:theme-light-dark', label: 'Editor: Dashboard', name: `Follow dashboard (${resolved})` }
+      : mode === 'dark'
+        ? { icon: 'mdi:moon-waning-crescent', label: 'Editor: Dark', name: 'Dark editor' }
+        : { icon: 'mdi:white-balance-sunny', label: 'Editor: Light', name: 'Light editor' };
+    const icon = button.querySelector?.('ha-icon');
+    const label = button.querySelector?.('.label');
+    if (icon) icon.setAttribute('icon', meta.icon);
+    if (label) label.textContent = meta.label;
+    button.dataset.tooltip = `${meta.name}. Click to change appearance.`;
+    button.title = button.dataset.tooltip;
+    button.setAttribute('aria-label', button.dataset.tooltip);
+    button.setAttribute('data-editor-theme-mode', mode);
+  },
+
+  _syncEditorThemeSurfaces_() {
+    const resolved = this._getResolvedEditorThemeMode_();
+    this.shadowRoot?.querySelectorAll?.('.modal')?.forEach?.((modal) => {
+      try { modal.dataset.ddcTheme = resolved; } catch {}
+    });
+  },
+
+  _applyEditorAppearance_() {
+    if (!this.editMode) {
+      this._clearEditorAppearance_();
+      return;
+    }
+    const mode = this._getEditorThemeMode_();
+    const resolved = this._getResolvedEditorThemeMode_();
+    this.setAttribute?.('data-ddc-editor-theme', mode);
+    this.setAttribute?.('data-ddc-editor-resolved-theme', resolved);
+    this._syncEditorThemeSurfaces_();
+    this._syncEditorThemeButton_();
+  },
+
+  _clearEditorAppearance_() {
+    this.removeAttribute?.('data-ddc-editor-theme');
+    this.removeAttribute?.('data-ddc-editor-resolved-theme');
+    const dashboardMode = this._getEffectiveDashboardThemeMode_?.() === 'dark' ? 'dark' : 'light';
+    this.shadowRoot?.querySelectorAll?.('.modal')?.forEach?.((modal) => {
+      try { modal.dataset.ddcTheme = dashboardMode; } catch {}
+    });
+  },
+
+  _setEditorThemeMode_(value, { persist = true, announce = false } = {}) {
+    const mode = normalizeEditorThemeMode(value);
+    this.editorThemeMode = mode;
+    const preferenceKey = this._getEditorThemeStorageKey_();
+    this.__editorThemePreferenceLoadedForKey = preferenceKey;
+    if (persist) {
+      try { localStorage.setItem(preferenceKey, mode); } catch {}
+    }
+    if (this.editMode) this._applyEditorAppearance_();
+    else this._syncEditorThemeButton_();
+    if (announce) {
+      const label = mode === 'dashboard' ? 'Following dashboard theme' : `${mode[0].toUpperCase()}${mode.slice(1)} editor`;
+      this._toast?.(label);
+    }
+    return mode;
+  },
+
+  _cycleEditorThemeMode_() {
+    const order = ['light', 'dark', 'dashboard'];
+    const current = this._getEditorThemeMode_();
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    return this._setEditorThemeMode_(next, { persist: true, announce: true });
+  },
+
   _getAvailableDashboardThemeNames_() {
     try {
       const themes = this.hass?.themes?.themes || this.hass?.themes;

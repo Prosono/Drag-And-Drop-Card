@@ -163,7 +163,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
             </select>
           </div>
         </div>
-        <div class="hint">Choose whether the canvas scales as one surface, uses exact custom dimensions, or follows a preset.</div>
+        <div class="hint">Auto chooses separate Desktop, Tablet, and Mobile layouts from the browser's CSS viewport. For one fixed wall panel, use Fixed (custom) or Preset.</div>
       </div>
 
       <!-- AUTO VIEWPORT LIMITS -->
@@ -175,7 +175,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
           <div class="control auto-viewport-limits" role="group" aria-label="Auto viewport limits">
             <label class="auto-viewport-limit-field" for="ddc-setting-autoViewportMaxWidth">
-              <span>Max width</span>
+              <span>Live width cap</span>
               <input type="number" id="ddc-setting-autoViewportMaxWidth" min="0" max="10000" step="10" placeholder="Unlimited" />
             </label>
             <label class="auto-viewport-limit-field" for="ddc-setting-autoScaleMax">
@@ -185,7 +185,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
         </div>
         <div class="hint auto-viewport-help">
-          <p><strong>Max width</strong> sets the largest real screen width the live Auto canvas may use. For example, 1600 makes an ultrawide screen behave as if the canvas has at most 1600 px available, and the canvas is centered.</p>
+          <p><strong>Live width cap</strong> is an upper limit in CSS pixels, not a target resolution. For example, 2560 uses the available browser width up to 2560 px; it does not force a 2560 px canvas.</p>
           <p><strong>Max scale</strong> sets how much the whole canvas may grow. For example, 1 means the canvas never grows beyond its original design size, while 1.2 allows 20% enlargement.</p>
           <p><strong>Empty or 0</strong> keeps the previous unlimited behavior.</p>
         </div>
@@ -249,6 +249,23 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
         </div>
         <div class="hint" id="ddc-setting-dashboardThemeHint">Pick the Home Assistant theme this dashboard should inherit from.</div>
+      </div>
+
+      <div class="setting" role="group" aria-labelledby="lbl-editor-theme-mode">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:monitor-edit" aria-hidden="true"></ha-icon>
+            <label id="lbl-editor-theme-mode" for="ddc-setting-editorThemeMode">Editor appearance</label>
+          </div>
+          <div class="control">
+            <select id="ddc-setting-editorThemeMode">
+              <option value="light">Light (recommended)</option>
+              <option value="dark">Dark</option>
+              <option value="dashboard">Follow dashboard</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint">Controls DDC toolbars, dialogs, and editing controls only. The dashboard theme is restored when edit mode closes.</div>
       </div>
 
       <div class="setting" role="group" aria-labelledby="lbl-dashboard-theme-override">

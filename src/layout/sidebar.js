@@ -1844,9 +1844,15 @@ const sidebarMethods = {
       </button>
     `;
 
-    const delHandle = document.createElement('div');
+    const delHandle = document.createElement('button');
+    delHandle.type = 'button';
     delHandle.className = 'delete-handle';
+    delHandle.setAttribute('title', 'Delete card');
+    delHandle.setAttribute('aria-label', 'Delete card');
     delHandle.innerHTML = `<ha-icon icon="mdi:close-thick"></ha-icon>`;
+    ['pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
+      delHandle.addEventListener(type, (event) => event.stopPropagation(), true);
+    });
     delHandle.addEventListener('click', (ev) => {
       ev.stopPropagation();
       wrap.remove();
@@ -1893,26 +1899,15 @@ const sidebarMethods = {
         const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
         await this._openSmartPicker('edit', cfg, async (newCfg) => {
           const cleanCfg = this._sanitizeCardConfigForStorage_(newCfg || {});
-          const oldEl = wrap.firstElementChild;
-          const newEl = await this._createCard(cleanCfg);
-          try {
-            wrap.dataset.cfg = JSON.stringify(cleanCfg);
-            if (this._hasCardModDeep?.(cleanCfg)) wrap.dataset.needsCardMod = 'true';
-            else delete wrap.dataset.needsCardMod;
-          } catch {}
-          wrap.replaceChild(newEl, oldEl);
-          try {
-            newEl.hass = this.hass;
-            newEl.requestUpdate?.();
-            if (newEl.updateComplete) { try { await newEl.updateComplete; } catch {} }
-          } catch {}
-          try { this._rebuildOnce(newEl); } catch {}
+          await this._replaceEditedCardElement_(wrap, cleanCfg);
           this._syncSidebarLayoutToConfig_?.();
           this._updateSidebarHeader_?.();
           this._queueSave?.('sidebar-edit-card');
         });
       }
     });
+
+    const editActions = this._createCardEditActions_(wrap);
 
     const shield = document.createElement('div');
     shield.className = 'shield';
@@ -1931,13 +1926,14 @@ const sidebarMethods = {
       }
     } catch {}
 
-    wrap.append(cardEl, shield, chip, delHandle, resizeHandle);
+    wrap.append(cardEl, shield, chip, editActions, delHandle, resizeHandle);
     wrap.addEventListener('dblclick', (ev) => {
       if (!this.editMode) return;
-      if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip')) return;
+      if (ev.target.closest('.resize-handle') || ev.target.closest('.delete-handle') || ev.target.closest('.chip') || ev.target.closest('.ddc-card-edit-actions')) return;
       ev.stopPropagation();
       wrap.querySelector('.chip button[data-act="edit"]')?.click?.();
     });
+    requestAnimationFrame(() => this._syncCompactEditUiForWrapper_?.(wrap));
     return wrap;
   },
 
@@ -2086,6 +2082,7 @@ const sidebarMethods = {
           wrap.style.width = `${rect.width}px`;
           wrap.style.height = `${rect.height}px`;
           this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+          this._syncCompactEditUiForWrapper_?.(wrap);
         },
         end: () => {
           const gs = Math.max(1, Number(this.gridSize || 20) || 20);
@@ -2097,6 +2094,7 @@ const sidebarMethods = {
           wrap.style.width = `${rect.width}px`;
           wrap.style.height = `${rect.height}px`;
           this._setSidebarCardPosition_(wrap, rect.x, rect.y);
+          this._syncCompactEditUiForWrapper_?.(wrap);
           wrap.classList.remove('dragging');
           this.__sidebarResizingCard = false;
           this._syncSidebarLayoutToConfig_?.();

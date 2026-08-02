@@ -30,7 +30,8 @@ const dashboardSettingsMethods = {
     // Build modal container
     const modal = document.createElement('div');
     modal.className = 'modal';
-    const settingsThemeMode = this._getEffectiveDashboardThemeMode_?.()
+    const settingsThemeMode = this._getResolvedEditorThemeMode_?.()
+      || this._getEffectiveDashboardThemeMode_?.()
       || (window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light');
     modal.dataset.ddcTheme = settingsThemeMode === 'dark' ? 'dark' : 'light';
     // Use the existing .dialog styles for consistent centering and sizing. Limit
@@ -166,6 +167,9 @@ const dashboardSettingsMethods = {
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
     const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
+    const selEditorThemeMode = modal.querySelector('#ddc-setting-editorThemeMode');
+    const initialEditorThemeMode = this._getEditorThemeMode_?.() || 'light';
+    let editorThemeModeCommitted = false;
     const txtDashboardThemeHint = modal.querySelector('#ddc-setting-dashboardThemeHint');
     const chkDashboardThemeOverrideAllDesign = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesign');
     const txtDashboardThemeOverrideAllDesignHint = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesignHint');
@@ -1431,6 +1435,7 @@ const dashboardSettingsMethods = {
     });
     if (chkOverlap) chkOverlap.checked = !!this.disableOverlap;
     if (selDashboardTheme) selDashboardTheme.value = String(this.dashboardTheme || '');
+    if (selEditorThemeMode) selEditorThemeMode.value = this._getEditorThemeMode_?.() || 'light';
     if (chkDashboardThemeOverrideAllDesign) chkDashboardThemeOverrideAllDesign.checked = !!this.dashboardThemeOverrideAllDesign;
     updateDashboardThemeState();
     if (inpCBg)     inpCBg.value       = String(this.containerBackground || '');
@@ -1500,6 +1505,10 @@ const dashboardSettingsMethods = {
     selDashboardTheme?.addEventListener('change', () => {
       updateDashboardThemeState();
       applyLiveDashboardThemePreview();
+    });
+    selEditorThemeMode?.addEventListener('change', () => {
+      const previewMode = this._normalizeEditorThemeMode_?.(selEditorThemeMode.value) || 'light';
+      this._setEditorThemeMode_?.(previewMode, { persist: false });
     });
     chkDashboardThemeOverrideAllDesign?.addEventListener('change', () => {
       updateDashboardThemeState();
@@ -2704,6 +2713,9 @@ const dashboardSettingsMethods = {
 
     // Remove modal helper
     const closeModal = () => {
+      if (!editorThemeModeCommitted) {
+        this._setEditorThemeMode_?.(initialEditorThemeMode, { persist: false });
+      }
       try { closeFeatureEditor(); } catch {}
       try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
       try { clearTimeout(particlesPreviewTimer); } catch {}
@@ -2748,6 +2760,7 @@ const dashboardSettingsMethods = {
       const newDashboardTheme = String(selDashboardTheme?.value || '').trim();
       const newDashboardThemeEnabled = !!newDashboardTheme;
       const newDashboardThemeOverrideAllDesign = !!newDashboardTheme && !!chkDashboardThemeOverrideAllDesign?.checked;
+      const newEditorThemeMode = this._normalizeEditorThemeMode_?.(selEditorThemeMode?.value) || 'light';
       const newCBg       = (inpCBg?.value || '').trim();
       const newApplyPageBg = !!chkApplyPageBg?.checked;
       const newCardBg    = (inpCardBg?.value || '').trim();
@@ -2821,6 +2834,8 @@ const dashboardSettingsMethods = {
           if (inpStorageKey) inpStorageKey.value = resolvedStorageKey;
           this._syncEditorsStorageKey?.();
         }
+        editorThemeModeCommitted = true;
+        this._setEditorThemeMode_?.(newEditorThemeMode, { persist: true });
 
         // Auto resize cards
         this.autoResizeCards = newAuto;

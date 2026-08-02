@@ -268,12 +268,12 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `drag_live_snap`               | boolean   | `false`                    | Snap while dragging/resizing (live feedback). |
 | `auto_save`                    | boolean   | `true`                     | Automatically save changes. |
 | `auto_save_debounce`           | number    | `800`                      | Debounce window (ms) for auto-save. |
-| `container_size_mode`          | string    | `auto`                     | `auto` (responsive scaled canvas), `fixed_custom`, or `preset`. Legacy `dynamic` configs are automatically migrated to `auto`. |
+| `container_size_mode`          | string    | `auto`                     | `auto` selects separate Desktop/Tablet/Mobile layouts from the browser's CSS viewport. Use `fixed_custom` or `preset` for one exact wall-panel canvas. Legacy `dynamic` configs are automatically migrated to `auto`. |
 | `container_fixed_width`        | number    | `null`                     | Fixed width (px) when `fixed_custom`. |
 | `container_fixed_height`       | number    | `null`                     | Fixed height (px) when `fixed_custom`. |
 | `container_preset`             | string    | `fhd` / `fullhd`           | Device/display preset key (see below) when `preset`. |
 | `container_preset_orientation` | string    | `auto`                     | `auto` \| `portrait` \| `landscape`. |
-| `auto_viewport_max_width`      | number    | `0`                        | Caps the live Auto canvas viewport width in px. `0` or empty keeps the old unlimited behavior. |
+| `auto_viewport_max_width`      | number    | `0`                        | Upper limit for the live Auto canvas width in CSS px; it is not a target resolution. `0` or empty keeps the old unlimited behavior. |
 | `auto_scale_max`               | number    | `0`                        | Caps the live Auto canvas scale. `0` or empty keeps the old unlimited behavior. |
 | `container_background`         | string    | `transparent`              | Canvas background (e.g. color/gradient). |
 | `card_background`              | string    | `var(--ha-card-background, var(--card-background-color))` | Default background for wrapped cards. |
@@ -314,6 +314,14 @@ Below is a summary of the main configuration options. Many have reasonable defau
 
 Use the **Add** button in edit mode to pick from standard Lovelace cards or drag across an area to add a card directly to the grid.
 
+The picker offers three ways to start:
+
+- **Cards** — choose the exact Home Assistant or Drag & Drop Card type.
+- **By entity** — search for an entity, then choose from every compatible starting card. The domain-aware recommendation appears first, while alternatives such as Tile, Button, Entity, Glance, graphs, and DDC Icon remain available when supported. Installed custom cards are detected from Home Assistant's card registry and included when they safely match the selected domain, including Mushroom, Bubble Card, Button Card, Mini Graph Card, and other recognized cards. Compatible owned or free single-card designs from HADS are included too; selecting one downloads it, replaces its original entity with your selection, and opens the normal editor before it is added.
+- **HADS** — browse cards and dashboard packages from the Home Assistant Dashboard Store.
+
+The selected card remains fully editable through the visual and YAML editors before it is added.
+
 Each added card is wrapped in a draggable/resizable container that participates in snapping and layout persistence.
 
 ---
@@ -323,7 +331,11 @@ Each added card is wrapped in a draggable/resizable container that participates 
 - Layouts are saved **per `storage_key`**.
 - Primary storage uses Home Assistant’s **backend integration** when available; otherwise falls back to **`localStorage`** (`ddc_local_<storage_key>`) in the browser.
 - When backend becomes available, **local layouts are migrated automatically**.
+- When the backend is connected, a reload treats its shared snapshot as authoritative instead of allowing an older browser-local copy to overwrite it.
+- Saves use a three-way merge, so independent PC and tablet edits are preserved across responsive profiles. If both devices change the exact same field before either reloads, the device that saves last resolves that field.
 - **Auto-save** is enabled by default; you can also use the **Apply** button or **Ctrl/Cmd + S** in edit mode for manual saves.
+
+In **Auto** mode, Live View reports the browser viewport in **CSS pixels** and selects a Desktop, Tablet, or Mobile profile. A high-density 2560×1600 tablet can therefore report roughly half that size when its device-pixel ratio is 2. `auto_viewport_max_width` is only a width cap. For a dashboard that targets one wall panel and should always use one exact design surface, choose **Fixed (custom)** or a matching **Preset** instead.
 
 ---
 
@@ -500,7 +512,7 @@ These are the most important option keys for an LLM to know:
 | `auto_save` | boolean | Save automatically |
 | `auto_save_debounce` | number | Auto-save delay in ms |
 | `container_size_mode` | string | `auto`, `fixed_custom`, `preset` |
-| `auto_viewport_max_width` | number | Maximum live Auto viewport width in px; `0` means unlimited |
+| `auto_viewport_max_width` | number | Upper limit for the live Auto viewport width in CSS px; it does not force that width. `0` means unlimited |
 | `auto_scale_max` | number | Maximum live Auto scale; `0` means unlimited |
 | `container_background` | string | Dashboard background color or gradient |
 | `card_background` | string | Default wrapped card background |
@@ -844,6 +856,8 @@ The dashboard can also contain normal Lovelace cards such as:
 - `history-graph`
 - `picture-entity`
 - `picture-glance`
+- `weather-forecast`
+- `todo-list`
 
 These should be placed in `entry.card` exactly as a normal Lovelace card config.
 

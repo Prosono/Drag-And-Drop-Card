@@ -129,8 +129,8 @@ const cardSettingsMenuMethods = {
     const margin = 10;
     const viewportW = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
     const viewportH = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
-    const menuW = Math.max(210, menu.offsetWidth || 236);
-    const menuH = Math.max(120, menu.offsetHeight || 320);
+    const menuW = Math.max(276, menu.offsetWidth || 296);
+    const menuH = Math.max(180, menu.offsetHeight || 470);
 
     let left = rect.right - menuW;
     let top = rect.bottom + 8;
@@ -157,6 +157,7 @@ const cardSettingsMenuMethods = {
 
     const root = document.createElement('div');
     root.className = 'ddc-compact-actions-backdrop';
+    const trigger = wrap.querySelector?.('.ddc-compact-card-actions');
     const menu = document.createElement('div');
     menu.className = 'ddc-compact-actions-menu';
     menu.setAttribute('role', 'menu');
@@ -167,25 +168,76 @@ const cardSettingsMenuMethods = {
     menu.addEventListener('mousedown', stopEvt, true);
     menu.addEventListener('touchstart', stopEvt, true);
 
-    const actions = [
-      { action: 'edit', icon: 'mdi:pencil', label: 'Edit' },
-      { action: 'duplicate', icon: 'mdi:content-copy', label: 'Duplicate' },
-      { action: 'export-card', icon: 'mdi:download-box-outline', label: 'Export' },
-      { action: 'settings', icon: 'mdi:cog-outline', label: 'Settings' },
-      { action: 'front', icon: 'mdi:arrange-bring-forward', label: 'Forward' },
-      { action: 'back', icon: 'mdi:arrange-send-backward', label: 'Backward' },
-      { action: 'front-most', icon: 'mdi:arrange-bring-to-front', label: 'To front' },
-      { action: 'back-most', icon: 'mdi:arrange-send-to-back', label: 'To back' },
-      { action: 'delete', icon: 'mdi:trash-can-outline', label: 'Delete', danger: true },
-    ];
+    const selected = Array.from(this._selection || []);
+    const selectionCount = selected.length > 1 && selected.includes(wrap) ? selected.length : 1;
+    const isSidebarCard = wrap.dataset?.sidebarCard === '1';
+    const config = this._extractCardConfig?.(wrap.firstElementChild) || {};
+    const cardType = String(config.type || 'card').replace(/^custom:/, '').replace(/-/g, ' ');
 
-    actions.forEach(({ action, icon, label, danger = false }) => {
+    const header = document.createElement('header');
+    header.className = 'ddc-compact-actions-header';
+    const headerIcon = document.createElement('span');
+    headerIcon.className = 'ddc-compact-actions-header-icon';
+    headerIcon.innerHTML = '<ha-icon icon="mdi:card-bulleted-settings-outline"></ha-icon>';
+    const headerCopy = document.createElement('span');
+    headerCopy.className = 'ddc-compact-actions-header-copy';
+    const headerTitle = document.createElement('strong');
+    headerTitle.textContent = 'Card menu';
+    const headerSubtitle = document.createElement('small');
+    headerSubtitle.textContent = selectionCount > 1
+      ? `${selectionCount} selected cards`
+      : cardType;
+    headerCopy.append(headerTitle, headerSubtitle);
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'ddc-compact-actions-close';
+    closeButton.setAttribute('aria-label', 'Close card menu');
+    closeButton.setAttribute('title', 'Close');
+    closeButton.innerHTML = '<ha-icon icon="mdi:close"></ha-icon>';
+    closeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this._closeCompactCardActionsMenu_();
+      trigger?.focus?.();
+    });
+    header.append(headerIcon, headerCopy, closeButton);
+    menu.appendChild(header);
+
+    const makeGroup = (label, className = '') => {
+      const section = document.createElement('section');
+      section.className = `ddc-compact-actions-group${className ? ` ${className}` : ''}`;
+      if (label) {
+        const heading = document.createElement('span');
+        heading.className = 'ddc-compact-actions-group-label';
+        heading.textContent = label;
+        section.appendChild(heading);
+      }
+      const actionsHost = document.createElement('div');
+      actionsHost.className = 'ddc-compact-actions-group-buttons';
+      section.appendChild(actionsHost);
+      menu.appendChild(section);
+      return actionsHost;
+    };
+    const appendAction = (host, {
+      action,
+      icon,
+      label,
+      description = '',
+      danger = false,
+      featured = false,
+      compact = false,
+    }) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = danger ? 'danger' : '';
+      btn.className = [
+        danger ? 'danger' : '',
+        featured ? 'featured' : '',
+        compact ? 'compact' : '',
+      ].filter(Boolean).join(' ');
       btn.dataset.cardQuickAction = action;
       btn.setAttribute('role', 'menuitem');
-      btn.innerHTML = `<ha-icon icon="${icon}"></ha-icon><span>${label}</span>`;
+      btn.innerHTML = `
+        <span class="ddc-compact-actions-button-icon"><ha-icon icon="${icon}"></ha-icon></span>
+        <span class="ddc-compact-actions-button-copy"><strong>${label}</strong>${description ? `<small>${description}</small>` : ''}</span>`;
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         if (action === 'settings') {
@@ -195,14 +247,84 @@ const cardSettingsMenuMethods = {
         }
         this._runCardQuickAction_?.(wrap, action);
       });
-      menu.appendChild(btn);
+      host.appendChild(btn);
+      return btn;
+    };
+
+    const primaryActions = makeGroup('Open');
+    appendAction(primaryActions, {
+      action: 'edit',
+      icon: 'mdi:pencil-outline',
+      label: selectionCount > 1 ? 'Edit this card' : 'Edit card',
+      description: 'Content, entities and card options',
+      featured: true,
+    });
+    if (!isSidebarCard) {
+      appendAction(primaryActions, {
+        action: 'settings',
+        icon: 'mdi:tune-variant',
+        label: 'Card settings',
+        description: 'Appearance, overflow and behavior',
+      });
+    }
+
+    const manageActions = makeGroup('Manage');
+    appendAction(manageActions, {
+      action: 'duplicate',
+      icon: 'mdi:content-copy',
+      label: selectionCount > 1 ? 'Duplicate selection' : 'Duplicate',
+      description: selectionCount > 1 ? `${selectionCount} cards` : 'Create a copy',
+    });
+    if (!isSidebarCard) {
+      appendAction(manageActions, {
+        action: 'export-card',
+        icon: 'mdi:download-box-outline',
+        label: selectionCount > 1 ? 'Export this card' : 'Export',
+        description: 'Save as a file',
+      });
+    }
+
+    const layerActions = makeGroup(selectionCount > 1 ? 'Layer selection' : 'Layer', 'is-layer-grid');
+    (isSidebarCard
+      ? [
+          { action: 'front-most', icon: 'mdi:arrange-bring-to-front', label: 'To front' },
+          { action: 'back-most', icon: 'mdi:arrange-send-to-back', label: 'To back' },
+        ]
+      : [
+          { action: 'front-most', icon: 'mdi:arrange-bring-to-front', label: 'To front' },
+          { action: 'front', icon: 'mdi:arrange-bring-forward', label: 'Forward' },
+          { action: 'back', icon: 'mdi:arrange-send-backward', label: 'Backward' },
+          { action: 'back-most', icon: 'mdi:arrange-send-to-back', label: 'To back' },
+        ]
+    ).forEach((action) => appendAction(layerActions, { ...action, compact: true }));
+
+    const dangerActions = makeGroup('', 'is-danger-zone');
+    appendAction(dangerActions, {
+      action: 'delete',
+      icon: 'mdi:trash-can-outline',
+      label: selectionCount > 1 ? `Delete ${selectionCount} cards` : 'Delete card',
+      danger: true,
+    });
+
+    menu.addEventListener('keydown', (event) => {
+      const buttons = Array.from(menu.querySelectorAll('button:not(:disabled)'));
+      const activeElement = menu.getRootNode?.()?.activeElement || document.activeElement;
+      const current = buttons.indexOf(activeElement);
+      let next = -1;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = current < 0 ? 0 : (current + 1) % buttons.length;
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = current <= 0 ? buttons.length - 1 : current - 1;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = buttons.length - 1;
+      if (next >= 0) {
+        event.preventDefault();
+        buttons[next]?.focus?.();
+      }
     });
 
     const overlayRoot = this.shadowRoot || this;
     root.appendChild(menu);
     overlayRoot.appendChild(root);
 
-    const trigger = wrap.querySelector?.('.ddc-compact-card-actions');
     try { trigger?.setAttribute('aria-expanded', 'true'); } catch {}
     try { wrap.classList?.add('ddc-compact-actions-open'); } catch {}
 
@@ -215,7 +337,10 @@ const cardSettingsMenuMethods = {
       this._closeCompactCardActionsMenu_();
     };
     const closeOnEscape = (ev) => {
-      if (ev.key === 'Escape') this._closeCompactCardActionsMenu_();
+      if (ev.key === 'Escape') {
+        this._closeCompactCardActionsMenu_();
+        trigger?.focus?.();
+      }
     };
     const reposition = () => this._positionCompactCardActionsMenu_();
 
@@ -238,7 +363,10 @@ const cardSettingsMenuMethods = {
         window.removeEventListener('scroll', reposition, true);
       }
     };
-    requestAnimationFrame(() => this._positionCompactCardActionsMenu_());
+    requestAnimationFrame(() => {
+      this._positionCompactCardActionsMenu_();
+      menu.querySelector('[data-card-quick-action="edit"]')?.focus?.();
+    });
   },
 
   _positionCardSettingsMenu_() {

@@ -5,6 +5,16 @@
  * then builds the active responsive layout and refreshes post-load UI state.
  */
 
+export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot) {
+  if (backendSnapshot && typeof backendSnapshot === 'object') {
+    return { source: 'backend', snapshot: backendSnapshot };
+  }
+  if (localSnapshot && typeof localSnapshot === 'object') {
+    return { source: 'local', snapshot: localSnapshot };
+  }
+  return { source: 'none', snapshot: null };
+}
+
 const initialLoadMethods = {
   _prefersReducedMotion_() {
     try {
@@ -210,11 +220,14 @@ const initialLoadMethods = {
         const __rebuildAfter = [];
         let saved = null;
         let local = null;
+        let syncedWithBackend = false;
+        let authoritativeBackendSnapshot = null;
 
         // Try backend first if available
         if (this._backendOK && this.storageKey) {
           try {
             saved = await this._loadLayoutFromBackend(this.storageKey);
+            syncedWithBackend = !!(saved && typeof saved === 'object');
           } catch (e) {
             this._dbgPush('boot', 'Backend load failed', { error: String(e) });
           }
@@ -224,21 +237,22 @@ const initialLoadMethods = {
           local = this._readLocalLayoutSnapshot_?.();
         }
 
-        if (saved && local) {
-          const backendTime = this._layoutSnapshotTimestamp_(saved);
-          const localTime = this._layoutSnapshotTimestamp_(local);
-          if (localTime && (!backendTime || localTime > backendTime)) {
-            this._dbgPush('boot', 'Using newer local snapshot', { backendTime, localTime });
-            saved = local;
-            if (this._backendOK) {
-              try {
-                await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
-                this._dbgPush('boot', 'Repaired backend from newer local snapshot');
-              } catch (e) {
-                this._dbgPush('boot', 'Backend repair from local failed', { error: String(e) });
-              }
-            }
-          }
+        const selectedInitialSnapshot = selectInitialLayoutSnapshot(saved, local);
+        if (selectedInitialSnapshot.source === 'backend') {
+          saved = selectedInitialSnapshot.snapshot;
+          authoritativeBackendSnapshot = this._cloneJson_?.(saved) || saved;
+          syncedWithBackend = true;
+        }
+
+        // The shared backend is authoritative whenever it is reachable. A browser-local
+        // timestamp may be newer because of clock skew or an old offline session and must
+        // never overwrite a valid shared snapshot during refresh.
+        if (syncedWithBackend) {
+          this._dbgPush('boot', 'Using authoritative backend snapshot');
+          try {
+            localStorage.setItem(`ddc_local_${this.storageKey}`, JSON.stringify(saved));
+          } catch {}
+          try { this._writeRuntimeLayoutCache_?.(saved); } catch {}
         }
 
         // Fallback: localStorage (and migrate to backend if possible)
@@ -251,6 +265,7 @@ const initialLoadMethods = {
                 await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
                 this._dbgPush('boot', 'Migrated local -> backend');
                 saved = local;
+                syncedWithBackend = true;
               } catch (e) {
                 this._dbgPush('boot', 'Migration failed, staying local', { error: String(e) });
                 saved = local;
@@ -278,6 +293,11 @@ const initialLoadMethods = {
             saved = cached;
           }
         }
+
+        const syncedSnapshot = authoritativeBackendSnapshot || (syncedWithBackend ? saved : null);
+        this.__lastSyncedDashboardPayload = syncedSnapshot
+          ? (this._cloneJson_?.(this._normalizeDashboardPayload_(syncedSnapshot)) || syncedSnapshot)
+          : null;
 
         this._setDashboardPackages_(saved?.packages || []);
 

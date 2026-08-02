@@ -5,6 +5,122 @@
  * backend/local fallback behavior consistent.
  */
 
+const DDC_MERGE_MISSING = Symbol('ddc-merge-missing');
+
+function isPlainDashboardObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function cloneDashboardValue(value) {
+  if (value === DDC_MERGE_MISSING) return DDC_MERGE_MISSING;
+  if (value === undefined) return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
+}
+
+function dashboardValuesEqual(left, right) {
+  if (left === right) return true;
+  if (left === DDC_MERGE_MISSING || right === DDC_MERGE_MISSING) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => dashboardValuesEqual(value, right[index]));
+  }
+  if (isPlainDashboardObject(left) || isPlainDashboardObject(right)) {
+    if (!isPlainDashboardObject(left) || !isPlainDashboardObject(right)) return false;
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every((key) => (
+      Object.prototype.hasOwnProperty.call(right, key)
+      && dashboardValuesEqual(left[key], right[key])
+    ));
+  }
+  return false;
+}
+
+function canMergeArrayById(...arrays) {
+  const values = arrays.flatMap((value) => (Array.isArray(value) ? value : []));
+  return values.length > 0 && values.every((entry) => (
+    isPlainDashboardObject(entry)
+    && entry.id !== undefined
+    && entry.id !== null
+    && String(entry.id).trim() !== ''
+  ));
+}
+
+function mergeDashboardSyncValue(base, local, remote) {
+  if (dashboardValuesEqual(local, base)) return cloneDashboardValue(remote);
+  if (dashboardValuesEqual(remote, base)) return cloneDashboardValue(local);
+
+  if (local === DDC_MERGE_MISSING) return DDC_MERGE_MISSING;
+  if (remote === DDC_MERGE_MISSING) return cloneDashboardValue(local);
+
+  if (isPlainDashboardObject(local) && isPlainDashboardObject(remote)) {
+    const baseObject = isPlainDashboardObject(base) ? base : {};
+    const keys = new Set([
+      ...Object.keys(baseObject),
+      ...Object.keys(remote),
+      ...Object.keys(local),
+    ]);
+    const merged = {};
+    for (const key of keys) {
+      const next = mergeDashboardSyncValue(
+        Object.prototype.hasOwnProperty.call(baseObject, key) ? baseObject[key] : DDC_MERGE_MISSING,
+        Object.prototype.hasOwnProperty.call(local, key) ? local[key] : DDC_MERGE_MISSING,
+        Object.prototype.hasOwnProperty.call(remote, key) ? remote[key] : DDC_MERGE_MISSING
+      );
+      if (next !== DDC_MERGE_MISSING) merged[key] = next;
+    }
+    return merged;
+  }
+
+  if (Array.isArray(local) && Array.isArray(remote) && canMergeArrayById(base, local, remote)) {
+    const baseMap = new Map((Array.isArray(base) ? base : []).map((entry) => [String(entry.id), entry]));
+    const localMap = new Map(local.map((entry) => [String(entry.id), entry]));
+    const remoteMap = new Map(remote.map((entry) => [String(entry.id), entry]));
+    const orderedIds = [
+      ...local.map((entry) => String(entry.id)),
+      ...remote.map((entry) => String(entry.id)).filter((id) => !localMap.has(id)),
+    ];
+    const merged = [];
+    for (const id of orderedIds) {
+      const next = mergeDashboardSyncValue(
+        baseMap.has(id) ? baseMap.get(id) : DDC_MERGE_MISSING,
+        localMap.has(id) ? localMap.get(id) : DDC_MERGE_MISSING,
+        remoteMap.has(id) ? remoteMap.get(id) : DDC_MERGE_MISSING
+      );
+      if (next !== DDC_MERGE_MISSING) merged.push(next);
+    }
+    return merged;
+  }
+
+  // A true same-field conflict is resolved in favor of the editor that is currently saving.
+  return cloneDashboardValue(local);
+}
+
+function withoutDashboardSyncMetadata(value) {
+  const next = cloneDashboardValue(value && typeof value === 'object' ? value : {});
+  for (const key of ['updated_at', 'updatedAt', 'saved_at', 'savedAt']) delete next[key];
+  return next;
+}
+
+export function mergeDashboardSnapshots(base, local, remote, updatedAt = new Date().toISOString()) {
+  const merged = mergeDashboardSyncValue(
+    withoutDashboardSyncMetadata(base),
+    withoutDashboardSyncMetadata(local),
+    withoutDashboardSyncMetadata(remote)
+  );
+  const payload = isPlainDashboardObject(merged) ? merged : {};
+  payload.version = Math.max(3, Number(payload.version) || 0);
+  payload.updated_at = updatedAt;
+  return payload;
+}
+
 const persistenceMethods = {
   // ---------------- Dashboard URL helpers ----------------
   _getCurrentDashboardUrlPath_() {
@@ -310,9 +426,9 @@ const persistenceMethods = {
     this._persistCurrentResponsiveProfileToMemory_();
     try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
     this._recordLayoutHistoryCheckpoint_?.('save');
-    const desktopCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
+    let desktopCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || this._captureCurrentLayoutEntries_();
     const savedAt = new Date().toISOString();
-    const payload = {
+    let payload = {
        version: 3,
        updated_at: savedAt,
        options: this._exportableOptions(),
@@ -320,6 +436,32 @@ const persistenceMethods = {
        responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, desktopCards)),
        packages: this._exportDashboardPackages_(),
      };
+
+    if (this.storageKey && this._backendOK) {
+      try {
+        const remote = await this._loadLayoutFromBackend(this.storageKey);
+        if (remote && typeof remote === 'object') {
+          payload = this._mergeDashboardPayloadForSync_(
+            this.__lastSyncedDashboardPayload || remote,
+            payload,
+            remote,
+            savedAt
+          );
+          this._responsiveLayouts = this._normalizeResponsiveLayouts_(
+            payload.cards || [],
+            payload.responsive_layouts || null
+          );
+          desktopCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || payload.cards || desktopCards;
+          payload.cards = this._cloneJson_(desktopCards);
+          payload.responsive_layouts = this._cloneJson_(
+            this._serializeResponsiveLayouts_(this._responsiveLayouts, desktopCards)
+          );
+        }
+      } catch (mergeError) {
+        this._dbgPush?.('save', 'Remote merge skipped', { error: String(mergeError) });
+      }
+    }
+
     try {
       this._config = {
         ...(this._config || {}),
@@ -333,11 +475,13 @@ const persistenceMethods = {
     try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(payload)); } catch {}
 
     if (!this.storageKey) { if (!silent) this._toast('Saved locally (no storage_key set).');
+      this.__lastSyncedDashboardPayload = this._cloneJson_(payload);
       this.__dirty = false; this._updateApplyBtn();
       return; }
 
     try {
       await this._saveLayoutToBackend(this.storageKey, payload);
+      this.__lastSyncedDashboardPayload = this._cloneJson_(payload);
       if (!silent) {
         try { await this._persistThisCardConfigToStorage_?.(); } catch (persistErr) {
           console.warn('[drag-and-drop-card] Could not persist layout to Lovelace storage', persistErr);
@@ -350,6 +494,25 @@ const persistenceMethods = {
       this._dbgPush('save', 'Backend save failed', { error: String(e) });
       if (!silent) this._toast('Backend save failed — kept local copy.');
     }
+  },
+
+  _mergeDashboardPayloadForSync_(base, local, remote, updatedAt = new Date().toISOString()) {
+    const merged = mergeDashboardSnapshots(base, local, remote, updatedAt);
+    const normalized = this._normalizeDashboardPayload_(merged);
+    const responsiveLayouts = this._normalizeResponsiveLayouts_(
+      normalized?.cards || [],
+      normalized?.responsive_layouts || null
+    );
+    const primaryCards = responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || normalized?.cards || [];
+    return this._normalizeDashboardPayload_({
+      ...normalized,
+      version: 3,
+      updated_at: updatedAt,
+      cards: this._cloneJson_(primaryCards),
+      responsive_layouts: this._cloneJson_(
+        this._serializeResponsiveLayouts_(responsiveLayouts, primaryCards)
+      ),
+    });
   },
 
   async _probeBackend() {
@@ -443,31 +606,32 @@ const persistenceMethods = {
         this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true });
         this._syncLiveCardConfigsIntoResponsiveLayouts_?.();
       } catch {}
-      const curTime = this._layoutSnapshotTimestamp_(cur);
-      const localTime = this._layoutSnapshotTimestamp_(local);
-      const localIsNewer = !!(local && (!cur || (localTime && (!curTime || localTime > curTime))));
-      const base = localIsNewer
-        ? local
-        : ((cur && typeof cur === 'object')
-          ? cur
-          : ((local && typeof local === 'object') ? local : {}));
+      const base = this.__lastSyncedDashboardPayload
+        || ((cur && typeof cur === 'object') ? cur : ((local && typeof local === 'object') ? local : {}));
       const liveCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || this._captureCurrentLayoutEntries_?.() || [];
       const liveResponsiveLayouts = this._serializeResponsiveLayouts_
         ? this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, liveCards))
         : null;
       const normalizedOptions = this._normalizeDashboardOptions_(newOptions || this._exportableOptions?.() || {}, { requireSizeMode: true, forceAutoResize: true });
-      const merged = {
+      const localCandidate = {
         version: 3,
-        ...this._normalizeDashboardPayload_(base),
+        ...this._normalizeDashboardPayload_(base || {}),
         updated_at: new Date().toISOString(),
         options: normalizedOptions
       };
-      if (Array.isArray(liveCards) && liveCards.length) merged.cards = this._cloneJson_(liveCards);
-      else if (base && Array.isArray(base.cards)) merged.cards = base.cards;
-      if (liveResponsiveLayouts) merged.responsive_layouts = liveResponsiveLayouts;
-      else if (base && base.responsive_layouts) merged.responsive_layouts = base.responsive_layouts;
+      if (Array.isArray(liveCards) && liveCards.length) localCandidate.cards = this._cloneJson_(liveCards);
+      else if (base && Array.isArray(base.cards)) localCandidate.cards = base.cards;
+      if (liveResponsiveLayouts) localCandidate.responsive_layouts = liveResponsiveLayouts;
+      else if (base && base.responsive_layouts) localCandidate.responsive_layouts = base.responsive_layouts;
+      const merged = this._mergeDashboardPayloadForSync_(
+        base,
+        localCandidate,
+        (cur && typeof cur === 'object') ? cur : base,
+        localCandidate.updated_at
+      );
       try { localStorage.setItem(`ddc_local_${key || 'default'}`, JSON.stringify(merged)); } catch {}
       await this._saveLayoutToBackend(key, merged);
+      this.__lastSyncedDashboardPayload = this._cloneJson_(merged);
       return true;
     } catch (e) {
       console.warn('[ddc] saveOptionsToBackend failed', e);

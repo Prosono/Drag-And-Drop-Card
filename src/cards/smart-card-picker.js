@@ -12,6 +12,587 @@ const idle = () => new Promise((resolve) => (
   window.requestIdleCallback ? window.requestIdleCallback(() => resolve()) : window.setTimeout(resolve, 0)
 ));
 
+const isConfigObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+
+export function mergeVisualEditorConfig(currentConfig = {}, currentType = '', nextConfig = {}) {
+  if (!isConfigObject(nextConfig)) return isConfigObject(currentConfig) ? { ...currentConfig } : {};
+  const type = String(nextConfig.type || currentType || currentConfig?.type || '').trim();
+  return {
+    ...(isConfigObject(currentConfig) ? currentConfig : {}),
+    ...nextConfig,
+    ...(type ? { type } : {}),
+  };
+}
+
+export function readVisualEditorConfig(editor) {
+  if (!editor) return null;
+  try {
+    const config = editor.getConfig?.();
+    if (isConfigObject(config)) return { ...config };
+  } catch {}
+  for (const key of ['data', '_config', '_cfg', 'config']) {
+    try {
+      const config = editor[key];
+      if (isConfigObject(config)) return { ...config };
+    } catch {}
+  }
+  return null;
+}
+
+export function bridgeHaFormCardEditor(formEl, type, initialConfig = {}) {
+  if (!formEl) return formEl;
+  const cardType = String(type || initialConfig?.type || '').trim();
+  formEl.setConfig = (nextConfig = {}) => {
+    formEl.data = mergeVisualEditorConfig({}, cardType, nextConfig);
+  };
+  formEl.getConfig = () => mergeVisualEditorConfig({}, cardType, formEl.data || {});
+  formEl.setConfig(initialConfig);
+  formEl.addEventListener?.('value-changed', (event) => {
+    const nextConfig = event?.detail?.config ?? event?.detail?.value;
+    if (!isConfigObject(nextConfig)) return;
+    formEl.data = mergeVisualEditorConfig(formEl.data || {}, cardType, nextConfig);
+  });
+  return formEl;
+}
+
+const ENTITY_CARD_RECOMMENDATIONS = Object.freeze({
+  camera: {
+    type: 'picture-entity',
+    name: 'Picture entity',
+    icon: 'mdi:cctv',
+    reason: 'Shows the camera image instead of only its state.',
+  },
+  weather: {
+    type: 'weather-forecast',
+    name: 'Weather forecast',
+    icon: 'mdi:weather-partly-cloudy',
+    reason: 'Shows current conditions and the upcoming forecast.',
+  },
+  todo: {
+    type: 'todo-list',
+    name: 'To-do list',
+    icon: 'mdi:format-list-checks',
+    reason: 'Shows the actual tasks and lets you manage them.',
+  },
+  climate: {
+    type: 'thermostat',
+    name: 'Thermostat',
+    icon: 'mdi:thermostat',
+    reason: 'Adds temperature and climate controls.',
+  },
+  light: {
+    type: 'light',
+    name: 'Light',
+    icon: 'mdi:lightbulb-outline',
+    reason: 'Adds the controls available for this light.',
+  },
+  media_player: {
+    type: 'media-control',
+    name: 'Media control',
+    icon: 'mdi:play-circle-outline',
+    reason: 'Shows playback information and media controls.',
+  },
+  alarm_control_panel: {
+    type: 'alarm-panel',
+    name: 'Alarm panel',
+    icon: 'mdi:shield-home-outline',
+    reason: 'Adds the available alarm modes and controls.',
+  },
+  person: {
+    type: 'map',
+    name: 'Map',
+    icon: 'mdi:map-marker-account-outline',
+    reason: 'Shows this person on a map.',
+  },
+  device_tracker: {
+    type: 'map',
+    name: 'Map',
+    icon: 'mdi:map-marker-radius-outline',
+    reason: 'Shows this tracker on a map.',
+  },
+});
+
+const ENTITY_CARD_OPTION_DETAILS = Object.freeze({
+  tile: {
+    name: 'Tile',
+    icon: 'mdi:view-grid-outline',
+    reason: 'Compact state, actions, and supported controls.',
+  },
+  entity: {
+    name: 'Entity',
+    icon: 'mdi:checkbox-blank-circle-outline',
+    reason: 'A focused state card for one entity.',
+  },
+  button: {
+    name: 'Button',
+    icon: 'mdi:gesture-tap-button',
+    reason: 'A large touch target with tap actions.',
+  },
+  entities: {
+    name: 'Entities',
+    icon: 'mdi:format-list-bulleted',
+    reason: 'Starts an entity list with this entity included.',
+  },
+  glance: {
+    name: 'Glance',
+    icon: 'mdi:eye-outline',
+    reason: 'A compact overview that can grow into a group.',
+  },
+  'history-graph': {
+    name: 'History graph',
+    icon: 'mdi:chart-line',
+    reason: 'Shows how the entity state changed over time.',
+  },
+  'statistics-graph': {
+    name: 'Statistics graph',
+    icon: 'mdi:chart-bar',
+    reason: 'Plots long-term statistics for supported sensors.',
+  },
+  gauge: {
+    name: 'Gauge',
+    icon: 'mdi:gauge',
+    reason: 'Displays a numeric state against a range.',
+  },
+  sensor: {
+    name: 'Sensor',
+    icon: 'mdi:antenna',
+    reason: 'Shows the current numeric value and recent trend.',
+  },
+  'picture-glance': {
+    name: 'Picture glance',
+    icon: 'mdi:image-multiple-outline',
+    reason: 'Combines the live camera image with glance controls.',
+  },
+  'custom:ddc-icon-card': {
+    name: 'DDC Icon',
+    icon: 'mdi:star-four-points-circle',
+    reason: 'A minimal icon with state-aware color and actions.',
+  },
+});
+
+const DOMAIN_ENTITY_CARD_TYPES = Object.freeze({
+  camera: ['picture-entity', 'picture-glance'],
+  weather: ['weather-forecast'],
+  todo: ['todo-list'],
+  climate: ['thermostat'],
+  light: ['light'],
+  media_player: ['media-control'],
+  alarm_control_panel: ['alarm-panel'],
+  person: ['map'],
+  device_tracker: ['map'],
+});
+
+const UNIVERSAL_ENTITY_CARD_TYPES = Object.freeze([
+  'tile',
+  'button',
+  'entity',
+  'entities',
+  'glance',
+  'history-graph',
+  'custom:ddc-icon-card',
+]);
+
+const CUSTOM_CARD_DOMAIN_PROFILES = Object.freeze({
+  'mushroom-alarm-control-panel-card': ['alarm_control_panel'],
+  'mushroom-climate-card': ['climate'],
+  'mushroom-cover-card': ['cover'],
+  'mushroom-entity-card': ['*'],
+  'mushroom-fan-card': ['fan'],
+  'mushroom-humidifier-card': ['humidifier'],
+  'mushroom-light-card': ['light'],
+  'mushroom-lock-card': ['lock'],
+  'mushroom-media-player-card': ['media_player'],
+  'mushroom-number-card': ['number', 'input_number'],
+  'mushroom-person-card': ['person'],
+  'mushroom-select-card': ['select', 'input_select'],
+  'mushroom-template-card': ['*'],
+  'mushroom-update-card': ['update'],
+  'mushroom-vacuum-card': ['vacuum'],
+  'button-card': ['*'],
+  'bubble-card': ['*'],
+  'slider-button-card': ['light', 'switch', 'fan', 'cover', 'number', 'input_number'],
+  'mini-media-player': ['media_player'],
+  'simple-thermostat': ['climate'],
+  'light-entity-card': ['light', 'switch'],
+  'mini-graph-card': ['sensor', 'binary_sensor', 'number', 'input_number'],
+  'apexcharts-card': ['sensor', 'number', 'input_number'],
+  'vacuum-card': ['vacuum'],
+  'weather-card': ['weather'],
+  'clock-weather-card': ['weather'],
+});
+
+const CUSTOM_CARD_DOMAIN_TOKENS = Object.freeze({
+  alarm_control_panel: ['alarm'],
+  binary_sensor: ['binary-sensor'],
+  calendar: ['calendar'],
+  camera: ['camera'],
+  climate: ['climate', 'thermostat'],
+  cover: ['cover', 'blind', 'shutter'],
+  fan: ['fan'],
+  humidifier: ['humidifier'],
+  light: ['light', 'lighting'],
+  lock: ['lock'],
+  media_player: ['media-player', 'media'],
+  number: ['number'],
+  input_number: ['number'],
+  person: ['person'],
+  select: ['select'],
+  input_select: ['select'],
+  sensor: ['sensor'],
+  switch: ['switch'],
+  timer: ['timer'],
+  todo: ['todo', 'to-do'],
+  update: ['update'],
+  vacuum: ['vacuum'],
+  weather: ['weather'],
+});
+
+function normalizedCustomCardType(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.startsWith('custom:') ? raw : `custom:${raw}`;
+}
+
+function normalizedCustomCardBase(value = '') {
+  return normalizedCustomCardType(value).replace(/^custom:/, '').toLowerCase();
+}
+
+function declaredCustomCardDomains(card = {}) {
+  const raw = card.domains ?? card.entityDomains ?? card.entity_domains ?? card.domain;
+  const values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  return values
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function getCompatibleCustomCardsForEntity(entityId, registeredCards = []) {
+  const domain = entityDomain(entityId);
+  const seen = new Set();
+  return (Array.isArray(registeredCards) ? registeredCards : [])
+    .map((card) => {
+      const type = normalizedCustomCardType(card?.type);
+      const base = normalizedCustomCardBase(type);
+      if (!type || !base || seen.has(type)) return null;
+      if (base.startsWith('ddc-') || base === 'drag-and-drop-card') return null;
+
+      const declaredDomains = declaredCustomCardDomains(card);
+      const profiledDomains = CUSTOM_CARD_DOMAIN_PROFILES[base] || [];
+      const exactDomains = declaredDomains.length ? declaredDomains : profiledDomains;
+      const universal = exactDomains.includes('*');
+      let domainMatch = universal || exactDomains.includes(domain);
+
+      if (!domainMatch && !exactDomains.length) {
+        const tokens = CUSTOM_CARD_DOMAIN_TOKENS[domain] || [];
+        domainMatch = tokens.some((token) => (
+          base === `${token}-card`
+          || base.startsWith(`${token}-`)
+          || base.includes(`-${token}-`)
+        ));
+      }
+      if (!domainMatch) return null;
+
+      seen.add(type);
+      return {
+        type,
+        name: card?.name || base.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        icon: card?.icon || 'mdi:puzzle-outline',
+        reason: universal
+          ? 'Installed custom card that works with any entity.'
+          : `Installed custom card matched to ${domain.replace(/_/g, ' ')} entities.`,
+        recommended: false,
+        installed: true,
+        matchPriority: universal ? 1 : 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.matchPriority - b.matchPriority || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    .map(({ matchPriority, ...card }) => card);
+}
+
+export function isFreeHadsListing(item = {}) {
+  const price = String(item?.price || '').trim().toLowerCase();
+  return !price || price === 'free' || price === 'open' || /^0(?:[.,]00)?(?:\s+[a-z]{3})?$/.test(price);
+}
+
+export function resolveHadsListingUrl(item = {}, storeBase = 'https://hads.smarti.dev') {
+  const base = String(storeBase || 'https://hads.smarti.dev').trim().replace(/\/+$/, '');
+  const externalUrl = String(item?.externalUrl || item?.external_url || item?.url || '').trim();
+  if (/^https?:\/\//i.test(externalUrl)) return externalUrl;
+  if (externalUrl) return `${base}${externalUrl.startsWith('/') ? '' : '/'}${externalUrl}`;
+  const slug = String(item?.slug || '').trim();
+  return slug ? `${base}/d/${encodeURIComponent(slug)}` : `${base}/explore`;
+}
+
+export function getHadsImportAction(item = {}, busy = false) {
+  const isDashboard = String(item?.kind || '').toLowerCase().includes('dashboard');
+  if (isDashboard) {
+    return {
+      icon: 'mdi:download',
+      label: busy ? 'Downloading...' : 'Download dashboard',
+    };
+  }
+  return {
+    icon: 'mdi:plus',
+    label: busy ? 'Adding...' : 'Add',
+  };
+}
+
+function declaredHadsDomains(item = {}) {
+  const raw = item.domains ?? item.entityDomains ?? item.entity_domains ?? item.domain;
+  const values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  return values
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function getCompatibleHadsCardsForEntity(entityId, listings = []) {
+  const domain = entityDomain(entityId);
+  const tokens = CUSTOM_CARD_DOMAIN_TOKENS[domain] || [];
+  const seen = new Set();
+  return (Array.isArray(listings) ? listings : [])
+    .map((item) => {
+      const type = String(item?.type || '').trim();
+      const kind = String(item?.kind || 'Card').toLowerCase();
+      if (!type || seen.has(type) || kind.includes('dashboard')) return null;
+      if (!item?.downloadUrl && !item?.cardConfig) return null;
+      if (!item?.owned && !isFreeHadsListing(item)) return null;
+
+      const domains = declaredHadsDomains(item);
+      const searchable = [item?.slug, item?.name, item?.description, item?.badge]
+        .map((value) => String(value || '').toLowerCase().replace(/_/g, '-'))
+        .join(' ');
+      const explicitMatch = domains.includes('*') || domains.includes(domain);
+      const inferredMatch = !domains.length && tokens.some((token) => (
+        searchable.includes(`${token}-`)
+        || searchable.includes(`${token} `)
+        || searchable.includes(`${token}s`)
+      ));
+      if (!explicitMatch && !inferredMatch) return null;
+
+      seen.add(type);
+      return {
+        type,
+        name: item?.name || item?.slug || 'HADS card',
+        icon: item?.icon || 'mdi:storefront-outline',
+        reason: item?.owned
+          ? `Available in your HADS library for ${domain.replace(/_/g, ' ')} entities.`
+          : `Free HADS card matched to ${domain.replace(/_/g, ' ')} entities.`,
+        recommended: false,
+        hads: true,
+        hadsItem: item,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+export function extractHadsCardConfig(payload = null) {
+  if (!payload || typeof payload !== 'object') return null;
+  const config = payload?.entry?.card
+    || payload?.card?.card
+    || payload?.card_config
+    || payload?.cardConfig
+    || (payload?.type && !String(payload.type).startsWith('hads:') ? payload : null);
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
+  try { return JSON.parse(JSON.stringify(config)); } catch { return { ...config }; }
+}
+
+export function bindEntityToHadsCardConfig(config = null, entityId = '', listing = {}) {
+  const entity = String(entityId || '').trim();
+  if (!config || typeof config !== 'object' || !entity) return config;
+  const selectedDomain = entityDomain(entity);
+  const supportedDomains = new Set([
+    selectedDomain,
+    ...declaredHadsDomains(listing).filter((domain) => domain !== '*'),
+  ]);
+  const entityPattern = /\b[a-z_][a-z0-9_]*\.[a-z0-9_]+\b/gi;
+  let replacements = 0;
+
+  const replaceString = (value, key = '') => {
+    let next = String(value || '');
+    next = next.replace(/__ENTITY__|\{\{\s*entity\s*\}\}/g, () => {
+      replacements += 1;
+      return entity;
+    });
+    next = next.replace(entityPattern, (candidate) => {
+      const candidateDomain = entityDomain(candidate);
+      const directEntityField = key === 'entity' || key === 'entity_id';
+      if (!directEntityField && !supportedDomains.has(candidateDomain)) return candidate;
+      replacements += 1;
+      return entity;
+    });
+    return next;
+  };
+  const walk = (value, key = '') => {
+    if (typeof value === 'string') return replaceString(value, key);
+    if (Array.isArray(value)) return value.map((entry) => walk(entry, key));
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, walk(childValue, childKey)]));
+  };
+
+  const bound = walk(config);
+  if (!replacements && Object.prototype.hasOwnProperty.call(bound, 'entity')) {
+    bound.entity = entity;
+  }
+  return bound;
+}
+
+function entityDomain(entityId = '') {
+  return String(entityId || '').trim().split('.')[0].toLowerCase();
+}
+
+function isNumericEntityState(entityState = null) {
+  const raw = String(entityState?.state ?? '').trim().toLowerCase();
+  if (!raw || ['unknown', 'unavailable', 'none', 'null'].includes(raw)) return false;
+  return Number.isFinite(Number(raw));
+}
+
+export function getRecommendedCardForEntity(entityId, entityState = null) {
+  const domain = entityDomain(entityId);
+  const configured = ENTITY_CARD_RECOMMENDATIONS[domain];
+  if (configured) return { domain, ...configured };
+  if (domain === 'sensor' && isNumericEntityState(entityState)) {
+    return {
+      domain,
+      type: 'sensor',
+      name: 'Sensor',
+      icon: entityState?.attributes?.icon || 'mdi:chart-line',
+      reason: 'Shows the current value with its recent trend.',
+    };
+  }
+  return {
+    domain,
+    type: 'tile',
+    name: 'Tile',
+    icon: entityState?.attributes?.icon || 'mdi:view-grid-outline',
+    reason: 'Provides a compact state and the controls this entity exposes.',
+  };
+}
+
+export function getCompatibleCardsForEntity(entityId, entityState = null, registeredCustomCards = [], hadsListings = []) {
+  const domain = entityDomain(entityId);
+  const recommendation = getRecommendedCardForEntity(entityId, entityState);
+  const domainTypes = DOMAIN_ENTITY_CARD_TYPES[domain] || [];
+  const numericTypes = isNumericEntityState(entityState)
+    ? ['sensor', 'gauge']
+    : [];
+  const statisticsTypes = entityState?.attributes?.state_class
+    ? ['statistics-graph']
+    : [];
+  const orderedTypes = [
+    recommendation.type,
+    ...domainTypes,
+    ...numericTypes,
+    ...statisticsTypes,
+    ...UNIVERSAL_ENTITY_CARD_TYPES,
+  ];
+
+  const nativeCards = [...new Set(orderedTypes)].map((type) => {
+    const details = type === recommendation.type
+      ? recommendation
+      : ENTITY_CARD_OPTION_DETAILS[type];
+    return {
+      type,
+      name: details?.name || type,
+      icon: details?.icon || 'mdi:card-outline',
+      reason: details?.reason || 'Uses the selected entity as its starting point.',
+      recommended: type === recommendation.type,
+    };
+  });
+  const customCards = getCompatibleCustomCardsForEntity(entityId, registeredCustomCards);
+  const hadsCards = getCompatibleHadsCardsForEntity(entityId, hadsListings);
+  return [nativeCards[0], ...customCards, ...hadsCards, ...nativeCards.slice(1)]
+    .filter((card, index, cards) => card && cards.findIndex((item) => item?.type === card.type) === index);
+}
+
+export function buildEntityCardConfig(entityId, type, entityState = null) {
+  const entity = String(entityId || '').trim();
+  const cardType = String(type || '').trim() || getRecommendedCardForEntity(entity, entityState).type;
+  const multiEntityTypes = ['map', 'entities', 'glance', 'history-graph', 'statistics-graph'];
+  const config = multiEntityTypes.includes(cardType)
+    ? { type: cardType, entities: [entity] }
+    : { type: cardType, entity };
+
+  if (cardType === 'picture-entity') {
+    Object.assign(config, {
+      camera_view: 'live',
+      show_name: true,
+      show_state: true,
+    });
+  } else if (cardType === 'picture-glance') {
+    delete config.entity;
+    config.camera_image = entity;
+    config.camera_view = 'live';
+    config.entities = [];
+  } else if (cardType === 'weather-forecast') {
+    Object.assign(config, {
+      show_current: true,
+      show_forecast: true,
+      forecast_type: 'daily',
+    });
+  } else if (cardType === 'todo-list') {
+    config.hide_completed = false;
+  } else if (cardType === 'sensor') {
+    config.graph = 'line';
+  } else if (cardType === 'tile') {
+    config.features_position = 'bottom';
+    config.vertical = false;
+  } else if (cardType === 'alarm-panel') {
+    config.states = ['arm_home', 'arm_away'];
+  } else if (cardType === 'history-graph') {
+    config.hours_to_show = 24;
+  } else if (cardType === 'statistics-graph') {
+    config.days_to_show = 30;
+    config.stat_types = ['mean', 'min', 'max'];
+  } else if (cardType === 'button') {
+    config.show_name = true;
+    config.show_icon = true;
+  } else if (cardType === 'custom:ddc-icon-card') {
+    Object.assign(config, {
+      icon: entityState?.attributes?.icon || 'mdi:checkbox-blank-circle-outline',
+      state_based_color: true,
+      click_action: 'more-info',
+    });
+  } else if (cardType === 'custom:mini-graph-card') {
+    delete config.entity;
+    config.entities = [entity];
+    config.hours_to_show = 24;
+  } else if (cardType === 'custom:apexcharts-card') {
+    delete config.entity;
+    config.series = [{ entity }];
+    config.graph_span = '24h';
+  } else if (cardType === 'custom:bubble-card') {
+    const bubbleType = ({
+      climate: 'climate',
+      cover: 'cover',
+      media_player: 'media-player',
+      select: 'select',
+      input_select: 'select',
+    })[entityDomain(entity)] || 'button';
+    config.card_type = bubbleType;
+    if (bubbleType === 'button') {
+      config.button_type = ['light', 'fan', 'number', 'input_number'].includes(entityDomain(entity))
+        ? 'slider'
+        : 'state';
+      config.show_state = true;
+    }
+  } else if (cardType === 'custom:mushroom-template-card') {
+    config.icon = entityState?.attributes?.icon || 'mdi:checkbox-blank-circle-outline';
+    config.primary = '{{ state_attr(entity, "friendly_name") }}';
+    config.secondary = '{{ states(entity) }}';
+    config.tap_action = { action: 'more-info' };
+  }
+
+  return config;
+}
+
+export function buildRecommendedEntityCardConfig(entityId, entityState = null) {
+  const recommendation = getRecommendedCardForEntity(entityId, entityState);
+  return buildEntityCardConfig(entityId, recommendation.type, entityState);
+}
+
 /**
  * Prepare and connect a card preview in the same order Home Assistant uses for
  * live Lovelace cards.
@@ -69,6 +650,7 @@ const smartPickerMethods = {
         {type:'tile',              name:'Tile',              icon:'mdi:view-grid-outline'},
         {type:'button',            name:'Button',            icon:'mdi:gesture-tap-button'},
         {type:'glance',            name:'Glance',            icon:'mdi:eye-outline'},
+        {type:'todo-list',         name:'To-do list',        icon:'mdi:format-list-checks'},
         {type:'markdown',          name:'Markdown',          icon:'mdi:language-markdown'},
         // NEW: allow adding an empty custom card that the user can edit manually
         {type:'custom_card',       name:'Custom Card',       icon:'mdi:puzzle-outline'},
@@ -269,6 +851,13 @@ const smartPickerMethods = {
       badge: entry.badge || entry.package_label || '',
       externalUrl: absolute(entry.url || entry.external_url || (slug ? `/d/${slug}` : '/explore')),
       downloadUrl: absolute(entry.download_url || entry.package_url || ''),
+      domains: entry.domains
+        ?? entry.entity_domains
+        ?? entry.entityDomains
+        ?? entry.domain
+        ?? entry.compatibility?.domains
+        ?? [],
+      cardConfig: entry.card_config || entry.cardConfig || null,
       owned: !!entry.owned,
       requiresAuth: !!entry.requires_auth,
       source: 'HADS',
@@ -325,7 +914,7 @@ const smartPickerMethods = {
   _hadsMarketplaceCatalog_() {
     const base = this._hadsStoreBase_();
     const asset = (path) => `${base}${path}`;
-    const item = ({ slug, name, icon, image, kind = 'Card', price = 'Free', description = '', badge = '' }) => ({
+    const item = ({ slug, name, icon, image, kind = 'Card', price = 'Free', description = '', badge = '', domains = [] }) => ({
       type: `hads:${slug}`,
       name,
       icon,
@@ -334,6 +923,7 @@ const smartPickerMethods = {
       price,
       description,
       badge,
+      domains,
       externalUrl: `${base}/d/${slug}`,
       source: 'HADS',
     });
@@ -344,6 +934,7 @@ const smartPickerMethods = {
         icon: 'mdi:weather-partly-cloudy',
         image: '/static/uploads/c325643dd664491c99fa923e5a533bdc.png',
         price: '1.99 USD',
+        domains: ['weather'],
         description: 'Weather-focused dashboard cards from the HADS marketplace.',
       }),
       item({
@@ -352,6 +943,7 @@ const smartPickerMethods = {
         icon: 'mdi:chart-line',
         image: '/static/uploads/b18462d400744d32aac3256b08588161.png',
         price: '1.99 USD',
+        domains: ['sensor', 'number', 'input_number'],
         description: 'Chart and graph designs for Home Assistant dashboards.',
       }),
       item({
@@ -360,6 +952,7 @@ const smartPickerMethods = {
         icon: 'mdi:toggle-switch-outline',
         image: '/static/uploads/d0c8ea5a6efc47f3837527a3a56f4a38.gif',
         price: '1.99 USD',
+        domains: ['switch', 'input_boolean', 'light'],
         description: 'Switch controls and status widgets built for Drag & Drop Card.',
       }),
       item({
@@ -367,6 +960,7 @@ const smartPickerMethods = {
         name: 'Battery Companion Card',
         icon: 'mdi:battery-heart-outline',
         image: '/static/uploads/9400784f03c84272be2fc3f0b9c17fa0.png',
+        domains: ['sensor', 'binary_sensor'],
         description: 'Battery overview and low-battery helper card.',
       }),
       item({
@@ -374,6 +968,7 @@ const smartPickerMethods = {
         name: 'HADS Gauge Card',
         icon: 'mdi:gauge',
         image: '/static/uploads/8ccbdb242d4541c09643247f74415b0f.png',
+        domains: ['sensor', 'number', 'input_number'],
         description: 'Configurable gauge card for numeric Home Assistant values.',
       }),
       item({
@@ -389,6 +984,7 @@ const smartPickerMethods = {
         name: 'Simple Media Player Card',
         icon: 'mdi:play-circle-outline',
         image: '/static/uploads/b47a7a18a48842b0b5433dc77689052c.png',
+        domains: ['media_player'],
         description: 'Responsive media player card with playback controls.',
       }),
       item({
@@ -396,6 +992,7 @@ const smartPickerMethods = {
         name: 'Person Card',
         icon: 'mdi:account-group-outline',
         image: '/static/uploads/68f649137c8b45ddab0335ae03ad8c08.png',
+        domains: ['person', 'device_tracker'],
         description: 'Presence and people-at-home card.',
       }),
       item({
@@ -404,6 +1001,7 @@ const smartPickerMethods = {
         icon: 'mdi:battery-charging-70',
         image: '/static/uploads/bdeaad1c21e2435d8621047635e66ea1.png',
         badge: '9+ custom cards',
+        domains: ['sensor', 'binary_sensor'],
         description: 'Battery overview package using multiple helper cards.',
       }),
       item({
@@ -412,6 +1010,7 @@ const smartPickerMethods = {
         icon: 'mdi:lightbulb-group-outline',
         image: '/static/uploads/9b5771a3829941b6a6b70b817131a9f5.png',
         badge: '5 custom cards',
+        domains: ['light'],
         description: 'Light controls and room lighting layout.',
       }),
       item({
@@ -555,12 +1154,10 @@ const smartPickerMethods = {
               if (typeof formInfo.computeHelper === 'function') {
                 formEl.computeHelper = formInfo.computeHelper.bind(CardClass);
               }
-              // Provide initial data (cfg) to the form. Spread to avoid mutation
-              formEl.data = { ...cfg };
-              // When the form value changes, fire a value-changed event compatible with our onChange handler
-              formEl.addEventListener('value-changed', (ev) => {
-                // event.detail.value contains the new config object
-              });
+              // Adapt HA's form API to the card-editor API used by the picker.
+              // Keep `data` current so Save can also read the visual value from
+              // HA versions that do not emit a `config-changed` event here.
+              bridgeHaFormCardEditor(formEl, type, cfg || {});
               try { console.info('[ddc:editor] Generated form editor via getConfigForm', { type }); } catch {}
               return formEl;
             }
@@ -694,14 +1291,19 @@ const smartPickerMethods = {
   _customCardsFromRegistry() {
     const reg = Array.isArray(window.customCards) ? window.customCards : [];
     return reg
-      .map((cc) => ({
-        type: cc?.type?.startsWith('custom:') ? cc.type : `custom:${cc?.type}`,
-        name: cc?.name || cc?.type || 'Custom card',
-        icon: 'mdi:puzzle-outline',
-        description: cc?.description || '',
-        editorTag: cc?.editor || null,  // <- keep if provided
-      }))
-      .filter((it) => typeof it.type === 'string' && it.type.startsWith('custom:'));
+      .map((cc) => {
+        const registeredType = String(cc?.type || '').trim();
+        if (!registeredType) return null;
+        return {
+          type: registeredType.startsWith('custom:') ? registeredType : `custom:${registeredType}`,
+          name: cc?.name || registeredType || 'Custom card',
+          icon: cc?.icon || 'mdi:puzzle-outline',
+          description: cc?.description || '',
+          editorTag: cc?.editor || null,
+          domains: cc?.domains ?? cc?.entityDomains ?? cc?.entity_domains ?? cc?.domain ?? [],
+        };
+      })
+      .filter((it) => typeof it?.type === 'string' && it.type.startsWith('custom:'));
   },
 
 
@@ -718,6 +1320,7 @@ const smartPickerMethods = {
       'picture-glance': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:any, label:'Entities (multiselect)'}, {key:'image', type:'text', label:'Image URL (optional)'} ]}),
       'picture-entity': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:any, label:'Entity'}, {key:'image', type:'text', label:'Image URL (optional)'} ]}),
       'weather-forecast': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['weather'], label:'Weather entity'} ]}),
+      'todo-list': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['todo'], label:'To-do entity'}, {key:'title', type:'text', label:'Title (optional)'}, {key:'hide_completed', type:'boolean', label:'Hide completed'} ]}),
       'map': S({ fields:[ {key:'entities', type:'entities', multi:true, domains:['device_tracker','person'], label:'Trackers / people (multiselect)'}, {key:'default_zoom', type:'number', label:'Default zoom', default:14} ]}),
       'media-control': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['media_player'], label:'Media player'} ]}),
       'light': S({ fields:[ {key:'entity', type:'entity', multi:false, domains:['light'], label:'Light'} ]}),
@@ -1616,6 +2219,9 @@ const smartPickerMethods = {
       modal.remove();
     };
     const modal = document.createElement('div'); modal.className='modal smart-picker-modal';
+    modal.dataset.ddcTheme = this._getResolvedEditorThemeMode_?.()
+      || this._getEffectiveDashboardThemeMode_?.()
+      || 'light';
     modal.innerHTML = `
       <div class="dialog smart-picker-dialog" role="dialog" aria-modal="true">
         <div class="dlg-head">
@@ -1623,6 +2229,9 @@ const smartPickerMethods = {
           <div class="picker-mode-tabs" role="tablist" aria-label="Card picker source">
             <button type="button" class="picker-mode-tab picker-mode-tab--cards active" id="pickerCardsTab" role="tab" aria-selected="true">
               <ha-icon icon="mdi:view-grid-plus-outline"></ha-icon><span>Cards</span>
+            </button>
+            <button type="button" class="picker-mode-tab picker-mode-tab--entities" id="pickerEntitiesTab" role="tab" aria-selected="false">
+              <ha-icon icon="mdi:home-search-outline"></ha-icon><span>By entity</span>
             </button>
             <button type="button" class="picker-mode-tab picker-mode-tab--hads" id="pickerHadsTab" role="tab" aria-selected="false" title="HADS - Home Assistant Dashboard Store" aria-label="HADS - Home Assistant Dashboard Store">
               <ha-icon icon="mdi:storefront-outline"></ha-icon><span>HADS</span>
@@ -1742,7 +2351,9 @@ const smartPickerMethods = {
     const cancelTop = modal.querySelector('#cancelBtn');
     const cancelBot = modal.querySelector('#footCancel');
     const search = modal.querySelector('#search');
+    const searchWrap = modal.querySelector('.picker-search-wrap');
     const pickerCardsTab = modal.querySelector('#pickerCardsTab');
+    const pickerEntitiesTab = modal.querySelector('#pickerEntitiesTab');
     const pickerHadsTab = modal.querySelector('#pickerHadsTab');
     const hadsStorePane = modal.querySelector('#hadsStorePane');
     const cardHost = modal.querySelector('#cardHost');
@@ -1761,7 +2372,18 @@ const smartPickerMethods = {
     const err = modal.querySelector('#err');
     const previewSpin = modal.querySelector('#previewSpin');
     const pickerFootnote = modal.querySelector('.picker-footnote');
-    const enableCommit = (on) => { addTop.disabled = addBottom.disabled = !on; };
+    const enableCommit = (on) => {
+      let allowed = !!on;
+      if (activePickerMode === 'hads') allowed = false;
+      if (activePickerMode === 'entities') {
+        allowed = allowed
+          && !!selectedEntityId
+          && !!selectedEntityCardType
+          && currentType === selectedEntityCardType
+          && !!currentConfig;
+      }
+      addTop.disabled = addBottom.disabled = !allowed;
+    };
     const setError = (msg) => { if (!msg){ err.hidden=true; err.textContent=''; } else { err.hidden=false; err.textContent=msg; } };
     const featureEditorTagForType = (type = '') => {
       const normalized = String(type || '').trim().replace(/^custom:/, '').replace(/_/g, '-');
@@ -1985,6 +2607,10 @@ const smartPickerMethods = {
     showTab('visual');
 
     let activePickerMode = 'cards';
+    let selectedEntityId = '';
+    let selectedEntityCardType = '';
+    let selectedEntityCardOptionKey = '';
+    let renderEntityPicker = () => {};
     const escapePickerHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -2005,7 +2631,7 @@ const smartPickerMethods = {
     };
     const openHadsListing = (item) => {
       try {
-        window.open(item.externalUrl || `${this._hadsStoreBase_()}/explore`, '_blank', 'noopener,noreferrer');
+        window.open(resolveHadsListingUrl(item, this._hadsStoreBase_()), '_blank', 'noopener,noreferrer');
       } catch {}
     };
     const openHadsCreateUser = () => {
@@ -2013,10 +2639,7 @@ const smartPickerMethods = {
         window.open(`${this._hadsStoreBase_()}/signup`, '_blank', 'noopener,noreferrer');
       } catch {}
     };
-    const isFreeHadsItem = (item = {}) => {
-      const price = String(item.price || '').trim().toLowerCase();
-      return !price || price === 'free' || price === 'open' || /^0(?:[.,]00)?(?:\s+[a-z]{3})?$/.test(price);
-    };
+    const isFreeHadsItem = (item = {}) => isFreeHadsListing(item);
     const shouldOfferHadsImport = (item = {}) => !!item.owned || isFreeHadsItem(item);
     const canImportHadsItem = (item = {}) => shouldOfferHadsImport(item) && !!item.downloadUrl;
     let selectedHadsType = '';
@@ -2037,7 +2660,7 @@ const smartPickerMethods = {
       }
       if (!hadsSession?.access_token) {
         selectedHadsType = item.type;
-        hadsCatalogError = 'Sign in to HADS to use Download & import from Drag & Drop Card. Free listings can still be downloaded directly on the HADS website.';
+        hadsCatalogError = 'Sign in to HADS to add cards from Drag & Drop Card. Free listings can still be downloaded directly on the HADS website.';
         renderHadsStore();
         try { await connectHads(); } catch {}
         return;
@@ -2069,7 +2692,7 @@ const smartPickerMethods = {
             includeLocal: !!hadsSession?.access_token,
             trustOwned: !!hadsSession?.access_token,
           });
-          this._toast?.('HADS card imported.');
+          this._toast?.('HADS card added.');
           close();
         }
       } catch (err) {
@@ -2109,6 +2732,7 @@ const smartPickerMethods = {
       } finally {
         hadsCatalogLoading = false;
         if (activePickerMode === 'hads') renderHadsStore();
+        if (activePickerMode === 'entities') renderEntityPicker();
       }
     };
     const connectHads = async () => {
@@ -2130,6 +2754,7 @@ const smartPickerMethods = {
       } finally {
         hadsAuthBusy = false;
         renderHadsStore();
+        if (activePickerMode === 'entities') renderEntityPicker();
       }
     };
     const disconnectHads = () => {
@@ -2153,38 +2778,41 @@ const smartPickerMethods = {
         : items.map((item) => (item?.owned ? { ...item, owned: false } : item));
       const storeBase = this._hadsStoreBase_();
       const detailItem = selectedHadsItem();
-      const renderHadsCard = (item) => `
-        <article class="hads-store-card${selectedHadsType === item.type ? ' is-selected' : ''}" data-hads-type="${escapePickerHtml(item.type)}">
-          <button type="button" class="hads-store-card-preview" data-hads-detail-type="${escapePickerHtml(item.type)}">
-            <span class="hads-store-image">
-              ${item.image ? `<img src="${escapePickerHtml(item.image)}" alt="${escapePickerHtml(item.name)}" loading="lazy">` : `<ha-icon icon="${escapePickerHtml(item.icon || 'mdi:storefront-outline')}"></ha-icon>`}
-              <span class="hads-store-overlay"></span>
-            </span>
-            <span class="hads-store-copy">
-              <span class="hads-store-chips">
-                <span>${escapePickerHtml(item.kind || 'Card')}</span>
-                <span>${escapePickerHtml(item.price || 'Open')}</span>
-                ${item.owned ? '<span>Owned</span>' : ''}
-                ${item.badge ? `<span>${escapePickerHtml(item.badge)}</span>` : ''}
+      const renderHadsCard = (item) => {
+        const importAction = getHadsImportAction(item, hadsDownloadBusyType === item.type);
+        return `
+          <article class="hads-store-card${selectedHadsType === item.type ? ' is-selected' : ''}" data-hads-type="${escapePickerHtml(item.type)}">
+            <button type="button" class="hads-store-card-preview" data-hads-detail-type="${escapePickerHtml(item.type)}">
+              <span class="hads-store-image">
+                ${item.image ? `<img src="${escapePickerHtml(item.image)}" alt="${escapePickerHtml(item.name)}" loading="lazy">` : `<ha-icon icon="${escapePickerHtml(item.icon || 'mdi:storefront-outline')}"></ha-icon>`}
+                <span class="hads-store-overlay"></span>
               </span>
-              <strong>${escapePickerHtml(item.name)}</strong>
-              <small>${escapePickerHtml(item.description || 'Open this HADS listing.')}</small>
-            </span>
-          </button>
-          <span class="hads-store-card-actions">
-            ${shouldOfferHadsImport(item)
-              ? `<button type="button" class="hads-store-card-action primary hads-store-card-import" data-hads-type="${escapePickerHtml(item.type)}" ${hadsDownloadBusyType === item.type ? 'disabled' : ''}>
-                  <ha-icon icon="mdi:download"></ha-icon><span>${hadsDownloadBusyType === item.type ? 'Importing...' : 'Download & import'}</span>
-                </button>`
-              : `<button type="button" class="hads-store-card-action primary hads-store-card-buy" data-hads-type="${escapePickerHtml(item.type)}">
-                  <ha-icon icon="mdi:open-in-new"></ha-icon><span>Buy</span>
-                </button>`}
-            <button type="button" class="hads-store-card-action ghost hads-store-card-detail" data-hads-detail-type="${escapePickerHtml(item.type)}" aria-label="Show listing details">
-              <ha-icon icon="mdi:information-outline"></ha-icon>
+              <span class="hads-store-copy">
+                <span class="hads-store-chips">
+                  <span>${escapePickerHtml(item.kind || 'Card')}</span>
+                  <span>${escapePickerHtml(item.price || 'Open')}</span>
+                  ${item.owned ? '<span>Owned</span>' : ''}
+                  ${item.badge ? `<span>${escapePickerHtml(item.badge)}</span>` : ''}
+                </span>
+                <strong>${escapePickerHtml(item.name)}</strong>
+                <small>${escapePickerHtml(item.description || 'Open this HADS listing.')}</small>
+              </span>
             </button>
-          </span>
-        </article>
-      `;
+            <span class="hads-store-card-actions">
+              ${shouldOfferHadsImport(item)
+                ? `<button type="button" class="hads-store-card-action primary hads-store-card-import" data-hads-type="${escapePickerHtml(item.type)}" ${hadsDownloadBusyType === item.type ? 'disabled' : ''}>
+                    <ha-icon icon="${importAction.icon}"></ha-icon><span>${importAction.label}</span>
+                  </button>`
+                : `<button type="button" class="hads-store-card-action primary hads-store-card-buy" data-hads-type="${escapePickerHtml(item.type)}">
+                    <ha-icon icon="mdi:open-in-new"></ha-icon><span>Buy</span>
+                  </button>`}
+              <button type="button" class="hads-store-card-action ghost hads-store-card-detail" data-hads-open-type="${escapePickerHtml(item.type)}" aria-label="Open ${escapePickerHtml(item.name)} in HADS" title="Open in HADS">
+                <ha-icon icon="mdi:information-outline"></ha-icon>
+              </button>
+            </span>
+          </article>
+        `;
+      };
       const accountName = hadsSession?.user?.name || hadsSession?.user?.email || hadsSession?.account?.name || 'HADS account';
       const accountHtml = hadsSession?.access_token
         ? `
@@ -2244,7 +2872,7 @@ const smartPickerMethods = {
               <div class="hads-store-detail-actions">
                 ${shouldOfferHadsImport(detailItem)
                   ? `<button type="button" class="hads-store-detail-btn primary hads-store-download" ${hadsDownloadBusyType === detailItem.type ? 'disabled' : ''}>
-                      <ha-icon icon="mdi:download"></ha-icon><span>${hadsDownloadBusyType === detailItem.type ? 'Importing...' : 'Download & import'}</span>
+                      <ha-icon icon="${getHadsImportAction(detailItem, hadsDownloadBusyType === detailItem.type).icon}"></ha-icon><span>${getHadsImportAction(detailItem, hadsDownloadBusyType === detailItem.type).label}</span>
                     </button>`
                   : `<button type="button" class="hads-store-detail-btn primary hads-store-buy">
                       <ha-icon icon="mdi:open-in-new"></ha-icon><span>Buy in HADS</span>
@@ -2263,7 +2891,7 @@ const smartPickerMethods = {
           <section class="hads-store-section">
             <div class="hads-store-section-head">
               <span>Owned cards</span>
-              <small>${ownedItems.length} ready to import</small>
+              <small>${ownedItems.length} ready to add</small>
             </div>
             <div class="hads-store-grid">${ownedItems.map(renderHadsCard).join('')}</div>
           </section>
@@ -2306,6 +2934,10 @@ const smartPickerMethods = {
           renderHadsStore();
         });
       });
+      hadsStorePane.querySelectorAll('[data-hads-open-type]').forEach((button) => {
+        const item = hadsItems.find((entry) => entry.type === button.dataset.hadsOpenType);
+        button.addEventListener('click', () => item && openHadsListing(item));
+      });
       hadsStorePane.querySelectorAll('.hads-store-card-import').forEach((button) => {
         const item = hadsItems.find((entry) => entry.type === button.dataset.hadsType);
         button.addEventListener('click', () => item && downloadAndImportHadsListing(item));
@@ -2316,27 +2948,40 @@ const smartPickerMethods = {
       });
     };
     const setPickerMode = (modeName = 'cards') => {
-      activePickerMode = modeName === 'hads' ? 'hads' : 'cards';
+      const previousMode = activePickerMode;
+      activePickerMode = modeName === 'hads' ? 'hads' : (modeName === 'entities' ? 'entities' : 'cards');
       const hadsMode = activePickerMode === 'hads';
+      const entityMode = activePickerMode === 'entities';
+      if (search && previousMode !== activePickerMode) search.value = '';
       modal.classList.toggle('hads-store-mode', hadsMode);
+      modal.classList.toggle('by-entity-mode', entityMode);
       layoutGrid?.classList?.toggle('hads-store-active', hadsMode);
-      pickerCardsTab?.classList.toggle('active', !hadsMode);
-      pickerCardsTab?.setAttribute('aria-selected', String(!hadsMode));
+      layoutGrid?.classList?.toggle('entity-card-awaiting', entityMode && !selectedEntityCardType);
+      pickerCardsTab?.classList.toggle('active', !hadsMode && !entityMode);
+      pickerCardsTab?.setAttribute('aria-selected', String(!hadsMode && !entityMode));
+      pickerEntitiesTab?.classList.toggle('active', entityMode);
+      pickerEntitiesTab?.setAttribute('aria-selected', String(entityMode));
       pickerHadsTab?.classList.toggle('active', hadsMode);
       pickerHadsTab?.setAttribute('aria-selected', String(hadsMode));
       if (hadsStorePane) hadsStorePane.hidden = !hadsMode;
       if (left) left.hidden = hadsMode;
+      left?.classList?.toggle('entity-picker-active', entityMode);
       const rightPane = modal.querySelector('#rightPane');
-      if (rightPane) rightPane.hidden = hadsMode;
+      if (rightPane) rightPane.hidden = hadsMode || (entityMode && !selectedEntityCardType);
       if (search) {
         search.placeholder = hadsMode
           ? 'Search HADS cards, dashboards, lights, battery...'
-          : 'Search cards (name or type)...';
+          : (entityMode
+            ? (selectedEntityId ? 'Search compatible cards...' : 'Search entities by name, ID, domain, or state...')
+            : 'Search cards (name or type)...');
       }
+      if (searchWrap) searchWrap.hidden = false;
       if (pickerFootnote) {
         pickerFootnote.innerHTML = hadsMode
           ? 'HADS listings open on hads.smarti.dev'
-          : 'Tip: use <ha-icon icon="mdi:star-outline"></ha-icon> to favorite cards you use often';
+          : (entityMode
+            ? '<ha-icon icon="mdi:card-search-outline"></ha-icon> Choose an entity first, then pick any compatible card type.'
+            : 'Tip: use <ha-icon icon="mdi:star-outline"></ha-icon> to favorite cards you use often');
       }
       addTop.style.display = hadsMode ? 'none' : '';
       addBottom.style.display = hadsMode ? 'none' : '';
@@ -2344,6 +2989,10 @@ const smartPickerMethods = {
         enableCommit(false);
         renderHadsStore();
         refreshHadsCatalog();
+      } else if (entityMode) {
+        renderEntityPicker();
+        refreshHadsCatalog();
+        enableCommit(!!selectedEntityId && !!selectedEntityCardType && currentType === selectedEntityCardType && !!currentConfig);
       } else {
         renderLeft();
         enableCommit(!!currentConfig);
@@ -2411,6 +3060,8 @@ const smartPickerMethods = {
               </span>`;
             b.addEventListener('click', async () => {
               highlight(b);
+              selectedEntityCardType = '';
+              selectedEntityCardOptionKey = '';
               await selectType(item.type, { fromUser: true });
             });
             div.appendChild(b);
@@ -2433,6 +3084,7 @@ const smartPickerMethods = {
 
     let currentConfig = null;
     let currentType = null;
+    let commitInFlight = false;
     let yamlEditorApi = null;
     let visualEditor = null;
     let editor = null;
@@ -2445,7 +3097,244 @@ const smartPickerMethods = {
     let subElementCleanup = null;
     let subElementParentSyncPending = false;
     pickerCardsTab?.addEventListener('click', () => setPickerMode('cards'));
+    pickerEntitiesTab?.addEventListener('click', () => setPickerMode('entities'));
     pickerHadsTab?.addEventListener('click', () => setPickerMode('hads'));
+
+    const entityPickerIcon = (entityId, entityState = null) => {
+      const explicit = String(entityState?.attributes?.icon || '').trim();
+      if (explicit) return explicit;
+      return getRecommendedCardForEntity(entityId, entityState).icon || 'mdi:checkbox-blank-circle-outline';
+    };
+
+    const selectEntityForCard = (entityId) => {
+      const nextEntityId = String(entityId || '').trim();
+      if (!nextEntityId) return;
+      selectedEntityId = nextEntityId;
+      selectedEntityCardType = '';
+      selectedEntityCardOptionKey = '';
+      if (search) {
+        search.value = '';
+        search.placeholder = 'Search compatible cards...';
+      }
+      enableCommit(false);
+      renderEntityPicker();
+    };
+
+    const selectCardForEntity = async (cardOption) => {
+      const card = typeof cardOption === 'string'
+        ? { type: cardOption }
+        : (cardOption || {});
+      const optionKey = String(card.type || '').trim();
+      if (!selectedEntityId || !optionKey || hadsDownloadBusyType) return;
+      selectedEntityCardOptionKey = optionKey;
+      selectedEntityCardType = card.hads ? '' : optionKey;
+      renderEntityPicker();
+      enableCommit(false);
+      const entityState = this.hass?.states?.[selectedEntityId] || null;
+      if (!card.hads) {
+        const entityConfig = buildEntityCardConfig(selectedEntityId, optionKey, entityState);
+        await selectType(optionKey, {
+          fromUser: true,
+          configOverride: entityConfig,
+          replaceConfig: true,
+        });
+        if (activePickerMode === 'entities') {
+          renderEntityPicker();
+          enableCommit(currentType === selectedEntityCardType && !!currentConfig);
+        }
+        return;
+      }
+
+      const entityAtSelection = selectedEntityId;
+      hadsDownloadBusyType = optionKey;
+      renderEntityPicker();
+      try {
+        let listing = card.hadsItem || hadsItems.find((item) => item.type === optionKey);
+        if (!listing) throw new Error('This HADS card is no longer available.');
+        let cardConfig = listing.cardConfig ? extractHadsCardConfig(listing.cardConfig) : null;
+
+        if (!cardConfig) {
+          if (!hadsSession?.access_token) {
+            await connectHads();
+            if (!hadsSession?.access_token) throw new Error('Connect HADS to add this card.');
+          }
+          if (!listing.downloadUrl) {
+            await refreshHadsCatalog({ force: true });
+            listing = hadsItems.find((item) => item.type === optionKey) || listing;
+          }
+          if (!listing.downloadUrl) throw new Error('HADS has not exposed a card download for this listing yet.');
+          const payload = await this._hadsFetchJson_(listing.downloadUrl, { timeoutMs: 15000 });
+          cardConfig = extractHadsCardConfig(payload);
+          if (!cardConfig) throw new Error('This HADS listing is not a single card and cannot be added by entity.');
+        }
+
+        if (selectedEntityId !== entityAtSelection || selectedEntityCardOptionKey !== optionKey) return;
+        const entityConfig = bindEntityToHadsCardConfig(cardConfig, entityAtSelection, listing);
+        const nextType = String(entityConfig?.type || '').trim();
+        if (!nextType) throw new Error('The HADS card package does not contain a card type.');
+        selectedEntityCardType = nextType;
+        await selectType(nextType, {
+          fromUser: true,
+          configOverride: entityConfig,
+          replaceConfig: true,
+        });
+        this._rememberHadsOwned_(listing);
+        hadsItems = this._applyHadsOwnedCache_(hadsItems, {
+          includeLocal: !!hadsSession?.access_token,
+          trustOwned: !!hadsSession?.access_token,
+        });
+        this._toast?.('HADS card ready to customize.');
+      } catch (err) {
+        selectedEntityCardOptionKey = '';
+        selectedEntityCardType = '';
+        this._toast?.(err?.message || 'Could not load this HADS card.');
+        if (err?.status === 403) openHadsListing(card.hadsItem || {});
+      } finally {
+        hadsDownloadBusyType = '';
+        if (activePickerMode === 'entities') {
+          renderEntityPicker();
+          enableCommit(currentType === selectedEntityCardType && !!currentConfig);
+        }
+      }
+    };
+
+    renderEntityPicker = () => {
+      if (!left) return;
+      const safe = escapePickerHtml;
+      const q = String(search?.value || '').trim().toLowerCase();
+      const states = Object.entries(this.hass?.states || {});
+      const selectedState = selectedEntityId ? this.hass?.states?.[selectedEntityId] : null;
+      const awaitingCardChoice = !selectedEntityCardType;
+      layoutGrid?.classList?.toggle('entity-card-awaiting', awaitingCardChoice);
+      const rightPane = modal.querySelector('#rightPane');
+      if (rightPane) rightPane.hidden = awaitingCardChoice;
+
+      if (selectedEntityId) {
+        if (search) search.placeholder = 'Search compatible cards...';
+        const friendlyName = String(selectedState?.attributes?.friendly_name || selectedEntityId.split('.').slice(1).join(' ').replace(/_/g, ' '));
+        const domain = entityDomain(selectedEntityId).replace(/_/g, ' ');
+        const installedCustomCards = this._customCardsFromRegistry();
+        const compatibleCards = getCompatibleCardsForEntity(selectedEntityId, selectedState, installedCustomCards, hadsItems);
+        const matchingCards = compatibleCards.filter((card) => !q || [card.name, card.type, card.reason, card.installed ? 'installed custom' : (card.hads ? 'hads store library' : 'standard')]
+          .some((value) => String(value || '').toLowerCase().includes(q)));
+
+        left.innerHTML = `
+          <section class="entity-flow entity-card-step" aria-label="Choose a card for entity">
+            <button type="button" class="entity-change-button">
+              <ha-icon icon="mdi:arrow-left"></ha-icon><span>Change entity</span>
+            </button>
+            <div class="entity-selected-summary">
+              <ha-icon icon="${safe(entityPickerIcon(selectedEntityId, selectedState))}"></ha-icon>
+              <span><small>Selected entity</small><strong>${safe(friendlyName)}</strong><em>${safe(selectedEntityId)} · ${safe(domain)}</em></span>
+            </div>
+            <div class="entity-card-options-head">
+              <span><small>Step 2 of 2</small><strong>Choose a card</strong></span>
+              <em>${compatibleCards.length} compatible</em>
+            </div>
+            <div class="entity-card-options" role="listbox" aria-label="Compatible cards"></div>
+          </section>`;
+
+        left.querySelector('.entity-change-button')?.addEventListener('click', () => {
+          selectedEntityId = '';
+          selectedEntityCardType = '';
+          selectedEntityCardOptionKey = '';
+          if (search) {
+            search.value = '';
+            search.placeholder = 'Search entities by name, ID, domain, or state...';
+          }
+          enableCommit(false);
+          renderEntityPicker();
+        });
+
+        const cardOptions = left.querySelector('.entity-card-options');
+        if (!cardOptions) return;
+        if (!matchingCards.length) {
+          cardOptions.innerHTML = '<div class="entity-results-empty"><ha-icon icon="mdi:card-search-outline"></ha-icon><strong>No card types found</strong><span>Try a card name or clear the search.</span></div>';
+          return;
+        }
+        matchingCards.forEach((card) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          const selected = selectedEntityCardOptionKey === card.type;
+          const loading = card.hads && hadsDownloadBusyType === card.type;
+          button.className = `entity-card-option${card.recommended ? ' is-recommended' : ''}${card.installed ? ' is-installed' : ''}${card.hads ? ' is-hads' : ''}${selected ? ' is-selected' : ''}`;
+          button.setAttribute('role', 'option');
+          button.setAttribute('aria-selected', String(selected));
+          button.disabled = !!hadsDownloadBusyType;
+          button.innerHTML = `
+            <ha-icon icon="${safe(loading ? 'mdi:loading' : card.icon)}"${loading ? ' class="entity-card-loading-icon"' : ''}></ha-icon>
+            <span class="entity-card-option-copy">
+              <strong>${safe(card.name)}</strong>
+              <small>${safe(loading ? 'Downloading this card from HADS…' : card.reason)}</small>
+            </span>
+            ${card.recommended ? '<em>Recommended</em>' : (card.installed ? '<em class="entity-card-installed-badge">Installed</em>' : (card.hads ? '<em class="entity-card-hads-badge">HADS</em>' : ''))}`;
+          button.addEventListener('click', () => { void selectCardForEntity(card); });
+          cardOptions.appendChild(button);
+        });
+        return;
+      }
+
+      if (search) search.placeholder = 'Search entities by name, ID, domain, or state...';
+      const priority = ['camera', 'weather', 'todo', 'climate', 'light', 'media_player', 'alarm_control_panel'];
+      const priorityIndex = (entityId) => {
+        const index = priority.indexOf(entityDomain(entityId));
+        return index < 0 ? priority.length : index;
+      };
+      const filteredStates = states
+        .filter(([entityId, entityState]) => {
+          if (!q) return true;
+          const friendlyName = String(entityState?.attributes?.friendly_name || '');
+          return [entityId, friendlyName, entityDomain(entityId), entityState?.state]
+            .some((value) => String(value || '').toLowerCase().includes(q));
+        })
+        .sort(([aId, aState], [bId, bState]) => {
+          const priorityDelta = priorityIndex(aId) - priorityIndex(bId);
+          if (!q && priorityDelta) return priorityDelta;
+          const aName = String(aState?.attributes?.friendly_name || aId);
+          const bName = String(bState?.attributes?.friendly_name || bId);
+          return aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+        });
+      const matches = filteredStates.slice(0, q ? 180 : 100);
+
+      left.innerHTML = `
+        <section class="entity-flow" aria-label="Add card by entity">
+          <div class="entity-flow-intro">
+            <span class="entity-flow-kicker"><ha-icon icon="mdi:numeric-1-circle-outline"></ha-icon> Choose an entity</span>
+            <p>Select what you want to show or control. You will choose the card type in the next step.</p>
+          </div>
+          <div class="entity-results-head">
+            <strong>${q ? `${filteredStates.length} matching ${filteredStates.length === 1 ? 'entity' : 'entities'}` : 'Suggested entities'}</strong>
+            <span>${states.length} available</span>
+          </div>
+          <div class="entity-results" role="listbox" aria-label="Entities"></div>
+          ${q && filteredStates.length > matches.length ? '<p class="entity-results-note">Refine the search to narrow the results.</p>' : ''}
+        </section>`;
+
+      const results = left.querySelector('.entity-results');
+      if (!results) return;
+      if (!matches.length) {
+        results.innerHTML = '<div class="entity-results-empty"><ha-icon icon="mdi:magnify-close"></ha-icon><strong>No entities found</strong><span>Try a name, entity ID, domain, or current state.</span></div>';
+        return;
+      }
+      matches.forEach(([entityId, entityState]) => {
+        const friendlyName = String(entityState?.attributes?.friendly_name || entityId.split('.').slice(1).join(' ').replace(/_/g, ' '));
+        const domain = entityDomain(entityId).replace(/_/g, ' ');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `entity-result${selectedEntityId === entityId ? ' is-selected' : ''}`;
+        button.setAttribute('role', 'option');
+        button.setAttribute('aria-selected', String(selectedEntityId === entityId));
+        button.innerHTML = `
+          <ha-icon icon="${safe(entityPickerIcon(entityId, entityState))}"></ha-icon>
+          <span class="entity-result-copy">
+            <strong>${safe(friendlyName)}</strong>
+            <small>${safe(entityId)}</small>
+          </span>
+          <span class="entity-result-meta"><em>${safe(domain)}</em><small>${safe(entityState?.state || 'unknown')}</small></span>`;
+        button.addEventListener('click', () => { selectEntityForCard(entityId); });
+        results.appendChild(button);
+      });
+    };
 
     const buildQuickFill = (type, cfg) => {
       const sc = this._schemaForType(type);
@@ -4027,7 +4916,13 @@ const smartPickerMethods = {
               const all = Object.keys(this.hass?.states || {});
               const byDomain = (d)=>all.filter((e)=>e.startsWith(d+'.'));
               const better = await CardClass.getStubConfig(this.hass, all, byDomain);
-              if (better) cfg = this._shapeBySchema(lookupType, { ...better });
+              // Stubs can supply missing defaults, but must not replace the
+              // values of the existing card being edited.
+              if (better) cfg = this._shapeBySchema(lookupType, {
+                ...better,
+                ...(isConfigObject(cfg) ? cfg : {}),
+                type: lookupType,
+              });
             }
           }
         } catch {}
@@ -4047,14 +4942,13 @@ const smartPickerMethods = {
     
         const onChange = async (e) => {
           const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
-          if (!next || typeof next !== 'object') return;
+          if (!isConfigObject(next)) return;
           const nextType = next.type || currentType;
           currentType = nextType;
-          currentConfig = this._shapeBySchema(nextType, {
-            ...(currentConfig && typeof currentConfig === 'object' ? currentConfig : {}),
-            ...next,
-            type: nextType,
-          });
+          currentConfig = this._shapeBySchema(
+            nextType,
+            mergeVisualEditorConfig(currentConfig, nextType, next)
+          );
           if (subElementParentSyncPending) {
             subElementParentSyncPending = false;
             try { editor?.setConfig?.(currentConfig); } catch {}
@@ -4161,6 +5055,11 @@ const smartPickerMethods = {
         cfg = (mode==='edit' && initialCfg && initialCfg.type===type)
           ? { ...initialCfg }
           : await getStub(type);
+        if (opts.configOverride && typeof opts.configOverride === 'object') {
+          cfg = opts.replaceConfig
+            ? { ...opts.configOverride, type }
+            : { ...(cfg || {}), ...opts.configOverride, type };
+        }
       } catch (err) {
         setError(`Could not load ${type}: ${String(err?.message || err)}`);
         paintPreviewFallback('This card could not be loaded in the picker. Try reloading the dashboard resource and selecting it again.');
@@ -4219,35 +5118,46 @@ const smartPickerMethods = {
 
     };
     const commit = async () => {
-      if (!currentConfig) return;
+      if (!currentConfig || commitInFlight) return;
+      commitInFlight = true;
+      enableCommit(false);
       try {
-        let liveConfig = null;
-        if (visualEditor && typeof visualEditor.getConfig === 'function') {
-          liveConfig = visualEditor.getConfig();
-        } else if (
-          visualEditor
-          && String(visualEditor.localName || '').startsWith('ddc-')
-          && visualEditor._config
-          && typeof visualEditor._config === 'object'
-        ) {
-          liveConfig = this._cloneCardConfig_(visualEditor._config);
-        }
-        if (liveConfig && typeof liveConfig === 'object') {
+        const liveConfig = readVisualEditorConfig(visualEditor);
+        if (isConfigObject(liveConfig)) {
           const liveType = liveConfig.type || currentType;
           currentType = liveType;
-          currentConfig = this._shapeBySchema(liveType, {
-            ...(currentConfig && typeof currentConfig === 'object' ? currentConfig : {}),
-            ...liveConfig,
-            type: liveType,
-          });
+          currentConfig = this._shapeBySchema(
+            liveType,
+            mergeVisualEditorConfig(currentConfig, liveType, liveConfig)
+          );
         }
       } catch {}
       const finalCfg = this._shapeBySchema(currentType, currentConfig);
       if (typeof onCommit === 'function') {
-        await onCommit(finalCfg);
+        // Editing is optimistic: close immediately and let card replacement
+        // plus persistence continue after the click task has completed. The
+        // previous flow kept this modal open while `_saveLayout` performed its
+        // storage work, which made Update feel roughly two seconds slower.
+        close();
+        window.setTimeout(async () => {
+          try {
+            await onCommit(finalCfg);
+          } catch (error) {
+            console.warn('[drag-and-drop-card] Card update failed after closing the editor', error);
+            try { this._toast?.('Could not update the card. Please try again.'); } catch {}
+          }
+        }, 0);
+        return;
       } else {
-        await this._addPickedCardToLayout(finalCfg);
-        this._pushRecent((finalCfg||{}).type);
+        try {
+          await this._addPickedCardToLayout(finalCfg);
+          this._pushRecent((finalCfg||{}).type);
+        } catch (error) {
+          commitInFlight = false;
+          enableCommit(true);
+          setError(`Could not add card: ${String(error?.message || error)}`);
+          return;
+        }
       }
       close();
     };
@@ -4266,6 +5176,7 @@ const smartPickerMethods = {
       if (__searchTimer) clearTimeout(__searchTimer);
       __searchTimer = setTimeout(() => {
         if (activePickerMode === 'hads') renderHadsStore();
+        else if (activePickerMode === 'entities') renderEntityPicker();
         else renderLeft();
       }, 120);
     });
@@ -4409,7 +5320,7 @@ const smartPickerMethods = {
     const first = all[0];
     const firstSensor = byDomain('sensor')[0] || first;
 
-    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast','map'].includes(type)) {
+    if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity','weather-forecast','todo-list','map'].includes(type)) {
       // Provide sensible defaults for cards that require an `entity` field.
       const defaultEntity = ({
         'sensor': firstSensor,
@@ -4419,6 +5330,7 @@ const smartPickerMethods = {
         'thermostat': byDomain('climate')[0] || first,
         'alarm-panel': byDomain('alarm_control_panel')[0] || first,
         'weather-forecast': byDomain('weather')[0] || first,
+        'todo-list': byDomain('todo')[0] || first,
         'map': byDomain('device_tracker')[0] || byDomain('person')[0] || first,
       })[type] || firstSensor || first;
       if (['entity','sensor','button','gauge','tile','light','thermostat','media-control','alarm-panel','picture-entity'].includes(type)) {
@@ -4428,6 +5340,9 @@ const smartPickerMethods = {
         base.show_current = true;
         base.show_forecast = true;
         base.forecast_type = 'daily';
+      } else if (type === 'todo-list') {
+        base.entity = defaultEntity;
+        base.hide_completed = false;
       } else if (type === 'map') {
         base.entities = [defaultEntity].filter(Boolean);
         base.theme_mode = 'auto';

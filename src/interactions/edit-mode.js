@@ -178,6 +178,7 @@ const editModeMethods = {
       setDisplay(this.storeBadge, on);
       setDisplay(this.applyLayoutBtn, on);
       setDisplay(this.toolbarAutoSaveBtn, on);
+      setDisplay(this.editorThemeBtn, on);
       setDisplay(this.copyBtn, on);
       setDisplay(this.pasteBtn, on);
       setDisplay(this.undoBtn, on);
@@ -199,6 +200,7 @@ const editModeMethods = {
       setDisplay(this.storeBadge, off);
       setDisplay(this.applyLayoutBtn, off);
       setDisplay(this.toolbarAutoSaveBtn, off);
+      setDisplay(this.editorThemeBtn, off);
       setDisplay(this.copyBtn, off);
       setDisplay(this.pasteBtn, off);
       setDisplay(this.undoBtn, off);
@@ -275,6 +277,8 @@ const editModeMethods = {
   
     // === Your existing non-visual logic unchanged ===
     this.editMode = entering;
+    if (entering) this._applyEditorAppearance_?.();
+    else this._clearEditorAppearance_?.();
     if (entering) {
       try { this._computeHaTopGutter_?.(); } catch {}
       try { this._syncToolbarFollowPosition_?.(); } catch {}
@@ -327,6 +331,7 @@ const editModeMethods = {
     });
     this._syncSidebarEmptyState_?.();
     if (!this.editMode) this._clearSelection?.();
+    this._scheduleSelectionArrangeToolbarSync_?.();
   
     if (!this.editMode) {
       this.cardContainer?.querySelectorAll('.card-wrapper.dragging')
@@ -592,6 +597,7 @@ const editModeMethods = {
     toggle(this.storeBadge);
     toggle(this.applyLayoutBtn);
     toggle(this.toolbarAutoSaveBtn);
+    toggle(this.editorThemeBtn);
     toggle(this.undoBtn);
     toggle(this.redoBtn);
     toggle(this.lineModeBtn);

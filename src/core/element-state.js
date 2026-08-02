@@ -31,6 +31,8 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.sidebarHeaderHost = null;
   instance.sidebarDetail = null;
   instance.__dashboardThemeAppliedVars = [];
+  instance.editorThemeMode = 'light';
+  instance.__editorThemePreferenceLoadedForKey = '';
   instance.__animatedCardIds = new Set();
   instance.__suppressCardAnimation = false;
   instance.playLoadingAnimation = false;
@@ -38,6 +40,7 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__ddcLoadingAnimationToken = 0;
   instance.__backendProbePending = false;
   instance.__backendRefreshPending = false;
+  instance.__lastSyncedDashboardPayload = null;
   instance.__helpersPreloadQueued = false;
   instance._responsivePreviewOrientations = {
     desktop: 'landscape',
