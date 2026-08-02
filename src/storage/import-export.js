@@ -611,7 +611,6 @@ const designImportExportMethods = {
             for (const key of this._runtimeLayoutCacheKeys_?.() || []) {
               if (key) globalThis.__ddcRuntimeLayoutCache.set(key, snapshot);
             }
-            globalThis.__ddcLastRuntimeLayoutPayload = snapshot;
           } catch {
             try { this._writeRuntimeLayoutCache_?.(importedSnapshot); } catch {}
           }

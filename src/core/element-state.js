@@ -41,6 +41,8 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__backendProbePending = false;
   instance.__backendRefreshPending = false;
   instance.__lastSyncedDashboardPayload = null;
+  instance.__ddcAnonymousConfigSource = null;
+  instance.__ddcAnonymousStorageKey = '';
   instance.__helpersPreloadQueued = false;
   instance._responsivePreviewOrientations = {
     desktop: 'landscape',

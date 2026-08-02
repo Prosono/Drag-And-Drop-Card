@@ -67,7 +67,14 @@ const emptyStateMethods = {
   },
 
   _shouldShowEmptyDashboardPlaceholder_() {
-    return !this._isHaEditorBlockingEmptyState_?.();
+    // The compact HA card-config preview has its own purpose-built preview UI.
+    // The real dashboard canvas, however, must show onboarding immediately even
+    // while the surrounding Home Assistant dashboard is in edit mode.
+    try {
+      if (this.__haConfigPreviewMode || this.__haConfigPreviewRendered) return false;
+      if (this._isInHaEditorPreview?.()) return false;
+    } catch {}
+    return true;
   },
 
 

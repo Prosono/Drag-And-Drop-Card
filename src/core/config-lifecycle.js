@@ -24,8 +24,13 @@ const setConfigMethods = {
       // Track old key so we only rebuild when storage_key actually changes
       // Keep previous to detect real key changes
       const prevKey = this.storageKey;
-      const providedKey = String(config?.storage_key || config?.storageKey || '').trim();
-      const stableKey = providedKey || prevKey || this._deriveStorageKeyFromConfig_(config);
+      const storageIdentity = this._resolveIncomingDashboardStorageIdentity_?.(config) || {
+        key: this._deriveStorageKeyFromConfig_(config),
+        anonymous: false,
+        fresh: false,
+      };
+      const stableKey = String(storageIdentity.key || '').trim();
+      const freshEmptyConfig = !!(storageIdentity.anonymous && storageIdentity.fresh);
       config = this._normalizeDashboardOptions_({ ...config, storage_key: stableKey }, { requireSizeMode: true, forceAutoResize: true });
       this.config = { ...config };
 
@@ -234,10 +239,12 @@ const setConfigMethods = {
       const haNativeEditActive = !!this._isHaEditorBlockingEmptyState_?.();
       const hasRenderedCards = !!this.cardContainer?.querySelector?.('.card-wrapper:not(.ddc-placeholder)');
       const editorLoadOptions = haNativeEditActive
-        ? { preserveExistingOnEmpty: true, reason: 'ha-native-edit' }
+        ? (freshEmptyConfig
+            ? { replaceExisting: true, reason: 'fresh-empty-card' }
+            : { preserveExistingOnEmpty: true, reason: 'ha-native-edit' })
         : undefined;
       if (keyChanged && this.__booted) {
-        if (haNativeEditActive && hasRenderedCards) {
+        if (haNativeEditActive && hasRenderedCards && !freshEmptyConfig) {
           this._syncEmptyStateUI?.();
           this._applyAutoScale?.({ force: true });
         } else {

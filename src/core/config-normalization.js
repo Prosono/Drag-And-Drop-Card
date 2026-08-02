@@ -57,8 +57,66 @@ const configHelperMethods = {
       cards: Array.isArray(config?.cards) ? config.cards : [],
       tabs: Array.isArray(config?.tabs) ? config.tabs : [],
       default_tab: config?.default_tab || '',
+      options: Object.fromEntries(
+        Object.keys(config || {})
+          .filter((key) => !['type', 'storage_key', 'storageKey', 'cards', 'responsive_layouts', 'responsiveLayouts'].includes(key))
+          .sort()
+          .map((key) => [key, config[key]])
+      ),
     };
     return `layout_auto_${this._hashStorageSeed_(JSON.stringify(seed))}`;
+  },
+
+  _hasEmbeddedDashboardLayout_(config = {}) {
+    if (!config || typeof config !== 'object') return false;
+    if (Array.isArray(config.cards) && config.cards.length > 0) return true;
+    if (Array.isArray(config.tabs) && config.tabs.length > 0) return true;
+    const layouts = config.responsive_layouts || config.responsiveLayouts;
+    if (!layouts || typeof layouts !== 'object') return false;
+    const visit = (value) => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (!value || typeof value !== 'object') return false;
+      if (Array.isArray(value.cards) && value.cards.length > 0) return true;
+      return Object.values(value).some(visit);
+    };
+    return visit(layouts);
+  },
+
+  _resolveIncomingDashboardStorageIdentity_(config = {}) {
+    const explicit = String(config?.storage_key || config?.storageKey || '').trim();
+    const id = String(config?.id || '').trim();
+    const hasEmbeddedLayout = this._hasEmbeddedDashboardLayout_(config);
+    const hasMeaningfulOptions = Object.keys(config || {}).some((key) => (
+      !['type', 'storage_key', 'storageKey', 'cards', 'tabs', 'responsive_layouts', 'responsiveLayouts'].includes(key)
+      && config[key] !== undefined
+    ));
+    if (explicit || id || hasEmbeddedLayout || hasMeaningfulOptions) {
+      this.__ddcAnonymousConfigSource = null;
+      this.__ddcAnonymousStorageKey = '';
+      return {
+        key: explicit || this._deriveStorageKeyFromConfig_(config),
+        anonymous: false,
+        fresh: false,
+      };
+    }
+
+    // Home Assistant can reuse a custom-card DOM element while switching from
+    // an existing card to a brand-new one. An unidentified empty config must
+    // therefore never inherit the previous instance's storage key. Keep the
+    // generated key stable only while HA is passing the exact same config
+    // object; a new config object represents a new anonymous card lifecycle.
+    const sameAnonymousConfig = this.__ddcAnonymousConfigSource === config
+      && !!this.__ddcAnonymousStorageKey;
+    if (!sameAnonymousConfig) {
+      this.__ddcAnonymousConfigSource = config;
+      this.__ddcAnonymousStorageKey = this.constructor?._genKey?.()
+        || `layout_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+    return {
+      key: this.__ddcAnonymousStorageKey,
+      anonymous: true,
+      fresh: !sameAnonymousConfig,
+    };
   },
 
   _normalizeContainerSizeMode_(mode) {

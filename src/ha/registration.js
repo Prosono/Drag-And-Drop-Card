@@ -36,13 +36,13 @@ function __ddcDashboardStrategyTitle__(config = {}, hass = {}) {
   ).trim();
 }
 
-function __ddcDashboardStrategyStorageKey__(config = {}, hass = {}) {
+export function resolveDashboardStrategyStorageKey(config = {}, hass = {}) {
   const explicit = String(config.storage_key || config.storageKey || '').trim();
   if (explicit) return explicit;
   let currentPath = '';
   try { currentPath = window.location?.pathname || ''; } catch {}
 
-  const seedParts = [
+  const stableSeedParts = [
     config.url_path,
     config.urlPath,
     config.path,
@@ -50,14 +50,18 @@ function __ddcDashboardStrategyStorageKey__(config = {}, hass = {}) {
     config.id,
     config.dashboard_id,
     config.dashboardId,
-    currentPath,
     config.title,
-    hass?.config?.location_name,
+    config.name,
   ].map((part) => String(part || '').trim()).filter(Boolean);
-
-  const seed = seedParts.length ? seedParts.join('|') : 'drag-and-drop-dashboard';
+  // During the Community dashboard creation flow window.location can still
+  // point at the dashboard the user came from. Never mix that transient route
+  // into an otherwise stable strategy identity or the storage key will change
+  // on the first refresh. The current route is only a final fallback for old
+  // YAML strategy configs that contain no identifying fields.
+  const fallbackSeed = String(currentPath || hass?.config?.location_name || 'drag-and-drop-dashboard').trim();
+  const seed = stableSeedParts.length ? stableSeedParts.join('|') : fallbackSeed;
   const slug = __ddcDashboardStrategySlug__(
-    config.url_path || config.urlPath || config.path || config.slug || currentPath || config.title || 'dashboard',
+    config.url_path || config.urlPath || config.path || config.slug || config.title || config.name || currentPath || 'dashboard',
     'dashboard'
   );
   return `dashboard_${slug}_${__ddcDashboardStrategyHash__(seed)}`;
@@ -76,7 +80,7 @@ export function registerDragAndDropCard(DragAndDropCard, version) {
 
     static async generate(config = {}, hass = {}) {
       const title = __ddcDashboardStrategyTitle__(config, hass);
-      const storageKey = __ddcDashboardStrategyStorageKey__(config, hass);
+      const storageKey = resolveDashboardStrategyStorageKey(config, hass);
       const cardOverrides = (
         config.card && typeof config.card === 'object' && !Array.isArray(config.card)
       ) ? config.card : {};

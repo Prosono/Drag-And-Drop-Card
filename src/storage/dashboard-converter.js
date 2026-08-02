@@ -1,13 +1,16 @@
 /*
  * Lovelace dashboard converter.
  *
- * This MVP imports an existing Home Assistant Lovelace config as a copy, converts views to DDC tabs,
- * and places each top-level Lovelace card as a draggable card on the dashboard canvas.
+ * Imports an existing Home Assistant Lovelace config as a copy. The flow is deliberately split into
+ * source parsing, an inspectable import plan, responsive layout packing, validation, and an atomic
+ * apply step so malformed or partially supported dashboards cannot leave the current canvas broken.
  */
 
 import { load as loadYaml } from 'js-yaml';
 
 const DASHBOARD_CONVERTER_MODAL_ID = 'ddc-dashboard-converter-modal';
+const DASHBOARD_CONVERTER_MAX_SOURCE_CHARS = 5_000_000;
+const DASHBOARD_CONVERTER_MAX_CARDS = 2_000;
 
 const converterMethods = {
   _dashboardConverterSlug_(value, fallback = 'tab') {
@@ -24,6 +27,9 @@ const converterMethods = {
   _parseDashboardConverterText_(text = '') {
     const raw = String(text || '').trim();
     if (!raw) throw new Error('Paste a Lovelace dashboard config first.');
+    if (raw.length > DASHBOARD_CONVERTER_MAX_SOURCE_CHARS) {
+      throw new Error('This dashboard config is too large to import safely (maximum 5 MB).');
+    }
     try {
       return JSON.parse(raw);
     } catch (jsonErr) {
@@ -533,6 +539,97 @@ const converterMethods = {
     ].includes(type);
   },
 
+  _dashboardConverterAddWarning_(diagnostics = null, code = 'warning', message = '', context = {}) {
+    if (!diagnostics || !Array.isArray(diagnostics.warnings) || !message) return;
+    const warning = {
+      code,
+      message: String(message),
+      ...(context?.view ? { view: String(context.view) } : {}),
+      ...(context?.path ? { path: String(context.path) } : {}),
+    };
+    const signature = `${warning.code}|${warning.view || ''}|${warning.path || ''}|${warning.message}`;
+    if (diagnostics.__warningSignatures?.has(signature)) return;
+    diagnostics.__warningSignatures?.add(signature);
+    diagnostics.warnings.push(warning);
+  },
+
+  _sanitizeDashboardConverterNestedCards_(value, diagnostics = null, context = {}) {
+    if (Array.isArray(value)) {
+      return value
+        .map((child, index) => {
+          if (!child || typeof child !== 'object' || !child.type) return this._cloneJson_?.(child) ?? child;
+          return this._sanitizeDashboardConverterCard_(child, diagnostics, {
+            ...context,
+            path: `${context.path || 'card'}[${index}]`,
+          });
+        })
+        .filter((child) => child != null);
+    }
+    if (!value || typeof value !== 'object') return value;
+    if (value.type) return this._sanitizeDashboardConverterCard_(value, diagnostics, context);
+    const out = {};
+    Object.entries(value).forEach(([key, child]) => {
+      if (child && typeof child === 'object' && child.type) {
+        const sanitized = this._sanitizeDashboardConverterCard_(child, diagnostics, {
+          ...context,
+          path: `${context.path || 'card'}.${key}`,
+        });
+        if (sanitized) out[key] = sanitized;
+      } else {
+        out[key] = this._cloneJson_?.(child) ?? child;
+      }
+    });
+    return out;
+  },
+
+  _sanitizeDashboardConverterCard_(card = {}, diagnostics = null, context = {}) {
+    if (!card || typeof card !== 'object' || Array.isArray(card)) {
+      if (diagnostics) diagnostics.invalid_cards += 1;
+      this._dashboardConverterAddWarning_(diagnostics, 'invalid-card', 'Skipped a malformed card entry.', context);
+      return null;
+    }
+    const type = String(card.type || '').trim();
+    if (!type) {
+      if (diagnostics) diagnostics.invalid_cards += 1;
+      this._dashboardConverterAddWarning_(diagnostics, 'missing-card-type', 'Skipped a card without a type.', context);
+      return null;
+    }
+    if (this._dashboardConverterIsDdcCard_(card)) {
+      if (diagnostics) diagnostics.skipped_drag_drop_cards += 1;
+      this._dashboardConverterAddWarning_(
+        diagnostics,
+        'recursive-ddc-card',
+        'Skipped an existing Drag & Drop Card to prevent a recursive dashboard import.',
+        context
+      );
+      return null;
+    }
+
+    const cloned = this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card));
+    const nestedKeys = ['card', 'cards', 'default', 'states'];
+    nestedKeys.forEach((key) => {
+      if (!(key in cloned)) return;
+      const sanitized = this._sanitizeDashboardConverterNestedCards_(cloned[key], diagnostics, {
+        ...context,
+        path: `${context.path || type}.${key}`,
+      });
+      if (sanitized == null || (Array.isArray(sanitized) && !sanitized.length)) delete cloned[key];
+      else if (sanitized && typeof sanitized === 'object' && !Array.isArray(sanitized) && !Object.keys(sanitized).length) delete cloned[key];
+      else cloned[key] = sanitized;
+    });
+
+    const normalizedType = type.toLowerCase();
+    if (normalizedType === 'conditional' && !cloned.card) {
+      this._dashboardConverterAddWarning_(diagnostics, 'empty-conditional', 'Skipped a conditional card whose nested card could not be imported.', context);
+      return null;
+    }
+    if ((normalizedType === 'custom:state-switch' || normalizedType === 'state-switch') && !cloned.states && !cloned.default) {
+      this._dashboardConverterAddWarning_(diagnostics, 'empty-state-switch', 'Skipped a state-switch card with no importable states.', context);
+      return null;
+    }
+    return cloned;
+  },
+
   _dashboardConverterStructuralChildSources_(card = {}) {
     const sources = [];
     const collect = (value) => {
@@ -559,25 +656,14 @@ const converterMethods = {
   _collectDashboardConverterCardsFromList_(sourceCards = [], options = {}) {
     const out = [];
     const source = Array.isArray(sourceCards) ? sourceCards : [];
-    source.forEach((card) => {
-      if (!card || typeof card !== 'object') return;
-      if (this._dashboardConverterIsDdcCard_(card)) return;
-
-      const type = String(card.type || '').trim().toLowerCase();
-      if (this._dashboardConverterIsStructuralCard_(card)) {
-        const childSources = this._dashboardConverterStructuralChildSources_(card);
-        if (childSources.length) {
-          childSources.forEach((childSource) => {
-            out.push(...this._collectDashboardConverterCardsFromList_(childSource, options));
-          });
-        } else {
-          out.push(this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card)));
-        }
-        return;
-      }
-
-      const cloned = this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card));
-      if (options.preserveLayoutBreaks || type !== 'custom:layout-break') out.push(cloned);
+    source.forEach((card, index) => {
+      const sanitized = this._sanitizeDashboardConverterCard_(card, options.diagnostics || null, {
+        view: options.viewTitle || '',
+        path: `${options.path || 'cards'}[${index}]`,
+      });
+      if (!sanitized) return;
+      const type = String(sanitized.type || '').trim().toLowerCase();
+      if (options.preserveLayoutBreaks || type !== 'custom:layout-break') out.push(sanitized);
     });
     return out;
   },
@@ -632,6 +718,159 @@ const converterMethods = {
       });
     }
     return count;
+  },
+
+  _buildDashboardConverterImportPlan_(sourceConfig = {}) {
+    const config = this._normalizeDashboardConverterConfig_(sourceConfig);
+    const sourceViews = Array.isArray(config.views) ? config.views : [];
+    if (!sourceViews.length) throw new Error('This dashboard has no views to convert.');
+
+    const diagnostics = {
+      warnings: [],
+      invalid_cards: 0,
+      skipped_drag_drop_cards: 0,
+      empty_views: 0,
+      custom_card_types: new Set(),
+      __warningSignatures: new Set(),
+    };
+    const usedTabIds = new Set();
+    const tabs = [];
+    const views = [];
+    let cardCount = 0;
+
+    sourceViews.forEach((view, viewIndex) => {
+      const title = String(view?.title || view?.path || `View ${viewIndex + 1}`).trim() || `View ${viewIndex + 1}`;
+      const tabId = this._normalizeDashboardConverterTabId_(view, viewIndex, usedTabIds);
+      const layoutMode = this._dashboardConverterViewLayoutMode_(view);
+      const viewLayoutOptions = this._dashboardConverterLayoutOptions_(view);
+      const blocks = [];
+      let blockIndex = 0;
+
+      const addBlock = (cards = [], mode = layoutMode, layoutOptions = {}, source = 'view') => {
+        const normalizedCards = (Array.isArray(cards) ? cards : []).filter((card) => card && typeof card === 'object');
+        if (!normalizedCards.length) return;
+        normalizedCards.forEach((card) => {
+          const type = String(card.type || '').trim().toLowerCase();
+          if (type.startsWith('custom:')) diagnostics.custom_card_types.add(type);
+          if (type !== 'custom:layout-break') cardCount += 1;
+        });
+        blocks.push({
+          id: `${tabId}:${source}:${blockIndex++}`,
+          mode: mode || 'grid',
+          layoutOptions: layoutOptions || {},
+          cards: normalizedCards,
+          source,
+        });
+      };
+
+      const badges = Array.isArray(view?.badges)
+        ? view.badges.map((badge) => this._normalizeDashboardConverterBadgeCard_(badge)).filter(Boolean)
+        : [];
+      if (badges.length) {
+        addBlock([{
+          type: 'glance',
+          title: 'Badges',
+          entities: badges
+            .map((badge) => badge.entity ? { entity: badge.entity, name: badge.name, icon: badge.icon } : null)
+            .filter(Boolean),
+        }], 'grid', {}, 'badges');
+      }
+
+      const addTopLevelCards = (sourceCards = [], source = 'view-cards', path = 'cards') => {
+        const cards = this._collectDashboardConverterCardsFromList_(sourceCards, {
+          preserveLayoutBreaks: true,
+          diagnostics,
+          viewTitle: title,
+          path,
+        });
+        let nativeCards = [];
+        const flushNative = () => {
+          if (!nativeCards.length) return;
+          addBlock(nativeCards, layoutMode, viewLayoutOptions, source);
+          nativeCards = [];
+        };
+        cards.forEach((card) => {
+          const layoutCardMode = this._dashboardConverterLayoutCardMode_(card);
+          if (layoutCardMode && Array.isArray(card.cards)) {
+            flushNative();
+            addBlock(card.cards, layoutCardMode, this._dashboardConverterLayoutOptions_(card), 'layout-card');
+            return;
+          }
+          nativeCards.push(card);
+        });
+        flushNative();
+      };
+
+      if (Array.isArray(view?.cards)) addTopLevelCards(view.cards, 'view-cards', `views[${viewIndex}].cards`);
+
+      if (Array.isArray(view?.sections)) {
+        view.sections.forEach((section, sectionIndex) => {
+          const sectionCards = [];
+          const sectionTitle = String(section?.title || '').trim();
+          if (sectionTitle) {
+            sectionCards.push({
+              type: 'markdown',
+              content: `## ${sectionTitle}`,
+              grid_options: { columns: 12, rows: 1 },
+            });
+          }
+          sectionCards.push(...this._collectDashboardConverterCardsFromList_(section?.cards, {
+            preserveLayoutBreaks: true,
+            diagnostics,
+            viewTitle: title,
+            path: `views[${viewIndex}].sections[${sectionIndex}].cards`,
+          }));
+          addBlock(sectionCards, 'grid', this._dashboardConverterLayoutOptions_(section), `section-${sectionIndex + 1}`);
+        });
+      }
+
+      const visibleCards = blocks.reduce((count, block) => (
+        count + block.cards.filter((card) => String(card?.type || '').toLowerCase() !== 'custom:layout-break').length
+      ), 0);
+      if (!visibleCards) {
+        diagnostics.empty_views += 1;
+        this._dashboardConverterAddWarning_(diagnostics, 'empty-view', `“${title}” contains no importable cards.`, { view: title });
+      }
+      if (view?.subview === true) {
+        this._dashboardConverterAddWarning_(diagnostics, 'subview-as-tab', `“${title}” is a subview and will be imported as a normal tab.`, { view: title });
+      }
+      if (layoutMode === 'panel' && visibleCards > 1) {
+        this._dashboardConverterAddWarning_(diagnostics, 'multi-card-panel', `“${title}” is a panel view with multiple cards; they will be stacked full-width.`, { view: title });
+      }
+
+      tabs.push({
+        id: tabId,
+        label: title,
+        ...(view?.icon ? { icon: view.icon } : {}),
+      });
+      views.push({
+        index: viewIndex,
+        tabId,
+        title,
+        layoutMode,
+        blocks,
+        cardCount: visibleCards,
+      });
+    });
+
+    if (!cardCount) throw new Error('No Lovelace cards were found to convert.');
+    if (cardCount > DASHBOARD_CONVERTER_MAX_CARDS) {
+      throw new Error(`This dashboard contains ${cardCount} cards. The safe import limit is ${DASHBOARD_CONVERTER_MAX_CARDS}.`);
+    }
+
+    return {
+      config,
+      tabs,
+      views,
+      cardCount,
+      diagnostics: {
+        warnings: diagnostics.warnings,
+        invalid_cards: diagnostics.invalid_cards,
+        skipped_drag_drop_cards: diagnostics.skipped_drag_drop_cards,
+        empty_views: diagnostics.empty_views,
+        custom_card_types: Array.from(diagnostics.custom_card_types).sort(),
+      },
+    };
   },
 
   _estimateDashboardConverterCardSize_(card = {}, context = {}) {
@@ -740,6 +979,24 @@ const converterMethods = {
   },
 
   _dashboardConverterViewportWidth_(variantKey = 'desktop_landscape') {
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const readResponsiveWidth = () => {
+      try {
+        const { profile, orientation } = this._splitResponsiveLayoutKey_(variantKey);
+        const viewport = this._getResponsiveViewportProfile_?.(profile, orientation);
+        const width = Number(viewport?.width || 0);
+        if (Number.isFinite(width) && width > 0) return width;
+      } catch {}
+      return 0;
+    };
+
+    // A fixed desktop canvas describes the primary import surface, not every
+    // responsive variant. Tablet/mobile layouts must use their own viewport
+    // widths or all generated variants become identical to desktop.
+    if (variantKey !== primaryKey) {
+      const responsiveWidth = readResponsiveWidth();
+      if (responsiveWidth > 0) return responsiveWidth;
+    }
     try {
       const mode = this._normalizeContainerSizeMode_?.(this.containerSizeMode || this._config?.container_size_mode);
       if (mode === 'preset' || mode === 'fixed' || mode === 'fixed_custom') {
@@ -751,12 +1008,8 @@ const converterMethods = {
         if (Number.isFinite(width) && width > 0) return Math.max(500, width);
       }
     } catch {}
-    try {
-      const { profile, orientation } = this._splitResponsiveLayoutKey_(variantKey);
-      const viewport = this._getResponsiveViewportProfile_?.(profile, orientation);
-      const width = Number(viewport?.width || 0);
-      if (Number.isFinite(width) && width > 0) return width;
-    } catch {}
+    const responsiveWidth = readResponsiveWidth();
+    if (responsiveWidth > 0) return responsiveWidth;
     try {
       const size = this._getContainerSize?.() || {};
       const width = Number(size.w || size.width || 0);
@@ -927,10 +1180,15 @@ const converterMethods = {
     const visibleGroup = group.filter((item) => String(item.card?.type || '').toLowerCase() !== 'custom:layout-break');
     const entries = visibleGroup.map((item) => {
       const estimate = this._estimateDashboardConverterCardSize_(item.card, { panel: item.panel });
+      const sizeHints = this._dashboardConverterCardSizeHints_(item.card);
       const widthSpan = estimate.width
         ? Math.ceil((estimate.width + gap) / Math.max(1, columnWidth + gap))
         : 1;
-      const span = estimate.full ? columns : Math.max(1, Math.min(columns, Number(estimate.span || widthSpan) || widthSpan));
+      const sectionGridSpan = sizeHints.gridColumns
+        ? Math.max(1, Math.ceil((sizeHints.gridColumns / 12) * columns))
+        : 0;
+      const requestedSpan = Math.max(Number(estimate.span || 0), widthSpan, sectionGridSpan, 1);
+      const span = estimate.full ? columns : Math.max(1, Math.min(columns, requestedSpan));
       let bestCol = 0;
       let bestY = Infinity;
       for (let col = 0; col <= columns - span; col += 1) {
@@ -1338,73 +1596,29 @@ const converterMethods = {
   },
 
   _convertLovelaceDashboardToDdc_(sourceConfig = {}) {
-    const config = this._normalizeDashboardConverterConfig_(sourceConfig);
+    const plan = this._buildDashboardConverterImportPlan_(sourceConfig);
+    const { config, tabs } = plan;
     const views = Array.isArray(config.views) ? config.views : [];
-    if (!views.length) throw new Error('This dashboard has no views to convert.');
-
-    const usedTabIds = new Set();
-    const tabs = [];
     const items = [];
-    let visibleItemCount = 0;
-    views.forEach((view, viewIndex) => {
-      const tabId = this._normalizeDashboardConverterTabId_(view, viewIndex, usedTabIds);
-      const layoutMode = this._dashboardConverterViewLayoutMode_(view);
-      const viewLayoutOptions = this._dashboardConverterLayoutOptions_(view);
-      const title = String(view.title || view.path || `View ${viewIndex + 1}`).trim();
-      tabs.push({
-        id: tabId,
-        label: title || `View ${viewIndex + 1}`,
-        ...(view.icon ? { icon: view.icon } : {}),
-      });
-      const cards = this._collectDashboardConverterCardsForView_(view);
-      let gridBlockIndex = 0;
-      cards.forEach((card, cardIndex) => {
-        const layoutCardMode = this._dashboardConverterLayoutCardMode_(card);
-        if (layoutCardMode && Array.isArray(card.cards)) {
-          const layoutOptions = this._dashboardConverterLayoutOptions_(card);
-          const childCards = this._collectDashboardConverterCardsFromList_(card.cards, { preserveLayoutBreaks: true });
-          childCards.forEach((childCard, childIndex) => {
-            if (!childCard || typeof childCard !== 'object') return;
-            const isLayoutBreak = String(childCard.type || '').toLowerCase() === 'custom:layout-break';
-            items.push({
-              id: this._dashboardConverterCardId_(viewIndex, `${cardIndex}-${childIndex}`),
-              tabId,
-              card: this._cloneJson_?.(childCard) || JSON.parse(JSON.stringify(childCard)),
-              cardStyle: this._dashboardConverterCardStyleHints_(childCard),
-              layoutMode: layoutCardMode,
-              layoutBlockMode: layoutCardMode,
-              layoutBlockId: `${tabId}:layout-card:${cardIndex}`,
-              layoutOptions,
-              isLayoutBreak,
-            });
-            if (!isLayoutBreak) visibleItemCount += 1;
+    plan.views.forEach((viewPlan) => {
+      viewPlan.blocks.forEach((block, blockIndex) => {
+        block.cards.forEach((card, cardIndex) => {
+          const isLayoutBreak = String(card?.type || '').toLowerCase() === 'custom:layout-break';
+          items.push({
+            id: this._dashboardConverterCardId_(viewPlan.index, `${blockIndex}-${cardIndex}`),
+            tabId: viewPlan.tabId,
+            card: this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card)),
+            cardStyle: this._dashboardConverterCardStyleHints_(card),
+            layoutMode: viewPlan.layoutMode,
+            layoutBlockMode: block.mode,
+            layoutBlockId: block.id,
+            layoutOptions: block.layoutOptions || {},
+            panel: block.mode === 'panel',
+            isLayoutBreak,
           });
-          gridBlockIndex += 1;
-          return;
-        }
-
-        const blockMode =
-          layoutMode === 'panel'
-            ? 'panel'
-            : (layoutMode === 'horizontal' || layoutMode === 'vertical' || layoutMode === 'masonry' ? layoutMode : 'grid');
-        const isLayoutBreak = String(card.type || '').toLowerCase() === 'custom:layout-break';
-        items.push({
-          id: this._dashboardConverterCardId_(viewIndex, cardIndex),
-          tabId,
-          card,
-          cardStyle: this._dashboardConverterCardStyleHints_(card),
-          layoutMode,
-          layoutBlockMode: blockMode,
-          layoutBlockId: blockMode === 'grid' ? `${tabId}:grid:${gridBlockIndex}` : `${tabId}:${blockMode}:0`,
-          layoutOptions: blockMode === 'horizontal' || blockMode === 'vertical' || blockMode === 'masonry' ? viewLayoutOptions : {},
-          panel: layoutMode === 'panel',
-          isLayoutBreak,
         });
-        if (!isLayoutBreak) visibleItemCount += 1;
       });
     });
-
-    if (!visibleItemCount) throw new Error('No Lovelace cards were found to convert.');
     const variantKeys = this._responsiveLayoutVariantKeys_?.() || ['desktop_landscape'];
     const responsiveLayouts = {};
     variantKeys.forEach((variantKey) => {
@@ -1443,23 +1657,128 @@ const converterMethods = {
       responsive_layouts: responsiveLayouts,
       summary: {
         views: tabs.length,
-        cards: visibleItemCount,
+        cards: plan.cardCount,
         canvas_width: options.container_fixed_width || inflated.bounds?.width || null,
         canvas_height: options.container_fixed_height || inflated.bounds?.height || null,
-        skipped_drag_drop_cards: views.reduce((count, view) => count + this._countDashboardConverterSkippedDdcCards_(view), 0),
+        skipped_drag_drop_cards: plan.diagnostics.skipped_drag_drop_cards,
+        invalid_cards: plan.diagnostics.invalid_cards,
+        empty_views: plan.diagnostics.empty_views,
+        custom_card_types: plan.diagnostics.custom_card_types,
+        warnings: plan.diagnostics.warnings,
+        view_details: plan.views.map((view) => ({
+          id: view.tabId,
+          title: view.title,
+          cards: view.cardCount,
+          layout: view.layoutMode,
+        })),
       },
     };
   },
 
+  _validateConvertedDashboardPayload_(payload = {}) {
+    if (!payload || typeof payload !== 'object') throw new Error('The converter did not produce a dashboard payload.');
+    const tabs = Array.isArray(payload?.options?.tabs) ? payload.options.tabs : [];
+    const tabIds = new Set(tabs.map((tab) => String(tab?.id || '').trim()).filter(Boolean));
+    if (!tabIds.size) throw new Error('The converted dashboard has no valid tabs.');
+    if (tabIds.size !== tabs.length) throw new Error('The converted dashboard contains duplicate or empty tab IDs.');
+
+    const primaryCards = Array.isArray(payload.cards) ? payload.cards : [];
+    if (!primaryCards.length) throw new Error('The converted dashboard has no cards.');
+    if (primaryCards.length > DASHBOARD_CONVERTER_MAX_CARDS) {
+      throw new Error(`The converted dashboard exceeds the ${DASHBOARD_CONVERTER_MAX_CARDS}-card safety limit.`);
+    }
+
+    const validateEntries = (entries = [], label = 'layout') => {
+      const ids = new Set();
+      entries.forEach((entry, index) => {
+        const id = String(entry?.id || '').trim();
+        const type = String(entry?.card?.type || '').trim();
+        const tabId = String(entry?.tabId || entry?.tab_id || '').trim();
+        const numbers = [entry?.position?.x, entry?.position?.y, entry?.size?.width, entry?.size?.height].map(Number);
+        if (!id || ids.has(id)) throw new Error(`${label} contains a duplicate or empty card ID at position ${index + 1}.`);
+        if (!type) throw new Error(`${label} contains a card without a type at position ${index + 1}.`);
+        if (!tabIds.has(tabId)) throw new Error(`${label} contains a card assigned to an unknown tab.`);
+        if (!numbers.every(Number.isFinite) || numbers[2] <= 0 || numbers[3] <= 0) {
+          throw new Error(`${label} contains an invalid card position or size.`);
+        }
+        ids.add(id);
+      });
+      return ids;
+    };
+
+    const primaryIds = validateEntries(primaryCards, 'Primary layout');
+    const responsiveLayouts = payload.responsive_layouts && typeof payload.responsive_layouts === 'object'
+      ? payload.responsive_layouts
+      : {};
+    Object.entries(responsiveLayouts).forEach(([key, value]) => {
+      const entries = Array.isArray(value) ? value : (Array.isArray(value?.cards) ? value.cards : null);
+      if (!entries) throw new Error(`Responsive layout “${key}” has an invalid format.`);
+      const ids = validateEntries(entries, `Responsive layout “${key}”`);
+      if (ids.size !== primaryIds.size || Array.from(primaryIds).some((id) => !ids.has(id))) {
+        throw new Error(`Responsive layout “${key}” does not contain the same cards as the primary layout.`);
+      }
+    });
+    return payload;
+  },
+
+  _captureDashboardConverterRuntimeSnapshot_() {
+    const clone = (value) => this._cloneJson_?.(value) || JSON.parse(JSON.stringify(value ?? null));
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const livePrimary = this._responsiveLayouts?.[primaryKey] || this._captureCurrentLayoutEntries_?.() || [];
+    return {
+      config: clone(this._config || {}),
+      responsiveLayouts: clone(this._responsiveLayouts || this._normalizeResponsiveLayouts_?.(livePrimary, null) || {}),
+      responsiveConnectors: clone(this._responsiveConnectors || {}),
+      tabs: clone(this.tabs || []),
+      defaultTab: this.defaultTab,
+      activeTab: this.activeTab,
+      activeResponsiveLayoutKey: this._activeResponsiveLayoutKey,
+      activeResponsiveProfile: this._activeResponsiveProfile,
+    };
+  },
+
+  async _restoreDashboardConverterRuntimeSnapshot_(snapshot = null) {
+    if (!snapshot) return false;
+    const clone = (value) => this._cloneJson_?.(value) || JSON.parse(JSON.stringify(value ?? null));
+    this._config = clone(snapshot.config || {});
+    this.config = { ...(this.config || {}), ...(this._config || {}) };
+    this.tabs = clone(snapshot.tabs || []);
+    this.defaultTab = snapshot.defaultTab || this.tabs[0]?.id || 'default';
+    this.activeTab = snapshot.activeTab || this.defaultTab;
+    this._responsiveLayouts = clone(snapshot.responsiveLayouts || {});
+    this._responsiveConnectors = clone(snapshot.responsiveConnectors || {});
+    this._activeResponsiveLayoutKey = snapshot.activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    this._activeResponsiveProfile = snapshot.activeResponsiveProfile || 'desktop';
+    const previousSuppressResponsiveRebuild = !!this.__suppressResponsiveRebuild;
+    this.__suppressResponsiveRebuild = true;
+    try { this._applyImportedOptions?.(this._config, true); } finally { this.__suppressResponsiveRebuild = previousSuppressResponsiveRebuild; }
+    const entries = this._responsiveLayouts?.[this._activeResponsiveLayoutKey]
+      || this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()]
+      || [];
+    await this._buildCardsFromEntries_?.(entries, 0, { replaceExisting: true });
+    try { this._renderTabs?.(); this._renderLayersBar_?.(); this._applyActiveTab?.(); this._applyVisibility_?.(); } catch {}
+    try { this._renderConnectors_?.(); this._syncEmptyStateUI?.(); this._resizeContainer?.(); this._applyAutoScale?.(); } catch {}
+    return true;
+  },
+
   async _applyConvertedDashboardPayload_(payload = {}) {
+    this._validateConvertedDashboardPayload_(payload);
+    if (this.__dashboardConverterImporting) throw new Error('A dashboard import is already running.');
+    if (!payload.summary || typeof payload.summary !== 'object') payload.summary = {};
     const cards = Array.isArray(payload.cards) ? payload.cards : [];
-    if (!cards.length) throw new Error('The converted dashboard has no cards.');
 
     const realCards = this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)') || [];
     if (realCards.length) {
-      const ok = window.confirm?.('Replace the current Drag & Drop canvas with the converted dashboard copy?');
+      const ok = window.confirm?.(`Replace the current Drag & Drop canvas with ${payload.summary?.cards || cards.length} imported cards across ${payload.summary?.views || payload.options?.tabs?.length || 1} tabs?`);
       if (!ok) return false;
     }
+
+    const rollbackSnapshot = this._captureDashboardConverterRuntimeSnapshot_?.();
+    this.__dashboardConverterImporting = true;
+    const previousImportingDashboard = !!this.__ddcImportingDashboard;
+    this.__ddcImportingDashboard = true;
+
+    try {
 
     this._hideEmptyPlaceholder?.();
     this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.forEach((node) => node.remove());
@@ -1505,7 +1824,7 @@ const converterMethods = {
     const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
     const activeEntries = this._responsiveLayouts?.[activeLayoutKey] || primaryCards;
     if (activeEntries.length) {
-      await this._buildCardsFromEntries_?.(activeEntries);
+      await this._buildCardsFromEntries_?.(activeEntries, 0, { replaceExisting: true });
     }
     this._restoreDashboardConverterTabAssignments_?.(payload);
     this._resizeContainer?.();
@@ -1520,12 +1839,22 @@ const converterMethods = {
     this.__suppressResponsiveMemoryPersist = true;
     try {
       try { await this._saveLayout?.(true); } catch { this._queueSave?.('dashboard-converter'); }
-      await this._persistDashboardConverterConfig_?.();
+      payload.summary.persisted_to_lovelace = await this._persistDashboardConverterConfig_?.();
     } finally {
       this.__suppressResponsiveMemoryPersist = previousSaveSuppressResponsiveMemoryPersist;
     }
-    this._toast?.(`Converted ${payload.summary?.cards || cards.length} cards across ${payload.summary?.views || options.tabs?.length || 1} tabs.`);
+    const persistenceNote = payload.summary?.persisted_to_lovelace === false ? ' The layout is active, but Home Assistant could not persist the card config automatically.' : '';
+    this._toast?.(`Converted ${payload.summary?.cards || cards.length} cards across ${payload.summary?.views || options.tabs?.length || 1} tabs.${persistenceNote}`);
     return true;
+    } catch (err) {
+      try { await this._restoreDashboardConverterRuntimeSnapshot_?.(rollbackSnapshot); } catch (rollbackErr) {
+        console.warn('[drag-and-drop-card] Dashboard import rollback failed', rollbackErr);
+      }
+      throw err;
+    } finally {
+      this.__ddcImportingDashboard = previousImportingDashboard;
+      this.__dashboardConverterImporting = false;
+    }
   },
 
   async _fetchDashboardConverterDashboardList_() {
@@ -1560,6 +1889,8 @@ const converterMethods = {
         .ddc-converter-title{display:flex;align-items:center;gap:12px;font-weight:850;font-size:18px;}
         .ddc-converter-title ha-icon{color:var(--primary-color,#03a9f4);}
         .ddc-converter-body{display:grid;gap:16px;padding:18px 20px;overflow:auto;}
+        .ddc-converter-steps{display:flex;align-items:center;gap:8px;color:var(--secondary-text-color,#9ca3af);font-size:12px;font-weight:750;}
+        .ddc-converter-step{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}.ddc-converter-step b{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:color-mix(in oklab,var(--primary-color,#03a9f4) 18%,transparent);color:var(--primary-color,#03a9f4);}.ddc-converter-step-sep{opacity:.55;}
         .ddc-converter-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.55fr);gap:16px;}
         .ddc-converter-field{display:grid;gap:8px;}
         .ddc-converter-field label{font-size:12px;font-weight:800;color:var(--secondary-text-color,#9ca3af);text-transform:uppercase;letter-spacing:0;}
@@ -1572,12 +1903,15 @@ const converterMethods = {
         .ddc-converter-card p,.ddc-converter-status{margin:0;color:var(--secondary-text-color,#9ca3af);font-size:13px;line-height:1.45;}
         .ddc-converter-stats{display:grid;gap:8px;}
         .ddc-converter-stat{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.04);font-size:13px;}
+        .ddc-converter-view-list,.ddc-converter-warning-list{display:grid;gap:7px;max-height:180px;overflow:auto;}
+        .ddc-converter-view{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.035);font-size:12px;}.ddc-converter-view span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.ddc-converter-view small{grid-column:1/-1;color:var(--secondary-text-color,#9ca3af);}
+        .ddc-converter-warning{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:12px;background:color-mix(in oklab,var(--warning-color,#f59e0b) 12%,transparent);color:var(--primary-text-color,#f8fafc);font-size:12px;line-height:1.4;}.ddc-converter-warning ha-icon{flex:none;width:17px;color:var(--warning-color,#f59e0b);}
         .ddc-converter-btn{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.16)) 76%,transparent);background:color-mix(in oklab,var(--card-background-color,#111827) 86%,transparent);color:var(--primary-text-color,#f8fafc);font:750 13px/1 "Segoe UI",-apple-system,BlinkMacSystemFont,sans-serif;padding:0 14px;cursor:pointer;}
         .ddc-converter-btn.primary{border-color:color-mix(in oklab,var(--primary-color,#03a9f4) 58%,transparent);background:linear-gradient(180deg,color-mix(in oklab,var(--primary-color,#03a9f4) 90%,#fff 10%),color-mix(in oklab,var(--primary-color,#03a9f4) 74%,#022033 26%));color:#fff;box-shadow:0 14px 28px color-mix(in oklab,var(--primary-color,#03a9f4) 22%,transparent);}
         .ddc-converter-btn.icon{width:40px;padding:0;}
-        .ddc-converter-btn:disabled{opacity:.55;cursor:not-allowed;}
+        .ddc-converter-btn:disabled{opacity:.55;cursor:not-allowed;}.ddc-converter-dialog[aria-busy="true"] .ddc-converter-btn{pointer-events:none;}
         .ddc-converter-error{color:var(--error-color,#ef4444);font-size:13px;}
-        @media (max-width:760px){.ddc-converter-overlay{padding:12px;align-items:end}.ddc-converter-dialog{width:100%;max-height:92vh;border-radius:22px}.ddc-converter-grid{grid-template-columns:1fr}.ddc-converter-foot{flex-wrap:wrap}.ddc-converter-foot .ddc-converter-row{width:100%;justify-content:flex-end}}
+        @media (max-width:760px){.ddc-converter-overlay{padding:12px;align-items:end}.ddc-converter-dialog{width:100%;max-height:92vh;border-radius:22px}.ddc-converter-grid{grid-template-columns:1fr}.ddc-converter-steps{overflow:auto}.ddc-converter-foot{flex-wrap:wrap}.ddc-converter-foot .ddc-converter-row{width:100%;justify-content:flex-end}}
       </style>
     `;
   },
@@ -1597,6 +1931,11 @@ const converterMethods = {
           <button type="button" class="ddc-converter-btn icon" data-action="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
         <div class="ddc-converter-body">
+          <div class="ddc-converter-steps" aria-label="Import steps">
+            <span class="ddc-converter-step"><b>1</b> Choose source</span><span class="ddc-converter-step-sep">→</span>
+            <span class="ddc-converter-step"><b>2</b> Review conversion</span><span class="ddc-converter-step-sep">→</span>
+            <span class="ddc-converter-step"><b>3</b> Import copy</span>
+          </div>
           <div class="ddc-converter-grid">
             <div class="ddc-converter-field">
               <label for="ddc-converter-source">Existing Home Assistant dashboards</label>
@@ -1614,9 +1953,12 @@ const converterMethods = {
                 <div class="ddc-converter-stat"><span>Views</span><strong>0</strong></div>
                 <div class="ddc-converter-stat"><span>Cards</span><strong>0</strong></div>
                 <div class="ddc-converter-stat"><span>Skipped DDC cards</span><strong>0</strong></div>
+                <div class="ddc-converter-stat"><span>Warnings</span><strong>0</strong></div>
               </div>
-              <p class="ddc-converter-status" data-status>Choose a dashboard or paste Lovelace config to preview it.</p>
-              <p class="ddc-converter-error" data-error hidden></p>
+              <div class="ddc-converter-view-list" data-view-list hidden></div>
+              <div class="ddc-converter-warning-list" data-warning-list hidden></div>
+              <p class="ddc-converter-status" data-status aria-live="polite">Choose a dashboard or paste Lovelace config to preview it.</p>
+              <p class="ddc-converter-error" data-error role="alert" hidden></p>
             </aside>
           </div>
         </div>
@@ -1628,19 +1970,28 @@ const converterMethods = {
           </div>
           <div class="ddc-converter-row">
             <button type="button" class="ddc-converter-btn" data-action="close">Cancel</button>
-            <button type="button" class="ddc-converter-btn primary" data-action="convert"><ha-icon icon="mdi:import"></ha-icon><span>Convert into Drag & Drop</span></button>
+            <button type="button" class="ddc-converter-btn primary" data-action="convert" disabled><ha-icon icon="mdi:import"></ha-icon><span>Import dashboard copy</span></button>
           </div>
         </div>
       </div>
     `;
 
-    const close = () => overlay.remove();
+    let previewTimer = 0;
+    let previewPayload = null;
+    const close = () => {
+      if (previewTimer) clearTimeout(previewTimer);
+      overlay.remove();
+    };
+    const dialog = overlay.querySelector('.ddc-converter-dialog');
     const sourceSelect = overlay.querySelector('#ddc-converter-source');
     const textInput = overlay.querySelector('#ddc-converter-text');
     const fileInput = overlay.querySelector('[data-file-input]');
     const statusEl = overlay.querySelector('[data-status]');
     const errorEl = overlay.querySelector('[data-error]');
     const previewEl = overlay.querySelector('[data-preview]');
+    const viewListEl = overlay.querySelector('[data-view-list]');
+    const warningListEl = overlay.querySelector('[data-warning-list]');
+    const convertBtn = overlay.querySelector('[data-action="convert"]');
     let loadedDashboardConfig = null;
     let loadedDashboardUrlPath = null;
 
@@ -1661,11 +2012,61 @@ const converterMethods = {
       errorEl.textContent = message;
     };
     const setStatus = (message = '') => { if (statusEl) statusEl.textContent = message; };
+    const invalidatePreview = () => {
+      previewPayload = null;
+      if (convertBtn) convertBtn.disabled = true;
+    };
+    const setBusy = (busy = false) => {
+      dialog?.setAttribute?.('aria-busy', busy ? 'true' : 'false');
+      overlay.querySelectorAll('.ddc-converter-btn').forEach((button) => {
+        if (button.dataset.action === 'close') return;
+        button.disabled = busy || (button === convertBtn && !previewPayload);
+      });
+      if (sourceSelect) sourceSelect.disabled = busy;
+      if (textInput) textInput.disabled = busy;
+    };
     const renderPreview = (converted = null) => {
       if (!previewEl || !converted) return;
       const stats = converted.summary || {};
-      const values = [stats.views || 0, stats.cards || 0, stats.skipped_drag_drop_cards || 0];
+      const warnings = Array.isArray(stats.warnings) ? stats.warnings : [];
+      const values = [stats.views || 0, stats.cards || 0, stats.skipped_drag_drop_cards || 0, warnings.length];
       previewEl.querySelectorAll('strong').forEach((node, index) => { node.textContent = String(values[index] ?? 0); });
+      if (viewListEl) {
+        viewListEl.replaceChildren();
+        (Array.isArray(stats.view_details) ? stats.view_details : []).forEach((view) => {
+          const row = document.createElement('div');
+          row.className = 'ddc-converter-view';
+          const title = document.createElement('span');
+          title.textContent = view.title || view.id || 'View';
+          const count = document.createElement('strong');
+          count.textContent = `${Number(view.cards || 0)} card${Number(view.cards || 0) === 1 ? '' : 's'}`;
+          const detail = document.createElement('small');
+          detail.textContent = `${String(view.layout || 'grid')} layout → ${view.id}`;
+          row.append(title, count, detail);
+          viewListEl.appendChild(row);
+        });
+        viewListEl.hidden = !viewListEl.childElementCount;
+      }
+      if (warningListEl) {
+        warningListEl.replaceChildren();
+        warnings.slice(0, 8).forEach((warning) => {
+          const row = document.createElement('div');
+          row.className = 'ddc-converter-warning';
+          const icon = document.createElement('ha-icon');
+          icon.setAttribute('icon', 'mdi:alert-outline');
+          const message = document.createElement('span');
+          message.textContent = warning.message || String(warning);
+          row.append(icon, message);
+          warningListEl.appendChild(row);
+        });
+        if (warnings.length > 8) {
+          const more = document.createElement('div');
+          more.className = 'ddc-converter-warning';
+          more.textContent = `And ${warnings.length - 8} more warnings.`;
+          warningListEl.appendChild(more);
+        }
+        warningListEl.hidden = !warningListEl.childElementCount;
+      }
     };
     const readCurrentSource = () => {
       if (loadedDashboardConfig && loadedDashboardUrlPath === sourceSelect?.value && !String(textInput?.value || '').trim()) {
@@ -1676,63 +2077,119 @@ const converterMethods = {
     const previewCurrent = () => {
       setError('');
       const converted = this._convertLovelaceDashboardToDdc_(readCurrentSource());
+      this._validateConvertedDashboardPayload_(converted);
+      previewPayload = converted;
       renderPreview(converted);
-      setStatus(`Ready to import ${converted.summary.cards} cards across ${converted.summary.views} tabs.`);
+      if (convertBtn) convertBtn.disabled = false;
+      const warningCount = converted.summary?.warnings?.length || 0;
+      setStatus(`Ready to import ${converted.summary.cards} cards across ${converted.summary.views} tabs${warningCount ? ` with ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}.`);
       return converted;
     };
 
     overlay.addEventListener('click', (ev) => {
       if (ev.target === overlay) close();
     });
+    overlay.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        close();
+      }
+    });
     overlay.querySelectorAll('[data-action="close"]').forEach((btn) => btn.addEventListener('click', close));
     overlay.querySelector('[data-action="file"]')?.addEventListener('click', () => fileInput?.click?.());
     fileInput?.addEventListener('change', async () => {
       const file = fileInput.files?.[0];
       if (!file) return;
-      textInput.value = await file.text();
-      loadedDashboardConfig = null;
-      loadedDashboardUrlPath = null;
-      try { previewCurrent(); } catch (err) { setError(String(err?.message || err)); }
+      invalidatePreview();
+      try {
+        if (file.size > DASHBOARD_CONVERTER_MAX_SOURCE_CHARS) throw new Error('This file is larger than the 5 MB import limit.');
+        setBusy(true);
+        setStatus('Reading dashboard file...');
+        textInput.value = await file.text();
+        loadedDashboardConfig = null;
+        loadedDashboardUrlPath = null;
+        previewCurrent();
+      } catch (err) {
+        setError(String(err?.message || err));
+        setStatus('Could not read or preview that file.');
+      } finally {
+        setBusy(false);
+        fileInput.value = '';
+      }
     });
     textInput?.addEventListener('input', () => {
       loadedDashboardConfig = null;
       loadedDashboardUrlPath = null;
+      invalidatePreview();
+      setError('');
+      if (previewTimer) clearTimeout(previewTimer);
+      if (!String(textInput.value || '').trim()) {
+        setStatus('Choose a dashboard or paste Lovelace config to preview it.');
+        return;
+      }
+      previewTimer = setTimeout(() => {
+        try { previewCurrent(); } catch (err) {
+          invalidatePreview();
+          setError(String(err?.message || err));
+          setStatus('Fix the source config before importing.');
+        }
+      }, 350);
     });
     overlay.querySelector('[data-action="preview"]')?.addEventListener('click', () => {
-      try { previewCurrent(); } catch (err) { setError(String(err?.message || err)); }
+      try { previewCurrent(); } catch (err) {
+        invalidatePreview();
+        setError(String(err?.message || err));
+        setStatus('Fix the source config before importing.');
+      }
+    });
+    sourceSelect?.addEventListener('change', () => {
+      invalidatePreview();
+      loadedDashboardConfig = null;
+      loadedDashboardUrlPath = null;
+      setError('');
+      setStatus('Click Load to review the selected dashboard before importing it.');
     });
     overlay.querySelector('[data-action="load"]')?.addEventListener('click', async () => {
       const urlPath = sourceSelect?.value || '';
       try {
+        invalidatePreview();
+        setBusy(true);
         setError('');
         setStatus('Loading dashboard config...');
         loadedDashboardConfig = await this._fetchDashboardConverterDashboardConfig_(urlPath || null);
         loadedDashboardUrlPath = urlPath;
         textInput.value = '';
-        const converted = this._convertLovelaceDashboardToDdc_(loadedDashboardConfig);
-        renderPreview(converted);
+        const converted = previewCurrent();
         setStatus(`Loaded ${converted.summary.cards} cards from the selected dashboard.`);
       } catch (err) {
+        invalidatePreview();
         loadedDashboardConfig = null;
         loadedDashboardUrlPath = null;
         setError(String(err?.message || err));
         setStatus('Could not load that dashboard. Paste YAML/JSON instead.');
+      } finally {
+        setBusy(false);
       }
     });
     overlay.querySelector('[data-action="convert"]')?.addEventListener('click', async () => {
       try {
         setError('');
-        const converted = previewCurrent();
-        setStatus('Converting dashboard...');
+        const converted = previewPayload || previewCurrent();
+        setBusy(true);
+        setStatus('Building and saving the imported dashboard...');
         const ok = await this._applyConvertedDashboardPayload_(converted);
         if (ok !== false) close();
+        else setStatus('Import cancelled. Your current dashboard was not changed.');
       } catch (err) {
         setError(String(err?.message || err));
-        setStatus('Conversion failed.');
+        setStatus('Import failed. The previous dashboard was restored.');
+      } finally {
+        if (overlay.isConnected) setBusy(false);
       }
     });
 
     this.shadowRoot.appendChild(overlay);
+    requestAnimationFrame(() => overlay.querySelector('[data-action="close"]')?.focus?.());
     this._fetchDashboardConverterDashboardList_()
       .then((dashboards) => {
         if (!sourceSelect) return;

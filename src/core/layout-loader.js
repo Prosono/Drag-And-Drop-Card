@@ -125,7 +125,7 @@ const initialLoadMethods = {
     add(this.config?.storageKey);
     if (this.config?.id) add(`layout_${String(this.config.id).replace(/[^a-zA-Z0-9_-]+/g, '_')}`);
     try { add(this._deriveStorageKeyFromConfig_?.(this.config || this._config || {})); } catch {}
-    add('default');
+    if (!keys.length) add('default');
     return keys;
   },
 
@@ -138,8 +138,7 @@ const initialLoadMethods = {
         const normalized = this._normalizeDashboardPayload_?.(this._cloneJson_?.(cached) || cached) || null;
         if (normalized?.cards?.length) return normalized;
       }
-      const last = globalThis.__ddcLastRuntimeLayoutPayload;
-      return this._normalizeDashboardPayload_?.(this._cloneJson_?.(last) || last) || null;
+      return null;
     } catch {
       return null;
     }
@@ -185,7 +184,6 @@ const initialLoadMethods = {
       for (const key of this._runtimeLayoutCacheKeys_?.() || []) {
         if (key) globalThis.__ddcRuntimeLayoutCache.set(key, snapshot);
       }
-      globalThis.__ddcLastRuntimeLayoutPayload = snapshot;
     } catch {}
   },
 
@@ -412,7 +410,9 @@ const initialLoadMethods = {
         this._activeResponsiveProfile = targetProfile;
         this._activeResponsiveLayoutKey = targetLayoutKey;
 
-        await this._buildCardsFromEntries_(entriesToBuild);
+        await this._buildCardsFromEntries_(entriesToBuild, 0, {
+          replaceExisting: !!options?.replaceExisting,
+        });
 
         if (entriesToBuild.length) {
           this._writeRuntimeLayoutCache_?.({
