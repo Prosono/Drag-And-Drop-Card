@@ -237,7 +237,7 @@ const dashboardApiMethods = {
 
       this._syncViewportPreviewUI_?.();
       this._applyAutoScale?.();
-      if (!this.__ddcImportingDashboard) {
+      if (!this.__ddcImportingDashboard && !this.__suppressResponsiveRebuild) {
         try { Promise.resolve(this._syncResponsiveProfileForViewport_?.({ force: true })).catch(() => {}); } catch {}
       }
     }

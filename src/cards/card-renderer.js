@@ -5,7 +5,12 @@
  * rebuilt when needed, and coordinates sidebar/card-mod rebuild behavior.
  */
 
-const raf = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+const raf = () => new Promise((resolve) => {
+  const scheduler = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (callback) => setTimeout(callback, 0);
+  scheduler(() => resolve());
+});
 
 /* Card creation, wrapper controls, card config extraction, and layout insertion helpers. */
 const cardBuilderMethods = {
@@ -555,9 +560,12 @@ const cardBuilderMethods = {
     this._clearSelection?.();
   
     let builtAny = false;
+    let builtCardCount = 0;
     const fragment = document.createDocumentFragment();
     const wrappersToRebuild = [];
     const wrappersToInit = [];
+    const activeTabId = this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.defaultTab;
+    const canDeferInactiveTabs = !this.editMode && Array.isArray(this.tabs) && this.tabs.length > 1;
     for (const conf of entryList) {
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
@@ -576,8 +584,17 @@ const cardBuilderMethods = {
         builtAny = true;
         continue;
       }
+
+      const entryTabId = this._normalizeTabId?.(normalized.tabId || this.defaultTab) || this.defaultTab;
+      if (canDeferInactiveTabs && entryTabId !== activeTabId) {
+        const wrap = this._makeDeferredCardWrapper_(normalized);
+        fragment.appendChild(wrap);
+        wrappersToInit.push(wrap);
+        builtAny = true;
+        continue;
+      }
   
-      const cardEl = await this._createCard(normalized.card);
+      const cardEl = await this._createCardSafely_(normalized.card);
       if (ticket && ticket !== this.__responsiveSwitchSeq) return;
       const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
       if (this.editMode) wrap.classList.add('editing');
@@ -603,6 +620,11 @@ const cardBuilderMethods = {
       wrappersToRebuild.push(wrap);
       wrappersToInit.push(wrap);
       builtAny = true;
+      builtCardCount += 1;
+      if (!this.editMode && builtCardCount % 4 === 0) {
+        await raf();
+        if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+      }
     }
   
     if (!builtAny) {
@@ -645,6 +667,136 @@ const cardBuilderMethods = {
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
   },
+
+    _makeCardLoadErrorElement_(cardConfig = {}, err = null) {
+      const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+      const type = String(cleanConfig?.type || 'unknown card');
+      const message = String(err?.message || err || 'This card could not be rendered.');
+      const el = document.createElement('div');
+      el.className = 'ddc-card-load-error';
+      el.__ddcSourceConfig = cleanConfig;
+      el.style.cssText = [
+        'box-sizing:border-box',
+        'width:100%',
+        'height:100%',
+        'display:flex',
+        'flex-direction:column',
+        'justify-content:center',
+        'gap:8px',
+        'padding:14px',
+        'border-radius:12px',
+        'border:1px solid color-mix(in oklab,var(--error-color,#ef4444) 42%,transparent)',
+        'background:color-mix(in oklab,var(--error-color,#ef4444) 10%,var(--card-background-color,#111827) 90%)',
+        'color:var(--primary-text-color,#f8fafc)',
+        'font:500 13px/1.35 var(--paper-font-body1_-_font-family,Arial,sans-serif)',
+        'overflow:auto',
+      ].join(';');
+      const title = document.createElement('strong');
+      title.textContent = `Could not render ${type}`;
+      title.style.cssText = 'font-size:13px;font-weight:800;color:var(--error-color,#ef4444);';
+      const body = document.createElement('div');
+      body.textContent = message;
+      body.style.cssText = 'color:var(--secondary-text-color,#94a3b8);word-break:break-word;';
+      el.append(title, body);
+      return el;
+    },
+
+    async _createCardSafely_(cfg) {
+      try {
+        return await this._createCard(cfg);
+      } catch (err) {
+        console.warn('[drag-and-drop-card] Could not create Lovelace card', { config: cfg, error: err });
+        return this._makeCardLoadErrorElement_(cfg, err);
+      }
+    },
+
+    _makeDeferredCardElement_(cardConfig = {}) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'ddc-deferred-card';
+      placeholder.setAttribute('aria-hidden', 'true');
+      placeholder.__ddcSourceConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+      return placeholder;
+    },
+
+    _makeDeferredCardWrapper_(normalized = {}) {
+      const cleanCard = this._sanitizeCardConfigForStorage_(normalized.card || {});
+      const placeholder = this._makeDeferredCardElement_(cleanCard);
+      const wrap = this._makeWrapper(placeholder, { layoutCardId: normalized.id });
+      wrap.dataset.ddcDeferred = 'true';
+      wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
+      this._setWrapperLayerIds_(wrap, normalized.layerIds || normalized.layer_ids || []);
+      this._setCardPosition(wrap, normalized.position?.x || 0, normalized.position?.y || 0);
+      wrap.style.width = `${normalized.size?.width ?? 14 * this.gridSize}px`;
+      wrap.style.height = `${normalized.size?.height ?? 10 * this.gridSize}px`;
+      if (normalized.z != null) wrap.style.zIndex = String(normalized.z);
+      if (normalized.overflow) {
+        try {
+          wrap.style.overflow = normalized.overflow;
+          wrap.dataset.overflow = normalized.overflow;
+        } catch {}
+      }
+      try { this._applyPerCardStyle_?.(wrap, normalized.card_style || normalized.cardStyle || null); } catch {}
+      try { wrap.dataset.cfg = JSON.stringify(cleanCard); } catch {}
+      return wrap;
+    },
+
+    async _hydrateDeferredCardWrapper_(wrap) {
+      if (!wrap || wrap.dataset?.ddcDeferred !== 'true' || wrap.dataset?.ddcHydrating === 'true') return false;
+      wrap.dataset.ddcHydrating = 'true';
+      try {
+        let cardConfig = null;
+        try { cardConfig = JSON.parse(wrap.dataset.cfg || 'null'); } catch {}
+        if (!cardConfig || typeof cardConfig !== 'object') cardConfig = this._extractCardConfig(wrap.firstElementChild) || {};
+        const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
+        const cardEl = await this._createCardSafely_(cleanConfig);
+        cardEl.__ddcSourceConfig = cleanConfig;
+        const current = wrap.firstElementChild;
+        if (current) wrap.replaceChild(cardEl, current);
+        else wrap.prepend(cardEl);
+        try { wrap.dataset.cfg = JSON.stringify(cleanConfig); } catch {}
+        delete wrap.dataset.ddcDeferred;
+        delete wrap.dataset.ddcHydrating;
+        if (this._hasCardModDeep?.(cleanConfig)) wrap.dataset.needsCardMod = 'true';
+        if (wrap.dataset.overflow) {
+          try { cardEl.style.overflow = wrap.dataset.overflow; } catch {}
+        }
+        try { this._rebuildOnce(cardEl); } catch {}
+        this.__ddcTextLockDirty = true;
+        try { this._scheduleTextResizeLockRefresh_?.(true); } catch {}
+        return true;
+      } catch (err) {
+        delete wrap.dataset.ddcHydrating;
+        console.warn('[drag-and-drop-card] Failed to hydrate deferred card', err);
+        return false;
+      }
+    },
+
+    async _hydrateVisibleDeferredCards_(wraps = null) {
+      const source = wraps
+        ? Array.from(wraps)
+        : Array.from(this.cardContainer?.querySelectorAll?.('.card-wrapper[data-ddc-deferred="true"]') || []);
+      const candidates = source.filter((wrap) => {
+        if (!wrap || wrap.dataset?.ddcDeferred !== 'true') return false;
+        if (wrap.style.display === 'none' || wrap.classList.contains('ddc-hidden') || wrap.inert === true) return false;
+        return true;
+      });
+      if (!candidates.length) return 0;
+      const batchSize = Math.max(1, Math.min(12, Number(this._config?.dashboard_converter_hydrate_batch_size || 4) || 4));
+      let count = 0;
+      for (let index = 0; index < candidates.length; index += batchSize) {
+        const batch = candidates.slice(index, index + batchSize);
+        const results = await Promise.all(batch.map((wrap) => this._hydrateDeferredCardWrapper_(wrap)));
+        count += results.filter(Boolean).length;
+        if (index + batchSize < candidates.length) {
+          try { await raf(); } catch {}
+        }
+      }
+      if (count) {
+        try { this._applyVisibility_?.(); } catch {}
+        try { this._renderConnectors_?.(); } catch {}
+      }
+      return count;
+    },
 
     async _createCard(cfg) {
       let sourceCfg = this._sanitizeCardConfigForStorage_(cfg || {});

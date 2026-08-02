@@ -37,6 +37,7 @@ import { installTabsLayoutMethods } from '../layout/tabs.js';
 import { installConnectorMethods } from '../interactions/connectors.js';
 import { installDashboardApiMethods } from '../dashboard/api.js';
 import { installDesignImportExportMethods } from '../storage/import-export.js';
+import { installDashboardConverterMethods } from '../storage/dashboard-converter.js';
 import { installDebugDiagnosticsMethods } from '../diagnostics/debug-tools.js';
 import { installLayoutGeometryMethods } from '../layout/geometry.js';
 import { installTextResizeLockMethods } from '../layout/text-size-lock.js';
@@ -91,6 +92,7 @@ export function installDragAndDropCardFeatures(CardClass, version) {
   installPersistenceMethods(CardClass.prototype);
   installDashboardApiMethods(CardClass.prototype);
   installDesignImportExportMethods(CardClass.prototype);
+  installDashboardConverterMethods(CardClass.prototype);
   installDebugDiagnosticsMethods(CardClass.prototype);
   installScreenSaverMethods(CardClass.prototype);
   installDashboardSettingsMethods(CardClass.prototype);

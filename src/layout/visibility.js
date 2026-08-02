@@ -162,6 +162,9 @@ const visibilityMethods = {
       else this._renderLayersBar_?.();
     } catch {}
     if (changed) {
+      try {
+        this._hydrateVisibleDeferredCards_?.(becameVisible).catch?.(() => {});
+      } catch {}
       try { this._animateCards?.(becameVisible, { replay: true, reason: 'layer-change' }); } catch {}
       try { this._renderConnectors_?.(); } catch {}
     }
