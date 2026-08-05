@@ -80,6 +80,13 @@ const emptyStateMethods = {
         || this.__dashboardConverterImporting
         || this.__ddcImportingDashboard
       ) return false;
+      // A newly-created HA element can receive an already populated imported
+      // config before its first layout load starts. Do not render the onboarding
+      // widget in that short window; the first load will either mount the cards
+      // or, if the saved layout is genuinely empty, show onboarding in finally.
+      if (!this.__booted && this._hasEmbeddedDashboardLayout_?.(this._config || this.config || {})) {
+        return false;
+      }
     } catch {}
     return true;
   },

@@ -136,6 +136,7 @@ const editModeMethods = {
     try { this.__clearPressTimer?.(); } catch {}
   
     const entering = (force === null) ? !this.editMode : !!force;
+    const editModeChanged = entering !== !!this.editMode;
     const wasOff   = !this.editMode && entering;
     // EDIT MODE PIN gate
     try {
@@ -285,7 +286,11 @@ const editModeMethods = {
     }
     if (!entering) {
       this._stopMiddleMousePan_?.();
-      this._persistCurrentResponsiveProfileToMemory_();
+      // setConfig() and connectedCallback() both synchronize the view-mode UI.
+      // They must not behave like a real edit-mode exit: doing so used to
+      // capture/rebuild the complete responsive layout on every HA config
+      // refresh and could race a tab click immediately after an import.
+      if (editModeChanged) this._persistCurrentResponsiveProfileToMemory_();
       this.viewportPreviewMode = 'live';
       this._closeConnectorSettings_?.();
       this._cancelConnectorDraft_?.();
@@ -330,7 +335,7 @@ const editModeMethods = {
       w.style.touchAction = this.editMode ? 'none' : 'auto';
     });
     this._syncSidebarEmptyState_?.();
-    if (!this.editMode) this._clearSelection?.();
+    if (!this.editMode && editModeChanged) this._clearSelection?.();
     this._scheduleSelectionArrangeToolbarSync_?.();
   
     if (!this.editMode) {
@@ -392,7 +397,9 @@ const editModeMethods = {
     try {
       // Resize the container based on current card positions.  This
       // updates its width/height and refreshes the grid overlay.
-      this._syncResponsiveProfileForViewport_?.({ force: !entering });
+      // A no-op view-mode synchronization may still detect a genuine viewport
+      // profile change, but it must never force a same-profile card rebuild.
+      this._syncResponsiveProfileForViewport_?.({ force: editModeChanged && !entering });
       if (typeof this._resizeContainer === 'function') {
         this._resizeContainer();
       }

@@ -99,6 +99,22 @@ test('the empty dashboard widget stays hidden during tab transitions and dashboa
   assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), true);
 });
 
+test('a populated imported config never flashes the empty-dashboard widget before first load', () => {
+  const harness = new DashboardIdentityHarness();
+  harness._isInHaEditorPreview = () => false;
+  harness.__booted = false;
+  harness._config = {
+    type: 'custom:drag-and-drop-card',
+    tabs: [{ id: 'home' }, { id: 'climate' }],
+    cards: [{ id: 'home-card', tabId: 'home', card: { type: 'tile' } }],
+  };
+
+  assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), false);
+
+  harness.__booted = true;
+  assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), true);
+});
+
 test('community dashboard storage identity does not depend on the previously visited dashboard route', () => {
   const previousWindow = globalThis.window;
   try {

@@ -44,6 +44,8 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__ddcAnonymousConfigSource = null;
   instance.__ddcAnonymousStorageKey = '';
   instance.__helpersPreloadQueued = false;
+  instance.__cardBuildSeq = 0;
+  instance._selection = new Set();
   instance._responsivePreviewOrientations = {
     desktop: 'landscape',
     tablet: 'landscape',

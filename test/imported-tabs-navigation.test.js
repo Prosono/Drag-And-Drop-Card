@@ -99,3 +99,25 @@ test('same-dashboard config refresh preserves the selected or transitioning tab'
     sameDashboard: true,
   }), 'security');
 });
+
+test('active deferred cards hydrate even when a rebuild committed them already visible', async () => {
+  const harness = new ImportedTabsHarness();
+  let hydrationArgument = Symbol('not-called');
+  harness.cardContainer = {
+    querySelectorAll: () => harness.wrappers,
+  };
+  harness._applyWrapDisplayState_ = () => ({
+    becameVisible: false,
+    visible: true,
+  });
+  harness._hydrateVisibleDeferredCards_ = (argument) => {
+    hydrationArgument = argument;
+    return Promise.resolve(1);
+  };
+  harness._clearSelection = () => {};
+  harness._animateCards = () => {};
+
+  await harness._applyActiveTab({ reason: 'tab-change' });
+
+  assert.equal(hydrationArgument, undefined);
+});

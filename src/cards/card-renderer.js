@@ -527,6 +527,16 @@ const cardBuilderMethods = {
   },
 
   async _buildCardsFromEntries_(entries = [], ticket = 0, options = {}) {
+    // All rebuild sources (initial load, import, responsive switching and HA
+    // config refresh) share one generation. The responsive ticket alone does
+    // not protect ticket=0 callers, so an older async build could otherwise
+    // commit after a newer imported dashboard and restore the wrong tab/page.
+    const buildSeq = (Number(this.__cardBuildSeq || 0) || 0) + 1;
+    this.__cardBuildSeq = buildSeq;
+    const isCurrentBuild = () => (
+      buildSeq === this.__cardBuildSeq
+      && (!ticket || ticket === this.__responsiveSwitchSeq)
+    );
     let entryList = Array.isArray(entries) ? entries : [];
     const replaceExisting = !!options?.replaceExisting;
     if (!entryList.length && !replaceExisting && this._shouldShowEmptyDashboardPlaceholder_?.() === false) {
@@ -564,7 +574,7 @@ const cardBuilderMethods = {
     const activeTabId = this._normalizeTabId?.(this.activeTab || this.defaultTab) || this.defaultTab;
     const canDeferInactiveTabs = !this.editMode && Array.isArray(this.tabs) && this.tabs.length > 1;
     for (const conf of entryList) {
-      if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+      if (!isCurrentBuild()) return;
       const normalized = this._normalizeSavedCardEntry_(conf);
       if (!normalized?.card || (typeof normalized.card === 'object' && Object.keys(normalized.card).length === 0)) {
         const wrap = this._makePlaceholderAt(
@@ -592,7 +602,7 @@ const cardBuilderMethods = {
       }
   
       const cardEl = await this._createCardSafely_(normalized.card);
-      if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+      if (!isCurrentBuild()) return;
       const wrap = this._makeWrapper(cardEl, { layoutCardId: normalized.id });
       if (this.editMode) wrap.classList.add('editing');
       wrap.dataset.tabId = this._normalizeTabId(normalized.tabId || this.defaultTab);
@@ -620,9 +630,12 @@ const cardBuilderMethods = {
       builtCardCount += 1;
       if (!this.editMode && builtCardCount % 4 === 0) {
         await raf();
-        if (ticket && ticket !== this.__responsiveSwitchSeq) return;
+        if (!isCurrentBuild()) return;
       }
     }
+
+    // Never clear the live canvas for an obsolete async build.
+    if (!isCurrentBuild()) return;
   
     if (!builtAny) {
       this._restoreBackgroundHostToContainer_();

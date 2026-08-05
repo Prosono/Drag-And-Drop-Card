@@ -258,7 +258,13 @@ const tabsLayoutMethods = {
     try { this._clearSelection(); } catch {}
     let hydration = Promise.resolve(0);
     try {
-      const pending = this._hydrateVisibleDeferredCards_?.(becameVisible);
+      // Scan the committed canvas rather than only wrappers that changed from
+      // hidden to visible. A responsive/config rebuild can create the currently
+      // active tab as a deferred wrapper while a tab click is in flight; that
+      // wrapper is already "visible" at commit time and therefore is absent
+      // from becameVisible. Scanning all deferred wrappers is cheap and ensures
+      // the active destination can never remain as an empty shell.
+      const pending = this._hydrateVisibleDeferredCards_?.();
       if (pending && typeof pending.then === 'function') hydration = pending.catch(() => 0);
     } catch {}
     // On tab changes, replay entrance motion only for cards that just became
