@@ -40,6 +40,10 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__ddcLoadingAnimationToken = 0;
   instance.__backendProbePending = false;
   instance.__backendRefreshPending = false;
+  instance.__backendProbeRetryTimer = 0;
+  instance.__backendProbeRetryAttempts = 0;
+  instance.__backendRefreshTimer = 0;
+  instance.__backendRefreshReason = '';
   instance.__initialLoadSeq = 0;
   instance.__lastSyncedDashboardPayload = null;
   instance.__ddcAnonymousConfigSource = null;

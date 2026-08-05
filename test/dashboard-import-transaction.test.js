@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 
 import { installDashboardConverterMethods } from '../src/storage/dashboard-converter.js';
 import { installResponsiveModelMethods } from '../src/layout/responsive-layouts.js';
-import { shouldDeferBackendRefresh } from '../src/core/element-lifecycle.js';
+import {
+  installLifecycleMethods,
+  shouldDeferBackendRefresh,
+  shouldLoadBackendSnapshotAfterProbe,
+} from '../src/core/element-lifecycle.js';
 import { installInitialLoadMethods } from '../src/core/layout-loader.js';
 import {
   collectDdcCardStorageLocations,
@@ -206,6 +210,79 @@ test('backend refresh is deferred throughout a dashboard import', () => {
   assert.equal(shouldDeferBackendRefresh({ __booting: true }), true);
   assert.equal(shouldDeferBackendRefresh({ __dashboardConverterImporting: true }), true);
   assert.equal(shouldDeferBackendRefresh({ __ddcImportingDashboard: true }), true);
+});
+
+test('an editor-active empty canvas still loads the backend snapshot', () => {
+  const emptyEditor = {
+    _isHaEditorBlockingEmptyState_: () => true,
+    cardContainer: { querySelector: () => null },
+  };
+  const populatedEditor = {
+    _isHaEditorBlockingEmptyState_: () => true,
+    cardContainer: { querySelector: () => ({ dataset: { layoutCardId: 'card-1' } }) },
+  };
+
+  assert.equal(shouldLoadBackendSnapshotAfterProbe(emptyEditor), true);
+  assert.equal(shouldLoadBackendSnapshotAfterProbe(populatedEditor), false);
+});
+
+test('a pending backend refresh survives until a disconnected card is reconnected', async () => {
+  class RefreshHarness {
+    constructor() {
+      this.storageKey = 'layout_import_test';
+      this._backendOK = true;
+      this.isConnected = false;
+      this.cardContainer = { querySelector: () => null };
+      this.loads = [];
+    }
+    _isHaEditorBlockingEmptyState_() { return true; }
+    _initialLoad(force, options) { this.loads.push({ force, options }); }
+  }
+  installLifecycleMethods(RefreshHarness.prototype);
+  const harness = new RefreshHarness();
+
+  harness._queueBackendRefresh_('probe-finished');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(harness.loads.length, 0);
+  assert.equal(harness.__backendRefreshPending, true);
+
+  harness.isConnected = true;
+  harness._queueBackendRefresh_('reconnected');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(harness.loads.length, 1);
+  assert.equal(harness.loads[0].options.reason, 'reconnected');
+  assert.equal(harness.__backendRefreshPending, false);
+});
+
+test('a transient backend probe failure retries and refreshes the empty dashboard', async () => {
+  class ProbeHarness {
+    constructor() {
+      this.storageKey = 'layout_import_test';
+      this.__booted = true;
+      this.__cfgReady = true;
+      this.isConnected = true;
+      this.cardContainer = { querySelector: () => null, children: [] };
+      this.probes = 0;
+      this.loads = 0;
+    }
+    _hasHassApi_() { return !!this._hass?.callApi; }
+    async _probeBackend() {
+      this.probes += 1;
+      this._backendOK = this.probes >= 2;
+      return this._backendOK;
+    }
+    _isHaEditorBlockingEmptyState_() { return true; }
+    _initialLoad() { this.loads += 1; }
+  }
+  installLifecycleMethods(ProbeHarness.prototype);
+  const harness = new ProbeHarness();
+
+  harness.hass = { callApi: async () => ({}) };
+  await new Promise((resolve) => setTimeout(resolve, 140));
+
+  assert.equal(harness.probes, 2);
+  assert.equal(harness.loads, 1);
+  assert.equal(harness._backendOK, true);
 });
 
 test('an in-flight backend load cannot apply stale state after an import starts', async () => {

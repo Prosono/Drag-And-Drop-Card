@@ -550,22 +550,8 @@ const initialLoadMethods = {
             && this._backendOK
             && this.storageKey
           );
-          this.__backendRefreshPending = false;
           if (shouldRefreshBackend) {
-            setTimeout(() => {
-              try {
-                if (this.__booting || !this.isConnected) return;
-                if (this._isHaEditorBlockingEmptyState_?.()) {
-                  this._syncEmptyStateUI?.();
-                  this._applyAutoScale?.({ force: true });
-                } else {
-                  this._initialLoad(true, {
-                    preserveExistingOnEmpty: true,
-                    reason: 'backend-probe-refresh',
-                  });
-                }
-              } catch {}
-            }, 0);
+            this._queueBackendRefresh_?.(this.__backendRefreshReason || 'backend-probe-refresh');
           }
         }
       }

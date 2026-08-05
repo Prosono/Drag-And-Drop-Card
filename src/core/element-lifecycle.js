@@ -13,7 +13,66 @@ export function shouldDeferBackendRefresh(instance = null) {
   );
 }
 
+export function shouldLoadBackendSnapshotAfterProbe(instance = null) {
+  if (!instance) return false;
+  let editorActive = false;
+  try { editorActive = !!instance._isHaEditorBlockingEmptyState_?.(); } catch {}
+  if (!editorActive) return true;
+  try {
+    return !instance.cardContainer?.querySelector?.('.card-wrapper:not(.ddc-placeholder)');
+  } catch {
+    return true;
+  }
+}
+
 const lifecycleMethods = {
+  _queueBackendRefresh_(reason = 'backend-refresh') {
+    if (reason) this.__backendRefreshReason = String(reason);
+    this.__backendRefreshPending = true;
+    if (this.__backendRefreshTimer) return true;
+
+    this.__backendRefreshTimer = setTimeout(() => {
+      this.__backendRefreshTimer = 0;
+      if (!this.__backendRefreshPending) return;
+      if (!this._backendOK || !this.storageKey) return;
+      if (shouldDeferBackendRefresh(this) || !this.isConnected) return;
+
+      const refreshReason = this.__backendRefreshReason || 'backend-refresh';
+      this.__backendRefreshPending = false;
+      this.__backendRefreshReason = '';
+      if (!shouldLoadBackendSnapshotAfterProbe(this)) {
+        this._syncEmptyStateUI?.();
+        this._applyAutoScale?.({ force: true });
+        return;
+      }
+      this._initialLoad?.(true, {
+        preserveExistingOnEmpty: true,
+        reason: refreshReason,
+      });
+    }, 0);
+    return true;
+  },
+
+  _scheduleBackendProbeRetry_() {
+    if (this.__backendProbeRetryTimer || this.__backendProbePending || this._backendOK) return false;
+    if (!this.storageKey || !this._hasHassApi_?.()) return false;
+    const attempt = (Number(this.__backendProbeRetryAttempts || 0) || 0) + 1;
+    const delays = [80, 300, 900, 2000];
+    if (attempt > delays.length) return false;
+    this.__backendProbeRetryAttempts = attempt;
+    this.__backendProbeRetryTimer = setTimeout(() => {
+      this.__backendProbeRetryTimer = 0;
+      if (!this.isConnected) {
+        this.__probed = false;
+        return;
+      }
+      if (this.__backendProbePending || this._backendOK) return;
+      this.__probed = false;
+      this.hass = this._hass;
+    }, delays[attempt - 1]);
+    return true;
+  },
+
   // === Initial autosize kick (view-mode safe) ===
     _startInitialAutosize() {
     try {
@@ -136,6 +195,13 @@ const lifecycleMethods = {
       } catch {}
 
       try { this.__ddcBindPointerListeners?.(); } catch {}
+
+      if (this.__backendRefreshPending) {
+        this._queueBackendRefresh_?.(this.__backendRefreshReason || 'reconnected-backend-refresh');
+      }
+      if (!this.__probed && this._hasHassApi_?.()) {
+        this.hass = this._hass;
+      }
     },
 
   disconnectedCallback() {
@@ -232,6 +298,15 @@ const lifecycleMethods = {
 
       try { this.__visObs?.disconnect?.(); } catch {}
       this.__visObs = null;
+      if (this.__backendProbeRetryTimer) {
+        clearTimeout(this.__backendProbeRetryTimer);
+        this.__backendProbeRetryTimer = 0;
+        if (!this._backendOK) this.__probed = false;
+      }
+      if (this.__backendRefreshTimer) {
+        clearTimeout(this.__backendRefreshTimer);
+        this.__backendRefreshTimer = 0;
+      }
       try { clearTimeout(this.__connectorRenderSettleTimer1); } catch {}
       try { clearTimeout(this.__connectorRenderSettleTimer2); } catch {}
       this.__connectorRenderSettleTimer1 = 0;
@@ -262,30 +337,30 @@ const lifecycleMethods = {
           this.__booted = true;
           this._initialLoad(false);
         }
-        this._probeBackend().then(() => {
+        this._probeBackend().then((backendReady) => {
           this.__probed = true;
           this.__backendProbePending = false;
+          if (backendReady) {
+            this.__backendProbeRetryAttempts = 0;
+            if (this.__backendProbeRetryTimer) {
+              clearTimeout(this.__backendProbeRetryTimer);
+              this.__backendProbeRetryTimer = 0;
+            }
+          }
           if (!this.__booted && this.__cfgReady) {
             this.__booted = true;
             this._initialLoad(true);
           } else if (this.__booted && this._backendOK && this.storageKey) {
-            if (shouldDeferBackendRefresh(this)) {
-              this.__backendRefreshPending = true;
-              return;
-            }
-            if (this._isHaEditorBlockingEmptyState_?.()) {
-              this._syncEmptyStateUI?.();
-              this._applyAutoScale?.({ force: true });
-            } else {
-              this._initialLoad(true, { preserveExistingOnEmpty: true, reason: 'hass-refresh' });
-            }
+            this._queueBackendRefresh_?.('hass-refresh');
           }
+          if (!backendReady) this._scheduleBackendProbeRetry_?.();
         }).catch(() => {
           this.__backendProbePending = false;
           if (!this.__booted && this.__cfgReady) {
             this.__booted = true;
             this._initialLoad(true);
           }
+          this._scheduleBackendProbeRetry_?.();
         });
       } else if (!this.__booted && this.__cfgReady && hass) {
         this.__booted = true;
