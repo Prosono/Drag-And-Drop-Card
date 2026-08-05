@@ -438,6 +438,13 @@ const persistenceMethods = {
     return current;
   },
 
+  _shouldMergeRemoteDashboardSnapshot_() {
+    // A full Lovelace conversion intentionally replaces the current dashboard.
+    // Merging the previous backend snapshot here can resurrect old tabs/cards
+    // and destroy the imported card-to-tab membership.
+    return !this.__dashboardConverterImporting && !this.__replaceDashboardSnapshot;
+  },
+
   async _saveLayoutInner_(silent = true) {
     this._persistCurrentResponsiveProfileToMemory_();
     try { this._syncLiveCardConfigsIntoResponsiveLayouts_?.(); } catch {}
@@ -453,7 +460,7 @@ const persistenceMethods = {
        packages: this._exportDashboardPackages_(),
      };
 
-    if (this.storageKey && this._backendOK) {
+    if (this.storageKey && this._backendOK && this._shouldMergeRemoteDashboardSnapshot_()) {
       try {
         const remote = await this._loadLayoutFromBackend(this.storageKey);
         if (remote && typeof remote === 'object') {

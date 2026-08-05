@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { selectInitialLayoutSnapshot } from '../src/core/layout-loader.js';
-import { mergeDashboardSnapshots } from '../src/storage/layout-persistence.js';
+import { installPersistenceMethods, mergeDashboardSnapshots } from '../src/storage/layout-persistence.js';
 import { formatLiveViewportMeta } from '../src/layout/viewport-preview.js';
 
 const card = (x, entity = 'light.old') => ({
@@ -77,6 +77,16 @@ test('same-field conflicts favor the device that is currently saving', () => {
   const merged = mergeDashboardSnapshots(base, local, remote, '2026-08-01T10:03:00.000Z');
 
   assert.equal(merged.responsive_layouts.tablet_landscape[0].x, 80);
+});
+
+test('a full dashboard conversion bypasses remote snapshot merging', () => {
+  class PersistenceHarness {}
+  installPersistenceMethods(PersistenceHarness.prototype);
+  const harness = new PersistenceHarness();
+
+  assert.equal(harness._shouldMergeRemoteDashboardSnapshot_(), true);
+  harness.__dashboardConverterImporting = true;
+  assert.equal(harness._shouldMergeRemoteDashboardSnapshot_(), false);
 });
 
 test('Live View text reports CSS viewport and describes a configured width cap', () => {

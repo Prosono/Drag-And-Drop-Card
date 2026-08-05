@@ -110,4 +110,6 @@ test('the empty-state import action and assistant expose the complete Lovelace i
   assert.match(converterSource, /data-action="review"/);
   assert.match(converterSource, /data-action="convert"/);
   assert.match(converterSource, /data-dashboard-preview/);
+  assert.match(converterSource, /loadSelectedDashboardPreview/);
+  assert.match(converterSource, /data-source-preview-stage/);
 });

@@ -161,6 +161,37 @@ test('dashboard converter builds a tab-aware thumbnail model from the actual pac
   assert.ok(homePreview.canvasHeight >= Math.max(...homePreview.entries.map((entry) => entry.y + entry.height)));
 });
 
+test('dashboard converter builds a live source preview per Lovelace view and removes recursive DDC cards', () => {
+  const harness = new DashboardConverterHarness();
+  const preview = harness._dashboardConverterSourcePreviewModel_({
+    title: 'Existing wall panel',
+    views: [
+      {
+        title: 'Home',
+        path: 'home',
+        cards: [
+          { type: 'entities', title: 'Lights', entities: ['light.kitchen'] },
+          { type: 'custom:drag-and-drop-card', storage_key: 'current-card' },
+        ],
+      },
+      {
+        title: 'Climate',
+        path: 'climate',
+        cards: [{ type: 'thermostat', entity: 'climate.living_room' }],
+      },
+    ],
+  }, 'climate');
+
+  assert.equal(preview.title, 'Existing wall panel');
+  assert.equal(preview.activeViewId, 'climate');
+  assert.equal(preview.cards.length, 1);
+  assert.equal(preview.cards[0].type, 'thermostat');
+  assert.deepEqual(preview.views.map(({ id, cardCount }) => ({ id, cardCount })), [
+    { id: 'home', cardCount: 1 },
+    { id: 'climate', cardCount: 1 },
+  ]);
+});
+
 test('dashboard converter skips an existing Drag & Drop card to avoid recursive imports', () => {
   const harness = new DashboardConverterHarness();
   const converted = harness._convertLovelaceDashboardToDdc_({

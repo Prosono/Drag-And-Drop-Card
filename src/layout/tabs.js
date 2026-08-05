@@ -26,6 +26,29 @@ const tabsLayoutMethods = {
     return (tabId && valid.includes(tabId)) ? tabId : (this.defaultTab || valid[0]);
   },
 
+  _syncWrapperTabAssignmentsFromActiveLayout_() {
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const layoutKey = this._activeResponsiveLayoutKey || primaryKey;
+    const entries = Array.isArray(this._responsiveLayouts?.[layoutKey])
+      ? this._responsiveLayouts[layoutKey]
+      : (Array.isArray(this._responsiveLayouts?.[primaryKey])
+          ? this._responsiveLayouts[primaryKey]
+          : []);
+    if (!entries.length || !this.cardContainer) return 0;
+    const validTabIds = new Set((Array.isArray(this.tabs) ? this.tabs : []).map((tab) => String(tab?.id || '')));
+    const tabByCardId = new Map(entries
+      .map((entry) => [String(entry?.id || '').trim(), String(entry?.tabId || entry?.tab_id || '').trim()])
+      .filter(([id, tabId]) => id && tabId && (!validTabIds.size || validTabIds.has(tabId))));
+    let changed = 0;
+    this.cardContainer.querySelectorAll?.('.card-wrapper')?.forEach((wrap) => {
+      const tabId = tabByCardId.get(String(wrap?.dataset?.layoutCardId || '').trim());
+      if (!tabId || wrap.dataset.tabId === tabId) return;
+      wrap.dataset.tabId = tabId;
+      changed += 1;
+    });
+    return changed;
+  },
+
   _shouldRenderTabBar_() {
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
     const shouldRenderTabs = !!tabs.length && !(tabs.length === 1 && this.hideTabsWhenSingle);
@@ -123,6 +146,7 @@ const tabsLayoutMethods = {
           this.activeTab = nextTab;
           try { this._closeLayersMenu_?.({ render: false }); } catch {}
           try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, nextTab); } catch {}
+          try { this._syncWrapperTabAssignmentsFromActiveLayout_?.(); } catch {}
           try { this._applyActiveTab({ reason: 'tab-change' }); } catch (err) { console.warn('[ddc:tabs] Could not apply active tab', err); }
           try { this._renderTabs(); } catch (err) { console.warn('[ddc:tabs] Could not render tabs after switch', err); }
           // Reapply visibility for the newly active tab. Visibility must be

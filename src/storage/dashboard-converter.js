@@ -1879,6 +1879,32 @@ const converterMethods = {
     return await this.hass.callWS(payload);
   },
 
+  _dashboardConverterSourcePreviewModel_(sourceConfig = {}, requestedViewId = '') {
+    const config = this._normalizeDashboardConverterConfig_(sourceConfig);
+    const sourceViews = Array.isArray(config.views) ? config.views : [];
+    const usedViewIds = new Set();
+    const views = sourceViews.map((view, index) => ({
+      id: this._normalizeDashboardConverterTabId_(view, index, usedViewIds),
+      label: String(view?.title || view?.path || `View ${index + 1}`).trim() || `View ${index + 1}`,
+      icon: String(view?.icon || '').trim(),
+      layout: this._dashboardConverterViewLayoutMode_(view),
+      cards: this._collectDashboardConverterCardsForView_(view)
+        .filter((card) => String(card?.type || '').toLowerCase() !== 'custom:layout-break'),
+    }));
+    const requested = String(requestedViewId || '').trim();
+    const activeView = views.find((view) => view.id === requested) || views[0] || null;
+    const cards = (activeView?.cards || []).slice(0, 24);
+    return {
+      title: String(config.title || 'Lovelace dashboard').trim(),
+      views: views.map(({ cards: viewCards, ...view }) => ({ ...view, cardCount: viewCards.length })),
+      activeViewId: activeView?.id || '',
+      activeViewLabel: activeView?.label || 'Dashboard',
+      layout: activeView?.layout || 'grid',
+      cards,
+      hiddenCardCount: Math.max(0, (activeView?.cards?.length || 0) - cards.length),
+    };
+  },
+
   _dashboardConverterPreviewModel_(converted = {}, requestedTabId = '') {
     const tabs = (Array.isArray(converted?.options?.tabs) ? converted.options.tabs : [])
       .map((tab, index) => ({
@@ -1974,14 +2000,15 @@ const converterMethods = {
         .ddc-converter-source-note{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;border-radius:11px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 8%,transparent);color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-source-note ha-icon{width:17px;flex:none;color:var(--primary-color,#3ca5dd)}
         .ddc-converter-dropzone{min-height:250px;display:grid;place-items:center;padding:30px;border:1.5px dashed color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line));border-radius:16px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 4%,transparent);color:inherit;text-align:center;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}.ddc-converter-dropzone:hover,.ddc-converter-dropzone.is-dragging{border-color:var(--primary-color,#3ca5dd);background:color-mix(in oklab,var(--primary-color,#3ca5dd) 9%,transparent);transform:translateY(-1px)}.ddc-converter-drop-inner{display:grid;justify-items:center;gap:8px}.ddc-converter-drop-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd);box-shadow:0 10px 24px rgba(0,0,0,.1)}.ddc-converter-drop-icon ha-icon{width:23px}.ddc-converter-drop-inner strong{font-size:15px}.ddc-converter-drop-inner span{max-width:300px;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-file-name{color:var(--primary-color,#3ca5dd)!important;font-weight:750;overflow-wrap:anywhere}
         .ddc-converter-review{min-width:0;display:grid;grid-template-rows:minmax(0,1fr);padding:26px 28px;border-left:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--primary-background-color,#0d151d) 34%,transparent);overflow:auto}.ddc-converter-review-empty{align-self:center;display:grid;justify-items:start;gap:12px;max-width:340px;color:var(--secondary-text-color,#9eacb8)}.ddc-converter-review-empty-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd)}.ddc-converter-review-empty h3{margin:0;color:var(--primary-text-color,#e8eef3);font-size:18px}.ddc-converter-review-empty p{margin:0;font-size:13px;line-height:1.55}.ddc-converter-review-ready{display:grid;align-content:start;gap:18px;animation:ddc-import-panel-in .26s cubic-bezier(.22,1,.36,1)}.ddc-converter-review-ready[hidden],.ddc-converter-review-empty[hidden]{display:none}.ddc-converter-review-head{display:grid;gap:6px}.ddc-converter-review-kicker{color:var(--primary-color,#3ca5dd);font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.ddc-converter-review-head h3{margin:0;font-size:21px;letter-spacing:-.02em;line-height:1.2}.ddc-converter-review-head p{margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.5}
+        .ddc-converter-source-preview{display:grid;align-content:start;gap:14px;animation:ddc-import-panel-in .24s cubic-bezier(.22,1,.36,1)}.ddc-converter-source-preview[hidden]{display:none}.ddc-converter-source-preview-head{display:grid;gap:5px}.ddc-converter-source-preview-kicker{display:flex;align-items:center;gap:7px;color:var(--success-color,#47a36b);font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.ddc-converter-source-preview-kicker ha-icon{width:15px}.ddc-converter-source-preview-head h3{margin:0;font-size:20px;letter-spacing:-.02em;line-height:1.2}.ddc-converter-source-preview-head p{margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.5}.ddc-converter-source-window{overflow:hidden;border:1px solid var(--ddc-import-line);border-radius:14px;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 82%,transparent);box-shadow:0 14px 34px rgba(0,0,0,.12)}.ddc-converter-source-window-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--ddc-import-line)}.ddc-converter-source-window-dot{width:5px;height:5px;border-radius:50%;background:color-mix(in oklab,var(--secondary-text-color,#9eacb8) 44%,transparent)}.ddc-converter-source-window-title{margin-left:3px;overflow:hidden;color:var(--secondary-text-color,#9eacb8);font-size:9px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}.ddc-converter-source-preview-tabs{display:flex;gap:3px;padding:7px 8px 0;overflow-x:auto;scrollbar-width:none}.ddc-converter-source-preview-tabs::-webkit-scrollbar{display:none}.ddc-converter-source-preview-tab{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:0;border-radius:7px 7px 2px 2px;background:transparent;color:var(--secondary-text-color,#9eacb8);font:720 9px/1 inherit;white-space:nowrap;cursor:pointer;transition:background .16s ease,color .16s ease}.ddc-converter-source-preview-tab:hover{color:var(--primary-text-color,#e8eef3);background:color-mix(in oklab,var(--primary-text-color,#fff) 5%,transparent)}.ddc-converter-source-preview-tab[aria-selected="true"]{background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3)}.ddc-converter-source-preview-tab ha-icon{width:12px;height:12px}.ddc-converter-source-preview-stage{position:relative;height:260px;overflow:hidden;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 91%,transparent)}.ddc-converter-source-preview-canvas{position:absolute;inset:12px auto auto 12px;width:1080px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:18px;transform-origin:top left;pointer-events:none}.ddc-converter-source-preview-canvas.panel{grid-template-columns:1fr}.ddc-converter-source-preview-canvas.vertical{grid-template-columns:repeat(2,minmax(0,1fr))}.ddc-converter-source-preview-card{min-width:0}.ddc-converter-source-preview-card>*{display:block;max-width:100%}.ddc-converter-source-preview-empty{position:absolute;inset:0;display:grid;place-items:center;padding:30px;color:var(--secondary-text-color,#9eacb8);font-size:11px;text-align:center}.ddc-converter-source-preview-loading{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 92%,transparent);color:var(--secondary-text-color,#9eacb8)}.ddc-converter-source-preview-loading[hidden]{display:none}.ddc-converter-source-preview-loading span{display:grid;justify-items:center;gap:10px;font-size:11px}.ddc-converter-source-preview-loading i{width:22px;height:22px;border:2px solid color-mix(in oklab,var(--primary-color,#3ca5dd) 22%,transparent);border-top-color:var(--primary-color,#3ca5dd);border-radius:50%;animation:ddc-import-spin .8s linear infinite}.ddc-converter-source-preview-note{display:flex;align-items:flex-start;gap:7px;color:var(--secondary-text-color,#9eacb8);font-size:10px;line-height:1.45}.ddc-converter-source-preview-note ha-icon{width:14px;flex:none;color:var(--primary-color,#3ca5dd)}
         .ddc-converter-mini-preview{overflow:hidden;border:1px solid var(--ddc-import-line);border-radius:14px;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 72%,transparent);box-shadow:0 12px 30px rgba(0,0,0,.08)}.ddc-converter-mini-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-bottom:1px solid var(--ddc-import-line)}.ddc-converter-mini-title{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:800;letter-spacing:.055em;text-transform:uppercase}.ddc-converter-mini-title ha-icon{width:15px;color:var(--primary-color,#3ca5dd)}.ddc-converter-mini-meta{overflow:hidden;color:var(--secondary-text-color,#9eacb8);font-size:9px;text-overflow:ellipsis;text-transform:capitalize;white-space:nowrap}.ddc-converter-mini-tabs{display:flex;gap:3px;padding:7px 8px 0;overflow-x:auto;scrollbar-width:none}.ddc-converter-mini-tabs::-webkit-scrollbar{display:none}.ddc-converter-mini-tabs:empty{display:none}.ddc-converter-mini-tab{min-width:0;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:0;border-radius:7px 7px 3px 3px;background:transparent;color:var(--secondary-text-color,#9eacb8);font:720 9px/1 inherit;white-space:nowrap;cursor:pointer;transition:background .16s ease,color .16s ease}.ddc-converter-mini-tab:hover{color:var(--primary-text-color,#e8eef3);background:color-mix(in oklab,var(--primary-text-color,#fff) 5%,transparent)}.ddc-converter-mini-tab[aria-selected="true"]{background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3)}.ddc-converter-mini-tab ha-icon{width:12px;height:12px}.ddc-converter-mini-stage{height:190px;display:grid;place-items:center;overflow:hidden;padding:10px;background:linear-gradient(color-mix(in oklab,var(--divider-color,rgba(128,145,160,.25)) 18%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in oklab,var(--divider-color,rgba(128,145,160,.25)) 18%,transparent) 1px,transparent 1px),color-mix(in oklab,var(--primary-background-color,#0d151d) 82%,transparent);background-size:10px 10px}.ddc-converter-mini-canvas{width:100%;height:100%;filter:drop-shadow(0 8px 14px rgba(0,0,0,.16))}.ddc-converter-mini-canvas-bg{fill:color-mix(in oklab,var(--card-background-color,#15202b) 91%,var(--primary-background-color,#0d151d) 9%);stroke:var(--ddc-import-line);stroke-width:1;vector-effect:non-scaling-stroke}.ddc-converter-mini-card{fill:color-mix(in oklab,var(--ddc-import-raised) 94%,transparent);stroke:color-mix(in oklab,var(--primary-text-color,#fff) 16%,transparent);stroke-width:1;vector-effect:non-scaling-stroke}.ddc-converter-mini-card-accent{fill:color-mix(in oklab,var(--primary-color,#3ca5dd) 64%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.light{fill:color-mix(in oklab,var(--warning-color,#d99a28) 72%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.climate{fill:color-mix(in oklab,#5b9bcf 72%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.media{fill:color-mix(in oklab,#8b78b5 66%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.camera{fill:color-mix(in oklab,#648d7d 68%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.sensor{fill:color-mix(in oklab,#6f9a78 66%,var(--ddc-import-raised))}.ddc-converter-mini-card-title{fill:var(--primary-text-color,#e8eef3);font-weight:750}.ddc-converter-mini-card-type{fill:var(--secondary-text-color,#9eacb8);font-weight:600;text-transform:capitalize}.ddc-converter-mini-more{display:flex;justify-content:center;padding:0 10px 9px;color:var(--secondary-text-color,#9eacb8);font-size:9px}.ddc-converter-mini-more[hidden]{display:none}
         .ddc-converter-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ddc-converter-stat{display:grid;gap:2px;padding:11px;border-radius:11px;background:var(--ddc-import-raised);border:1px solid color-mix(in oklab,var(--ddc-import-line) 75%,transparent)}.ddc-converter-stat strong{font-size:18px;line-height:1.15;letter-spacing:-.02em}.ddc-converter-stat span{color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.045em}.ddc-converter-stat.warning strong{color:var(--warning-color,#d99a28)}
         .ddc-converter-review-label{margin:0 0 8px;color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:800;letter-spacing:.065em;text-transform:uppercase}.ddc-converter-view-list,.ddc-converter-warning-list{display:grid;gap:7px}.ddc-converter-view{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border-radius:11px;background:color-mix(in oklab,var(--ddc-import-raised) 82%,transparent);border:1px solid color-mix(in oklab,var(--ddc-import-line) 68%,transparent);font-size:12px}.ddc-converter-view-icon{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 11%,transparent);color:var(--primary-color,#3ca5dd)}.ddc-converter-view-icon ha-icon{width:16px}.ddc-converter-view-copy{min-width:0;display:grid;gap:2px}.ddc-converter-view-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.ddc-converter-view-copy small{color:var(--secondary-text-color,#9eacb8);font-size:10px;text-transform:capitalize}.ddc-converter-view-count{color:var(--secondary-text-color,#9eacb8);font-size:11px;font-weight:700;white-space:nowrap}.ddc-converter-warning{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:10px;background:color-mix(in oklab,var(--warning-color,#d99a28) 10%,transparent);color:var(--primary-text-color,#e8eef3);font-size:11px;line-height:1.45}.ddc-converter-warning ha-icon{width:16px;flex:none;color:var(--warning-color,#d99a28)}
         .ddc-converter-status-wrap{display:grid;gap:7px}.ddc-converter-status{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-status ha-icon{width:16px;flex:none;color:var(--primary-color,#3ca5dd)}.ddc-converter-error{margin:0;padding:10px 11px;border-radius:10px;background:color-mix(in oklab,var(--error-color,#d94b55) 10%,transparent);color:var(--error-color,#d94b55);font-size:12px;line-height:1.45}
         .ddc-converter-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 28px;border-top:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--ddc-import-surface) 96%,transparent)}.ddc-converter-footnote{display:flex;align-items:center;gap:8px;min-width:0;color:var(--secondary-text-color,#9eacb8);font-size:11px}.ddc-converter-footnote ha-icon{width:16px;flex:none;color:var(--success-color,#47a36b)}.ddc-converter-actions{display:flex;align-items:center;gap:9px;flex:none}
         .ddc-converter-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;border:1px solid var(--ddc-import-line);border-radius:11px;background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3);font:740 12px/1 inherit;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,opacity .16s ease}.ddc-converter-btn:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line))}.ddc-converter-btn.primary{min-width:154px;border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 72%,transparent);background:var(--primary-color,#2386bd);color:var(--text-primary-color,#f7fbff);box-shadow:0 10px 24px color-mix(in oklab,var(--primary-color,#3ca5dd) 19%,transparent)}.ddc-converter-btn.primary:hover:not(:disabled){background:color-mix(in oklab,var(--primary-color,#2386bd) 88%,var(--primary-text-color,#fff) 12%)}.ddc-converter-btn.ghost{background:transparent}.ddc-converter-btn.icon{width:42px;padding:0}.ddc-converter-btn:disabled{opacity:.45;cursor:not-allowed}.ddc-converter-dialog[aria-busy="true"] .ddc-converter-btn{pointer-events:none}
-        @keyframes ddc-import-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        @media (prefers-reduced-motion:reduce){.ddc-converter-source-panel,.ddc-converter-review-ready{animation:none}.ddc-converter-btn,.ddc-converter-source-tab,.ddc-converter-dropzone,.ddc-converter-mini-tab{transition:none}}
+        @keyframes ddc-import-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes ddc-import-spin{to{transform:rotate(360deg)}}
+        @media (prefers-reduced-motion:reduce){.ddc-converter-source-panel,.ddc-converter-review-ready,.ddc-converter-source-preview{animation:none}.ddc-converter-source-preview-loading i{animation:none}.ddc-converter-btn,.ddc-converter-source-tab,.ddc-converter-dropzone,.ddc-converter-mini-tab,.ddc-converter-source-preview-tab{transition:none}}
         @media (max-width:780px){.ddc-converter-overlay{align-items:end;padding:8px}.ddc-converter-dialog{width:100%;height:min(94vh,860px);border-radius:20px 20px 12px 12px}.ddc-converter-head{padding:19px 18px 16px}.ddc-converter-subtitle{display:none}.ddc-converter-body{display:block;overflow:auto}.ddc-converter-source,.ddc-converter-review{overflow:visible;padding:20px 18px}.ddc-converter-review{border-left:0;border-top:1px solid var(--ddc-import-line)}.ddc-converter-source-tabs{grid-template-columns:1fr}.ddc-converter-source-tab{justify-content:flex-start;padding:0 14px}.ddc-converter-dropzone{min-height:190px}.ddc-converter-foot{align-items:stretch;padding:13px 18px}.ddc-converter-footnote{display:none}.ddc-converter-actions{width:100%}.ddc-converter-actions .ddc-converter-btn{flex:1}.ddc-converter-actions .ddc-converter-btn.ghost{flex:0 0 auto}}
       </style>
     `;
@@ -2065,6 +2092,24 @@ const converterMethods = {
               <h3>Your import map will appear here</h3>
               <p>Review tabs, card totals, responsive layout choices and anything that needs attention before the canvas changes.</p>
             </div>
+            <div class="ddc-converter-source-preview" data-source-preview hidden>
+              <div class="ddc-converter-source-preview-head">
+                <span class="ddc-converter-source-preview-kicker"><ha-icon icon="mdi:eye-outline"></ha-icon><span>Current Lovelace dashboard</span></span>
+                <h3 data-source-preview-title>Dashboard preview</h3>
+                <p>This is the selected dashboard before Drag &amp; Drop conversion.</p>
+              </div>
+              <div class="ddc-converter-source-window">
+                <div class="ddc-converter-source-window-bar">
+                  <i class="ddc-converter-source-window-dot"></i><i class="ddc-converter-source-window-dot"></i><i class="ddc-converter-source-window-dot"></i>
+                  <span class="ddc-converter-source-window-title" data-source-preview-window-title>Lovelace</span>
+                </div>
+                <div class="ddc-converter-source-preview-tabs" data-source-preview-tabs role="tablist" aria-label="Current Lovelace view"></div>
+                <div class="ddc-converter-source-preview-stage" data-source-preview-stage>
+                  <div class="ddc-converter-source-preview-loading" data-source-preview-loading hidden><span><i></i><b>Loading live cards…</b></span></div>
+                </div>
+              </div>
+              <div class="ddc-converter-source-preview-note"><ha-icon icon="mdi:cursor-default-click-outline"></ha-icon><span>Preview cards are read-only. Use the tabs above to inspect each current Lovelace view.</span></div>
+            </div>
             <div class="ddc-converter-review-ready" data-review-ready hidden>
               <div class="ddc-converter-review-head">
                 <span class="ddc-converter-review-kicker">Ready to rebuild</span>
@@ -2117,6 +2162,10 @@ const converterMethods = {
     let loadedDashboardConfig = null;
     let loadedDashboardUrlPath = null;
     let uploadedSourceText = '';
+    let sourcePreviewSequence = 0;
+    let sourcePreviewRenderSequence = 0;
+    let sourcePreviewLoading = false;
+    let sourcePreviewResizeObserver = null;
     const previouslyFocused = this.shadowRoot.activeElement || document.activeElement;
     const dialog = overlay.querySelector('.ddc-converter-dialog');
     const sourceSelect = overlay.querySelector('#ddc-converter-source');
@@ -2132,6 +2181,12 @@ const converterMethods = {
     const warningListEl = overlay.querySelector('[data-warning-list]');
     const warningSectionEl = overlay.querySelector('[data-warning-section]');
     const reviewEmptyEl = overlay.querySelector('[data-review-empty]');
+    const sourcePreviewEl = overlay.querySelector('[data-source-preview]');
+    const sourcePreviewTitleEl = overlay.querySelector('[data-source-preview-title]');
+    const sourcePreviewWindowTitleEl = overlay.querySelector('[data-source-preview-window-title]');
+    const sourcePreviewTabsEl = overlay.querySelector('[data-source-preview-tabs]');
+    const sourcePreviewStageEl = overlay.querySelector('[data-source-preview-stage]');
+    const sourcePreviewLoadingEl = overlay.querySelector('[data-source-preview-loading]');
     const reviewReadyEl = overlay.querySelector('[data-review-ready]');
     const reviewTitleEl = overlay.querySelector('[data-review-title]');
     const reviewCopyEl = overlay.querySelector('[data-review-copy]');
@@ -2158,6 +2213,8 @@ const converterMethods = {
     const close = ({ force = false } = {}) => {
       if (!force && dialog?.getAttribute?.('aria-busy') === 'true') return;
       if (previewTimer) clearTimeout(previewTimer);
+      sourcePreviewSequence += 1;
+      sourcePreviewResizeObserver?.disconnect?.();
       overlay.remove();
       requestAnimationFrame(() => previouslyFocused?.focus?.());
     };
@@ -2179,7 +2236,13 @@ const converterMethods = {
       });
     };
     const sourceIsReady = () => {
-      if (sourceMode === 'ha') return !!sourceSelect && sourceSelect.dataset.available === 'true';
+      if (sourceMode === 'ha') {
+        return !!sourceSelect
+          && sourceSelect.dataset.available === 'true'
+          && !sourcePreviewLoading
+          && !!loadedDashboardConfig
+          && loadedDashboardUrlPath === (sourceSelect.value || '');
+      }
       if (sourceMode === 'upload') return !!uploadedSourceText.trim();
       return !!String(textInput?.value || '').trim();
     };
@@ -2197,8 +2260,16 @@ const converterMethods = {
       }
     };
     const resetReview = () => {
+      sourcePreviewLoading = false;
+      sourcePreviewRenderSequence += 1;
       if (reviewEmptyEl) reviewEmptyEl.hidden = false;
+      if (sourcePreviewEl) sourcePreviewEl.hidden = true;
       if (reviewReadyEl) reviewReadyEl.hidden = true;
+      if (sourcePreviewLoadingEl) sourcePreviewLoadingEl.hidden = true;
+      sourcePreviewTabsEl?.replaceChildren?.();
+      sourcePreviewStageEl?.querySelectorAll?.('.ddc-converter-source-preview-canvas,.ddc-converter-source-preview-empty')?.forEach?.((node) => node.remove());
+      sourcePreviewResizeObserver?.disconnect?.();
+      sourcePreviewResizeObserver = null;
       previewTabsEl?.replaceChildren?.();
       previewStageEl?.replaceChildren?.();
       if (previewMetaEl) previewMetaEl.textContent = '';
@@ -2221,6 +2292,148 @@ const converterMethods = {
       dialog?.setAttribute?.('aria-busy', busy ? 'true' : 'false');
       overlay.querySelectorAll('button,select,textarea').forEach((control) => { control.disabled = busy; });
       updateActions();
+    };
+    const setSourcePreviewLoading = (loading = false, label = 'Loading live cards…') => {
+      sourcePreviewLoading = !!loading;
+      if (sourcePreviewEl) sourcePreviewEl.hidden = false;
+      if (reviewEmptyEl) reviewEmptyEl.hidden = true;
+      if (reviewReadyEl) reviewReadyEl.hidden = true;
+      if (sourcePreviewLoadingEl) {
+        sourcePreviewLoadingEl.hidden = !loading;
+        const copy = sourcePreviewLoadingEl.querySelector('b');
+        if (copy) copy.textContent = label;
+      }
+      updateActions();
+    };
+    const fitSourcePreviewCanvas = () => {
+      const canvas = sourcePreviewStageEl?.querySelector?.('.ddc-converter-source-preview-canvas');
+      if (!canvas || !sourcePreviewStageEl) return;
+      const canvasWidth = Math.max(640, Number(canvas.dataset.canvasWidth || 1080) || 1080);
+      const availableWidth = Math.max(1, Number(sourcePreviewStageEl.clientWidth || 0) - 24);
+      const scale = Math.max(0.18, Math.min(0.58, availableWidth / canvasWidth));
+      const renderedWidth = canvasWidth * scale;
+      canvas.style.left = `${Math.max(12, Math.round((sourcePreviewStageEl.clientWidth - renderedWidth) / 2))}px`;
+      canvas.style.transform = `scale(${scale})`;
+      canvas.style.minHeight = `${Math.ceil((Math.max(1, sourcePreviewStageEl.clientHeight) - 24) / scale)}px`;
+    };
+    const renderSourcePreview = async (sourceConfig = {}, requestedViewId = '') => {
+      if (!sourcePreviewTabsEl || !sourcePreviewStageEl) return null;
+      const renderSequence = ++sourcePreviewRenderSequence;
+      const model = this._dashboardConverterSourcePreviewModel_(sourceConfig, requestedViewId);
+      setSourcePreviewLoading(true, 'Rendering current Lovelace view…');
+      setError('');
+      if (sourcePreviewTitleEl) sourcePreviewTitleEl.textContent = model.title || 'Lovelace dashboard';
+      if (sourcePreviewWindowTitleEl) sourcePreviewWindowTitleEl.textContent = model.activeViewLabel;
+      sourcePreviewTabsEl.replaceChildren();
+      model.views.forEach((view) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ddc-converter-source-preview-tab';
+        button.dataset.sourcePreviewView = view.id;
+        button.setAttribute('role', 'tab');
+        button.setAttribute('aria-selected', String(view.id === model.activeViewId));
+        button.tabIndex = view.id === model.activeViewId ? 0 : -1;
+        if (view.icon) {
+          const icon = document.createElement('ha-icon');
+          icon.setAttribute('icon', view.icon);
+          button.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = view.label;
+        button.appendChild(label);
+        const selectView = async (viewId) => {
+          await renderSourcePreview(sourceConfig, viewId);
+          requestAnimationFrame(() => {
+            Array.from(sourcePreviewTabsEl.querySelectorAll('[data-source-preview-view]'))
+              .find((candidate) => candidate.dataset.sourcePreviewView === viewId)
+              ?.focus?.();
+          });
+        };
+        button.addEventListener('click', () => selectView(view.id));
+        button.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || model.views.length < 2) return;
+          event.preventDefault();
+          const currentIndex = model.views.findIndex((candidate) => candidate.id === view.id);
+          const delta = event.key === 'ArrowRight' ? 1 : -1;
+          const nextView = model.views[(currentIndex + delta + model.views.length) % model.views.length];
+          if (nextView) selectView(nextView.id);
+        });
+        sourcePreviewTabsEl.appendChild(button);
+      });
+
+      sourcePreviewStageEl.querySelectorAll('.ddc-converter-source-preview-canvas,.ddc-converter-source-preview-empty').forEach((node) => node.remove());
+      if (!model.cards.length) {
+        const empty = document.createElement('div');
+        empty.className = 'ddc-converter-source-preview-empty';
+        empty.textContent = 'This Lovelace view has no previewable cards.';
+        sourcePreviewStageEl.appendChild(empty);
+      } else {
+        const canvas = document.createElement('div');
+        canvas.className = `ddc-converter-source-preview-canvas ${model.layout}`;
+        canvas.dataset.canvasWidth = model.layout === 'panel' ? '960' : '1080';
+        sourcePreviewStageEl.appendChild(canvas);
+        const renderedCards = await Promise.all(model.cards.map(async (card) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'ddc-converter-source-preview-card';
+          const element = await this._createCardSafely_(card);
+          element.dataset.dashboardSourcePreviewCard = 'true';
+          try { element.hass = this.hass; } catch {}
+          wrap.appendChild(element);
+          return wrap;
+        }));
+        if (renderSequence !== sourcePreviewRenderSequence || !overlay.isConnected) return null;
+        canvas.append(...renderedCards);
+        if (model.hiddenCardCount > 0) {
+          const more = document.createElement('div');
+          more.className = 'ddc-converter-source-preview-card';
+          more.textContent = `+ ${model.hiddenCardCount} more cards`;
+          more.style.cssText = 'padding:24px;border:1px dashed var(--divider-color);border-radius:12px;color:var(--secondary-text-color);text-align:center;';
+          canvas.appendChild(more);
+        }
+      }
+      if (renderSequence !== sourcePreviewRenderSequence || !overlay.isConnected) return null;
+      sourcePreviewResizeObserver?.disconnect?.();
+      if (typeof ResizeObserver === 'function' && sourcePreviewStageEl) {
+        sourcePreviewResizeObserver = new ResizeObserver(() => fitSourcePreviewCanvas());
+        sourcePreviewResizeObserver.observe(sourcePreviewStageEl);
+      }
+      requestAnimationFrame(() => fitSourcePreviewCanvas());
+      setSourcePreviewLoading(false);
+      return model;
+    };
+    const loadSelectedDashboardPreview = async () => {
+      if (!sourceSelect || sourceSelect.dataset.available !== 'true') return null;
+      const urlPath = sourceSelect.value || '';
+      const sequence = ++sourcePreviewSequence;
+      loadedDashboardConfig = null;
+      loadedDashboardUrlPath = null;
+      setSourcePreviewLoading(true, 'Reading the selected dashboard…');
+      setError('');
+      setStatus('Loading the current Lovelace dashboard preview…');
+      try {
+        const config = await this._fetchDashboardConverterDashboardConfig_(urlPath || null);
+        if (sequence !== sourcePreviewSequence || !overlay.isConnected) return null;
+        loadedDashboardConfig = config;
+        loadedDashboardUrlPath = urlPath;
+        const model = await renderSourcePreview(config);
+        if (sequence !== sourcePreviewSequence || !overlay.isConnected) return null;
+        setStatus(`Previewing “${model?.activeViewLabel || 'dashboard'}” as it currently appears in Lovelace. Review it when you are ready.`);
+        return config;
+      } catch (error) {
+        if (sequence !== sourcePreviewSequence) return null;
+        setSourcePreviewLoading(false);
+        if (sourcePreviewEl) sourcePreviewEl.hidden = true;
+        if (reviewEmptyEl) reviewEmptyEl.hidden = false;
+        setStatus('The selected dashboard preview could not be loaded.');
+        setError(String(error?.message || error));
+        return null;
+      } finally {
+        if (sequence === sourcePreviewSequence) {
+          sourcePreviewLoading = false;
+          if (sourcePreviewLoadingEl) sourcePreviewLoadingEl.hidden = true;
+          updateActions();
+        }
+      }
     };
     const renderDashboardPreview = (converted = null, requestedTabId = '') => {
       if (!converted || !previewTabsEl || !previewStageEl) return;
@@ -2407,6 +2620,9 @@ const converterMethods = {
       }
       if (warningSectionEl) warningSectionEl.hidden = !warnings.length;
       if (reviewEmptyEl) reviewEmptyEl.hidden = true;
+      if (sourcePreviewEl) sourcePreviewEl.hidden = true;
+      sourcePreviewResizeObserver?.disconnect?.();
+      sourcePreviewResizeObserver = null;
       if (reviewReadyEl) reviewReadyEl.hidden = false;
       setPhase('review');
     };
@@ -2464,6 +2680,9 @@ const converterMethods = {
       if (focus) {
         const target = mode === 'ha' ? sourceSelect : mode === 'upload' ? dropzone : textInput;
         requestAnimationFrame(() => target?.focus?.());
+      }
+      if (mode === 'ha' && sourceSelect?.dataset?.available === 'true') {
+        requestAnimationFrame(() => loadSelectedDashboardPreview());
       }
     };
     const acceptFile = async (file) => {
@@ -2547,11 +2766,11 @@ const converterMethods = {
         }
       }, 420);
     });
-    sourceSelect?.addEventListener('change', () => {
-      loadedDashboardConfig = null;
-      loadedDashboardUrlPath = null;
+    sourceSelect?.addEventListener('change', async () => {
+      sourcePreviewSequence += 1;
       setError('');
-      invalidatePreview('Selection updated. Review the dashboard to see its import map.');
+      invalidatePreview('Selection updated. Loading its current Lovelace preview…');
+      await loadSelectedDashboardPreview();
     });
     reviewBtn?.addEventListener('click', async () => {
       try {
@@ -2607,7 +2826,8 @@ const converterMethods = {
           sourceSelect.appendChild(option);
         });
         sourceSelect.dataset.available = 'true';
-        setStatus('Select a dashboard, then review how it will be rebuilt.');
+        setStatus('Loading the selected dashboard preview…');
+        loadSelectedDashboardPreview();
       })
       .catch(() => {
         if (sourceSelect) {
