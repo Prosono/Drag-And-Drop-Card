@@ -131,6 +131,27 @@ test('community dashboard storage identity does not depend on the previously vis
   }
 });
 
+test('community dashboard storage identity ignores the active Lovelace view during a cold refresh', () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = { location: { pathname: '/drag-drop-dashboard-test-importing-10' } };
+    const created = resolveDashboardStrategyStorageKey({}, { config: { location_name: 'Home' } });
+    globalThis.window.location.pathname = '/drag-drop-dashboard-test-importing-10/home';
+    const refreshedOnHome = resolveDashboardStrategyStorageKey({}, { config: { location_name: 'Home' } });
+    globalThis.window.location.pathname = '/drag-drop-dashboard-test-importing-10/lights';
+    const refreshedOnLights = resolveDashboardStrategyStorageKey({}, { config: { location_name: 'Home' } });
+    globalThis.window.location.pathname = '/another-dashboard/home';
+    const otherDashboard = resolveDashboardStrategyStorageKey({}, { config: { location_name: 'Home' } });
+
+    assert.equal(created, 'dashboard_drag-drop-dashboard-test-importing-10_12dt2bq');
+    assert.equal(refreshedOnHome, created);
+    assert.equal(refreshedOnLights, created);
+    assert.notEqual(otherDashboard, created);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
 test('the empty-state import action and assistant expose the complete Lovelace import flow', () => {
   const emptyStateSource = readFileSync(new URL('../src/dashboard/empty-state.js', import.meta.url), 'utf8');
   const converterSource = readFileSync(new URL('../src/storage/dashboard-converter.js', import.meta.url), 'utf8');

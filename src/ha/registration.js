@@ -28,6 +28,15 @@ function __ddcDashboardStrategyHash__(value = '') {
   return (hash >>> 0).toString(36);
 }
 
+function __ddcDashboardStrategyRouteRoot__(pathname = '') {
+  const segments = String(pathname || '')
+    .split(/[?#]/, 1)[0]
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return segments.length ? `/${segments[0]}` : '/';
+}
+
 function __ddcDashboardStrategyTitle__(config = {}, hass = {}) {
   return String(
     config.title
@@ -41,6 +50,7 @@ export function resolveDashboardStrategyStorageKey(config = {}, hass = {}) {
   if (explicit) return explicit;
   let currentPath = '';
   try { currentPath = window.location?.pathname || ''; } catch {}
+  const dashboardRouteRoot = __ddcDashboardStrategyRouteRoot__(currentPath);
 
   const stableSeedParts = [
     config.url_path,
@@ -58,10 +68,15 @@ export function resolveDashboardStrategyStorageKey(config = {}, hass = {}) {
   // into an otherwise stable strategy identity or the storage key will change
   // on the first refresh. The current route is only a final fallback for old
   // YAML strategy configs that contain no identifying fields.
-  const fallbackSeed = String(currentPath || hass?.config?.location_name || 'drag-and-drop-dashboard').trim();
+  // A dashboard strategy is generated both at the dashboard root and while a
+  // concrete Lovelace view is active. Treat `/wall-panel`, `/wall-panel/home`
+  // and `/wall-panel/lights` as the same dashboard identity. Using the full
+  // pathname here made a cold refresh look up a different backend snapshot
+  // than navigation from another dashboard.
+  const fallbackSeed = String(dashboardRouteRoot || hass?.config?.location_name || 'drag-and-drop-dashboard').trim();
   const seed = stableSeedParts.length ? stableSeedParts.join('|') : fallbackSeed;
   const slug = __ddcDashboardStrategySlug__(
-    config.url_path || config.urlPath || config.path || config.slug || config.title || config.name || currentPath || 'dashboard',
+    config.url_path || config.urlPath || config.path || config.slug || config.title || config.name || dashboardRouteRoot || 'dashboard',
     'dashboard'
   );
   return `dashboard_${slug}_${__ddcDashboardStrategyHash__(seed)}`;
