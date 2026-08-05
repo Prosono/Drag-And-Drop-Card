@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { installConfigHelperMethods } from '../src/core/config-normalization.js';
 import { installInitialLoadMethods } from '../src/core/layout-loader.js';
@@ -96,4 +97,16 @@ test('community dashboard storage identity does not depend on the previously vis
   } finally {
     globalThis.window = previousWindow;
   }
+});
+
+test('the empty-state import action and assistant expose the complete Lovelace import flow', () => {
+  const emptyStateSource = readFileSync(new URL('../src/dashboard/empty-state.js', import.meta.url), 'utf8');
+  const converterSource = readFileSync(new URL('../src/storage/dashboard-converter.js', import.meta.url), 'utf8');
+
+  assert.match(emptyStateSource, /Import Existing Lovelace Dashboard/);
+  assert.match(converterSource, /data-source-mode="ha"/);
+  assert.match(converterSource, /data-source-mode="upload"/);
+  assert.match(converterSource, /data-source-mode="paste"/);
+  assert.match(converterSource, /data-action="review"/);
+  assert.match(converterSource, /data-action="convert"/);
 });

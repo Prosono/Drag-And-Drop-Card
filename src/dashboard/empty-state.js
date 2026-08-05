@@ -226,7 +226,7 @@ const emptyStateMethods = {
           <ha-icon icon="mdi:plus-circle-outline"></ha-icon><span>Add first card</span>
         </button>
         <button type="button" class="ddc-empty-btn" data-ddc-empty-action="convert-dashboard">
-          <ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import dashboard</span>
+          <ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import Existing Lovelace Dashboard</span>
         </button>
         <button type="button" class="ddc-empty-btn" data-ddc-empty-action="settings">
           <ha-icon icon="mdi:tune-variant"></ha-icon><span>Dashboard settings</span>

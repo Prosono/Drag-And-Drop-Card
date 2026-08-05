@@ -1882,36 +1882,30 @@ const converterMethods = {
   _dashboardConverterModalStyles_() {
     return `
       <style>
-        .ddc-converter-overlay{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.48);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
-        .ddc-converter-dialog{width:min(920px,calc(100vw - 32px));max-height:min(86vh,860px);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border-radius:24px;border:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.16)) 72%,transparent);background:color-mix(in oklab,var(--card-background-color,#111827) 92%,var(--primary-background-color,#050812) 8%);box-shadow:0 28px 70px rgba(0,0,0,.42);color:var(--primary-text-color,#f8fafc);}
-        .ddc-converter-head,.ddc-converter-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.14)) 70%,transparent);}
-        .ddc-converter-foot{border-top:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.14)) 70%,transparent);border-bottom:0;}
-        .ddc-converter-title{display:flex;align-items:center;gap:12px;font-weight:850;font-size:18px;}
-        .ddc-converter-title ha-icon{color:var(--primary-color,#03a9f4);}
-        .ddc-converter-body{display:grid;gap:16px;padding:18px 20px;overflow:auto;}
-        .ddc-converter-steps{display:flex;align-items:center;gap:8px;color:var(--secondary-text-color,#9ca3af);font-size:12px;font-weight:750;}
-        .ddc-converter-step{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}.ddc-converter-step b{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:color-mix(in oklab,var(--primary-color,#03a9f4) 18%,transparent);color:var(--primary-color,#03a9f4);}.ddc-converter-step-sep{opacity:.55;}
-        .ddc-converter-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.55fr);gap:16px;}
-        .ddc-converter-field{display:grid;gap:8px;}
-        .ddc-converter-field label{font-size:12px;font-weight:800;color:var(--secondary-text-color,#9ca3af);text-transform:uppercase;letter-spacing:0;}
-        .ddc-converter-row{display:flex;gap:8px;align-items:center;}
-        .ddc-converter-select,.ddc-converter-textarea{width:100%;box-sizing:border-box;border-radius:14px;border:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.16)) 78%,transparent);background:color-mix(in oklab,var(--primary-background-color,#050812) 72%,transparent);color:var(--primary-text-color,#f8fafc);font:500 14px/1.45 "Segoe UI",-apple-system,BlinkMacSystemFont,sans-serif;}
-        .ddc-converter-select{height:42px;padding:0 12px;}
-        .ddc-converter-textarea{min-height:320px;resize:vertical;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
-        .ddc-converter-card{display:grid;gap:10px;align-content:start;border-radius:18px;border:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.16)) 70%,transparent);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));padding:14px;}
-        .ddc-converter-card strong{font-size:14px;}
-        .ddc-converter-card p,.ddc-converter-status{margin:0;color:var(--secondary-text-color,#9ca3af);font-size:13px;line-height:1.45;}
-        .ddc-converter-stats{display:grid;gap:8px;}
-        .ddc-converter-stat{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.04);font-size:13px;}
-        .ddc-converter-view-list,.ddc-converter-warning-list{display:grid;gap:7px;max-height:180px;overflow:auto;}
-        .ddc-converter-view{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.035);font-size:12px;}.ddc-converter-view span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.ddc-converter-view small{grid-column:1/-1;color:var(--secondary-text-color,#9ca3af);}
-        .ddc-converter-warning{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:12px;background:color-mix(in oklab,var(--warning-color,#f59e0b) 12%,transparent);color:var(--primary-text-color,#f8fafc);font-size:12px;line-height:1.4;}.ddc-converter-warning ha-icon{flex:none;width:17px;color:var(--warning-color,#f59e0b);}
-        .ddc-converter-btn{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;border:1px solid color-mix(in oklab,var(--divider-color,rgba(255,255,255,.16)) 76%,transparent);background:color-mix(in oklab,var(--card-background-color,#111827) 86%,transparent);color:var(--primary-text-color,#f8fafc);font:750 13px/1 "Segoe UI",-apple-system,BlinkMacSystemFont,sans-serif;padding:0 14px;cursor:pointer;}
-        .ddc-converter-btn.primary{border-color:color-mix(in oklab,var(--primary-color,#03a9f4) 58%,transparent);background:linear-gradient(180deg,color-mix(in oklab,var(--primary-color,#03a9f4) 90%,#fff 10%),color-mix(in oklab,var(--primary-color,#03a9f4) 74%,#022033 26%));color:#fff;box-shadow:0 14px 28px color-mix(in oklab,var(--primary-color,#03a9f4) 22%,transparent);}
-        .ddc-converter-btn.icon{width:40px;padding:0;}
-        .ddc-converter-btn:disabled{opacity:.55;cursor:not-allowed;}.ddc-converter-dialog[aria-busy="true"] .ddc-converter-btn{pointer-events:none;}
-        .ddc-converter-error{color:var(--error-color,#ef4444);font-size:13px;}
-        @media (max-width:760px){.ddc-converter-overlay{padding:12px;align-items:end}.ddc-converter-dialog{width:100%;max-height:92vh;border-radius:22px}.ddc-converter-grid{grid-template-columns:1fr}.ddc-converter-steps{overflow:auto}.ddc-converter-foot{flex-wrap:wrap}.ddc-converter-foot .ddc-converter-row{width:100%;justify-content:flex-end}}
+        .ddc-converter-overlay{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:clamp(12px,3vw,32px);background:rgba(8,12,18,.58);backdrop-filter:blur(14px) saturate(.8);-webkit-backdrop-filter:blur(14px) saturate(.8);}
+        .ddc-converter-dialog{--ddc-import-surface:color-mix(in oklab,var(--card-background-color,#15202b) 94%,var(--primary-background-color,#edf3f7) 6%);--ddc-import-raised:color-mix(in oklab,var(--card-background-color,#15202b) 87%,var(--primary-background-color,#edf3f7) 13%);--ddc-import-line:color-mix(in oklab,var(--divider-color,rgba(128,145,160,.3)) 82%,transparent);width:min(1040px,calc(100vw - 28px));height:min(780px,calc(100vh - 32px));display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border-radius:22px;border:1px solid var(--ddc-import-line);background:var(--ddc-import-surface);box-shadow:0 32px 90px rgba(0,0,0,.38),0 2px 0 color-mix(in oklab,var(--primary-text-color,#fff) 7%,transparent) inset;color:var(--primary-text-color,#e8eef3);font-family:var(--paper-font-body1_-_font-family,"Avenir Next","Segoe UI",sans-serif);}
+        .ddc-converter-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;padding:24px 28px 20px;border-bottom:1px solid var(--ddc-import-line);}
+        .ddc-converter-heading{min-width:0}.ddc-converter-eyebrow{display:flex;align-items:center;gap:8px;margin-bottom:6px;color:var(--primary-color,#3ca5dd);font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.ddc-converter-eyebrow ha-icon{width:17px}.ddc-converter-title{margin:0;font-size:clamp(20px,2.4vw,28px);font-weight:760;letter-spacing:-.025em;line-height:1.14}.ddc-converter-subtitle{max-width:680px;margin:7px 0 0;color:var(--secondary-text-color,#9eacb8);font-size:13px;line-height:1.5}
+        .ddc-converter-close{align-self:start;width:40px;height:40px;padding:0;border-radius:11px;}
+        .ddc-converter-progress{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px;counter-reset:step;}
+        .ddc-converter-step{position:relative;display:flex;align-items:center;gap:9px;min-width:0;padding-top:12px;color:var(--secondary-text-color,#9eacb8);font-size:12px;font-weight:700;transition:color .18s ease}.ddc-converter-step::before{content:"";position:absolute;inset:0 0 auto;height:3px;border-radius:3px;background:var(--ddc-import-line);transition:background .18s ease}.ddc-converter-step b{display:grid;place-items:center;width:21px;height:21px;flex:none;border-radius:7px;background:var(--ddc-import-raised);color:inherit;font-size:11px}.ddc-converter-step.is-active{color:var(--primary-text-color,#e8eef3)}.ddc-converter-step.is-active::before,.ddc-converter-step.is-complete::before{background:var(--primary-color,#3ca5dd)}.ddc-converter-step.is-complete{color:var(--primary-color,#3ca5dd)}
+        .ddc-converter-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(330px,.92fr);overflow:hidden;}
+        .ddc-converter-source{min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:22px;padding:26px 28px;overflow:auto;}
+        .ddc-converter-source-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:5px;border-radius:14px;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 65%,transparent);border:1px solid var(--ddc-import-line);}
+        .ddc-converter-source-tab{min-width:0;min-height:46px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--secondary-text-color,#9eacb8);font:720 12px/1 inherit;cursor:pointer;transition:background .16s ease,color .16s ease,transform .16s ease}.ddc-converter-source-tab:hover{color:var(--primary-text-color,#e8eef3);background:color-mix(in oklab,var(--primary-text-color,#fff) 5%,transparent)}.ddc-converter-source-tab[aria-selected="true"]{background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3);box-shadow:0 1px 0 color-mix(in oklab,var(--primary-text-color,#fff) 7%,transparent) inset,0 6px 18px rgba(0,0,0,.09)}.ddc-converter-source-tab ha-icon{width:18px;color:currentColor}
+        .ddc-converter-source-panel{display:grid;align-content:start;gap:18px;animation:ddc-import-panel-in .22s cubic-bezier(.22,1,.36,1)}.ddc-converter-source-panel[hidden]{display:none}.ddc-converter-section-head{display:grid;gap:5px}.ddc-converter-section-head h3{margin:0;font-size:18px;line-height:1.25;letter-spacing:-.015em}.ddc-converter-section-head p{margin:0;color:var(--secondary-text-color,#9eacb8);font-size:13px;line-height:1.5}
+        .ddc-converter-field{display:grid;gap:8px}.ddc-converter-field label{font-size:11px;font-weight:800;color:var(--secondary-text-color,#9eacb8);letter-spacing:.055em;text-transform:uppercase}.ddc-converter-select,.ddc-converter-textarea{width:100%;box-sizing:border-box;border:1px solid var(--ddc-import-line);border-radius:12px;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 74%,transparent);color:var(--primary-text-color,#e8eef3);font:520 14px/1.48 inherit;outline:none;transition:border-color .16s ease,box-shadow .16s ease}.ddc-converter-select{min-height:48px;padding:0 14px}.ddc-converter-select:focus,.ddc-converter-textarea:focus{border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 72%,transparent);box-shadow:0 0 0 3px color-mix(in oklab,var(--primary-color,#3ca5dd) 17%,transparent)}.ddc-converter-textarea{min-height:310px;resize:vertical;padding:14px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12px;tab-size:2}
+        .ddc-converter-source-note{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;border-radius:11px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 8%,transparent);color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-source-note ha-icon{width:17px;flex:none;color:var(--primary-color,#3ca5dd)}
+        .ddc-converter-dropzone{min-height:250px;display:grid;place-items:center;padding:30px;border:1.5px dashed color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line));border-radius:16px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 4%,transparent);color:inherit;text-align:center;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}.ddc-converter-dropzone:hover,.ddc-converter-dropzone.is-dragging{border-color:var(--primary-color,#3ca5dd);background:color-mix(in oklab,var(--primary-color,#3ca5dd) 9%,transparent);transform:translateY(-1px)}.ddc-converter-drop-inner{display:grid;justify-items:center;gap:8px}.ddc-converter-drop-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd);box-shadow:0 10px 24px rgba(0,0,0,.1)}.ddc-converter-drop-icon ha-icon{width:23px}.ddc-converter-drop-inner strong{font-size:15px}.ddc-converter-drop-inner span{max-width:300px;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-file-name{color:var(--primary-color,#3ca5dd)!important;font-weight:750;overflow-wrap:anywhere}
+        .ddc-converter-review{min-width:0;display:grid;grid-template-rows:minmax(0,1fr);padding:26px 28px;border-left:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--primary-background-color,#0d151d) 34%,transparent);overflow:auto}.ddc-converter-review-empty{align-self:center;display:grid;justify-items:start;gap:12px;max-width:340px;color:var(--secondary-text-color,#9eacb8)}.ddc-converter-review-empty-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd)}.ddc-converter-review-empty h3{margin:0;color:var(--primary-text-color,#e8eef3);font-size:18px}.ddc-converter-review-empty p{margin:0;font-size:13px;line-height:1.55}.ddc-converter-review-ready{display:grid;align-content:start;gap:18px;animation:ddc-import-panel-in .26s cubic-bezier(.22,1,.36,1)}.ddc-converter-review-ready[hidden],.ddc-converter-review-empty[hidden]{display:none}.ddc-converter-review-head{display:grid;gap:6px}.ddc-converter-review-kicker{color:var(--primary-color,#3ca5dd);font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.ddc-converter-review-head h3{margin:0;font-size:21px;letter-spacing:-.02em;line-height:1.2}.ddc-converter-review-head p{margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.5}
+        .ddc-converter-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ddc-converter-stat{display:grid;gap:2px;padding:11px;border-radius:11px;background:var(--ddc-import-raised);border:1px solid color-mix(in oklab,var(--ddc-import-line) 75%,transparent)}.ddc-converter-stat strong{font-size:18px;line-height:1.15;letter-spacing:-.02em}.ddc-converter-stat span{color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.045em}.ddc-converter-stat.warning strong{color:var(--warning-color,#d99a28)}
+        .ddc-converter-review-label{margin:0 0 8px;color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:800;letter-spacing:.065em;text-transform:uppercase}.ddc-converter-view-list,.ddc-converter-warning-list{display:grid;gap:7px}.ddc-converter-view{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border-radius:11px;background:color-mix(in oklab,var(--ddc-import-raised) 82%,transparent);border:1px solid color-mix(in oklab,var(--ddc-import-line) 68%,transparent);font-size:12px}.ddc-converter-view-icon{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 11%,transparent);color:var(--primary-color,#3ca5dd)}.ddc-converter-view-icon ha-icon{width:16px}.ddc-converter-view-copy{min-width:0;display:grid;gap:2px}.ddc-converter-view-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.ddc-converter-view-copy small{color:var(--secondary-text-color,#9eacb8);font-size:10px;text-transform:capitalize}.ddc-converter-view-count{color:var(--secondary-text-color,#9eacb8);font-size:11px;font-weight:700;white-space:nowrap}.ddc-converter-warning{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:10px;background:color-mix(in oklab,var(--warning-color,#d99a28) 10%,transparent);color:var(--primary-text-color,#e8eef3);font-size:11px;line-height:1.45}.ddc-converter-warning ha-icon{width:16px;flex:none;color:var(--warning-color,#d99a28)}
+        .ddc-converter-status-wrap{display:grid;gap:7px}.ddc-converter-status{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-status ha-icon{width:16px;flex:none;color:var(--primary-color,#3ca5dd)}.ddc-converter-error{margin:0;padding:10px 11px;border-radius:10px;background:color-mix(in oklab,var(--error-color,#d94b55) 10%,transparent);color:var(--error-color,#d94b55);font-size:12px;line-height:1.45}
+        .ddc-converter-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 28px;border-top:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--ddc-import-surface) 96%,transparent)}.ddc-converter-footnote{display:flex;align-items:center;gap:8px;min-width:0;color:var(--secondary-text-color,#9eacb8);font-size:11px}.ddc-converter-footnote ha-icon{width:16px;flex:none;color:var(--success-color,#47a36b)}.ddc-converter-actions{display:flex;align-items:center;gap:9px;flex:none}
+        .ddc-converter-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;border:1px solid var(--ddc-import-line);border-radius:11px;background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3);font:740 12px/1 inherit;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,opacity .16s ease}.ddc-converter-btn:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line))}.ddc-converter-btn.primary{min-width:154px;border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 72%,transparent);background:var(--primary-color,#2386bd);color:var(--text-primary-color,#f7fbff);box-shadow:0 10px 24px color-mix(in oklab,var(--primary-color,#3ca5dd) 19%,transparent)}.ddc-converter-btn.primary:hover:not(:disabled){background:color-mix(in oklab,var(--primary-color,#2386bd) 88%,var(--primary-text-color,#fff) 12%)}.ddc-converter-btn.ghost{background:transparent}.ddc-converter-btn.icon{width:42px;padding:0}.ddc-converter-btn:disabled{opacity:.45;cursor:not-allowed}.ddc-converter-dialog[aria-busy="true"] .ddc-converter-btn{pointer-events:none}
+        @keyframes ddc-import-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @media (prefers-reduced-motion:reduce){.ddc-converter-source-panel,.ddc-converter-review-ready{animation:none}.ddc-converter-btn,.ddc-converter-source-tab,.ddc-converter-dropzone{transition:none}}
+        @media (max-width:780px){.ddc-converter-overlay{align-items:end;padding:8px}.ddc-converter-dialog{width:100%;height:min(94vh,860px);border-radius:20px 20px 12px 12px}.ddc-converter-head{padding:19px 18px 16px}.ddc-converter-subtitle{display:none}.ddc-converter-body{display:block;overflow:auto}.ddc-converter-source,.ddc-converter-review{overflow:visible;padding:20px 18px}.ddc-converter-review{border-left:0;border-top:1px solid var(--ddc-import-line)}.ddc-converter-source-tabs{grid-template-columns:1fr}.ddc-converter-source-tab{justify-content:flex-start;padding:0 14px}.ddc-converter-dropzone{min-height:190px}.ddc-converter-foot{align-items:stretch;padding:13px 18px}.ddc-converter-footnote{display:none}.ddc-converter-actions{width:100%}.ddc-converter-actions .ddc-converter-btn{flex:1}.ddc-converter-actions .ddc-converter-btn.ghost{flex:0 0 auto}}
       </style>
     `;
   },
@@ -1925,52 +1919,107 @@ const converterMethods = {
     overlay.className = 'ddc-converter-overlay';
     overlay.innerHTML = `
       ${this._dashboardConverterModalStyles_()}
-      <div class="ddc-converter-dialog" role="dialog" aria-modal="true" aria-label="Import existing dashboard">
+      <div class="ddc-converter-dialog" role="dialog" aria-modal="true" aria-labelledby="ddc-converter-title">
         <div class="ddc-converter-head">
-          <div class="ddc-converter-title"><ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import existing dashboard</span></div>
-          <button type="button" class="ddc-converter-btn icon" data-action="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+          <div class="ddc-converter-heading">
+            <div class="ddc-converter-eyebrow"><ha-icon icon="mdi:transit-transfer"></ha-icon><span>Lovelace transfer assistant</span></div>
+            <h2 class="ddc-converter-title" id="ddc-converter-title">Import Existing Lovelace Dashboard</h2>
+            <p class="ddc-converter-subtitle">Choose a source, review how every view will be rebuilt, then create an editable Drag &amp; Drop copy.</p>
+          </div>
+          <button type="button" class="ddc-converter-btn icon ghost ddc-converter-close" data-action="close" aria-label="Close import assistant"><ha-icon icon="mdi:close"></ha-icon></button>
+          <div class="ddc-converter-progress" aria-label="Import progress">
+            <span class="ddc-converter-step is-active" data-phase="source"><b>1</b><span>Choose source</span></span>
+            <span class="ddc-converter-step" data-phase="review"><b>2</b><span>Review structure</span></span>
+            <span class="ddc-converter-step" data-phase="import"><b>3</b><span>Import copy</span></span>
+          </div>
         </div>
         <div class="ddc-converter-body">
-          <div class="ddc-converter-steps" aria-label="Import steps">
-            <span class="ddc-converter-step"><b>1</b> Choose source</span><span class="ddc-converter-step-sep">→</span>
-            <span class="ddc-converter-step"><b>2</b> Review conversion</span><span class="ddc-converter-step-sep">→</span>
-            <span class="ddc-converter-step"><b>3</b> Import copy</span>
-          </div>
-          <div class="ddc-converter-grid">
-            <div class="ddc-converter-field">
-              <label for="ddc-converter-source">Existing Home Assistant dashboards</label>
-              <div class="ddc-converter-row">
-                <select id="ddc-converter-source" class="ddc-converter-select"><option value="">Loading dashboards...</option></select>
-                <button type="button" class="ddc-converter-btn" data-action="load"><ha-icon icon="mdi:download"></ha-icon><span>Load</span></button>
-              </div>
-              <label for="ddc-converter-text">Or paste/upload Lovelace YAML or JSON</label>
-              <textarea id="ddc-converter-text" class="ddc-converter-textarea" spellcheck="false"></textarea>
+          <section class="ddc-converter-source" aria-label="Dashboard source">
+            <div class="ddc-converter-source-tabs" role="tablist" aria-label="Choose import source">
+              <button type="button" class="ddc-converter-source-tab" role="tab" aria-selected="true" aria-controls="ddc-source-home-assistant" data-source-mode="ha"><ha-icon icon="mdi:home-assistant"></ha-icon><span>Home Assistant</span></button>
+              <button type="button" class="ddc-converter-source-tab" role="tab" aria-selected="false" aria-controls="ddc-source-upload" data-source-mode="upload"><ha-icon icon="mdi:file-upload-outline"></ha-icon><span>Upload file</span></button>
+              <button type="button" class="ddc-converter-source-tab" role="tab" aria-selected="false" aria-controls="ddc-source-paste" data-source-mode="paste"><ha-icon icon="mdi:code-json"></ha-icon><span>Paste YAML</span></button>
             </div>
-            <aside class="ddc-converter-card">
-              <strong>Conversion preview</strong>
-              <p>Views become tabs. Top-level Lovelace cards become draggable cards. The original dashboard is not modified.</p>
-              <div class="ddc-converter-stats" data-preview>
-                <div class="ddc-converter-stat"><span>Views</span><strong>0</strong></div>
-                <div class="ddc-converter-stat"><span>Cards</span><strong>0</strong></div>
-                <div class="ddc-converter-stat"><span>Skipped DDC cards</span><strong>0</strong></div>
-                <div class="ddc-converter-stat"><span>Warnings</span><strong>0</strong></div>
+
+            <div class="ddc-converter-source-panel" id="ddc-source-home-assistant" role="tabpanel" data-source-panel="ha">
+              <div class="ddc-converter-section-head">
+                <h3>Select a dashboard</h3>
+                <p>We read the Lovelace configuration directly from Home Assistant and leave the original untouched.</p>
               </div>
-              <div class="ddc-converter-view-list" data-view-list hidden></div>
-              <div class="ddc-converter-warning-list" data-warning-list hidden></div>
-              <p class="ddc-converter-status" data-status aria-live="polite">Choose a dashboard or paste Lovelace config to preview it.</p>
+              <div class="ddc-converter-field">
+                <label for="ddc-converter-source">Available dashboards</label>
+                <select id="ddc-converter-source" class="ddc-converter-select"><option value="">Loading dashboards...</option></select>
+              </div>
+              <div class="ddc-converter-source-note"><ha-icon icon="mdi:shield-check-outline"></ha-icon><span>This imports a copy. The selected dashboard and its YAML are never changed.</span></div>
+            </div>
+
+            <div class="ddc-converter-source-panel" id="ddc-source-upload" role="tabpanel" data-source-panel="upload" hidden>
+              <div class="ddc-converter-section-head">
+                <h3>Upload a Lovelace file</h3>
+                <p>Use a YAML or JSON export up to 5 MB. Drop it below or browse from this device.</p>
+              </div>
+              <input type="file" accept=".yaml,.yml,.json,application/json,text/yaml,text/plain" hidden data-file-input>
+              <button type="button" class="ddc-converter-dropzone" data-action="file">
+                <span class="ddc-converter-drop-inner">
+                  <span class="ddc-converter-drop-icon"><ha-icon icon="mdi:tray-arrow-up"></ha-icon></span>
+                  <strong>Drop a dashboard file here</strong>
+                  <span>or click to choose YAML / JSON</span>
+                  <span class="ddc-converter-file-name" data-file-name hidden></span>
+                </span>
+              </button>
+            </div>
+
+            <div class="ddc-converter-source-panel" id="ddc-source-paste" role="tabpanel" data-source-panel="paste" hidden>
+              <div class="ddc-converter-section-head">
+                <h3>Paste raw Lovelace configuration</h3>
+                <p>Paste the complete dashboard config. Both YAML and JSON are detected automatically.</p>
+              </div>
+              <div class="ddc-converter-field">
+                <label for="ddc-converter-text">Lovelace YAML or JSON</label>
+                <textarea id="ddc-converter-text" class="ddc-converter-textarea" spellcheck="false" aria-describedby="ddc-converter-paste-help"></textarea>
+              </div>
+              <div class="ddc-converter-source-note" id="ddc-converter-paste-help"><ha-icon icon="mdi:information-outline"></ha-icon><span>Tip: open Raw configuration editor in Home Assistant and copy the complete dashboard.</span></div>
+            </div>
+          </section>
+
+          <aside class="ddc-converter-review" aria-label="Import review">
+            <div class="ddc-converter-review-empty" data-review-empty>
+              <span class="ddc-converter-review-empty-mark"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon></span>
+              <h3>Your import map will appear here</h3>
+              <p>Review tabs, card totals, responsive layout choices and anything that needs attention before the canvas changes.</p>
+            </div>
+            <div class="ddc-converter-review-ready" data-review-ready hidden>
+              <div class="ddc-converter-review-head">
+                <span class="ddc-converter-review-kicker">Ready to rebuild</span>
+                <h3 data-review-title>Imported dashboard</h3>
+                <p data-review-copy>Each Lovelace view becomes a Drag &amp; Drop tab.</p>
+              </div>
+              <div class="ddc-converter-stats" data-preview>
+                <div class="ddc-converter-stat"><strong>0</strong><span>Tabs</span></div>
+                <div class="ddc-converter-stat"><strong>0</strong><span>Cards</span></div>
+                <div class="ddc-converter-stat warning"><strong>0</strong><span>Warnings</span></div>
+              </div>
+              <div data-view-section>
+                <p class="ddc-converter-review-label">Import map</p>
+                <div class="ddc-converter-view-list" data-view-list></div>
+              </div>
+              <div data-warning-section hidden>
+                <p class="ddc-converter-review-label">Needs attention</p>
+                <div class="ddc-converter-warning-list" data-warning-list></div>
+              </div>
+            </div>
+            <div class="ddc-converter-status-wrap">
+              <p class="ddc-converter-status" data-status aria-live="polite"><ha-icon icon="mdi:information-outline"></ha-icon><span>Choose a source to begin.</span></p>
               <p class="ddc-converter-error" data-error role="alert" hidden></p>
-            </aside>
-          </div>
+            </div>
+          </aside>
         </div>
         <div class="ddc-converter-foot">
-          <div class="ddc-converter-row">
-            <input type="file" accept=".yaml,.yml,.json,application/json,text/yaml,text/plain" hidden data-file-input>
-            <button type="button" class="ddc-converter-btn" data-action="file"><ha-icon icon="mdi:file-upload-outline"></ha-icon><span>Upload file</span></button>
-            <button type="button" class="ddc-converter-btn" data-action="preview"><ha-icon icon="mdi:eye-outline"></ha-icon><span>Preview</span></button>
-          </div>
-          <div class="ddc-converter-row">
-            <button type="button" class="ddc-converter-btn" data-action="close">Cancel</button>
-            <button type="button" class="ddc-converter-btn primary" data-action="convert" disabled><ha-icon icon="mdi:import"></ha-icon><span>Import dashboard copy</span></button>
+          <div class="ddc-converter-footnote"><ha-icon icon="mdi:check-decagram-outline"></ha-icon><span>Your original Lovelace dashboard stays exactly as it is.</span></div>
+          <div class="ddc-converter-actions">
+            <button type="button" class="ddc-converter-btn ghost" data-action="close">Cancel</button>
+            <button type="button" class="ddc-converter-btn primary" data-action="review"><ha-icon icon="mdi:arrow-right"></ha-icon><span>Review dashboard</span></button>
+            <button type="button" class="ddc-converter-btn primary" data-action="convert" hidden disabled><ha-icon icon="mdi:import"></ha-icon><span>Import dashboard copy</span></button>
           </div>
         </div>
       </div>
@@ -1978,27 +2027,37 @@ const converterMethods = {
 
     let previewTimer = 0;
     let previewPayload = null;
-    const close = () => {
-      if (previewTimer) clearTimeout(previewTimer);
-      overlay.remove();
-    };
+    let sourceMode = 'ha';
+    let loadedDashboardConfig = null;
+    let loadedDashboardUrlPath = null;
+    let uploadedSourceText = '';
+    const previouslyFocused = this.shadowRoot.activeElement || document.activeElement;
     const dialog = overlay.querySelector('.ddc-converter-dialog');
     const sourceSelect = overlay.querySelector('#ddc-converter-source');
     const textInput = overlay.querySelector('#ddc-converter-text');
     const fileInput = overlay.querySelector('[data-file-input]');
+    const fileNameEl = overlay.querySelector('[data-file-name]');
+    const dropzone = overlay.querySelector('.ddc-converter-dropzone');
     const statusEl = overlay.querySelector('[data-status]');
+    const statusTextEl = statusEl?.querySelector?.('span') || statusEl;
     const errorEl = overlay.querySelector('[data-error]');
     const previewEl = overlay.querySelector('[data-preview]');
     const viewListEl = overlay.querySelector('[data-view-list]');
     const warningListEl = overlay.querySelector('[data-warning-list]');
+    const warningSectionEl = overlay.querySelector('[data-warning-section]');
+    const reviewEmptyEl = overlay.querySelector('[data-review-empty]');
+    const reviewReadyEl = overlay.querySelector('[data-review-ready]');
+    const reviewTitleEl = overlay.querySelector('[data-review-title]');
+    const reviewCopyEl = overlay.querySelector('[data-review-copy]');
+    const reviewBtn = overlay.querySelector('[data-action="review"]');
     const convertBtn = overlay.querySelector('[data-action="convert"]');
-    let loadedDashboardConfig = null;
-    let loadedDashboardUrlPath = null;
 
     if (textInput) {
       textInput.placeholder = [
+        'title: Wall panel',
         'views:',
         '  - title: Home',
+        '    path: home',
         '    cards:',
         '      - type: entities',
         '        entities:',
@@ -2006,72 +2065,131 @@ const converterMethods = {
       ].join('\n');
     }
 
+    const close = ({ force = false } = {}) => {
+      if (!force && dialog?.getAttribute?.('aria-busy') === 'true') return;
+      if (previewTimer) clearTimeout(previewTimer);
+      overlay.remove();
+      requestAnimationFrame(() => previouslyFocused?.focus?.());
+    };
     const setError = (message = '') => {
       if (!errorEl) return;
       errorEl.hidden = !message;
       errorEl.textContent = message;
     };
-    const setStatus = (message = '') => { if (statusEl) statusEl.textContent = message; };
-    const invalidatePreview = () => {
+    const setStatus = (message = '') => {
+      if (statusTextEl) statusTextEl.textContent = message;
+    };
+    const setPhase = (phase = 'source') => {
+      const order = ['source', 'review', 'import'];
+      const current = Math.max(0, order.indexOf(phase));
+      overlay.querySelectorAll('[data-phase]').forEach((step) => {
+        const index = order.indexOf(step.dataset.phase);
+        step.classList.toggle('is-active', index === current);
+        step.classList.toggle('is-complete', index < current);
+      });
+    };
+    const sourceIsReady = () => {
+      if (sourceMode === 'ha') return !!sourceSelect && sourceSelect.dataset.available === 'true';
+      if (sourceMode === 'upload') return !!uploadedSourceText.trim();
+      return !!String(textInput?.value || '').trim();
+    };
+    const updateActions = () => {
+      const busy = dialog?.getAttribute?.('aria-busy') === 'true';
+      if (reviewBtn) {
+        reviewBtn.hidden = !!previewPayload;
+        reviewBtn.disabled = busy || !sourceIsReady();
+      }
+      if (convertBtn) {
+        convertBtn.hidden = !previewPayload;
+        convertBtn.disabled = busy || !previewPayload;
+        const label = convertBtn.querySelector('span');
+        if (label && previewPayload) label.textContent = `Import ${previewPayload.summary?.cards || previewPayload.cards?.length || 0} cards`;
+      }
+    };
+    const resetReview = () => {
+      if (reviewEmptyEl) reviewEmptyEl.hidden = false;
+      if (reviewReadyEl) reviewReadyEl.hidden = true;
+      viewListEl?.replaceChildren?.();
+      warningListEl?.replaceChildren?.();
+      if (warningSectionEl) warningSectionEl.hidden = true;
+    };
+    const invalidatePreview = (message = '') => {
       previewPayload = null;
-      if (convertBtn) convertBtn.disabled = true;
+      resetReview();
+      setPhase('source');
+      if (message) setStatus(message);
+      updateActions();
     };
     const setBusy = (busy = false) => {
       dialog?.setAttribute?.('aria-busy', busy ? 'true' : 'false');
-      overlay.querySelectorAll('.ddc-converter-btn').forEach((button) => {
-        if (button.dataset.action === 'close') return;
-        button.disabled = busy || (button === convertBtn && !previewPayload);
-      });
-      if (sourceSelect) sourceSelect.disabled = busy;
-      if (textInput) textInput.disabled = busy;
+      overlay.querySelectorAll('button,select,textarea').forEach((control) => { control.disabled = busy; });
+      updateActions();
     };
     const renderPreview = (converted = null) => {
       if (!previewEl || !converted) return;
       const stats = converted.summary || {};
       const warnings = Array.isArray(stats.warnings) ? stats.warnings : [];
-      const values = [stats.views || 0, stats.cards || 0, stats.skipped_drag_drop_cards || 0, warnings.length];
+      const values = [stats.views || 0, stats.cards || 0, warnings.length];
       previewEl.querySelectorAll('strong').forEach((node, index) => { node.textContent = String(values[index] ?? 0); });
-      if (viewListEl) {
-        viewListEl.replaceChildren();
-        (Array.isArray(stats.view_details) ? stats.view_details : []).forEach((view) => {
-          const row = document.createElement('div');
-          row.className = 'ddc-converter-view';
-          const title = document.createElement('span');
-          title.textContent = view.title || view.id || 'View';
-          const count = document.createElement('strong');
-          count.textContent = `${Number(view.cards || 0)} card${Number(view.cards || 0) === 1 ? '' : 's'}`;
-          const detail = document.createElement('small');
-          detail.textContent = `${String(view.layout || 'grid')} layout → ${view.id}`;
-          row.append(title, count, detail);
-          viewListEl.appendChild(row);
-        });
-        viewListEl.hidden = !viewListEl.childElementCount;
+      if (reviewTitleEl) reviewTitleEl.textContent = converted.source_title || 'Imported dashboard';
+      if (reviewCopyEl) {
+        const customTypes = Array.isArray(stats.custom_card_types) ? stats.custom_card_types.length : 0;
+        reviewCopyEl.textContent = customTypes
+          ? `Views become tabs. ${customTypes} custom card type${customTypes === 1 ? '' : 's'} will be preserved as installed.`
+          : 'Each Lovelace view becomes a tab with responsive, draggable card placement.';
       }
-      if (warningListEl) {
-        warningListEl.replaceChildren();
-        warnings.slice(0, 8).forEach((warning) => {
-          const row = document.createElement('div');
-          row.className = 'ddc-converter-warning';
-          const icon = document.createElement('ha-icon');
-          icon.setAttribute('icon', 'mdi:alert-outline');
-          const message = document.createElement('span');
-          message.textContent = warning.message || String(warning);
-          row.append(icon, message);
-          warningListEl.appendChild(row);
-        });
-        if (warnings.length > 8) {
-          const more = document.createElement('div');
-          more.className = 'ddc-converter-warning';
-          more.textContent = `And ${warnings.length - 8} more warnings.`;
-          warningListEl.appendChild(more);
-        }
-        warningListEl.hidden = !warningListEl.childElementCount;
+      viewListEl?.replaceChildren?.();
+      (Array.isArray(stats.view_details) ? stats.view_details : []).forEach((view) => {
+        const row = document.createElement('div');
+        row.className = 'ddc-converter-view';
+        const iconWrap = document.createElement('span');
+        iconWrap.className = 'ddc-converter-view-icon';
+        const icon = document.createElement('ha-icon');
+        icon.setAttribute('icon', 'mdi:tab');
+        iconWrap.appendChild(icon);
+        const copy = document.createElement('span');
+        copy.className = 'ddc-converter-view-copy';
+        const title = document.createElement('strong');
+        title.textContent = view.title || view.id || 'View';
+        const detail = document.createElement('small');
+        detail.textContent = `${String(view.layout || 'grid')} layout · tab “${view.id}”`;
+        copy.append(title, detail);
+        const count = document.createElement('span');
+        count.className = 'ddc-converter-view-count';
+        count.textContent = `${Number(view.cards || 0)} card${Number(view.cards || 0) === 1 ? '' : 's'}`;
+        row.append(iconWrap, copy, count);
+        viewListEl?.appendChild(row);
+      });
+      warningListEl?.replaceChildren?.();
+      warnings.slice(0, 8).forEach((warning) => {
+        const row = document.createElement('div');
+        row.className = 'ddc-converter-warning';
+        const icon = document.createElement('ha-icon');
+        icon.setAttribute('icon', 'mdi:alert-outline');
+        const message = document.createElement('span');
+        message.textContent = warning.message || String(warning);
+        row.append(icon, message);
+        warningListEl?.appendChild(row);
+      });
+      if (warnings.length > 8) {
+        const more = document.createElement('div');
+        more.className = 'ddc-converter-warning';
+        more.textContent = `And ${warnings.length - 8} more warnings.`;
+        warningListEl?.appendChild(more);
       }
+      if (warningSectionEl) warningSectionEl.hidden = !warnings.length;
+      if (reviewEmptyEl) reviewEmptyEl.hidden = true;
+      if (reviewReadyEl) reviewReadyEl.hidden = false;
+      setPhase('review');
     };
     const readCurrentSource = () => {
-      if (loadedDashboardConfig && loadedDashboardUrlPath === sourceSelect?.value && !String(textInput?.value || '').trim()) {
+      if (sourceMode === 'ha') {
+        if (!loadedDashboardConfig || loadedDashboardUrlPath !== (sourceSelect?.value || '')) {
+          throw new Error('Select and review a Home Assistant dashboard first.');
+        }
         return loadedDashboardConfig;
       }
+      if (sourceMode === 'upload') return this._parseDashboardConverterText_(uploadedSourceText);
       return this._parseDashboardConverterText_(textInput?.value || '');
     };
     const previewCurrent = () => {
@@ -2080,107 +2198,163 @@ const converterMethods = {
       this._validateConvertedDashboardPayload_(converted);
       previewPayload = converted;
       renderPreview(converted);
-      if (convertBtn) convertBtn.disabled = false;
       const warningCount = converted.summary?.warnings?.length || 0;
-      setStatus(`Ready to import ${converted.summary.cards} cards across ${converted.summary.views} tabs${warningCount ? ` with ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}.`);
+      setStatus(`${converted.summary.cards} cards are ready${warningCount ? ` with ${warningCount} item${warningCount === 1 ? '' : 's'} to review` : ''}.`);
+      updateActions();
       return converted;
     };
+    const analyzeCurrentSource = async () => {
+      if (sourceMode === 'ha') {
+        const urlPath = sourceSelect?.value || '';
+        if (!loadedDashboardConfig || loadedDashboardUrlPath !== urlPath) {
+          setStatus('Reading the selected dashboard from Home Assistant…');
+          loadedDashboardConfig = await this._fetchDashboardConverterDashboardConfig_(urlPath || null);
+          loadedDashboardUrlPath = urlPath;
+        }
+      }
+      return previewCurrent();
+    };
+    const setSourceMode = (mode = 'ha', { focus = false } = {}) => {
+      if (!['ha', 'upload', 'paste'].includes(mode)) return;
+      sourceMode = mode;
+      overlay.querySelectorAll('[data-source-mode]').forEach((button) => {
+        const selected = button.dataset.sourceMode === mode;
+        button.setAttribute('aria-selected', String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      });
+      overlay.querySelectorAll('[data-source-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.sourcePanel !== mode;
+      });
+      setError('');
+      invalidatePreview(
+        mode === 'ha'
+          ? 'Select a Home Assistant dashboard, then review its structure.'
+          : mode === 'upload'
+            ? (uploadedSourceText ? 'The selected file is ready to review.' : 'Drop a YAML or JSON dashboard file to continue.')
+            : 'Paste Lovelace YAML or JSON. It will be analyzed automatically.'
+      );
+      if (focus) {
+        const target = mode === 'ha' ? sourceSelect : mode === 'upload' ? dropzone : textInput;
+        requestAnimationFrame(() => target?.focus?.());
+      }
+    };
+    const acceptFile = async (file) => {
+      if (!file) return;
+      uploadedSourceText = '';
+      if (fileNameEl) {
+        fileNameEl.hidden = true;
+        fileNameEl.textContent = '';
+      }
+      setSourceMode('upload');
+      try {
+        setBusy(true);
+        setError('');
+        setStatus('Reading and analyzing the dashboard file…');
+        if (file.size > DASHBOARD_CONVERTER_MAX_SOURCE_CHARS) throw new Error('This file is larger than the 5 MB import limit.');
+        uploadedSourceText = await file.text();
+        if (fileNameEl) {
+          fileNameEl.hidden = false;
+          fileNameEl.textContent = `${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
+        }
+        previewCurrent();
+      } catch (err) {
+        invalidatePreview('The file could not be analyzed.');
+        setError(String(err?.message || err));
+      } finally {
+        setBusy(false);
+        if (fileInput) fileInput.value = '';
+      }
+    };
 
-    overlay.addEventListener('click', (ev) => {
-      if (ev.target === overlay) close();
-    });
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
     overlay.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') {
         ev.preventDefault();
         close();
+        return;
+      }
+      if (ev.key === 'Tab') {
+        const focusable = Array.from(overlay.querySelectorAll('button:not([disabled]):not([hidden]),select:not([disabled]),textarea:not([disabled])'))
+          .filter((element) => !element.closest('[hidden]'));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const activeElement = this.shadowRoot?.activeElement || document.activeElement;
+        if (ev.shiftKey && activeElement === first) { ev.preventDefault(); last.focus(); }
+        else if (!ev.shiftKey && activeElement === last) { ev.preventDefault(); first.focus(); }
       }
     });
     overlay.querySelectorAll('[data-action="close"]').forEach((btn) => btn.addEventListener('click', close));
-    overlay.querySelector('[data-action="file"]')?.addEventListener('click', () => fileInput?.click?.());
-    fileInput?.addEventListener('change', async () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
-      invalidatePreview();
-      try {
-        if (file.size > DASHBOARD_CONVERTER_MAX_SOURCE_CHARS) throw new Error('This file is larger than the 5 MB import limit.');
-        setBusy(true);
-        setStatus('Reading dashboard file...');
-        textInput.value = await file.text();
-        loadedDashboardConfig = null;
-        loadedDashboardUrlPath = null;
-        previewCurrent();
-      } catch (err) {
-        setError(String(err?.message || err));
-        setStatus('Could not read or preview that file.');
-      } finally {
-        setBusy(false);
-        fileInput.value = '';
-      }
+    overlay.querySelectorAll('[data-source-mode]').forEach((button) => {
+      button.addEventListener('click', () => setSourceMode(button.dataset.sourceMode, { focus: true }));
+      button.addEventListener('keydown', (ev) => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(ev.key)) return;
+        ev.preventDefault();
+        const modes = ['ha', 'upload', 'paste'];
+        const delta = ev.key === 'ArrowRight' ? 1 : -1;
+        const next = modes[(modes.indexOf(sourceMode) + delta + modes.length) % modes.length];
+        setSourceMode(next, { focus: true });
+      });
     });
+    overlay.querySelector('[data-action="file"]')?.addEventListener('click', () => fileInput?.click?.());
+    fileInput?.addEventListener('change', () => acceptFile(fileInput.files?.[0]));
+    ['dragenter', 'dragover'].forEach((eventName) => dropzone?.addEventListener(eventName, (ev) => {
+      ev.preventDefault();
+      dropzone.classList.add('is-dragging');
+    }));
+    ['dragleave', 'drop'].forEach((eventName) => dropzone?.addEventListener(eventName, (ev) => {
+      ev.preventDefault();
+      dropzone.classList.remove('is-dragging');
+    }));
+    dropzone?.addEventListener('drop', (ev) => acceptFile(ev.dataTransfer?.files?.[0]));
     textInput?.addEventListener('input', () => {
-      loadedDashboardConfig = null;
-      loadedDashboardUrlPath = null;
-      invalidatePreview();
+      invalidatePreview(String(textInput.value || '').trim() ? 'Analyzing pasted Lovelace configuration…' : 'Paste Lovelace YAML or JSON to continue.');
       setError('');
       if (previewTimer) clearTimeout(previewTimer);
-      if (!String(textInput.value || '').trim()) {
-        setStatus('Choose a dashboard or paste Lovelace config to preview it.');
-        return;
-      }
+      if (!String(textInput.value || '').trim()) return;
       previewTimer = setTimeout(() => {
         try { previewCurrent(); } catch (err) {
-          invalidatePreview();
+          invalidatePreview('The pasted configuration needs attention.');
           setError(String(err?.message || err));
-          setStatus('Fix the source config before importing.');
         }
-      }, 350);
-    });
-    overlay.querySelector('[data-action="preview"]')?.addEventListener('click', () => {
-      try { previewCurrent(); } catch (err) {
-        invalidatePreview();
-        setError(String(err?.message || err));
-        setStatus('Fix the source config before importing.');
-      }
+      }, 420);
     });
     sourceSelect?.addEventListener('change', () => {
-      invalidatePreview();
       loadedDashboardConfig = null;
       loadedDashboardUrlPath = null;
       setError('');
-      setStatus('Click Load to review the selected dashboard before importing it.');
+      invalidatePreview('Selection updated. Review the dashboard to see its import map.');
     });
-    overlay.querySelector('[data-action="load"]')?.addEventListener('click', async () => {
-      const urlPath = sourceSelect?.value || '';
+    reviewBtn?.addEventListener('click', async () => {
       try {
-        invalidatePreview();
         setBusy(true);
         setError('');
-        setStatus('Loading dashboard config...');
-        loadedDashboardConfig = await this._fetchDashboardConverterDashboardConfig_(urlPath || null);
-        loadedDashboardUrlPath = urlPath;
-        textInput.value = '';
-        const converted = previewCurrent();
-        setStatus(`Loaded ${converted.summary.cards} cards from the selected dashboard.`);
+        await analyzeCurrentSource();
       } catch (err) {
-        invalidatePreview();
-        loadedDashboardConfig = null;
-        loadedDashboardUrlPath = null;
+        invalidatePreview('We could not build an import map from this source.');
         setError(String(err?.message || err));
-        setStatus('Could not load that dashboard. Paste YAML/JSON instead.');
       } finally {
         setBusy(false);
       }
     });
-    overlay.querySelector('[data-action="convert"]')?.addEventListener('click', async () => {
+    convertBtn?.addEventListener('click', async () => {
       try {
-        setError('');
-        const converted = previewPayload || previewCurrent();
+        if (!previewPayload) return;
+        setPhase('import');
         setBusy(true);
-        setStatus('Building and saving the imported dashboard...');
-        const ok = await this._applyConvertedDashboardPayload_(converted);
-        if (ok !== false) close();
-        else setStatus('Import cancelled. Your current dashboard was not changed.');
+        setError('');
+        setStatus('Building responsive layouts and saving the imported dashboard…');
+        const ok = await this._applyConvertedDashboardPayload_(previewPayload);
+        if (ok !== false) {
+          setBusy(false);
+          close({ force: true });
+        }
+        else {
+          setPhase('review');
+          setStatus('Import cancelled. Your current dashboard was not changed.');
+        }
       } catch (err) {
+        setPhase('review');
         setError(String(err?.message || err));
         setStatus('Import failed. The previous dashboard was restored.');
       } finally {
@@ -2189,33 +2363,36 @@ const converterMethods = {
     });
 
     this.shadowRoot.appendChild(overlay);
+    setSourceMode('ha');
+    setBusy(true);
+    setStatus('Finding Home Assistant dashboards…');
     requestAnimationFrame(() => overlay.querySelector('[data-action="close"]')?.focus?.());
     this._fetchDashboardConverterDashboardList_()
       .then((dashboards) => {
         if (!sourceSelect) return;
-        sourceSelect.innerHTML = '';
-        if (!dashboards.length) {
-          const opt = document.createElement('option');
-          opt.value = '';
-          opt.textContent = 'Dashboard picker unavailable';
-          sourceSelect.appendChild(opt);
-          setStatus('Dashboard picker is unavailable here. Paste or upload Lovelace config instead.');
-          return;
-        }
+        sourceSelect.replaceChildren();
+        if (!dashboards.length) throw new Error('No dashboards returned');
         dashboards.forEach((dashboard) => {
-          const opt = document.createElement('option');
-          opt.value = dashboard.url_path || '';
-          opt.textContent = dashboard.title;
-          sourceSelect.appendChild(opt);
+          const option = document.createElement('option');
+          option.value = dashboard.url_path || '';
+          option.textContent = dashboard.title;
+          sourceSelect.appendChild(option);
         });
-        setStatus('Choose a dashboard and click Load, or paste/upload config.');
+        sourceSelect.dataset.available = 'true';
+        setStatus('Select a dashboard, then review how it will be rebuilt.');
       })
       .catch(() => {
         if (sourceSelect) {
-          sourceSelect.innerHTML = '<option value="">Dashboard picker unavailable</option>';
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'Dashboard picker unavailable';
+          sourceSelect.replaceChildren(option);
+          sourceSelect.dataset.available = 'false';
         }
-        setStatus('Dashboard picker is unavailable here. Paste or upload Lovelace config instead.');
-      });
+        setSourceMode('upload');
+        setStatus('Dashboard access is unavailable here. Upload a file or paste its YAML instead.');
+      })
+      .finally(() => setBusy(false));
   },
 };
 
