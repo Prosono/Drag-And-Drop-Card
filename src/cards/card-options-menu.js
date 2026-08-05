@@ -264,7 +264,7 @@ const cardSettingsMenuMethods = {
         action: 'settings',
         icon: 'mdi:tune-variant',
         label: 'Card settings',
-        description: 'Appearance, overflow and behavior',
+        description: 'Position, appearance and behavior',
       });
     }
 
@@ -399,12 +399,62 @@ const cardSettingsMenuMethods = {
     menu.style.top = `${Math.round(top)}px`;
   },
 
+  _updateCardPositionFromSettings_(wrap, coordinates = {}) {
+    if (!wrap) return null;
+    const numberOr = (value, fallback = 0) => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const currentX = numberOr(wrap.getAttribute?.('data-x'), numberOr(wrap.getAttribute?.('data-x-raw'), 0));
+    const currentY = numberOr(wrap.getAttribute?.('data-y'), numberOr(wrap.getAttribute?.('data-y-raw'), 0));
+    const gridSize = Math.max(1, numberOr(this.gridSize, numberOr(this._config?.grid, 1)));
+    const rect = wrap.getBoundingClientRect?.() || {};
+    const scaleX = Math.max(0.0001, numberOr(this.__pointerScaleX, 1));
+    const scaleY = Math.max(0.0001, numberOr(this.__pointerScaleY, 1));
+    const proposed = [{
+      el: wrap,
+      rawX: numberOr(coordinates.x, currentX),
+      rawY: numberOr(coordinates.y, currentY),
+      snapX: currentX,
+      snapY: currentY,
+      w: numberOr(wrap.style?.width, numberOr(wrap.offsetWidth, numberOr(rect.width, 0) / scaleX)),
+      h: numberOr(wrap.style?.height, numberOr(wrap.offsetHeight, numberOr(rect.height, 0) / scaleY)),
+    }];
+
+    if (typeof this._constrainProposedCardsToCanvas_ === 'function') {
+      this._constrainProposedCardsToCanvas_(proposed, true, gridSize);
+    } else {
+      proposed[0].snapX = Math.round(proposed[0].rawX / gridSize) * gridSize;
+      proposed[0].snapY = Math.max(0, Math.round(proposed[0].rawY / gridSize) * gridSize);
+    }
+
+    const nextX = Math.round(numberOr(proposed[0].snapX, proposed[0].rawX));
+    const nextY = Math.max(0, Math.round(numberOr(proposed[0].snapY, proposed[0].rawY)));
+    wrap.setAttribute?.('data-x-raw', String(nextX));
+    wrap.setAttribute?.('data-y-raw', String(nextY));
+    this._setCardPosition?.(wrap, nextX, nextY);
+
+    const cardId = String(wrap.dataset?.layoutCardId || '').trim();
+    if (cardId && (nextX !== currentX || nextY !== currentY)) {
+      this._moveConnectorsForCardDeltas_?.([{
+        id: cardId,
+        dx: nextX - currentX,
+        dy: nextY - currentY,
+      }], { reason: null, render: false });
+    }
+    this._syncAnchoredConnectorPointsForCurrentLayout_?.({ reason: null, render: false });
+    this._scheduleConnectorsRender_?.({ syncAnchors: true });
+    this._resizeContainer?.();
+    this._persistCurrentResponsiveProfileToMemory_?.();
+    this._queueSave?.('card-position-change');
+    return { x: nextX, y: nextY };
+  },
+
   /**
    * Open or toggle a small settings menu attached to a card wrapper. This menu
-   * currently exposes an overflow option that allows the user to choose
-   * between the default overflow behaviour, visible overflow or hidden
-   * overflow on a per-card basis. The menu is rendered as an overlay so it
-   * can extend outside short cards without being clipped.
+   * exposes placement, visibility, styling and overflow controls for one
+   * card. The menu is rendered as an overlay so it can extend outside short
+   * cards without being clipped.
    *
    * @param {HTMLElement} wrap The card wrapper to attach the settings menu to.
    */
@@ -745,6 +795,50 @@ const cardSettingsMenuMethods = {
       themeWarning.append(themeWarningIcon, themeWarningText);
       styleSection.appendChild(themeWarning);
     }
+
+    const positionFields = document.createElement('div');
+    positionFields.className = 'ddc-card-position-fields';
+    const gridStep = String(Math.max(1, Number(this.gridSize || this._config?.grid || 1) || 1));
+    const makePositionField = (axis, value) => {
+      const field = document.createElement('label');
+      field.className = 'ddc-card-position-field';
+      const axisLabel = document.createElement('span');
+      axisLabel.textContent = axis;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.inputMode = 'numeric';
+      input.step = gridStep;
+      input.value = String(Math.round(Number(value) || 0));
+      input.setAttribute('aria-label', `${axis} position`);
+      input.setAttribute('data-card-position-axis', axis.toLowerCase());
+      stopInteractive(input);
+      field.append(axisLabel, input);
+      return { field, input };
+    };
+    const xPosition = makePositionField('X', wrap.getAttribute?.('data-x'));
+    const yPosition = makePositionField('Y', wrap.getAttribute?.('data-y'));
+    const commitPosition = () => {
+      const next = this._updateCardPositionFromSettings_(wrap, {
+        x: xPosition.input.value,
+        y: yPosition.input.value,
+      });
+      if (!next) return;
+      xPosition.input.value = String(next.x);
+      yPosition.input.value = String(next.y);
+    };
+    xPosition.input.addEventListener('change', commitPosition);
+    yPosition.input.addEventListener('change', commitPosition);
+    positionFields.append(xPosition.field, yPosition.field);
+    const positionRow = makeRow('Position', positionFields);
+    positionRow.classList.add('ddc-card-position-row');
+    visibilitySection.appendChild(positionRow);
+    const positionHint = document.createElement('div');
+    positionHint.textContent = `Coordinates use the dashboard grid (${gridStep} px). Changes are applied immediately.`;
+    Object.assign(positionHint.style, {
+      fontSize: '.75rem',
+      color: 'var(--secondary-text-color, #9ca3af)'
+    });
+    visibilitySection.appendChild(positionHint);
 
     if (Array.isArray(this.tabs) && this.tabs.length > 1) {
       const tabSelect = document.createElement('select');

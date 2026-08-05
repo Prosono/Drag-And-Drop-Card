@@ -6000,6 +6000,7 @@ export function getDashboardShellTemplate() {
         --mdc-icon-size:20px;
       }
       .ddc-card-settings input[type="text"],
+      .ddc-card-settings input[type="number"],
       .ddc-card-settings select{
         min-height:44px!important;
         border:1px solid var(--ddc-popup-line)!important;
@@ -6012,11 +6013,50 @@ export function getDashboardShellTemplate() {
         outline:none;
       }
       .ddc-card-settings input[type="text"]:focus,
+      .ddc-card-settings input[type="number"]:focus,
       .ddc-card-settings select:focus{
         border-color:color-mix(in oklab, var(--ddc-popup-accent) 58%, var(--ddc-popup-line))!important;
         box-shadow:
           0 0 0 3px color-mix(in oklab, var(--ddc-popup-accent) 17%, transparent),
           inset 0 1px 0 rgba(255,255,255,.05)!important;
+      }
+      .ddc-card-settings .ddc-card-position-fields{
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:8px;
+        width:100%;
+      }
+      .ddc-card-settings .ddc-card-position-field{
+        min-width:0;
+        display:grid;
+        grid-template-columns:auto minmax(0, 1fr);
+        align-items:center;
+        gap:8px;
+        padding-left:11px;
+        border:1px solid var(--ddc-popup-line);
+        border-radius:12px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+          var(--ddc-popup-field);
+        color:var(--secondary-text-color, #9ca3af);
+        font-weight:800;
+      }
+      .ddc-card-settings .ddc-card-position-field:focus-within{
+        border-color:color-mix(in oklab, var(--ddc-popup-accent) 58%, var(--ddc-popup-line));
+        box-shadow:0 0 0 3px color-mix(in oklab, var(--ddc-popup-accent) 17%, transparent);
+      }
+      .ddc-card-settings .ddc-card-position-field input[type="number"]{
+        width:100%;
+        min-width:0;
+        box-sizing:border-box;
+        padding:10px 8px;
+        border:0!important;
+        border-radius:0 11px 11px 0!important;
+        background:transparent!important;
+        color:var(--primary-text-color, #f5f5f5)!important;
+        font:inherit;
+        font-weight:750;
+        box-shadow:none!important;
       }
       .ddc-card-settings input[type="color"]{
         border-radius:12px!important;
