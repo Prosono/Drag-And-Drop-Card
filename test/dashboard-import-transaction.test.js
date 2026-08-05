@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { installDashboardConverterMethods } from '../src/storage/dashboard-converter.js';
 import { installResponsiveModelMethods } from '../src/layout/responsive-layouts.js';
+import { shouldDeferBackendRefresh } from '../src/core/element-lifecycle.js';
+import { installInitialLoadMethods } from '../src/core/layout-loader.js';
 import {
   collectDdcCardStorageLocations,
   installPersistenceMethods,
@@ -132,6 +134,8 @@ test('apply uses one canonical replacement snapshot and clears stale dashboard-s
     sidebar_cards: [{ id: 'old-sidebar-card' }],
     background_mode: 'image',
   };
+  harness.__initialLoadSeq = 4;
+  harness.__backendRefreshPending = true;
   harness.layers = [{ id: 'old-layer' }];
   harness.activeLayerIds = ['old-layer'];
   harness.sidebarCards = [{ id: 'old-sidebar-card' }];
@@ -193,6 +197,57 @@ test('apply uses one canonical replacement snapshot and clears stale dashboard-s
   assert.deepEqual(harness._dashboardPackages, []);
   assert.equal(converted.summary.persisted_to_backend, 'saved');
   assert.equal(converted.summary.persisted_to_lovelace, true);
+  assert.equal(harness.__initialLoadSeq, 5);
+  assert.equal(harness.__backendRefreshPending, false);
+});
+
+test('backend refresh is deferred throughout a dashboard import', () => {
+  assert.equal(shouldDeferBackendRefresh({}), false);
+  assert.equal(shouldDeferBackendRefresh({ __booting: true }), true);
+  assert.equal(shouldDeferBackendRefresh({ __dashboardConverterImporting: true }), true);
+  assert.equal(shouldDeferBackendRefresh({ __ddcImportingDashboard: true }), true);
+});
+
+test('an in-flight backend load cannot apply stale state after an import starts', async () => {
+  let resolveBackend;
+  let appliedOptions = false;
+  let appliedPackages = false;
+  class InitialLoadHarness {
+    constructor() {
+      this.storageKey = 'layout_target';
+      this._backendOK = true;
+      this.__initialLoadSeq = 0;
+      this.__booting = false;
+      this._config = {};
+    }
+
+    _beginDashboardLoadingAnimation_() { return null; }
+    _dbgPush() {}
+    _readLocalLayoutSnapshot_() { return null; }
+    _hasPendingDashboardReplacement_() { return false; }
+    _loadLayoutFromBackend() {
+      return new Promise((resolve) => { resolveBackend = resolve; });
+    }
+    _cloneJson_(value) { return structuredClone(value); }
+    _normalizeDashboardPayload_(value) { return structuredClone(value); }
+    _applyImportedOptions() { appliedOptions = true; }
+    _setDashboardPackages_() { appliedPackages = true; }
+  }
+  installInitialLoadMethods(InitialLoadHarness.prototype);
+  const harness = new InitialLoadHarness();
+
+  const load = harness._initialLoad(true);
+  harness.__dashboardConverterImporting = true;
+  harness.__initialLoadSeq += 1;
+  resolveBackend({
+    options: { tabs: [{ id: 'stale', label: 'Stale' }], default_tab: 'stale' },
+    cards: [{ id: 'stale-card', tabId: 'stale', card: { type: 'tile' } }],
+  });
+  await load;
+
+  assert.equal(appliedOptions, false);
+  assert.equal(appliedPackages, false);
+  assert.equal(harness.__booting, false);
 });
 
 test('Lovelace storage lookup finds the correct keyed DDC card inside sections', () => {
@@ -232,7 +287,7 @@ test('ambiguous unidentified DDC cards are never resolved by picking the first d
   assert.equal(resolveDdcCardStorageLocation(config, { currentView: 0 }), null);
 });
 
-test('converter config persistence reports failure and dispatches only after direct storage finishes', async () => {
+test('converter config persistence dispatches only as fallback after direct storage fails', async () => {
   const harness = new ImportTransactionHarness();
   const order = [];
   harness._persistThisCardConfigToStorage_ = async () => {
@@ -243,6 +298,19 @@ test('converter config persistence reports failure and dispatches only after dir
 
   assert.equal(await harness._persistDashboardConverterConfig_(), false);
   assert.deepEqual(order, ['storage', 'event']);
+});
+
+test('converter config persistence does not dispatch a competing event after storage succeeds', async () => {
+  const harness = new ImportTransactionHarness();
+  const order = [];
+  harness._persistThisCardConfigToStorage_ = async () => {
+    order.push('storage');
+    return true;
+  };
+  harness._dispatchDashboardConverterConfigChanged_ = () => order.push('event');
+
+  assert.equal(await harness._persistDashboardConverterConfig_(), true);
+  assert.deepEqual(order, ['storage']);
 });
 
 test('ID seeding updates the keyed target instead of the first unidentified DDC card', async () => {
@@ -285,4 +353,79 @@ test('ID seeding updates the keyed target instead of the first unidentified DDC 
   assert.equal(harness.saved.views[0].cards[1].id, id);
   assert.equal(harness.config.id, id);
   assert.equal(harness._config.id, id);
+});
+
+test('full card persistence seeds its ID and imported tabs in one Lovelace save', async () => {
+  class StorageHarness {
+    constructor() {
+      this.storageKey = 'layout_target';
+      this._config = {
+        storage_key: this.storageKey,
+        tabs: [
+          { id: 'home', label: 'Home' },
+          { id: 'climate', label: 'Climate' },
+        ],
+        default_tab: 'home',
+      };
+      this.config = {};
+      this._responsiveLayouts = {
+        desktop_landscape: [
+          {
+            id: 'imported-home',
+            tabId: 'home',
+            position: { x: 0, y: 0 },
+            size: { width: 300, height: 200 },
+            card: { type: 'tile', entity: 'light.kitchen' },
+          },
+          {
+            id: 'imported-climate',
+            tabId: 'climate',
+            position: { x: 320, y: 0 },
+            size: { width: 300, height: 200 },
+            card: { type: 'thermostat', entity: 'climate.living_room' },
+          },
+        ],
+      };
+      this.messages = [];
+      this.hass = {
+        callWS: async (message) => {
+          this.messages.push(structuredClone(message));
+          if (message.type === 'lovelace/config/save') return true;
+          return structuredClone({
+            views: [{
+              cards: [
+                { type: 'custom:drag-and-drop-card' },
+                { type: 'custom:drag-and-drop-card', storage_key: 'layout_target' },
+              ],
+            }],
+          });
+        },
+      };
+    }
+
+    _getCurrentDashboardUrlPath_() { return null; }
+    _getLovelace() { return { current_view: 0 }; }
+    _getPrimaryResponsiveLayoutKey_() { return 'desktop_landscape'; }
+    _serializeResponsiveLayouts_(layouts) { return structuredClone(layouts); }
+    _cloneJson_(value) { return structuredClone(value); }
+    requestUpdate() {}
+  }
+  installPersistenceMethods(StorageHarness.prototype);
+  const harness = new StorageHarness();
+  harness._getCurrentDashboardUrlPath_ = () => null;
+  harness._getLovelace = () => ({ current_view: 0 });
+
+  assert.equal(await harness._persistThisCardConfigToStorage_(), true);
+
+  const saves = harness.messages.filter((message) => message.type === 'lovelace/config/save');
+  assert.equal(saves.length, 1);
+  const untouched = saves[0].config.views[0].cards[0];
+  const stored = saves[0].config.views[0].cards[1];
+  assert.equal(untouched.id, undefined);
+  assert.ok(stored.id);
+  assert.equal(stored.default_tab, 'home');
+  assert.deepEqual(stored.tabs.map((tab) => tab.id), ['home', 'climate']);
+  assert.deepEqual(new Set(stored.cards.map((entry) => entry.tabId)), new Set(['home', 'climate']));
+  assert.equal(harness.config.id, stored.id);
+  assert.equal(harness._config.id, stored.id);
 });

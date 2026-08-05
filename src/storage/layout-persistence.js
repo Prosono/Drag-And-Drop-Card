@@ -260,7 +260,6 @@ const persistenceMethods = {
   // Persist this._config back into the stored card (Storage dashboards)
   async _persistThisCardConfigToStorage_() {
     if (!this._hasHassWebSocketApi_()) return false;
-    await this._ensureCardIdSeededInStorage_();
     try {
       this._persistCurrentResponsiveProfileToMemory_?.({ syncMembership: true });
       this._syncLiveCardConfigsIntoResponsiveLayouts_?.();
@@ -270,11 +269,20 @@ const persistenceMethods = {
       ? this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, desktopCards))
       : undefined;
 
+    // A card created through Home Assistant's picker does not necessarily have
+    // an id yet. Seed it as part of the same Lovelace transaction as the full
+    // card config. Saving the id first used to recreate the card with its old
+    // (often empty) config immediately before the imported dashboard was saved.
+    const currentId = String(this.config?.id || this._config?.id || '').trim();
+    const id = currentId || (crypto?.randomUUID
+      ? crypto.randomUUID()
+      : ("ddc_" + Math.random().toString(36).slice(2)));
+
     // Build what we want to merge (like Visual Editor does at top-level)
     const partial = {
       type: "custom:drag-and-drop-card",
       ...this._config,
-      id: this.config?.id,
+      id,
       cards: this._cloneJson_(desktopCards),
     };
     if (responsiveLayouts) partial.responsive_layouts = responsiveLayouts;
@@ -288,7 +296,7 @@ const persistenceMethods = {
     let currentView = null;
     try { currentView = this._getLovelace?.()?.current_view; } catch {}
     const hit = resolveDdcCardStorageLocation(ll, {
-      id: this.config?.id,
+      id: currentId,
       storageKey: this.storageKey || this._config?.storage_key,
       currentView,
       sourceConfig: this.__lastSetConfigSource,
@@ -309,6 +317,8 @@ const persistenceMethods = {
 
     // Apply locally
     this.config = merged;
+    this._config = { ...(this._config || {}), id };
+    this.__lastSetConfigSource = this._cloneJson_?.(merged) || merged;
     this.requestUpdate?.();
     return true;
   },

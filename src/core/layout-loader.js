@@ -115,6 +115,17 @@ const initialLoadMethods = {
     }
   },
 
+  _cancelDashboardLoadingAnimation_(session = null) {
+    if (!session || session.token !== this.__ddcLoadingAnimationToken) return;
+    this.__ddcLoadingAnimationToken += 1;
+    try {
+      session.overlay.hidden = true;
+      session.overlay.classList.remove('is-active', 'is-leaving');
+      session.overlay.setAttribute('aria-hidden', 'true');
+      session.root.classList.remove('ddc-loading-active', 'ddc-loading-reveal');
+    } catch {}
+  },
+
   _runtimeLayoutCacheKeys_() {
     const keys = [];
     const add = (value) => {
@@ -194,6 +205,13 @@ const initialLoadMethods = {
     async _initialLoad(force = false, options = {}) {
       // prevent multiple parallel boots
       if (this.__booting) return;
+      const loadSeq = (Number(this.__initialLoadSeq || 0) || 0) + 1;
+      this.__initialLoadSeq = loadSeq;
+      const isCurrentLoad = () => (
+        loadSeq === this.__initialLoadSeq
+        && !this.__dashboardConverterImporting
+        && !this.__ddcImportingDashboard
+      );
       this.__booting = true;
       let loadingAnimation = this._beginDashboardLoadingAnimation_?.();
       let previousSuppressCardAnimation = false;
@@ -259,6 +277,11 @@ const initialLoadMethods = {
           }
         }
 
+        // The backend request above is asynchronous. An import may have started
+        // while it was in flight, in which case even updating local/runtime
+        // caches from this response would preserve stale dashboard state.
+        if (!isCurrentLoad()) return;
+
         const selectedInitialSnapshot = selectInitialLayoutSnapshot(saved, local, {
           preferLocal: preferLocalReplacement,
         });
@@ -320,6 +343,12 @@ const initialLoadMethods = {
             saved = cached;
           }
         }
+
+        // A dashboard import invalidates any storage load that was already in
+        // flight. Do this before touching tabs, responsive layouts, the runtime
+        // cache, or the live canvas so an older backend response cannot become
+        // the new baseline halfway through the import transaction.
+        if (!isCurrentLoad()) return;
 
         const syncedSnapshot = authoritativeBackendSnapshot || (syncedWithBackend ? saved : null);
         this.__lastSyncedDashboardPayload = syncedSnapshot
@@ -480,56 +509,64 @@ const initialLoadMethods = {
           });
         } catch {}
       } finally {
+        const loadStillCurrent = isCurrentLoad();
         this._loading = false;
         this.__booting = false;
-        this.__dirty = false;
-        try { this._ensurePlaceholderIfEmpty?.(); } catch {}
-        this._updateApplyBtn?.();
-        this._resetLayoutHistory_?.('load');
-        try { this._renderTabs(); this._renderLayersBar_?.(); this._applyActiveTab(); } catch {}
-        // Reevaluate visibility after the layout has been built. Cards with
-        // visibility conditions will hide themselves when not in edit mode.
-        try { this._applyVisibility_(); } catch {}
-        try {
-          const host = this.cardContainer?.querySelector?.('#ddcBgHost');
-          if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
-        } catch {}
-        try {
-          const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-          if (mode === 'auto' && autoBootVisualActive) {
-            this._settleAutoScaleAfterBoot_?.({ restoreCardAnimation: previousSuppressCardAnimation });
-          } else {
-            this.__suppressCardAnimation = previousSuppressCardAnimation;
-            this._setAutoScaleStartupVisualState_?.(false);
-            if (mode === 'auto') this._applyAutoScale?.({ force: true });
-          }
-        } catch {
+        if (!loadStillCurrent) {
           this.__suppressCardAnimation = previousSuppressCardAnimation;
           this._setAutoScaleStartupVisualState_?.(false);
+          this._cancelDashboardLoadingAnimation_?.(loadingAnimation);
         }
-        await this._finishDashboardLoadingAnimation_?.(loadingAnimation);
-        this._scheduleCardHelpersPreload_?.();
-        const shouldRefreshBackend = !!(
-          this.__backendRefreshPending
-          && this._backendOK
-          && this.storageKey
-        );
-        this.__backendRefreshPending = false;
-        if (shouldRefreshBackend) {
-          setTimeout(() => {
-            try {
-              if (this.__booting || !this.isConnected) return;
-              if (this._isHaEditorBlockingEmptyState_?.()) {
-                this._syncEmptyStateUI?.();
-                this._applyAutoScale?.({ force: true });
-              } else {
-                this._initialLoad(true, {
-                  preserveExistingOnEmpty: true,
-                  reason: 'backend-probe-refresh',
-                });
-              }
-            } catch {}
-          }, 0);
+        if (loadStillCurrent) {
+          this.__dirty = false;
+          try { this._ensurePlaceholderIfEmpty?.(); } catch {}
+          this._updateApplyBtn?.();
+          this._resetLayoutHistory_?.('load');
+          try { this._renderTabs(); this._renderLayersBar_?.(); this._applyActiveTab(); } catch {}
+          // Reevaluate visibility after the layout has been built. Cards with
+          // visibility conditions will hide themselves when not in edit mode.
+          try { this._applyVisibility_(); } catch {}
+          try {
+            const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+            if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+          } catch {}
+          try {
+            const mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
+            if (mode === 'auto' && autoBootVisualActive) {
+              this._settleAutoScaleAfterBoot_?.({ restoreCardAnimation: previousSuppressCardAnimation });
+            } else {
+              this.__suppressCardAnimation = previousSuppressCardAnimation;
+              this._setAutoScaleStartupVisualState_?.(false);
+              if (mode === 'auto') this._applyAutoScale?.({ force: true });
+            }
+          } catch {
+            this.__suppressCardAnimation = previousSuppressCardAnimation;
+            this._setAutoScaleStartupVisualState_?.(false);
+          }
+          await this._finishDashboardLoadingAnimation_?.(loadingAnimation);
+          this._scheduleCardHelpersPreload_?.();
+          const shouldRefreshBackend = !!(
+            this.__backendRefreshPending
+            && this._backendOK
+            && this.storageKey
+          );
+          this.__backendRefreshPending = false;
+          if (shouldRefreshBackend) {
+            setTimeout(() => {
+              try {
+                if (this.__booting || !this.isConnected) return;
+                if (this._isHaEditorBlockingEmptyState_?.()) {
+                  this._syncEmptyStateUI?.();
+                  this._applyAutoScale?.({ force: true });
+                } else {
+                  this._initialLoad(true, {
+                    preserveExistingOnEmpty: true,
+                    reason: 'backend-probe-refresh',
+                  });
+                }
+              } catch {}
+            }, 0);
+          }
         }
       }
     }

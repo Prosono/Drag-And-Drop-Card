@@ -1643,9 +1643,14 @@ const converterMethods = {
     } catch (err) {
       console.warn('[drag-and-drop-card] Could not persist converted dashboard config to Lovelace storage', err);
     }
-    // Notify Home Assistant only after the direct storage transaction. Emitting
-    // this first can synchronously re-run setConfig halfway through the import.
-    try { this._dispatchDashboardConverterConfigChanged_?.(); } catch {}
+    // A successful Lovelace storage save is already authoritative and causes
+    // Home Assistant to recreate the card. Dispatching config-changed as well
+    // started a second, competing update with a different lifecycle. Keep the
+    // event only as a fallback for dashboards where direct storage is not
+    // available (for example YAML-managed/editor-only configurations).
+    if (!persisted) {
+      try { this._dispatchDashboardConverterConfigChanged_?.(); } catch {}
+    }
     return persisted;
   },
 
@@ -1841,6 +1846,9 @@ const converterMethods = {
     }
 
     const rollbackSnapshot = this._captureDashboardConverterRuntimeSnapshot_?.();
+    // Cancel any backend/local initial load that may still be awaiting I/O.
+    // Its generation check will prevent it from applying stale tabs/layouts.
+    this.__initialLoadSeq = (Number(this.__initialLoadSeq || 0) || 0) + 1;
     this.__dashboardConverterImporting = true;
     const previousImportingDashboard = !!this.__ddcImportingDashboard;
     this.__ddcImportingDashboard = true;
@@ -1941,6 +1949,11 @@ const converterMethods = {
     } finally {
       this.__ddcImportingDashboard = previousImportingDashboard;
       this.__dashboardConverterImporting = false;
+      // A backend probe that completed during this import was deliberately
+      // deferred. The import itself has now committed the authoritative local
+      // snapshot (and backend snapshot when available), so replaying that old
+      // refresh would only reintroduce a competing rebuild.
+      this.__backendRefreshPending = false;
     }
   },
 

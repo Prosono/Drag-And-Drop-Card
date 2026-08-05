@@ -5,6 +5,14 @@
  * initial autosize kicks, and cleanup paths used when the element is detached.
  */
 
+export function shouldDeferBackendRefresh(instance = null) {
+  return !!(
+    instance?.__booting
+    || instance?.__dashboardConverterImporting
+    || instance?.__ddcImportingDashboard
+  );
+}
+
 const lifecycleMethods = {
   // === Initial autosize kick (view-mode safe) ===
     _startInitialAutosize() {
@@ -261,7 +269,7 @@ const lifecycleMethods = {
             this.__booted = true;
             this._initialLoad(true);
           } else if (this.__booted && this._backendOK && this.storageKey) {
-            if (this.__booting) {
+            if (shouldDeferBackendRefresh(this)) {
               this.__backendRefreshPending = true;
               return;
             }
