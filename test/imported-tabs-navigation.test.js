@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { installTabsLayoutMethods } from '../src/layout/tabs.js';
 import { resolveConfiguredActiveTab } from '../src/core/config-lifecycle.js';
+import { installInternalLovelaceRebuildBoundary } from '../src/dashboard/shell-bindings.js';
 
 class ImportedTabsHarness {
   constructor() {
@@ -120,4 +121,20 @@ test('active deferred cards hydrate even when a rebuild committed them already v
   await harness._applyActiveTab({ reason: 'tab-change' });
 
   assert.equal(hydrationArgument, undefined);
+});
+
+test('internal Lovelace rebuild events stop at the Drag and Drop shadow boundary', () => {
+  let listener = null;
+  const root = {
+    addEventListener(type, handler) {
+      if (type === 'll-rebuild') listener = handler;
+    },
+  };
+  const host = {};
+  let stopped = 0;
+
+  assert.equal(installInternalLovelaceRebuildBoundary(root, host), true);
+  listener?.({ stopPropagation: () => { stopped += 1; } });
+  assert.equal(stopped, 1);
+  assert.equal(installInternalLovelaceRebuildBoundary(root, host), false);
 });

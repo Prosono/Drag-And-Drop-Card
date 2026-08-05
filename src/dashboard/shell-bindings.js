@@ -7,12 +7,28 @@
 
 import { getDashboardShellTemplate } from './shell-template.js';
 
+export function installInternalLovelaceRebuildBoundary(root, host) {
+  if (!root || !host || host.__ddcInternalLovelaceRebuildBoundary) return false;
+  host.__ddcInternalLovelaceRebuildBoundary = (event) => {
+    // Child cards use ll-rebuild to finish their own initialization. Let that
+    // event traverse the complete internal card tree, but do not let it escape
+    // the DDC shadow root: Home Assistant treats an escaped ll-rebuild as a
+    // request to recreate the entire outer Drag & Drop card. Deferred cards on
+    // an imported tab are initialized on first activation, so that recreation
+    // used to reset the newly selected tab immediately.
+    event?.stopPropagation?.();
+  };
+  root.addEventListener('ll-rebuild', host.__ddcInternalLovelaceRebuildBoundary);
+  return true;
+}
+
 const dashboardShellBindingMethods = {
   _buildDashboardShellOnce_() {
     if (this._built) return;
     this._built = true;
     this.shadowRoot.innerHTML = getDashboardShellTemplate();
     this.cardContainer = this.shadowRoot.querySelector('#cardContainer');
+    installInternalLovelaceRebuildBoundary(this.shadowRoot, this);
     try { this._applyBackgroundFromConfig?.(); } catch {}
 
     // Reapply screensaver settings now that the card container exists. This ensures
