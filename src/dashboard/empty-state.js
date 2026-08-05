@@ -235,25 +235,28 @@ const emptyStateMethods = {
         <div class="ddc-empty-step"><strong>2. Add cards</strong><span>Open the card picker and place Home Assistant or Drag & Drop cards.</span></div>
         <div class="ddc-empty-step"><strong>3. Play around</strong><span>Drag, resize, layer, test ideas, and save when the dashboard feels right.</span></div>
       </div>
-      <div class="ddc-empty-actions">
-        <button type="button" class="ddc-empty-btn primary" data-ddc-empty-action="add">
-          <ha-icon icon="mdi:plus-circle-outline"></ha-icon><span>Add first card</span>
-        </button>
-        <button type="button" class="ddc-empty-btn" data-ddc-empty-action="convert-dashboard">
-          <ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import Existing Lovelace Dashboard</span>
-        </button>
-        <button type="button" class="ddc-empty-btn" data-ddc-empty-action="settings">
+      <button type="button" class="ddc-empty-btn primary ddc-empty-wide ddc-empty-add" data-ddc-empty-action="add">
+        <ha-icon icon="mdi:plus-circle-outline"></ha-icon><span>Add your first card</span>
+      </button>
+      <div class="ddc-empty-setup" aria-label="Dashboard setup">
+        <button type="button" class="ddc-empty-btn ddc-empty-settings" data-ddc-empty-action="settings">
           <ha-icon icon="mdi:tune-variant"></ha-icon><span>Dashboard settings</span>
         </button>
+        <div class="ddc-empty-presets" aria-label="Canvas size mode">
+          <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="fixed-fhd">
+            <ha-icon icon="mdi:monitor-screenshot"></ha-icon>
+            <span class="ddc-empty-size-copy"><span>Fixed Size (Full HD)</span><small>1920 x 1080 canvas</small></span>
+          </button>
+          <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="auto">
+            <ha-icon icon="mdi:fit-to-screen-outline"></ha-icon>
+            <span class="ddc-empty-size-copy"><span>Auto</span><small>Scales to the current viewport</small></span>
+          </button>
+        </div>
       </div>
-      <div class="ddc-empty-presets" aria-label="Canvas size mode">
-        <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="fixed-fhd">
-          <ha-icon icon="mdi:monitor-screenshot"></ha-icon>
-          <span class="ddc-empty-size-copy"><span>Fixed Size (Full HD)</span><small>1920 x 1080 canvas</small></span>
-        </button>
-        <button type="button" class="ddc-empty-btn ddc-empty-preset" data-ddc-empty-action="size-mode" data-size-mode="auto">
-          <ha-icon icon="mdi:fit-to-screen-outline"></ha-icon>
-          <span class="ddc-empty-size-copy"><span>Auto</span><small>Scales to the current viewport</small></span>
+      <div class="ddc-empty-import-choice">
+        <div class="ddc-empty-or" aria-hidden="true"><span>Or:</span></div>
+        <button type="button" class="ddc-empty-btn ddc-empty-wide ddc-empty-import" data-ddc-empty-action="convert-dashboard">
+          <ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon><span>Import Existing Lovelace Dashboard</span>
         </button>
       </div>
       <div class="ddc-empty-links">

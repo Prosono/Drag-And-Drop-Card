@@ -8405,12 +8405,12 @@ export function getDashboardShellTemplate() {
             z-index:2;
             display:grid;
             grid-template-columns:minmax(260px, .88fr) minmax(360px, 1.12fr);
-            gap:48px;
+            gap:42px;
             align-items:center;
             width:100%;
             height:100%;
             box-sizing:border-box;
-            padding:54px;
+            padding:46px;
           }
           .ddc-empty-visual{
             position:relative;
@@ -8445,13 +8445,14 @@ export function getDashboardShellTemplate() {
             display:flex;
             flex-direction:column;
             align-items:flex-start;
+            width:100%;
             min-width:0;
           }
           .ddc-empty-kicker{
             display:inline-flex;
             align-items:center;
             gap:8px;
-            margin-bottom:14px;
+            margin-bottom:10px;
             padding:7px 10px;
             border-radius:999px;
             border:1px solid color-mix(in oklab, var(--ddc-empty-accent) 34%, transparent);
@@ -8479,7 +8480,7 @@ export function getDashboardShellTemplate() {
             flex-wrap:wrap;
             align-items:center;
             gap:8px;
-            margin:17px 0 0;
+            margin:12px 0 0;
             max-width:680px;
             color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 72%, transparent);
             font-size:1.02rem;
@@ -8532,7 +8533,7 @@ export function getDashboardShellTemplate() {
             color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 78%, transparent);
           }
           .ddc-empty-sub{
-            margin:18px 0 0;
+            margin:12px 0 0;
             max-width:650px;
             color:color-mix(in oklab, var(--primary-text-color, #f8fafc) 78%, transparent);
             font-size:1.08rem;
@@ -8543,11 +8544,11 @@ export function getDashboardShellTemplate() {
             grid-template-columns:repeat(3, minmax(0, 1fr));
             gap:10px;
             width:100%;
-            margin:24px 0 0;
+            margin:16px 0 0;
           }
           .ddc-empty-step{
             min-width:0;
-            padding:13px 14px;
+            padding:11px 13px;
             border-radius:16px;
             border:1px solid color-mix(in oklab, var(--ddc-empty-line) 78%, transparent);
             background:color-mix(in oklab, var(--card-background-color, #111827) 76%, transparent);
@@ -8563,12 +8564,6 @@ export function getDashboardShellTemplate() {
             font-size:.8rem;
             line-height:1.42;
             color:color-mix(in oklab, var(--primary-text-color, #fff) 66%, transparent);
-          }
-          .ddc-empty-actions{
-            display:flex;
-            flex-wrap:wrap;
-            gap:10px;
-            margin-top:24px;
           }
           .ddc-empty-btn{
             appearance:none;
@@ -8607,15 +8602,31 @@ export function getDashboardShellTemplate() {
             color:#04121c;
             box-shadow:0 16px 30px color-mix(in oklab, var(--ddc-empty-accent) 24%, transparent);
           }
+          .ddc-empty-wide{
+            width:100%;
+            min-height:48px;
+          }
+          .ddc-empty-add{
+            margin-top:12px;
+          }
+          .ddc-empty-setup{
+            display:grid;
+            gap:8px;
+            width:100%;
+            margin-top:12px;
+          }
+          .ddc-empty-settings{
+            width:100%;
+            justify-content:flex-start;
+          }
           .ddc-empty-presets{
             display:grid;
             grid-template-columns:repeat(2, minmax(0, 1fr));
             gap:10px;
-            margin-top:14px;
-            width:min(100%, 620px);
+            width:100%;
           }
           .ddc-empty-preset{
-            min-height:64px;
+            min-height:58px;
             justify-content:flex-start;
             padding:10px 13px;
             border-radius:16px;
@@ -8644,12 +8655,38 @@ export function getDashboardShellTemplate() {
             line-height:1.28;
             font-weight:700;
           }
+          .ddc-empty-import-choice{
+            display:grid;
+            gap:8px;
+            width:100%;
+            margin-top:12px;
+          }
+          .ddc-empty-or{
+            display:grid;
+            grid-template-columns:1fr auto 1fr;
+            align-items:center;
+            gap:10px;
+            width:100%;
+            color:color-mix(in oklab, var(--primary-text-color, #fff) 58%, transparent);
+            font-size:.78rem;
+            font-weight:800;
+            letter-spacing:.04em;
+          }
+          .ddc-empty-or::before,
+          .ddc-empty-or::after{
+            content:"";
+            height:1px;
+            background:color-mix(in oklab, var(--ddc-empty-line) 72%, transparent);
+          }
+          .ddc-empty-import{
+            background:color-mix(in oklab, var(--card-background-color, #111827) 76%, transparent);
+          }
           .ddc-empty-links{
             display:flex;
             flex-wrap:wrap;
             align-items:center;
             gap:12px;
-            margin-top:18px;
+            margin-top:12px;
             color:color-mix(in oklab, var(--primary-text-color, #fff) 64%, transparent);
             font-size:.9rem;
           }

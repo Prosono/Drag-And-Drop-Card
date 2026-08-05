@@ -145,3 +145,25 @@ test('the empty-state import action and assistant expose the complete Lovelace i
   assert.match(converterSource, /loadSelectedDashboardPreview/);
   assert.match(converterSource, /data-source-preview-stage/);
 });
+
+test('the empty-state actions follow the guided onboarding hierarchy', () => {
+  const emptyStateSource = readFileSync(new URL('../src/dashboard/empty-state.js', import.meta.url), 'utf8');
+  const stepsIndex = emptyStateSource.indexOf('class="ddc-empty-steps"');
+  const addIndex = emptyStateSource.indexOf('class="ddc-empty-btn primary ddc-empty-wide ddc-empty-add"');
+  const settingsIndex = emptyStateSource.indexOf('class="ddc-empty-setup"');
+  const importIndex = emptyStateSource.indexOf('class="ddc-empty-import-choice"');
+
+  assert.ok(stepsIndex >= 0 && stepsIndex < addIndex);
+  assert.ok(addIndex < settingsIndex);
+  assert.ok(settingsIndex < importIndex);
+  assert.match(emptyStateSource, /Add your first card/);
+  assert.match(emptyStateSource, /<span>Or:<\/span>/);
+});
+
+test('the import review renders every conversion warning', () => {
+  const converterSource = readFileSync(new URL('../src/storage/dashboard-converter.js', import.meta.url), 'utf8');
+
+  assert.match(converterSource, /warnings\.forEach\(\(warning\)/);
+  assert.doesNotMatch(converterSource, /warnings\.slice\(/);
+  assert.doesNotMatch(converterSource, /more warnings/);
+});
