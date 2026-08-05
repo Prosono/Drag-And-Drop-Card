@@ -1879,6 +1879,82 @@ const converterMethods = {
     return await this.hass.callWS(payload);
   },
 
+  _dashboardConverterPreviewModel_(converted = {}, requestedTabId = '') {
+    const tabs = (Array.isArray(converted?.options?.tabs) ? converted.options.tabs : [])
+      .map((tab, index) => ({
+        id: String(tab?.id || `tab-${index + 1}`).trim() || `tab-${index + 1}`,
+        label: String(tab?.label || tab?.id || `Tab ${index + 1}`).trim(),
+        icon: String(tab?.icon || '').trim(),
+      }));
+    const validTabIds = new Set(tabs.map((tab) => tab.id));
+    const fallbackTabId = String(converted?.options?.default_tab || tabs[0]?.id || '').trim();
+    const activeTabId = validTabIds.has(String(requestedTabId || '').trim())
+      ? String(requestedTabId).trim()
+      : (validTabIds.has(fallbackTabId) ? fallbackTabId : tabs[0]?.id || '');
+
+    const layouts = converted?.responsive_layouts && typeof converted.responsive_layouts === 'object'
+      ? converted.responsive_layouts
+      : {};
+    const preferredLayoutKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const availableLayoutKey = Array.isArray(layouts[preferredLayoutKey])
+      ? preferredLayoutKey
+      : Object.keys(layouts).find((key) => Array.isArray(layouts[key])) || '';
+    const sourceEntries = availableLayoutKey
+      ? layouts[availableLayoutKey]
+      : (Array.isArray(converted?.cards) ? converted.cards : []);
+    const allEntries = sourceEntries.filter((entry) => entry && typeof entry === 'object');
+    const visibleEntries = allEntries.filter((entry) => !activeTabId || String(entry?.tabId || entry?.tab_id || '') === activeTabId);
+    const bounds = allEntries.reduce((result, entry) => {
+      const x = Math.max(0, Number(entry?.position?.x || 0) || 0);
+      const y = Math.max(0, Number(entry?.position?.y || 0) || 0);
+      const width = Math.max(1, Number(entry?.size?.width || 0) || 1);
+      const height = Math.max(1, Number(entry?.size?.height || 0) || 1);
+      result.width = Math.max(result.width, x + width);
+      result.height = Math.max(result.height, y + height);
+      return result;
+    }, { width: 0, height: 0 });
+    const canvasWidth = Math.max(
+      320,
+      Number(converted?.options?.container_fixed_width || converted?.summary?.canvas_width || 0) || 0,
+      Math.ceil(bounds.width + 24),
+    );
+    const canvasHeight = Math.max(
+      240,
+      Number(converted?.options?.container_fixed_height || converted?.summary?.canvas_height || 0) || 0,
+      Math.ceil(bounds.height + 24),
+    );
+    const entries = visibleEntries.slice(0, 80).map((entry, index) => {
+      const card = entry?.card && typeof entry.card === 'object' ? entry.card : {};
+      const entity = String(card.entity || card.camera_image || '').trim();
+      const type = String(card.type || 'card').replace(/^custom:/i, '').replace(/-card$/i, '').replace(/[-_]+/g, ' ').trim();
+      const domain = entity.includes('.') ? entity.split('.')[0].toLowerCase() : '';
+      const category = domain || (/light|lamp/i.test(type) ? 'light' : /climate|thermostat/i.test(type) ? 'climate' : /media/i.test(type) ? 'media' : /camera|picture/i.test(type) ? 'camera' : /sensor|graph|history|statistics/i.test(type) ? 'sensor' : 'generic');
+      const markdownTitle = String(card.content || '').split('\n').find((line) => line.trim())?.replace(/^#+\s*/, '') || '';
+      const label = String(card.title || card.name || markdownTitle || entity || type || `Card ${index + 1}`).trim();
+      return {
+        id: String(entry.id || `preview-${index + 1}`),
+        x: Math.max(0, Number(entry?.position?.x || 0) || 0),
+        y: Math.max(0, Number(entry?.position?.y || 0) || 0),
+        width: Math.max(1, Number(entry?.size?.width || 0) || 1),
+        height: Math.max(1, Number(entry?.size?.height || 0) || 1),
+        label,
+        type: type || 'card',
+        category,
+      };
+    });
+    const layoutLabel = String(availableLayoutKey || 'dashboard').replace(/_/g, ' ');
+    return {
+      tabs,
+      activeTabId,
+      layoutKey: availableLayoutKey,
+      layoutLabel,
+      canvasWidth,
+      canvasHeight,
+      entries,
+      hiddenCardCount: Math.max(0, visibleEntries.length - entries.length),
+    };
+  },
+
   _dashboardConverterModalStyles_() {
     return `
       <style>
@@ -1898,13 +1974,14 @@ const converterMethods = {
         .ddc-converter-source-note{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;border-radius:11px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 8%,transparent);color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-source-note ha-icon{width:17px;flex:none;color:var(--primary-color,#3ca5dd)}
         .ddc-converter-dropzone{min-height:250px;display:grid;place-items:center;padding:30px;border:1.5px dashed color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line));border-radius:16px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 4%,transparent);color:inherit;text-align:center;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease}.ddc-converter-dropzone:hover,.ddc-converter-dropzone.is-dragging{border-color:var(--primary-color,#3ca5dd);background:color-mix(in oklab,var(--primary-color,#3ca5dd) 9%,transparent);transform:translateY(-1px)}.ddc-converter-drop-inner{display:grid;justify-items:center;gap:8px}.ddc-converter-drop-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd);box-shadow:0 10px 24px rgba(0,0,0,.1)}.ddc-converter-drop-icon ha-icon{width:23px}.ddc-converter-drop-inner strong{font-size:15px}.ddc-converter-drop-inner span{max-width:300px;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-file-name{color:var(--primary-color,#3ca5dd)!important;font-weight:750;overflow-wrap:anywhere}
         .ddc-converter-review{min-width:0;display:grid;grid-template-rows:minmax(0,1fr);padding:26px 28px;border-left:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--primary-background-color,#0d151d) 34%,transparent);overflow:auto}.ddc-converter-review-empty{align-self:center;display:grid;justify-items:start;gap:12px;max-width:340px;color:var(--secondary-text-color,#9eacb8)}.ddc-converter-review-empty-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--ddc-import-raised);color:var(--primary-color,#3ca5dd)}.ddc-converter-review-empty h3{margin:0;color:var(--primary-text-color,#e8eef3);font-size:18px}.ddc-converter-review-empty p{margin:0;font-size:13px;line-height:1.55}.ddc-converter-review-ready{display:grid;align-content:start;gap:18px;animation:ddc-import-panel-in .26s cubic-bezier(.22,1,.36,1)}.ddc-converter-review-ready[hidden],.ddc-converter-review-empty[hidden]{display:none}.ddc-converter-review-head{display:grid;gap:6px}.ddc-converter-review-kicker{color:var(--primary-color,#3ca5dd);font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.ddc-converter-review-head h3{margin:0;font-size:21px;letter-spacing:-.02em;line-height:1.2}.ddc-converter-review-head p{margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.5}
+        .ddc-converter-mini-preview{overflow:hidden;border:1px solid var(--ddc-import-line);border-radius:14px;background:color-mix(in oklab,var(--primary-background-color,#0d151d) 72%,transparent);box-shadow:0 12px 30px rgba(0,0,0,.08)}.ddc-converter-mini-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-bottom:1px solid var(--ddc-import-line)}.ddc-converter-mini-title{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:800;letter-spacing:.055em;text-transform:uppercase}.ddc-converter-mini-title ha-icon{width:15px;color:var(--primary-color,#3ca5dd)}.ddc-converter-mini-meta{overflow:hidden;color:var(--secondary-text-color,#9eacb8);font-size:9px;text-overflow:ellipsis;text-transform:capitalize;white-space:nowrap}.ddc-converter-mini-tabs{display:flex;gap:3px;padding:7px 8px 0;overflow-x:auto;scrollbar-width:none}.ddc-converter-mini-tabs::-webkit-scrollbar{display:none}.ddc-converter-mini-tabs:empty{display:none}.ddc-converter-mini-tab{min-width:0;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:0;border-radius:7px 7px 3px 3px;background:transparent;color:var(--secondary-text-color,#9eacb8);font:720 9px/1 inherit;white-space:nowrap;cursor:pointer;transition:background .16s ease,color .16s ease}.ddc-converter-mini-tab:hover{color:var(--primary-text-color,#e8eef3);background:color-mix(in oklab,var(--primary-text-color,#fff) 5%,transparent)}.ddc-converter-mini-tab[aria-selected="true"]{background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3)}.ddc-converter-mini-tab ha-icon{width:12px;height:12px}.ddc-converter-mini-stage{height:190px;display:grid;place-items:center;overflow:hidden;padding:10px;background:linear-gradient(color-mix(in oklab,var(--divider-color,rgba(128,145,160,.25)) 18%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in oklab,var(--divider-color,rgba(128,145,160,.25)) 18%,transparent) 1px,transparent 1px),color-mix(in oklab,var(--primary-background-color,#0d151d) 82%,transparent);background-size:10px 10px}.ddc-converter-mini-canvas{width:100%;height:100%;filter:drop-shadow(0 8px 14px rgba(0,0,0,.16))}.ddc-converter-mini-canvas-bg{fill:color-mix(in oklab,var(--card-background-color,#15202b) 91%,var(--primary-background-color,#0d151d) 9%);stroke:var(--ddc-import-line);stroke-width:1;vector-effect:non-scaling-stroke}.ddc-converter-mini-card{fill:color-mix(in oklab,var(--ddc-import-raised) 94%,transparent);stroke:color-mix(in oklab,var(--primary-text-color,#fff) 16%,transparent);stroke-width:1;vector-effect:non-scaling-stroke}.ddc-converter-mini-card-accent{fill:color-mix(in oklab,var(--primary-color,#3ca5dd) 64%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.light{fill:color-mix(in oklab,var(--warning-color,#d99a28) 72%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.climate{fill:color-mix(in oklab,#5b9bcf 72%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.media{fill:color-mix(in oklab,#8b78b5 66%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.camera{fill:color-mix(in oklab,#648d7d 68%,var(--ddc-import-raised))}.ddc-converter-mini-card-accent.sensor{fill:color-mix(in oklab,#6f9a78 66%,var(--ddc-import-raised))}.ddc-converter-mini-card-title{fill:var(--primary-text-color,#e8eef3);font-weight:750}.ddc-converter-mini-card-type{fill:var(--secondary-text-color,#9eacb8);font-weight:600;text-transform:capitalize}.ddc-converter-mini-more{display:flex;justify-content:center;padding:0 10px 9px;color:var(--secondary-text-color,#9eacb8);font-size:9px}.ddc-converter-mini-more[hidden]{display:none}
         .ddc-converter-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ddc-converter-stat{display:grid;gap:2px;padding:11px;border-radius:11px;background:var(--ddc-import-raised);border:1px solid color-mix(in oklab,var(--ddc-import-line) 75%,transparent)}.ddc-converter-stat strong{font-size:18px;line-height:1.15;letter-spacing:-.02em}.ddc-converter-stat span{color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.045em}.ddc-converter-stat.warning strong{color:var(--warning-color,#d99a28)}
         .ddc-converter-review-label{margin:0 0 8px;color:var(--secondary-text-color,#9eacb8);font-size:10px;font-weight:800;letter-spacing:.065em;text-transform:uppercase}.ddc-converter-view-list,.ddc-converter-warning-list{display:grid;gap:7px}.ddc-converter-view{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border-radius:11px;background:color-mix(in oklab,var(--ddc-import-raised) 82%,transparent);border:1px solid color-mix(in oklab,var(--ddc-import-line) 68%,transparent);font-size:12px}.ddc-converter-view-icon{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:color-mix(in oklab,var(--primary-color,#3ca5dd) 11%,transparent);color:var(--primary-color,#3ca5dd)}.ddc-converter-view-icon ha-icon{width:16px}.ddc-converter-view-copy{min-width:0;display:grid;gap:2px}.ddc-converter-view-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.ddc-converter-view-copy small{color:var(--secondary-text-color,#9eacb8);font-size:10px;text-transform:capitalize}.ddc-converter-view-count{color:var(--secondary-text-color,#9eacb8);font-size:11px;font-weight:700;white-space:nowrap}.ddc-converter-warning{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:10px;background:color-mix(in oklab,var(--warning-color,#d99a28) 10%,transparent);color:var(--primary-text-color,#e8eef3);font-size:11px;line-height:1.45}.ddc-converter-warning ha-icon{width:16px;flex:none;color:var(--warning-color,#d99a28)}
         .ddc-converter-status-wrap{display:grid;gap:7px}.ddc-converter-status{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--secondary-text-color,#9eacb8);font-size:12px;line-height:1.45}.ddc-converter-status ha-icon{width:16px;flex:none;color:var(--primary-color,#3ca5dd)}.ddc-converter-error{margin:0;padding:10px 11px;border-radius:10px;background:color-mix(in oklab,var(--error-color,#d94b55) 10%,transparent);color:var(--error-color,#d94b55);font-size:12px;line-height:1.45}
         .ddc-converter-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 28px;border-top:1px solid var(--ddc-import-line);background:color-mix(in oklab,var(--ddc-import-surface) 96%,transparent)}.ddc-converter-footnote{display:flex;align-items:center;gap:8px;min-width:0;color:var(--secondary-text-color,#9eacb8);font-size:11px}.ddc-converter-footnote ha-icon{width:16px;flex:none;color:var(--success-color,#47a36b)}.ddc-converter-actions{display:flex;align-items:center;gap:9px;flex:none}
         .ddc-converter-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;border:1px solid var(--ddc-import-line);border-radius:11px;background:var(--ddc-import-raised);color:var(--primary-text-color,#e8eef3);font:740 12px/1 inherit;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,opacity .16s ease}.ddc-converter-btn:hover:not(:disabled){transform:translateY(-1px);border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 42%,var(--ddc-import-line))}.ddc-converter-btn.primary{min-width:154px;border-color:color-mix(in oklab,var(--primary-color,#3ca5dd) 72%,transparent);background:var(--primary-color,#2386bd);color:var(--text-primary-color,#f7fbff);box-shadow:0 10px 24px color-mix(in oklab,var(--primary-color,#3ca5dd) 19%,transparent)}.ddc-converter-btn.primary:hover:not(:disabled){background:color-mix(in oklab,var(--primary-color,#2386bd) 88%,var(--primary-text-color,#fff) 12%)}.ddc-converter-btn.ghost{background:transparent}.ddc-converter-btn.icon{width:42px;padding:0}.ddc-converter-btn:disabled{opacity:.45;cursor:not-allowed}.ddc-converter-dialog[aria-busy="true"] .ddc-converter-btn{pointer-events:none}
         @keyframes ddc-import-panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        @media (prefers-reduced-motion:reduce){.ddc-converter-source-panel,.ddc-converter-review-ready{animation:none}.ddc-converter-btn,.ddc-converter-source-tab,.ddc-converter-dropzone{transition:none}}
+        @media (prefers-reduced-motion:reduce){.ddc-converter-source-panel,.ddc-converter-review-ready{animation:none}.ddc-converter-btn,.ddc-converter-source-tab,.ddc-converter-dropzone,.ddc-converter-mini-tab{transition:none}}
         @media (max-width:780px){.ddc-converter-overlay{align-items:end;padding:8px}.ddc-converter-dialog{width:100%;height:min(94vh,860px);border-radius:20px 20px 12px 12px}.ddc-converter-head{padding:19px 18px 16px}.ddc-converter-subtitle{display:none}.ddc-converter-body{display:block;overflow:auto}.ddc-converter-source,.ddc-converter-review{overflow:visible;padding:20px 18px}.ddc-converter-review{border-left:0;border-top:1px solid var(--ddc-import-line)}.ddc-converter-source-tabs{grid-template-columns:1fr}.ddc-converter-source-tab{justify-content:flex-start;padding:0 14px}.ddc-converter-dropzone{min-height:190px}.ddc-converter-foot{align-items:stretch;padding:13px 18px}.ddc-converter-footnote{display:none}.ddc-converter-actions{width:100%}.ddc-converter-actions .ddc-converter-btn{flex:1}.ddc-converter-actions .ddc-converter-btn.ghost{flex:0 0 auto}}
       </style>
     `;
@@ -1994,6 +2071,15 @@ const converterMethods = {
                 <h3 data-review-title>Imported dashboard</h3>
                 <p data-review-copy>Each Lovelace view becomes a Drag &amp; Drop tab.</p>
               </div>
+              <div class="ddc-converter-mini-preview" data-dashboard-preview>
+                <div class="ddc-converter-mini-head">
+                  <span class="ddc-converter-mini-title"><ha-icon icon="mdi:monitor-dashboard"></ha-icon><span>Layout preview</span></span>
+                  <span class="ddc-converter-mini-meta" data-preview-meta></span>
+                </div>
+                <div class="ddc-converter-mini-tabs" data-preview-tabs role="tablist" aria-label="Preview dashboard tab"></div>
+                <div class="ddc-converter-mini-stage" data-preview-stage></div>
+                <div class="ddc-converter-mini-more" data-preview-more hidden></div>
+              </div>
               <div class="ddc-converter-stats" data-preview>
                 <div class="ddc-converter-stat"><strong>0</strong><span>Tabs</span></div>
                 <div class="ddc-converter-stat"><strong>0</strong><span>Cards</span></div>
@@ -2049,6 +2135,10 @@ const converterMethods = {
     const reviewReadyEl = overlay.querySelector('[data-review-ready]');
     const reviewTitleEl = overlay.querySelector('[data-review-title]');
     const reviewCopyEl = overlay.querySelector('[data-review-copy]');
+    const previewTabsEl = overlay.querySelector('[data-preview-tabs]');
+    const previewStageEl = overlay.querySelector('[data-preview-stage]');
+    const previewMetaEl = overlay.querySelector('[data-preview-meta]');
+    const previewMoreEl = overlay.querySelector('[data-preview-more]');
     const reviewBtn = overlay.querySelector('[data-action="review"]');
     const convertBtn = overlay.querySelector('[data-action="convert"]');
 
@@ -2109,6 +2199,13 @@ const converterMethods = {
     const resetReview = () => {
       if (reviewEmptyEl) reviewEmptyEl.hidden = false;
       if (reviewReadyEl) reviewReadyEl.hidden = true;
+      previewTabsEl?.replaceChildren?.();
+      previewStageEl?.replaceChildren?.();
+      if (previewMetaEl) previewMetaEl.textContent = '';
+      if (previewMoreEl) {
+        previewMoreEl.hidden = true;
+        previewMoreEl.textContent = '';
+      }
       viewListEl?.replaceChildren?.();
       warningListEl?.replaceChildren?.();
       if (warningSectionEl) warningSectionEl.hidden = true;
@@ -2125,6 +2222,136 @@ const converterMethods = {
       overlay.querySelectorAll('button,select,textarea').forEach((control) => { control.disabled = busy; });
       updateActions();
     };
+    const renderDashboardPreview = (converted = null, requestedTabId = '') => {
+      if (!converted || !previewTabsEl || !previewStageEl) return;
+      const model = this._dashboardConverterPreviewModel_(converted, requestedTabId);
+      previewTabsEl.replaceChildren();
+      model.tabs.forEach((tab) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ddc-converter-mini-tab';
+        button.dataset.previewTabId = tab.id;
+        button.setAttribute('role', 'tab');
+        button.setAttribute('aria-selected', String(tab.id === model.activeTabId));
+        button.tabIndex = tab.id === model.activeTabId ? 0 : -1;
+        button.disabled = dialog?.getAttribute?.('aria-busy') === 'true';
+        button.title = `Preview ${tab.label}`;
+        if (tab.icon) {
+          const icon = document.createElement('ha-icon');
+          icon.setAttribute('icon', tab.icon);
+          button.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = tab.label;
+        button.appendChild(label);
+        const selectTab = (tabId) => {
+          renderDashboardPreview(converted, tabId);
+          requestAnimationFrame(() => {
+            Array.from(previewTabsEl.querySelectorAll('[data-preview-tab-id]'))
+              .find((candidate) => candidate.dataset.previewTabId === tabId)
+              ?.focus?.();
+          });
+        };
+        button.addEventListener('click', () => selectTab(tab.id));
+        button.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || model.tabs.length < 2) return;
+          event.preventDefault();
+          const currentIndex = model.tabs.findIndex((candidate) => candidate.id === tab.id);
+          const delta = event.key === 'ArrowRight' ? 1 : -1;
+          const nextTab = model.tabs[(currentIndex + delta + model.tabs.length) % model.tabs.length];
+          if (nextTab) selectTab(nextTab.id);
+        });
+        previewTabsEl.appendChild(button);
+      });
+
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      const createSvgElement = (name, attributes = {}) => {
+        const element = document.createElementNS(svgNamespace, name);
+        Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
+        return element;
+      };
+      const svg = createSvgElement('svg', {
+        class: 'ddc-converter-mini-canvas',
+        viewBox: `0 0 ${model.canvasWidth} ${model.canvasHeight}`,
+        preserveAspectRatio: 'xMidYMid meet',
+        role: 'img',
+        'aria-label': `Preview of ${model.tabs.find((tab) => tab.id === model.activeTabId)?.label || 'dashboard'} layout`,
+      });
+      svg.appendChild(createSvgElement('rect', {
+        class: 'ddc-converter-mini-canvas-bg',
+        x: 0,
+        y: 0,
+        width: model.canvasWidth,
+        height: model.canvasHeight,
+        rx: Math.max(18, Math.min(model.canvasWidth, model.canvasHeight) * 0.025),
+      }));
+      model.entries.forEach((entry) => {
+        const group = createSvgElement('g');
+        const title = createSvgElement('title');
+        title.textContent = `${entry.label} · ${entry.type}`;
+        group.appendChild(title);
+        const radius = Math.max(10, Math.min(28, Math.min(entry.width, entry.height) * 0.08));
+        group.appendChild(createSvgElement('rect', {
+          class: 'ddc-converter-mini-card',
+          x: entry.x,
+          y: entry.y,
+          width: entry.width,
+          height: entry.height,
+          rx: radius,
+        }));
+        const accentWidth = Math.max(8, Math.min(18, entry.width * 0.035));
+        group.appendChild(createSvgElement('rect', {
+          class: `ddc-converter-mini-card-accent ${entry.category}`,
+          x: entry.x,
+          y: entry.y,
+          width: accentWidth,
+          height: entry.height,
+          rx: Math.min(radius, accentWidth / 2),
+        }));
+        if (entry.width >= 150 && entry.height >= 62) {
+          const padding = Math.max(18, Math.min(34, Math.min(entry.width, entry.height) * 0.12));
+          const fontSize = Math.max(26, Math.min(46, entry.width * 0.085));
+          const maxChars = Math.max(5, Math.floor((entry.width - padding * 2) / (fontSize * 0.58)));
+          const shortLabel = entry.label.length > maxChars ? `${entry.label.slice(0, Math.max(1, maxChars - 1))}…` : entry.label;
+          const label = createSvgElement('text', {
+            class: 'ddc-converter-mini-card-title',
+            x: entry.x + padding,
+            y: entry.y + padding + fontSize * 0.72,
+            'font-size': fontSize,
+          });
+          label.textContent = shortLabel;
+          group.appendChild(label);
+          if (entry.height >= fontSize * 2.6) {
+            const detail = createSvgElement('text', {
+              class: 'ddc-converter-mini-card-type',
+              x: entry.x + padding,
+              y: entry.y + padding + fontSize * 1.75,
+              'font-size': Math.max(20, fontSize * 0.68),
+            });
+            detail.textContent = entry.type;
+            group.appendChild(detail);
+          }
+        }
+        svg.appendChild(group);
+      });
+      if (!model.entries.length) {
+        const empty = createSvgElement('text', {
+          class: 'ddc-converter-mini-card-type',
+          x: model.canvasWidth / 2,
+          y: model.canvasHeight / 2,
+          'font-size': Math.max(28, model.canvasWidth * 0.025),
+          'text-anchor': 'middle',
+        });
+        empty.textContent = 'This tab has no cards';
+        svg.appendChild(empty);
+      }
+      previewStageEl.replaceChildren(svg);
+      if (previewMetaEl) previewMetaEl.textContent = `${model.layoutLabel} · ${Math.round(model.canvasWidth)} × ${Math.round(model.canvasHeight)}`;
+      if (previewMoreEl) {
+        previewMoreEl.hidden = model.hiddenCardCount <= 0;
+        previewMoreEl.textContent = model.hiddenCardCount > 0 ? `+ ${model.hiddenCardCount} more cards in this tab` : '';
+      }
+    };
     const renderPreview = (converted = null) => {
       if (!previewEl || !converted) return;
       const stats = converted.summary || {};
@@ -2138,6 +2365,7 @@ const converterMethods = {
           ? `Views become tabs. ${customTypes} custom card type${customTypes === 1 ? '' : 's'} will be preserved as installed.`
           : 'Each Lovelace view becomes a tab with responsive, draggable card placement.';
       }
+      renderDashboardPreview(converted);
       viewListEl?.replaceChildren?.();
       (Array.isArray(stats.view_details) ? stats.view_details : []).forEach((view) => {
         const row = document.createElement('div');
@@ -2275,7 +2503,7 @@ const converterMethods = {
       }
       if (ev.key === 'Tab') {
         const focusable = Array.from(overlay.querySelectorAll('button:not([disabled]):not([hidden]),select:not([disabled]),textarea:not([disabled])'))
-          .filter((element) => !element.closest('[hidden]'));
+          .filter((element) => !element.closest('[hidden]') && element.tabIndex >= 0);
         if (!focusable.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];

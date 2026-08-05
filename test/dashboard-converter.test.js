@@ -122,6 +122,45 @@ test('dashboard converter turns Lovelace views into DDC tabs and responsive card
   assert.equal(converted.cards.find((entry) => entry.card.type === 'horizontal-stack')?.card.cards.length, 2);
 });
 
+test('dashboard converter builds a tab-aware thumbnail model from the actual packed layout', () => {
+  const harness = new DashboardConverterHarness();
+  const converted = harness._convertLovelaceDashboardToDdc_({
+    title: 'Wall panel',
+    views: [
+      {
+        title: 'Home',
+        path: 'home',
+        cards: [
+          { type: 'entities', title: 'Kitchen lights', entities: ['light.kitchen'] },
+          { type: 'tile', entity: 'light.table_lamp' },
+        ],
+      },
+      {
+        title: 'Climate',
+        path: 'climate',
+        cards: [{ type: 'thermostat', entity: 'climate.living_room' }],
+      },
+    ],
+  });
+
+  const homePreview = harness._dashboardConverterPreviewModel_(converted);
+  const climatePreview = harness._dashboardConverterPreviewModel_(converted, 'climate');
+
+  assert.deepEqual(homePreview.tabs.map(({ id, label }) => ({ id, label })), [
+    { id: 'home', label: 'Home' },
+    { id: 'climate', label: 'Climate' },
+  ]);
+  assert.equal(homePreview.activeTabId, 'home');
+  assert.equal(homePreview.entries.length, 2);
+  assert.equal(homePreview.entries[0].label, 'Kitchen lights');
+  assert.equal(homePreview.entries[1].category, 'light');
+  assert.equal(climatePreview.activeTabId, 'climate');
+  assert.equal(climatePreview.entries.length, 1);
+  assert.equal(climatePreview.entries[0].category, 'climate');
+  assert.ok(homePreview.canvasWidth >= Math.max(...homePreview.entries.map((entry) => entry.x + entry.width)));
+  assert.ok(homePreview.canvasHeight >= Math.max(...homePreview.entries.map((entry) => entry.y + entry.height)));
+});
+
 test('dashboard converter skips an existing Drag & Drop card to avoid recursive imports', () => {
   const harness = new DashboardConverterHarness();
   const converted = harness._convertLovelaceDashboardToDdc_({
