@@ -36,6 +36,16 @@ test('backend snapshot is authoritative even when the local browser timestamp is
   assert.equal(selected.snapshot.cards[0].x, 0);
 });
 
+test('a marked full-dashboard replacement stays authoritative until it reaches the backend', () => {
+  const backend = snapshot({ desktopX: 0, updatedAt: '2026-08-01T10:00:00.000Z' });
+  const imported = snapshot({ desktopX: 900, updatedAt: '2026-08-02T10:00:00.000Z' });
+
+  const selected = selectInitialLayoutSnapshot(backend, imported, { preferLocal: true });
+
+  assert.equal(selected.source, 'local-replacement');
+  assert.equal(selected.snapshot.cards[0].x, 900);
+});
+
 test('three-way merge preserves tablet geometry while accepting PC config and option changes', () => {
   const base = snapshot({ updatedAt: '2026-08-01T10:00:00.000Z' });
   const localTablet = snapshot({ tabletX: 60, updatedAt: '2026-08-01T10:02:00.000Z' });

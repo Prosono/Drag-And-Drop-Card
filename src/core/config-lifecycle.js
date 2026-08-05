@@ -26,6 +26,7 @@ export function resolveConfiguredActiveTab({
 const setConfigMethods = {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+      try { this.__lastSetConfigSource = this._cloneJson_?.(config) || JSON.parse(JSON.stringify(config)); } catch {}
       const inHaConfigPreview = this._isInHaEditorPreview?.();
       if (this.__haConfigPreviewMode && !inHaConfigPreview) {
         this.__haConfigPreviewMode = false;
@@ -88,7 +89,6 @@ const setConfigMethods = {
       this.hideHaSidebar           = !!(config.hide_HA_Sidebar ?? config.hide_ha_sidebar ?? false);
           this.debug                    = !!config.debug;
       this.editMode                 = false;
-      this._backendOK               = false;
       this.disableOverlap           = !!config.disable_overlap;
       this.containerSizeMode        = this._normalizeContainerSizeMode_(config.container_size_mode);
       this.doNotResizeText          = !!(config.do_not_resize_text ?? config.doNotResizeText ?? false);

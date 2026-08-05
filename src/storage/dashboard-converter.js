@@ -1582,17 +1582,71 @@ const converterMethods = {
     return changed;
   },
 
+  _createDashboardConverterSnapshot_(payload = {}) {
+    const primaryKey = this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const layouts = this._normalizeResponsiveLayouts_(
+      payload.cards || [],
+      this._responsiveLayouts || payload.responsive_layouts || null
+    );
+    const primaryCards = layouts?.[primaryKey] || payload.cards || [];
+    const options = {
+      ...(payload.options || {}),
+      ...(this._exportableOptions?.() || {}),
+      tabs: this._cloneJson_?.(this.tabs || payload.options?.tabs || []) || [],
+      default_tab: this.defaultTab || payload.options?.default_tab || this.tabs?.[0]?.id || 'default',
+      storage_key: this.storageKey || this._config?.storage_key || payload.options?.storage_key || undefined,
+    };
+    Object.keys(options).forEach((key) => options[key] === undefined && delete options[key]);
+    return this._normalizeDashboardPayload_?.({
+      version: 3,
+      updated_at: new Date().toISOString(),
+      options,
+      cards: this._cloneJson_?.(primaryCards) || primaryCards,
+      responsive_layouts: this._cloneJson_?.(
+        this._serializeResponsiveLayouts_(layouts, primaryCards)
+      ) || payload.responsive_layouts,
+      packages: this._exportDashboardPackages_?.() || [],
+    });
+  },
+
+  async _persistDashboardConverterSnapshot_(snapshot = {}) {
+    const normalized = this._normalizeDashboardPayload_?.(snapshot) || snapshot;
+    if (!Array.isArray(normalized?.cards) || !normalized.cards.length) {
+      throw new Error('Refusing to persist an empty converted dashboard snapshot.');
+    }
+    try { this._writeRuntimeLayoutCache_?.(normalized); } catch {}
+    try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(normalized)); } catch {}
+
+    let backend = 'local';
+    if (this.storageKey && this._backendOK) {
+      try {
+        await this._saveLayoutToBackend(this.storageKey, normalized);
+        this._clearPendingDashboardReplacement_?.();
+        this.__lastSyncedDashboardPayload = this._cloneJson_?.(normalized) || normalized;
+        backend = 'saved';
+      } catch (err) {
+        this._markPendingDashboardReplacement_?.();
+        backend = 'pending';
+        console.warn('[drag-and-drop-card] Converted dashboard backend commit is pending', err);
+      }
+    } else if (this.storageKey) {
+      this._markPendingDashboardReplacement_?.();
+      backend = 'pending';
+    }
+    return { snapshot: normalized, backend };
+  },
+
   async _persistDashboardConverterConfig_() {
+    let persisted = false;
     try {
-      this._dispatchDashboardConverterConfigChanged_?.();
-    } catch {}
-    try {
-      await this._persistThisCardConfigToStorage_?.();
-      return true;
+      persisted = (await this._persistThisCardConfigToStorage_?.()) === true;
     } catch (err) {
       console.warn('[drag-and-drop-card] Could not persist converted dashboard config to Lovelace storage', err);
-      return false;
     }
+    // Notify Home Assistant only after the direct storage transaction. Emitting
+    // this first can synchronously re-run setConfig halfway through the import.
+    try { this._dispatchDashboardConverterConfigChanged_?.(); } catch {}
+    return persisted;
   },
 
   _convertLovelaceDashboardToDdc_(sourceConfig = {}) {
@@ -1631,6 +1685,15 @@ const converterMethods = {
       default_tab: tabs[0]?.id || 'imported',
       hide_tabs_when_single: tabs.length <= 1,
       tabs_position: this._normalizeTabsPosition_?.(this.tabsPosition || 'top') || 'top',
+      layers_enabled: false,
+      layers: [],
+      connectors: [],
+      responsive_connectors: {},
+      sidebar_enabled: false,
+      sidebar_cards: [],
+      background_mode: 'none',
+      container_background: 'transparent',
+      apply_background_to_page: false,
       container_size_mode: this._normalizeContainerSizeMode_?.(this.containerSizeMode || this._config?.container_size_mode || 'preset') || 'preset',
       container_preset: this.containerPreset || this._config?.container_preset || 'fhd',
       container_preset_orientation: this.containerPresetOrient || this._config?.container_preset_orientation || 'auto',
@@ -1734,6 +1797,8 @@ const converterMethods = {
       activeTab: this.activeTab,
       activeResponsiveLayoutKey: this._activeResponsiveLayoutKey,
       activeResponsiveProfile: this._activeResponsiveProfile,
+      packages: clone(this._dashboardPackages || []),
+      activeLayerIds: clone(this.activeLayerIds || []),
     };
   },
 
@@ -1749,6 +1814,8 @@ const converterMethods = {
     this._responsiveConnectors = clone(snapshot.responsiveConnectors || {});
     this._activeResponsiveLayoutKey = snapshot.activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
     this._activeResponsiveProfile = snapshot.activeResponsiveProfile || 'desktop';
+    this._setDashboardPackages_?.(snapshot.packages || []);
+    this.activeLayerIds = clone(snapshot.activeLayerIds || []);
     const previousSuppressResponsiveRebuild = !!this.__suppressResponsiveRebuild;
     this.__suppressResponsiveRebuild = true;
     try { this._applyImportedOptions?.(this._config, true); } finally { this.__suppressResponsiveRebuild = previousSuppressResponsiveRebuild; }
@@ -1781,10 +1848,13 @@ const converterMethods = {
     try {
 
     this._hideEmptyPlaceholder?.();
-    this.cardContainer?.querySelectorAll?.('.card-wrapper:not(.ddc-placeholder)')?.forEach((node) => node.remove());
     this._responsiveConnectors = this._normalizeResponsiveConnectorLayouts_?.([], null) || {};
     this._selectedConnectorId = null;
     this._connectorDraft = null;
+    this._setDashboardPackages_?.([]);
+    this.activeLayerIds = [];
+    this._setDashboardLayers_?.([], { refresh: false, persist: false });
+    this.sidebarCards = [];
 
     const options = payload.options || {};
     this._applyDashboardConverterTabs_?.(options);
@@ -1797,6 +1867,7 @@ const converterMethods = {
     }
     this._applyDashboardConverterTabs_?.(options);
     this.activeTab = this.defaultTab;
+    try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, this.activeTab); } catch {}
     this._responsiveLayouts = this._normalizeResponsiveLayouts_(cards, payload.responsive_layouts || null);
     const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || cards;
     this._config = {
@@ -1814,14 +1885,14 @@ const converterMethods = {
         this._applyAutoScale?.();
       } catch {}
     }
-    const previousSuppressResponsiveMemoryPersist = !!this.__suppressResponsiveMemoryPersist;
-    this.__suppressResponsiveMemoryPersist = true;
-    try {
-      await this._syncResponsiveProfileForViewport_?.({ force: true });
-    } finally {
-      this.__suppressResponsiveMemoryPersist = previousSuppressResponsiveMemoryPersist;
-    }
-    const activeLayoutKey = this._activeResponsiveLayoutKey || this._getPrimaryResponsiveLayoutKey_?.() || 'desktop_landscape';
+    const targetProfile = this._getRequestedResponsiveProfile_?.() || 'desktop';
+    const targetOrientation = this._getRequestedResponsiveOrientation_?.(targetProfile) || 'landscape';
+    const activeLayoutKey = this._getRuntimeResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+      || this._getResponsiveLayoutKey_?.(targetProfile, targetOrientation)
+      || this._getPrimaryResponsiveLayoutKey_?.()
+      || 'desktop_landscape';
+    this._activeResponsiveProfile = targetProfile;
+    this._activeResponsiveLayoutKey = activeLayoutKey;
     const activeEntries = this._responsiveLayouts?.[activeLayoutKey] || primaryCards;
     if (activeEntries.length) {
       await this._buildCardsFromEntries_?.(activeEntries, 0, { replaceExisting: true });
@@ -1835,15 +1906,31 @@ const converterMethods = {
     try { this._renderConnectors_?.(); } catch {}
     try { this._syncEmptyStateUI?.(); } catch {}
     this._restoreDashboardConverterTabAssignments_?.(payload);
+    const committedSnapshot = this._createDashboardConverterSnapshot_?.(payload);
+    const committedPrimary = committedSnapshot?.cards || primaryCards;
+    this._responsiveLayouts = this._normalizeResponsiveLayouts_(
+      committedPrimary,
+      committedSnapshot?.responsive_layouts || null
+    );
+    this._config = {
+      ...(this._config || {}),
+      ...(committedSnapshot?.options || options),
+      cards: this._cloneJson_?.(committedPrimary) || committedPrimary,
+      responsive_layouts: this._cloneJson_?.(committedSnapshot?.responsive_layouts) || payload.responsive_layouts,
+    };
+    this.config = { ...(this.config || {}), ...(this._config || {}) };
     const previousSaveSuppressResponsiveMemoryPersist = !!this.__suppressResponsiveMemoryPersist;
     this.__suppressResponsiveMemoryPersist = true;
     try {
-      try { await this._saveLayout?.(true); } catch { this._queueSave?.('dashboard-converter'); }
+      const commit = await this._persistDashboardConverterSnapshot_?.(committedSnapshot);
+      payload.summary.persisted_to_backend = commit?.backend || 'local';
       payload.summary.persisted_to_lovelace = await this._persistDashboardConverterConfig_?.();
     } finally {
       this.__suppressResponsiveMemoryPersist = previousSaveSuppressResponsiveMemoryPersist;
     }
-    const persistenceNote = payload.summary?.persisted_to_lovelace === false ? ' The layout is active, but Home Assistant could not persist the card config automatically.' : '';
+    const persistenceNote = payload.summary?.persisted_to_lovelace === false
+      ? ' The layout is safe locally and will sync to the backend, but Home Assistant could not persist the card config automatically.'
+      : '';
     this._toast?.(`Converted ${payload.summary?.cards || cards.length} cards across ${payload.summary?.views || options.tabs?.length || 1} tabs.${persistenceNote}`);
     return true;
     } catch (err) {

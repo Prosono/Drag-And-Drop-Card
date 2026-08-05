@@ -5,7 +5,10 @@
  * then builds the active responsive layout and refreshes post-load UI state.
  */
 
-export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot) {
+export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot, { preferLocal = false } = {}) {
+  if (preferLocal && localSnapshot && typeof localSnapshot === 'object') {
+    return { source: 'local-replacement', snapshot: localSnapshot };
+  }
   if (backendSnapshot && typeof backendSnapshot === 'object') {
     return { source: 'backend', snapshot: backendSnapshot };
   }
@@ -221,8 +224,33 @@ const initialLoadMethods = {
         let syncedWithBackend = false;
         let authoritativeBackendSnapshot = null;
 
-        // Try backend first if available
-        if (this._backendOK && this.storageKey) {
+        if (this.storageKey) {
+          local = this._readLocalLayoutSnapshot_?.();
+        }
+        const preferLocalReplacement = !!(
+          local
+          && this.storageKey
+          && this._hasPendingDashboardReplacement_?.()
+        );
+
+        // A converted dashboard is a deliberate full replacement. If it was
+        // imported before the backend probe completed, the marked local copy
+        // must be uploaded before an older backend snapshot is allowed to win.
+        if (preferLocalReplacement) {
+          saved = local;
+          this._dbgPush('boot', 'Using pending imported dashboard snapshot');
+          if (this._backendOK) {
+            try {
+              await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
+              this._clearPendingDashboardReplacement_?.();
+              authoritativeBackendSnapshot = this._cloneJson_?.(local) || local;
+              syncedWithBackend = true;
+              this._dbgPush('boot', 'Committed pending imported dashboard to backend');
+            } catch (e) {
+              this._dbgPush('boot', 'Pending dashboard commit failed; keeping local replacement', { error: String(e) });
+            }
+          }
+        } else if (this._backendOK && this.storageKey) {
           try {
             saved = await this._loadLayoutFromBackend(this.storageKey);
             syncedWithBackend = !!(saved && typeof saved === 'object');
@@ -231,15 +259,15 @@ const initialLoadMethods = {
           }
         }
 
-        if (this.storageKey) {
-          local = this._readLocalLayoutSnapshot_?.();
-        }
-
-        const selectedInitialSnapshot = selectInitialLayoutSnapshot(saved, local);
+        const selectedInitialSnapshot = selectInitialLayoutSnapshot(saved, local, {
+          preferLocal: preferLocalReplacement,
+        });
         if (selectedInitialSnapshot.source === 'backend') {
           saved = selectedInitialSnapshot.snapshot;
           authoritativeBackendSnapshot = this._cloneJson_?.(saved) || saved;
           syncedWithBackend = true;
+        } else if (selectedInitialSnapshot.source === 'local-replacement') {
+          saved = selectedInitialSnapshot.snapshot;
         }
 
         // The shared backend is authoritative whenever it is reachable. A browser-local
@@ -261,6 +289,7 @@ const initialLoadMethods = {
             if (this._backendOK) {
               try {
                 await this._saveLayoutToBackend(this.storageKey, this._normalizeDashboardPayload_(local));
+                this._clearPendingDashboardReplacement_?.();
                 this._dbgPush('boot', 'Migrated local -> backend');
                 saved = local;
                 syncedWithBackend = true;

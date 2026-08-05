@@ -7,6 +7,73 @@
 
 const DDC_MERGE_MISSING = Symbol('ddc-merge-missing');
 
+function ddcStorageKeyFromCard(card = {}) {
+  return String(
+    card?.storage_key
+    ?? card?.storageKey
+    ?? card?.options?.storage_key
+    ?? card?.options?.storageKey
+    ?? ''
+  ).trim();
+}
+
+export function collectDdcCardStorageLocations(lovelaceConfig = {}) {
+  const locations = [];
+  const views = Array.isArray(lovelaceConfig?.views) ? lovelaceConfig.views : [];
+  const visit = (value, viewIndex, path = [], seen = new Set()) => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    if (String(value.type || '').toLowerCase() === 'custom:drag-and-drop-card') {
+      locations.push({ viewIndex, path: [...path], card: value });
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => visit(child, viewIndex, path.concat(index), seen));
+      return;
+    }
+    Object.entries(value).forEach(([key, child]) => {
+      if (child && typeof child === 'object') visit(child, viewIndex, path.concat(key), seen);
+    });
+  };
+  views.forEach((view, viewIndex) => visit(view, viewIndex, ['views', viewIndex]));
+  return locations;
+}
+
+export function resolveDdcCardStorageLocation(lovelaceConfig = {}, {
+  id = '',
+  storageKey = '',
+  currentView = null,
+  sourceConfig = null,
+} = {}) {
+  const locations = collectDdcCardStorageLocations(lovelaceConfig);
+  const wantedId = String(id || '').trim();
+  const wantedStorageKey = String(storageKey || '').trim();
+  const chooseUnique = (candidates) => candidates.length === 1 ? candidates[0] : null;
+
+  if (wantedId) {
+    const exactId = locations.filter((location) => String(location.card?.id || '').trim() === wantedId);
+    const match = chooseUnique(exactId);
+    if (match) return match;
+  }
+  if (wantedStorageKey) {
+    const exactKey = locations.filter((location) => ddcStorageKeyFromCard(location.card) === wantedStorageKey);
+    const match = chooseUnique(exactKey);
+    if (match) return match;
+  }
+  if (sourceConfig && typeof sourceConfig === 'object') {
+    const exactConfig = locations.filter((location) => dashboardValuesEqual(location.card, sourceConfig));
+    const match = chooseUnique(exactConfig);
+    if (match) return match;
+  }
+  const viewIndex = Number(currentView);
+  if (Number.isInteger(viewIndex) && viewIndex >= 0) {
+    const inCurrentView = locations.filter((location) => location.viewIndex === viewIndex);
+    const match = chooseUnique(inCurrentView);
+    if (match) return match;
+  }
+  return chooseUnique(locations);
+}
+
 function isPlainDashboardObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
@@ -122,6 +189,22 @@ export function mergeDashboardSnapshots(base, local, remote, updatedAt = new Dat
 }
 
 const persistenceMethods = {
+  _pendingDashboardReplacementKey_() {
+    return `ddc_pending_replace_${this.storageKey || 'default'}`;
+  },
+
+  _hasPendingDashboardReplacement_() {
+    try { return localStorage.getItem(this._pendingDashboardReplacementKey_()) === '1'; } catch { return false; }
+  },
+
+  _markPendingDashboardReplacement_() {
+    try { localStorage.setItem(this._pendingDashboardReplacementKey_(), '1'); } catch {}
+  },
+
+  _clearPendingDashboardReplacement_() {
+    try { localStorage.removeItem(this._pendingDashboardReplacementKey_()); } catch {}
+  },
+
   // ---------------- Dashboard URL helpers ----------------
   _getCurrentDashboardUrlPath_() {
     // e.g. "/", "/lovelace/0", "/myboard/0", "/lovelace-myboard/0"
@@ -150,32 +233,27 @@ const persistenceMethods = {
     if (this.config?.id) return this.config.id;
 
     const id = (crypto?.randomUUID ? crypto.randomUUID() : ("ddc_" + Math.random().toString(36).slice(2)));
-    this.config = { ...this.config, id }; // in-memory immediately
-
-    try {
-      const url_path = this._getCurrentDashboardUrlPath_();
-      const ll = await this.hass.callWS(url_path ? { type: "lovelace/config", url_path } : { type: "lovelace/config" });
-
-      const hit = this._findThisCardPathRecursive_(ll, (c) =>
-        c?.type === "custom:drag-and-drop-card" && (!c.id || c.id === id)
-      );
-      if (!hit) return id;
-
-      const { viewIndex, cardIndex, parentPath } = hit;
-      const view = ll.views[viewIndex];
-      const curr = this._getCardByPath_(view, parentPath, cardIndex);
-      const updated = { ...curr, id };
-      this._setCardByPath_(view, parentPath, cardIndex, updated);
-
-      // SAVE with url_path when present
-      await this.hass.callWS(
-        url_path
-          ? { type: "lovelace/config/save", url_path, config: ll }
-          : { type: "lovelace/config/save", config: ll }
-      );
-    } catch (_) {
-      // YAML dashboards or permission issues: ignore; we still keep the in-memory id
+    const url_path = this._getCurrentDashboardUrlPath_();
+    const ll = await this.hass.callWS(url_path ? { type: "lovelace/config", url_path } : { type: "lovelace/config" });
+    let currentView = null;
+    try { currentView = this._getLovelace?.()?.current_view; } catch {}
+    const hit = resolveDdcCardStorageLocation(ll, {
+      storageKey: this.storageKey || this._config?.storage_key,
+      currentView,
+      sourceConfig: this.__lastSetConfigSource,
+    });
+    if (!hit) {
+      throw new Error('Could not uniquely identify this Drag & Drop card in Lovelace storage');
     }
+    const curr = this._getValueAtStoragePath_(ll, hit.path);
+    this._setValueAtStoragePath_(ll, hit.path, { ...curr, id });
+    await this.hass.callWS(
+      url_path
+        ? { type: "lovelace/config/save", url_path, config: ll }
+        : { type: "lovelace/config/save", config: ll }
+    );
+    this.config = { ...(this.config || {}), id };
+    this._config = { ...(this._config || {}), id };
     return id;
   },
 
@@ -207,18 +285,20 @@ const persistenceMethods = {
     const ll = await this.hass.callWS(url_path ? { type: "lovelace/config", url_path } : { type: "lovelace/config" });
 
     // FIND our card by type + id (supports nesting)
-    const hit = this._findThisCardPathRecursive_(ll, (c) =>
-      c?.type === "custom:drag-and-drop-card" && c?.id === this.config?.id
-    );
+    let currentView = null;
+    try { currentView = this._getLovelace?.()?.current_view; } catch {}
+    const hit = resolveDdcCardStorageLocation(ll, {
+      id: this.config?.id,
+      storageKey: this.storageKey || this._config?.storage_key,
+      currentView,
+      sourceConfig: this.__lastSetConfigSource,
+    });
     if (!hit) throw new Error("Card not found in Lovelace config");
 
-    const { viewIndex, cardIndex, parentPath } = hit;
-    const view = ll.views[viewIndex];
-
     // MERGE + WRITE
-    const currentCard = this._getCardByPath_(view, parentPath, cardIndex);
+    const currentCard = this._getValueAtStoragePath_(ll, hit.path);
     const merged = { ...currentCard, ...partial };
-    this._setCardByPath_(view, parentPath, cardIndex, merged);
+    this._setValueAtStoragePath_(ll, hit.path, merged);
 
     // SAVE (respect url_path)
     await this.hass.callWS(
@@ -230,6 +310,22 @@ const persistenceMethods = {
     // Apply locally
     this.config = merged;
     this.requestUpdate?.();
+    return true;
+  },
+
+  _getValueAtStoragePath_(root, path = []) {
+    return (path || []).reduce((value, segment) => value?.[segment], root);
+  },
+
+  _setValueAtStoragePath_(root, path = [], value) {
+    if (!root || !Array.isArray(path) || !path.length) return false;
+    let parent = root;
+    for (let index = 0; index < path.length - 1; index += 1) {
+      parent = parent?.[path[index]];
+      if (!parent) return false;
+    }
+    parent[path[path.length - 1]] = value;
+    return true;
   },
 
   // ---- Tree helpers (unchanged) ----
@@ -504,6 +600,7 @@ const persistenceMethods = {
 
     try {
       await this._saveLayoutToBackend(this.storageKey, payload);
+      this._clearPendingDashboardReplacement_?.();
       this.__lastSyncedDashboardPayload = this._cloneJson_(payload);
       if (!silent) {
         try { await this._persistThisCardConfigToStorage_?.(); } catch (persistErr) {
@@ -654,6 +751,7 @@ const persistenceMethods = {
       );
       try { localStorage.setItem(`ddc_local_${key || 'default'}`, JSON.stringify(merged)); } catch {}
       await this._saveLayoutToBackend(key, merged);
+      this._clearPendingDashboardReplacement_?.();
       this.__lastSyncedDashboardPayload = this._cloneJson_(merged);
       return true;
     } catch (e) {
