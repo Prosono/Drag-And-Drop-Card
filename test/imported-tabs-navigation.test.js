@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installTabsLayoutMethods } from '../src/layout/tabs.js';
+import { resolveConfiguredActiveTab } from '../src/core/config-lifecycle.js';
 
 class ImportedTabsHarness {
   constructor() {
@@ -42,4 +43,59 @@ test('tab switching restores imported card membership from the active responsive
   assert.equal(changed, 1);
   assert.equal(harness.wrappers[0].dataset.tabId, 'home');
   assert.equal(harness.wrappers[1].dataset.tabId, 'climate');
+});
+
+test('the latest rapid tab switch wins when an older destination hydrates later', async () => {
+  const harness = new ImportedTabsHarness();
+  const pending = new Map();
+  harness._applyActiveTab = ({ transitionSeq }) => new Promise((resolve) => pending.set(transitionSeq, resolve));
+  harness._renderTabs = () => {};
+  harness._applyVisibility_ = () => {};
+  harness._syncEmptyStateUI = () => {};
+
+  const climateSwitch = harness._switchActiveTab_('climate');
+  assert.equal(harness.activeTab, 'climate');
+  assert.equal(harness.__tabTransitionTarget, 'climate');
+
+  const homeSwitch = harness._switchActiveTab_('home');
+  assert.equal(harness.activeTab, 'home');
+  assert.equal(harness.__tabTransitionTarget, 'home');
+  assert.equal(harness.__tabTransitionActive, true);
+
+  pending.get(1)?.();
+  await climateSwitch;
+  assert.equal(harness.activeTab, 'home');
+  assert.equal(harness.__tabTransitionTarget, 'home');
+  assert.equal(harness.__tabTransitionActive, true);
+
+  pending.get(2)?.();
+  assert.equal(await homeSwitch, true);
+  assert.equal(harness.activeTab, 'home');
+  assert.equal(harness.__tabTransitionTarget, null);
+  assert.equal(harness.__tabTransitionActive, false);
+});
+
+test('same-dashboard config refresh preserves the selected or transitioning tab', () => {
+  const tabs = [
+    { id: 'home' },
+    { id: 'climate' },
+    { id: 'security' },
+  ];
+
+  assert.equal(resolveConfiguredActiveTab({
+    tabs,
+    defaultTab: 'home',
+    previousActiveTab: 'climate',
+    persistedActiveTab: 'home',
+    sameDashboard: true,
+  }), 'climate');
+
+  assert.equal(resolveConfiguredActiveTab({
+    tabs,
+    defaultTab: 'home',
+    previousActiveTab: 'climate',
+    persistedActiveTab: 'home',
+    transitionTarget: 'security',
+    sameDashboard: true,
+  }), 'security');
 });

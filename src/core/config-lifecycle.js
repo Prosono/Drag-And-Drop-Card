@@ -5,6 +5,24 @@
  * and decides whether an existing layout must be reloaded after a config change.
  */
 
+export function resolveConfiguredActiveTab({
+  tabs = [],
+  defaultTab = 'default',
+  previousActiveTab = '',
+  persistedActiveTab = '',
+  transitionTarget = '',
+  sameDashboard = false,
+} = {}) {
+  const valid = new Set((Array.isArray(tabs) ? tabs : []).map((tab) => String(tab?.id || '')).filter(Boolean));
+  const fallback = valid.has(String(defaultTab || ''))
+    ? String(defaultTab)
+    : (valid.values().next().value || String(defaultTab || 'default'));
+  if (valid.has(String(transitionTarget || ''))) return String(transitionTarget);
+  if (sameDashboard && valid.has(String(previousActiveTab || ''))) return String(previousActiveTab);
+  if (valid.has(String(persistedActiveTab || ''))) return String(persistedActiveTab);
+  return fallback;
+}
+
 const setConfigMethods = {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
@@ -24,6 +42,7 @@ const setConfigMethods = {
       // Track old key so we only rebuild when storage_key actually changes
       // Keep previous to detect real key changes
       const prevKey = this.storageKey;
+      const previousActiveTab = this.activeTab;
       const storageIdentity = this._resolveIncomingDashboardStorageIdentity_?.(config) || {
         key: this._deriveStorageKeyFromConfig_(config),
         anonymous: false,
@@ -37,6 +56,7 @@ const setConfigMethods = {
       // Store & reflect
       this._config = config;
       this.storageKey = stableKey || undefined;
+      const keyChanged = prevKey !== this.storageKey;
       this._syncEditorsStorageKey();
       this.gridSize                 = Number(config.grid ?? 10);
       this.connectorGridSize        = Number(config.connector_grid_size ?? config.connector_grid ?? config.line_grid_size ?? config.line_grid ?? 0) || 0;
@@ -159,16 +179,21 @@ const setConfigMethods = {
       this._setDashboardLayers_(config.layers || [], { refresh: false });
       this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
       this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
-      this.activeTab          = this.defaultTab;
-      try { const lastT = localStorage.getItem(`ddc_lasttab_${this.storageKey}`);
-        if (lastT && this.tabs.some(t=>t.id===lastT)) this.activeTab = lastT; } catch {}
+      let persistedActiveTab = '';
+      try { persistedActiveTab = localStorage.getItem(`ddc_lasttab_${this.storageKey}`) || ''; } catch {}
+      this.activeTab = resolveConfiguredActiveTab({
+        tabs: this.tabs,
+        defaultTab: this.defaultTab,
+        previousActiveTab,
+        persistedActiveTab,
+        transitionTarget: this.__tabTransitionTarget,
+        sameDashboard: !keyChanged,
+      });
       this._syncTabsPlacement_?.();
 
 
 
       if (this.cardContainer) this._applyContainerSizingFromConfig(false);
-
-      const keyChanged = prevKey !== this.storageKey;
 
         // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
       if (this.editMode && !this.__booting && !keyChanged) {

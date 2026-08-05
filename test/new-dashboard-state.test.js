@@ -83,6 +83,22 @@ test('the empty dashboard widget is visible immediately in HA dashboard edit mod
   assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), false);
 });
 
+test('the empty dashboard widget stays hidden during tab transitions and dashboard rebuilds', () => {
+  const harness = new DashboardIdentityHarness();
+  harness._isInHaEditorPreview = () => false;
+
+  harness.__tabTransitionActive = true;
+  assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), false);
+
+  harness.__tabTransitionActive = false;
+  harness._loading = true;
+  assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), false);
+
+  harness._loading = false;
+  harness.__booting = false;
+  assert.equal(harness._shouldShowEmptyDashboardPlaceholder_(), true);
+});
+
 test('community dashboard storage identity does not depend on the previously visited dashboard route', () => {
   const previousWindow = globalThis.window;
   try {

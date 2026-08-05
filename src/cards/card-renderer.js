@@ -556,9 +556,6 @@ const cardBuilderMethods = {
       return;
     }
 
-    this._restoreBackgroundHostToContainer_();
-    this._clearSelection?.();
-  
     let builtAny = false;
     let builtCardCount = 0;
     const fragment = document.createDocumentFragment();
@@ -628,6 +625,8 @@ const cardBuilderMethods = {
     }
   
     if (!builtAny) {
+      this._restoreBackgroundHostToContainer_();
+      this._clearSelection?.();
       if (this._shouldShowEmptyDashboardPlaceholder_?.() !== false) {
         this._showEmptyPlaceholder();
       } else {
@@ -635,6 +634,11 @@ const cardBuilderMethods = {
       }
       this._applyAutoScale?.();
     } else {
+      // Build the replacement off-DOM and swap it in one commit. Keeping the
+      // current cards mounted while Home Assistant creates the new elements
+      // prevents a blank canvas and the empty-dashboard assistant from flashing.
+      this._restoreBackgroundHostToContainer_();
+      this._clearSelection?.();
       this.cardContainer.appendChild(fragment);
       wrappersToRebuild.forEach((wrap) => {
         try { this._rebuildOnce(wrap.firstElementChild); } catch {}

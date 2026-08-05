@@ -143,20 +143,9 @@ const tabsLayoutMethods = {
         ev.stopPropagation?.();
         const nextTab = this._normalizeTabId?.(t.id) || t.id;
         if (this.activeTab !== nextTab) {
-          this.activeTab = nextTab;
-          try { this._closeLayersMenu_?.({ render: false }); } catch {}
-          try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, nextTab); } catch {}
-          try { this._syncWrapperTabAssignmentsFromActiveLayout_?.(); } catch {}
-          try { this._applyActiveTab({ reason: 'tab-change' }); } catch (err) { console.warn('[ddc:tabs] Could not apply active tab', err); }
-          try { this._renderTabs(); } catch (err) { console.warn('[ddc:tabs] Could not render tabs after switch', err); }
-          // Reapply visibility for the newly active tab. Visibility must be
-          // evaluated after switching tabs so cards with conditions are
-          // properly hidden when the tab becomes active.
-          try { this._applyVisibility_(); } catch {}
-          try {
-            const host = this.cardContainer?.querySelector?.('#ddcBgHost');
-            if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
-          } catch {}
+          this._switchActiveTab_?.(nextTab).catch?.((err) => {
+            console.warn('[ddc:tabs] Could not switch active tab', err);
+          });
         } else {
           try { this._centerTabButtonInScroller_?.(btn); } catch {}
         }
@@ -198,6 +187,53 @@ const tabsLayoutMethods = {
     } catch {}
   },
 
+  async _switchActiveTab_(tabId, options = {}) {
+    const nextTab = this._normalizeTabId?.(tabId) || tabId;
+    if (!nextTab || this.activeTab === nextTab) return false;
+
+    const transitionSeq = (Number(this.__tabTransitionSeq || 0) || 0) + 1;
+    this.__tabTransitionSeq = transitionSeq;
+    this.__tabTransitionActive = true;
+    this.__tabTransitionTarget = nextTab;
+
+    // The empty-dashboard assistant is only valid for a genuinely empty
+    // dashboard. Never let it flash while cards are being swapped or hydrated.
+    try { this._hideEmptyPlaceholder?.(); } catch {}
+    this.activeTab = nextTab;
+    try { this._closeLayersMenu_?.({ render: false }); } catch {}
+    try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, nextTab); } catch {}
+    try { this._syncWrapperTabAssignmentsFromActiveLayout_?.(); } catch {}
+
+    let hydration = null;
+    try {
+      hydration = this._applyActiveTab({ reason: options.reason || 'tab-change', transitionSeq });
+    } catch (err) {
+      console.warn('[ddc:tabs] Could not apply active tab', err);
+    }
+    try { this._renderTabs(); } catch (err) { console.warn('[ddc:tabs] Could not render tabs after switch', err); }
+    // Reapply visibility after tab membership has been resolved so conditional
+    // cards on the destination tab are correct on the very first frame.
+    try { this._applyVisibility_(); } catch {}
+    try {
+      const host = this.cardContainer?.querySelector?.('#ddcBgHost');
+      if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+    } catch {}
+
+    try {
+      await Promise.resolve(hydration);
+    } catch {}
+
+    // A slower hydration from an earlier click must never finish a newer tab
+    // transition or restore UI belonging to the stale destination.
+    if (transitionSeq !== this.__tabTransitionSeq || this.activeTab !== nextTab) return false;
+    this.__tabTransitionActive = false;
+    this.__tabTransitionTarget = null;
+    try { this._applyVisibility_(); } catch {}
+    try { this._syncEmptyStateUI?.(); } catch {}
+    try { this._renderConnectors_?.(); } catch {}
+    return true;
+  },
+
   _applyActiveTab(options = {}) {
     const opts = (options && typeof options === 'object') ? options : {};
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];
@@ -220,8 +256,10 @@ const tabsLayoutMethods = {
     } catch {}
 
     try { this._clearSelection(); } catch {}
+    let hydration = Promise.resolve(0);
     try {
-      this._hydrateVisibleDeferredCards_?.(becameVisible).catch?.(() => {});
+      const pending = this._hydrateVisibleDeferredCards_?.(becameVisible);
+      if (pending && typeof pending.then === 'function') hydration = pending.catch(() => 0);
     } catch {}
     // On tab changes, replay entrance motion only for cards that just became
     // visible. Initial render still uses the one-time mount animation below.
@@ -232,6 +270,7 @@ const tabsLayoutMethods = {
       else this._animateCards?.();
     } catch {}
     try { this._renderConnectors_?.(); } catch {}
+    return hydration;
   },
 
   _cardAnimationId_(wrap) {

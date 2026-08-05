@@ -73,6 +73,13 @@ const emptyStateMethods = {
     try {
       if (this.__haConfigPreviewMode || this.__haConfigPreviewRendered) return false;
       if (this._isInHaEditorPreview?.()) return false;
+      if (
+        this.__tabTransitionActive
+        || this.__booting
+        || this._loading
+        || this.__dashboardConverterImporting
+        || this.__ddcImportingDashboard
+      ) return false;
     } catch {}
     return true;
   },

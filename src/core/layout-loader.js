@@ -454,6 +454,7 @@ const initialLoadMethods = {
         this._loading = false;
         this.__booting = false;
         this.__dirty = false;
+        try { this._ensurePlaceholderIfEmpty?.(); } catch {}
         this._updateApplyBtn?.();
         this._resetLayoutHistory_?.('load');
         try { this._renderTabs(); this._renderLayersBar_?.(); this._applyActiveTab(); } catch {}
