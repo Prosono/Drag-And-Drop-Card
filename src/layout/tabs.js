@@ -98,9 +98,13 @@ const tabsLayoutMethods = {
       this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs');
       this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs-top');
       this.rootEl?.classList?.remove?.('ddc-fixed-canvas-tabs-bottom');
+      this.rootEl?.classList?.remove?.('ddc-edit-canvas-tabs');
+      this.rootEl?.classList?.remove?.('ddc-edit-canvas-tabs-top');
+      this.rootEl?.classList?.remove?.('ddc-edit-canvas-tabs-bottom');
       try { this.removeAttribute?.('ddc-tabs-fixed-canvas'); } catch {}
       try { this.removeAttribute?.('ddc-top-tabs-fixed-canvas'); } catch {}
       try { this.removeAttribute?.('ddc-bottom-tabs-fixed-canvas'); } catch {}
+      try { this.removeAttribute?.('ddc-tabs-edit-canvas'); } catch {}
       this._renderSidebar_?.();
       return;
     }
@@ -633,26 +637,34 @@ const tabsLayoutMethods = {
       const anchor = this.__scaleOuter || this.cardContainer;
       const sidebarActive = this._isSidebarEnabled_?.();
       const sidebarNavActive = this._isSidebarNavigationActive_?.();
+      let editCanvasTabs = false;
       const syncFixedTabsState = () => {
         let mode = 'auto';
         let fixedTabs = false;
         let fixedTop = false;
         let fixedBottom = false;
+        let eligibleFixedTabs = false;
         try {
           mode = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-          fixedTabs = this._shouldRenderTabBar_()
+          eligibleFixedTabs = this._shouldRenderTabBar_()
             && mode !== 'auto'
             && !sidebarNavActive
             && !this._isExplicitViewportPreview_?.();
+          editCanvasTabs = eligibleFixedTabs && !!this.editMode;
+          fixedTabs = eligibleFixedTabs && !editCanvasTabs;
           fixedTop = fixedTabs && this.tabsPosition !== 'bottom';
           fixedBottom = fixedTabs && this.tabsPosition === 'bottom';
         } catch {}
         root?.classList?.toggle?.('ddc-fixed-canvas-tabs', !!fixedTabs);
         root?.classList?.toggle?.('ddc-fixed-canvas-tabs-top', !!fixedTop);
         root?.classList?.toggle?.('ddc-fixed-canvas-tabs-bottom', !!fixedBottom);
+        root?.classList?.toggle?.('ddc-edit-canvas-tabs', !!editCanvasTabs);
+        root?.classList?.toggle?.('ddc-edit-canvas-tabs-top', !!editCanvasTabs && this.tabsPosition !== 'bottom');
+        root?.classList?.toggle?.('ddc-edit-canvas-tabs-bottom', !!editCanvasTabs && this.tabsPosition === 'bottom');
         try { this.toggleAttribute?.('ddc-tabs-fixed-canvas', !!fixedTabs); } catch {}
         try { this.toggleAttribute?.('ddc-top-tabs-fixed-canvas', !!fixedTop); } catch {}
         try { this.toggleAttribute?.('ddc-bottom-tabs-fixed-canvas', !!fixedBottom); } catch {}
+        try { this.toggleAttribute?.('ddc-tabs-edit-canvas', !!editCanvasTabs); } catch {}
         if (fixedTabs) {
           try { this._computeHaSidebarGutters_?.(); } catch {}
           try { this._computeHaTopGutter_?.(); } catch {}
@@ -687,6 +699,18 @@ const tabsLayoutMethods = {
         root?.classList?.toggle?.('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
         return;
       }
+
+      if (editCanvasTabs) {
+        if (bar.parentNode !== anchor) anchor.appendChild(bar);
+        root.classList.toggle('ddc-sidebar-layout', !!sidebarActive);
+        root.classList.toggle('ddc-tabs-bottom-layout', this.tabsPosition === 'bottom');
+        return;
+      }
+
+      // The edit context may have placed the tab bar inside the scale wrapper.
+      // Restore it as a root-level sibling before applying the normal viewport
+      // or sidebar placement used outside edit mode.
+      if (bar.parentNode !== root) root.insertBefore(bar, anchor);
 
       if (sidebarActive) {
         const host = this.sidebarHost;

@@ -9086,6 +9086,34 @@ export function getDashboardShellTemplate() {
   z-index: 10020 !important;
 }
 
+/* In edit mode a fixed-size dashboard is a canvas, not the viewport. Keep
+ * tabs inside that outlined canvas so their position matches the dashboard
+ * being edited and follows the canvas when it scales or scrolls. */
+.ddc-root.ddc-edit-canvas-tabs > .ddc-scale-outer > .ddc-tabs{
+  position:absolute !important;
+  left:12px !important;
+  right:12px !important;
+  width:fit-content !important;
+  max-width:calc(100% - 24px) !important;
+  margin-inline:auto !important;
+  transform:none !important;
+  z-index:10020 !important;
+}
+
+.ddc-root.ddc-edit-canvas-tabs-top > .ddc-scale-outer > .ddc-tabs:not(.ddc-tabs-bottom){
+  top:12px !important;
+  bottom:auto !important;
+}
+
+.ddc-root.ddc-edit-canvas-tabs-bottom > .ddc-scale-outer > .ddc-tabs.ddc-tabs-bottom{
+  top:auto !important;
+  bottom:12px !important;
+}
+
+.ddc-root.ddc-edit-canvas-tabs.ddc-tabs-bottom-layout > .ddc-scale-outer{
+  margin-bottom:0;
+}
+
 .ddc-tabs.ddc-tabs-left::before,
 .ddc-tabs.ddc-tabs-left::after{
   display:none;

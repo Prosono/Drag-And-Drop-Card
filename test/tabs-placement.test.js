@@ -28,6 +28,8 @@ function createHarness({ tabs, hideTabsWhenSingle, hasLayerMenu = false }) {
         if (enabled) classes.add(name);
         else classes.delete(name);
       },
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
     },
   };
   harness._hasLayerMenu_ = () => hasLayerMenu;
@@ -65,6 +67,73 @@ test('visible top tabs keep fixed-canvas tab placement', () => {
 
   assert.equal(classes.has('ddc-fixed-canvas-tabs-top'), true);
   assert.equal(attributes.has('ddc-top-tabs-fixed-canvas'), true);
+});
+
+test('fixed dashboard tabs move inside the canvas while editing and return afterwards', () => {
+  const { harness, classes, attributes } = createHarness({
+    tabs: [{ id: 'home' }, { id: 'lights' }],
+    hideTabsWhenSingle: true,
+  });
+  const makeNode = () => ({
+    parentNode: null,
+    children: [],
+    appendChild(child) {
+      child.parentNode?.removeChild?.(child);
+      this.children.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    insertBefore(child, reference) {
+      child.parentNode?.removeChild?.(child);
+      const index = this.children.indexOf(reference);
+      this.children.splice(index < 0 ? this.children.length : index, 0, child);
+      child.parentNode = this;
+      return child;
+    },
+    removeChild(child) {
+      const index = this.children.indexOf(child);
+      if (index >= 0) this.children.splice(index, 1);
+      child.parentNode = null;
+      return child;
+    },
+  });
+  const root = makeNode();
+  root.classList = harness.rootEl.classList;
+  const tabsBar = makeNode();
+  const scaleOuter = makeNode();
+  root.appendChild(tabsBar);
+  root.appendChild(scaleOuter);
+  harness.rootEl = root;
+  harness.tabsBar = tabsBar;
+  harness.__scaleOuter = scaleOuter;
+  harness.editMode = true;
+
+  harness._syncTabsPlacement_();
+
+  assert.equal(tabsBar.parentNode, scaleOuter);
+  assert.equal(classes.has('ddc-edit-canvas-tabs-top'), true);
+  assert.equal(classes.has('ddc-fixed-canvas-tabs-top'), false);
+  assert.equal(attributes.has('ddc-tabs-edit-canvas'), true);
+  assert.equal(attributes.has('ddc-tabs-fixed-canvas'), false);
+
+  harness.editMode = false;
+  harness._syncTabsPlacement_();
+
+  assert.equal(tabsBar.parentNode, root);
+  assert.equal(root.children.indexOf(tabsBar) < root.children.indexOf(scaleOuter), true);
+  assert.equal(classes.has('ddc-edit-canvas-tabs'), false);
+  assert.equal(classes.has('ddc-fixed-canvas-tabs-top'), true);
+  assert.equal(attributes.has('ddc-tabs-edit-canvas'), false);
+  assert.equal(attributes.has('ddc-tabs-fixed-canvas'), true);
+
+  harness.tabsPosition = 'bottom';
+  harness.editMode = true;
+  harness._syncTabsPlacement_();
+
+  assert.equal(tabsBar.parentNode, scaleOuter);
+  assert.equal(classes.has('ddc-edit-canvas-tabs-top'), false);
+  assert.equal(classes.has('ddc-edit-canvas-tabs-bottom'), true);
+  assert.equal(classes.has('ddc-fixed-canvas-tabs-bottom'), false);
 });
 
 test('layer menu keeps the tab bar fixed when the only tab is hidden', () => {
