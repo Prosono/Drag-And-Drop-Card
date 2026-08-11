@@ -13,6 +13,32 @@ import { installCardBuilderMethods } from '../src/cards/card-renderer.js';
 class TabsHarness {}
 installTabsLayoutMethods(TabsHarness.prototype);
 
+function createNode() {
+  return {
+    parentNode: null,
+    children: [],
+    appendChild(child) {
+      child.parentNode?.removeChild?.(child);
+      this.children.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    insertBefore(child, reference) {
+      child.parentNode?.removeChild?.(child);
+      const index = this.children.indexOf(reference);
+      this.children.splice(index < 0 ? this.children.length : index, 0, child);
+      child.parentNode = this;
+      return child;
+    },
+    removeChild(child) {
+      const index = this.children.indexOf(child);
+      if (index >= 0) this.children.splice(index, 1);
+      child.parentNode = null;
+      return child;
+    },
+  };
+}
+
 function createHarness({ tabs, hideTabsWhenSingle, hasLayerMenu = false }) {
   const classes = new Set();
   const attributes = new Set();
@@ -74,33 +100,10 @@ test('fixed dashboard tabs move inside the canvas while editing and return after
     tabs: [{ id: 'home' }, { id: 'lights' }],
     hideTabsWhenSingle: true,
   });
-  const makeNode = () => ({
-    parentNode: null,
-    children: [],
-    appendChild(child) {
-      child.parentNode?.removeChild?.(child);
-      this.children.push(child);
-      child.parentNode = this;
-      return child;
-    },
-    insertBefore(child, reference) {
-      child.parentNode?.removeChild?.(child);
-      const index = this.children.indexOf(reference);
-      this.children.splice(index < 0 ? this.children.length : index, 0, child);
-      child.parentNode = this;
-      return child;
-    },
-    removeChild(child) {
-      const index = this.children.indexOf(child);
-      if (index >= 0) this.children.splice(index, 1);
-      child.parentNode = null;
-      return child;
-    },
-  });
-  const root = makeNode();
+  const root = createNode();
   root.classList = harness.rootEl.classList;
-  const tabsBar = makeNode();
-  const scaleOuter = makeNode();
+  const tabsBar = createNode();
+  const scaleOuter = createNode();
   root.appendChild(tabsBar);
   root.appendChild(scaleOuter);
   harness.rootEl = root;
@@ -134,6 +137,40 @@ test('fixed dashboard tabs move inside the canvas while editing and return after
   assert.equal(classes.has('ddc-edit-canvas-tabs-top'), false);
   assert.equal(classes.has('ddc-edit-canvas-tabs-bottom'), true);
   assert.equal(classes.has('ddc-fixed-canvas-tabs-bottom'), false);
+});
+
+test('Sidebar tabs stay mounted in the Sidebar navigation slot', () => {
+  const { harness, classes } = createHarness({
+    tabs: [{ id: 'home' }, { id: 'lights' }],
+    hideTabsWhenSingle: true,
+  });
+  const root = createNode();
+  root.classList = harness.rootEl.classList;
+  const tabsBar = createNode();
+  const scaleOuter = createNode();
+  const sidebarHost = createNode();
+  const navigation = createNode();
+  sidebarHost.querySelector = selector => selector === '.ddc-sidebar-navigation' ? navigation : null;
+  sidebarHost.appendChild(navigation);
+  root.appendChild(sidebarHost);
+  root.appendChild(tabsBar);
+  root.appendChild(scaleOuter);
+  harness.rootEl = root;
+  harness.tabsBar = tabsBar;
+  harness.__scaleOuter = scaleOuter;
+  harness.sidebarHost = sidebarHost;
+  harness._isSidebarEnabled_ = () => true;
+  harness._isSidebarNavigationActive_ = () => true;
+
+  harness._syncTabsPlacement_();
+
+  assert.equal(tabsBar.parentNode, navigation);
+  assert.equal(classes.has('ddc-sidebar-layout'), true);
+  assert.equal(classes.has('ddc-tabs-bottom-layout'), false);
+
+  harness._syncTabsPlacement_();
+  assert.equal(tabsBar.parentNode, navigation);
+  assert.equal(navigation.children.filter(child => child === tabsBar).length, 1);
 });
 
 test('layer menu keeps the tab bar fixed when the only tab is hidden', () => {

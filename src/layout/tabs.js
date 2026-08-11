@@ -728,20 +728,22 @@ const tabsLayoutMethods = {
         return;
       }
 
-      // The edit context may have placed the tab bar inside the scale wrapper.
-      // Restore it as a root-level sibling before applying the normal viewport
-      // or sidebar placement used outside edit mode.
-      if (bar.parentNode !== root) root.insertBefore(bar, anchor);
-
       if (sidebarActive) {
         const host = this.sidebarHost;
         if (host && host.parentNode !== root) root.insertBefore(host, anchor);
       }
       if (sidebarNavActive) {
+        const navigation = this.sidebarHost?.querySelector?.('.ddc-sidebar-navigation');
+        if (navigation && bar.parentNode !== navigation) navigation.appendChild(bar);
         root.classList.add('ddc-sidebar-layout');
         root.classList.remove('ddc-tabs-bottom-layout');
         return;
       }
+
+      // The edit context may have placed the tab bar inside the scale wrapper.
+      // Restore it as a root-level sibling before applying the normal viewport
+      // or sidebar placement used outside edit mode.
+      if (bar.parentNode !== root) root.insertBefore(bar, anchor);
 
       if (this._isExplicitViewportPreview_?.()) {
         if (anchor.nextSibling !== bar) root.insertBefore(bar, anchor.nextSibling);
