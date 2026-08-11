@@ -1095,119 +1095,90 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
 
     <!-- Sidebar -->
     <section class="card sidebar-settings-card" data-settings-section="sidebar" aria-labelledby="sidebar-head" role="tabpanel" aria-describedby="ddc-settings-intro-sidebar" hidden>
-      <div class="section-head">
-        <ha-icon icon="mdi:page-layout-sidebar-left" aria-hidden="true"></ha-icon>
-        <h4 id="sidebar-head">Sidebar</h4>
-      </div>
-      <p class="tab-intro" id="ddc-settings-intro-sidebar"><strong>The Sidebar belongs to the whole dashboard.</strong> Navigation and sidebar cards stay in place while you move between tabs.</p>
+      <header class="sidebar-studio-head">
+        <div>
+          <span class="sidebar-studio-kicker">Dashboard structure</span>
+          <h4 id="sidebar-head">Sidebar studio</h4>
+          <p id="ddc-settings-intro-sidebar">One global rail for navigation and the controls you want to keep close.</p>
+        </div>
+        <label class="sidebar-master-switch" for="ddc-setting-sidebarEnabled">
+          <span><strong>Sidebar</strong><small>Show on this dashboard</small></span>
+          <ha-switch id="ddc-setting-sidebarEnabled"></ha-switch>
+        </label>
+      </header>
 
-      <div class="sidebar-settings-layout">
-        <div class="sidebar-settings-controls">
-          <div class="setting sidebar-enable-setting" role="group" aria-labelledby="lbl-sidebar-enabled">
-            <div class="row">
-              <div class="title">
-                <ha-icon icon="mdi:dock-left" aria-hidden="true"></ha-icon>
-                <label id="lbl-sidebar-enabled" for="ddc-setting-sidebarEnabled">Enable Sidebar</label>
-              </div>
-              <div class="control sidebar-switch-control">
-                <ha-switch id="ddc-setting-sidebarEnabled"></ha-switch>
-              </div>
-            </div>
-            <div class="hint">Keeps a global navigation rail beside the dashboard canvas.</div>
-          </div>
+      <div class="sidebar-studio-layout">
+        <div class="sidebar-studio-editor">
+          <fieldset class="sidebar-blueprints" id="ddc-setting-sidebarTypeGroup">
+            <legend>Structure</legend>
 
-          <fieldset class="sidebar-type-fieldset" id="ddc-setting-sidebarTypeGroup">
-            <legend>Choose a purpose</legend>
-            <div class="sidebar-type-grid">
-              <label class="sidebar-type-card">
-                <input type="radio" name="ddc-sidebar-type" value="minimal" />
-                <span class="sidebar-type-card-shell">
-                  <span class="sidebar-type-icon"><ha-icon icon="mdi:dock-left"></ha-icon></span>
-                  <span class="sidebar-type-copy"><strong>Minimal</strong><small>Tabs only</small></span>
-                  <span class="sidebar-type-check"><ha-icon icon="mdi:check"></ha-icon></span>
-                </span>
-              </label>
-              <label class="sidebar-type-card">
-                <input type="radio" name="ddc-sidebar-type" value="essentials" />
-                <span class="sidebar-type-card-shell">
-                  <span class="sidebar-type-icon"><ha-icon icon="mdi:clock-outline"></ha-icon></span>
-                  <span class="sidebar-type-copy"><strong>Essentials</strong><small>Header, tabs and a small card area</small></span>
-                  <span class="sidebar-type-check"><ha-icon icon="mdi:check"></ha-icon></span>
-                </span>
-              </label>
-              <label class="sidebar-type-card">
-                <input type="radio" name="ddc-sidebar-type" value="canvas" />
-                <span class="sidebar-type-card-shell">
-                  <span class="sidebar-type-icon"><ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon></span>
-                  <span class="sidebar-type-copy"><strong>Canvas</strong><small>Large, flexible Drag &amp; Drop area</small></span>
-                  <span class="sidebar-type-check"><ha-icon icon="mdi:check"></ha-icon></span>
-                </span>
-              </label>
-            </div>
+            <label class="sidebar-blueprint">
+              <input type="radio" name="ddc-sidebar-type" value="minimal" />
+              <span class="sidebar-blueprint-index">01</span>
+              <span class="sidebar-blueprint-copy"><strong>Minimal</strong><small>A compact tab spine. Nothing else.</small></span>
+              <span class="sidebar-blueprint-diagram diagram-minimal" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
+            </label>
+
+            <label class="sidebar-blueprint">
+              <input type="radio" name="ddc-sidebar-type" value="essentials" />
+              <span class="sidebar-blueprint-index">02</span>
+              <span class="sidebar-blueprint-copy"><strong>Essentials</strong><small>Time or weather, tabs, and one focused card area.</small></span>
+              <span class="sidebar-blueprint-diagram diagram-essentials" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
+            </label>
+
+            <label class="sidebar-blueprint">
+              <input type="radio" name="ddc-sidebar-type" value="canvas" />
+              <span class="sidebar-blueprint-index">03</span>
+              <span class="sidebar-blueprint-copy"><strong>Canvas</strong><small>A full-height space for any Home Assistant card.</small></span>
+              <span class="sidebar-blueprint-diagram diagram-canvas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
+            </label>
           </fieldset>
 
-          <div class="sidebar-context-controls" id="ddc-sidebar-context-controls">
-            <div class="setting" id="ddc-sidebar-header-setting" role="group" aria-labelledby="lbl-sidebar-header">
-              <div class="row">
-                <div class="title">
-                  <ha-icon icon="mdi:card-text-outline" aria-hidden="true"></ha-icon>
-                  <label id="lbl-sidebar-header" for="ddc-setting-sidebarHeader">Header</label>
-                </div>
-                <div class="control">
-                  <select id="ddc-setting-sidebarHeader"></select>
-                </div>
-              </div>
-              <div class="hint" id="ddc-sidebar-header-hint">Choose what appears above the tabs.</div>
+          <div class="sidebar-inspector" id="ddc-sidebar-context-controls">
+            <div class="sidebar-inspector-row" id="ddc-sidebar-header-setting">
+              <label for="ddc-setting-sidebarHeader"><span>Header</span><small>What leads the rail</small></label>
+              <select id="ddc-setting-sidebarHeader"></select>
             </div>
-
-            <div class="setting" id="ddc-sidebar-canvas-height-setting" role="group" aria-labelledby="lbl-sidebar-canvas-height">
-              <div class="row">
-                <div class="title">
-                  <ha-icon icon="mdi:arrow-expand-vertical" aria-hidden="true"></ha-icon>
-                  <label id="lbl-sidebar-canvas-height" for="ddc-setting-sidebarCanvasHeight">Card area height</label>
-                </div>
-                <div class="control">
-                  <div class="range-wrap">
-                    <input type="range" id="ddc-setting-sidebarCanvasHeight" min="280" max="1200" step="20" />
-                    <output id="ddc-sidebarCanvasHeightOut" for="ddc-setting-sidebarCanvasHeight">520 px</output>
-                  </div>
-                </div>
+            <div class="sidebar-inspector-row sidebar-inspector-range" id="ddc-sidebar-canvas-height-setting">
+              <label for="ddc-setting-sidebarCanvasHeight"><span>Card area</span><small>Available vertical space</small></label>
+              <div>
+                <input type="range" id="ddc-setting-sidebarCanvasHeight" min="280" max="1200" step="20" />
+                <output id="ddc-sidebarCanvasHeightOut" for="ddc-setting-sidebarCanvasHeight">520 px</output>
               </div>
-              <div class="hint">Cards use the same picker and edit tools as cards on the main canvas.</div>
             </div>
           </div>
 
-          <div class="sidebar-global-note">
-            <ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>
-            <span>To add or arrange sidebar cards, close settings and use Edit Mode directly in the sidebar.</span>
-          </div>
+          <p class="sidebar-studio-note"><ha-icon icon="mdi:cursor-move"></ha-icon><span>Add and arrange sidebar cards directly on the rail in Edit Mode.</span></p>
         </div>
 
-        <div class="sidebar-preview-panel" aria-live="polite">
-          <div class="sidebar-preview-heading">
-            <span>Live preview</span>
-            <small>Updates as you choose</small>
-          </div>
+        <figure class="sidebar-preview-panel" aria-live="polite">
+          <figcaption><span>Preview</span><small>Live dashboard scale</small></figcaption>
           <div class="sidebar-preview-stage" id="ddc-sidebar-preview" data-sidebar-type="minimal" data-sidebar-enabled="false">
             <div class="sidebar-preview-rail">
               <div class="sidebar-preview-header" id="ddc-sidebar-preview-header">
-                <span class="sidebar-preview-time">19:42</span>
-                <small>Tuesday, 11 August</small>
+                <small>Tuesday</small><span class="sidebar-preview-time">19:42</span><em>11 August</em>
               </div>
-              <div class="sidebar-preview-tabs" aria-hidden="true">
-                <span class="active"><ha-icon icon="mdi:home-outline"></ha-icon><b>Home</b></span>
-                <span><ha-icon icon="mdi:lightbulb-outline"></ha-icon><b>Lights</b></span>
-                <span><ha-icon icon="mdi:thermometer"></ha-icon><b>Climate</b></span>
+              <div class="sidebar-preview-nav" aria-hidden="true">
+                <span class="active"><i>01</i><ha-icon icon="mdi:home-outline"></ha-icon><b>Home</b></span>
+                <span><i>02</i><ha-icon icon="mdi:lightbulb-outline"></ha-icon><b>Lights</b></span>
+                <span><i>03</i><ha-icon icon="mdi:thermometer"></ha-icon><b>Climate</b></span>
               </div>
               <div class="sidebar-preview-canvas" id="ddc-sidebar-preview-canvas" aria-hidden="true">
                 <i></i><i></i><i></i>
               </div>
             </div>
             <div class="sidebar-preview-dashboard" aria-hidden="true">
-              <span></span><span></span><span></span><span></span>
+              <div class="sidebar-preview-dashboard-head"><span>Living space</span><i>19:42</i></div>
+              <span class="preview-zone zone-a"></span>
+              <span class="preview-zone zone-b"></span>
+              <span class="preview-zone zone-c"></span>
+              <span class="preview-zone zone-d"></span>
             </div>
           </div>
-        </div>
+        </figure>
       </div>
     </section>
 

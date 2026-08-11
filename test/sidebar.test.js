@@ -35,6 +35,46 @@ test('Sidebar navigation is global whenever the dashboard Sidebar is enabled', (
   assert.equal(harness._sidebarHasItem_('navigation'), true);
 });
 
+test('Sidebar mast uses the header allowed by the selected structure', () => {
+  const harness = new SidebarHarness();
+  const previousDocument = globalThis.document;
+  const created = [];
+  globalThis.document = {
+    createElement() {
+      const element = {
+        className: '',
+        dataset: {},
+        attributes: {},
+        innerHTML: '',
+        setAttribute(name, value) { this.attributes[name] = value; },
+        querySelectorAll() { return []; },
+      };
+      created.push(element);
+      return element;
+    },
+  };
+  try {
+    harness.sidebarType = 'essentials';
+    harness.sidebarHeader = 'clock';
+    harness._safe = value => String(value ?? '');
+    harness._getSidebarWeatherData_ = () => ({});
+    harness._formatSidebarWeekday_ = () => 'Tuesday';
+    harness._formatSidebarTime_ = () => '19:42';
+    harness._formatSidebarLongDate_ = () => '11 August 2026';
+
+    const mast = harness._createSidebarHeader_(new Date('2026-08-11T19:42:00'));
+
+    assert.equal(created.length, 1);
+    assert.equal(mast.dataset.sidebarHeader, 'date_time');
+    assert.match(mast.className, /ddc-sidebar-mast-date_time/);
+    assert.match(mast.innerHTML, /19:42/);
+    assert.doesNotMatch(mast.innerHTML, /live-pill|header-stats/);
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
 test('Sidebar card layout is retained in dashboard configuration', () => {
   const harness = new SidebarHarness();
   const entries = [{
@@ -80,12 +120,21 @@ test('dashboard option normalization preserves Sidebar data', () => {
 test('Sidebar settings expose Minimal, Essentials and Canvas with live preview', async () => {
   const template = await readFile(new URL('../src/dashboard/settings-template.js', import.meta.url), 'utf8');
   const controller = await readFile(new URL('../src/dashboard/settings-controller.js', import.meta.url), 'utf8');
+  const settingsStyles = await readFile(new URL('../src/styles/dashboard-settings-styles.js', import.meta.url), 'utf8');
+  const shell = await readFile(new URL('../src/dashboard/shell-template.js', import.meta.url), 'utf8');
+  const tabs = await readFile(new URL('../src/layout/tabs.js', import.meta.url), 'utf8');
 
   assert.match(template, /data-settings-tab="sidebar"/);
   assert.match(template, /name="ddc-sidebar-type" value="minimal"/);
   assert.match(template, /name="ddc-sidebar-type" value="essentials"/);
   assert.match(template, /name="ddc-sidebar-type" value="canvas"/);
   assert.match(template, /id="ddc-sidebar-preview"/);
+  assert.match(template, /class="sidebar-studio-layout"/);
+  assert.match(template, /class="sidebar-blueprint-index">01/);
   assert.match(controller, /updateSidebarSettingsPreview/);
   assert.match(controller, /this\._renderSidebar_\?\.\(\)/);
+  assert.match(settingsStyles, /Sidebar Studio — architectural control-rail redesign/);
+  assert.match(shell, /Sidebar control rail — solid, architectural, and purpose-led/);
+  assert.match(shell, /--ddc-rail-active:oklch/);
+  assert.match(tabs, /class="ddc-tab-index" aria-hidden="true"/);
 });

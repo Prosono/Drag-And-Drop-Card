@@ -1255,12 +1255,13 @@ const dashboardSettingsMethods = {
       if (sidebarPreview) {
         sidebarPreview.dataset.sidebarType = type;
         sidebarPreview.dataset.sidebarEnabled = enabled ? 'true' : 'false';
+        sidebarPreview.dataset.sidebarHeader = header;
       }
       if (sidebarPreviewHeader) {
         sidebarPreviewHeader.hidden = type === 'minimal' || header === 'none';
         sidebarPreviewHeader.innerHTML = header === 'weather'
-          ? `<span class="sidebar-preview-time">18°</span><small>Partly cloudy</small>`
-          : `<span class="sidebar-preview-time">19:42</span><small>Tuesday, 11 August</small>`;
+          ? `<small>Oslo</small><span class="sidebar-preview-time">18°</span><em>Partly cloudy</em>`
+          : `<small>${header === 'clock' ? 'Local time' : 'Tuesday'}</small><span class="sidebar-preview-time">19:42</span><em>${header === 'clock' ? 'Europe / Oslo' : '11 August'}</em>`;
       }
       if (!applyToDashboard) return;
       this.sidebarEnabled = enabled;

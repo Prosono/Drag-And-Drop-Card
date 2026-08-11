@@ -1164,25 +1164,14 @@ const sidebarMethods = {
 
   _createSidebarHeader_(now = new Date()) {
     const safe = (value) => this._safe?.(value) || String(value ?? '');
-    const headerType = this._normalizeSidebarHeader_(this.sidebarHeader ?? this._config?.sidebar_header ?? 'clock');
+    const sidebarType = this._normalizeSidebarType_(
+      this.sidebarType ?? this._config?.sidebar_type ?? 'minimal'
+    );
+    const headerType = this._getEffectiveSidebarHeader_(
+      sidebarType,
+      this.sidebarHeader ?? this._config?.sidebar_header ?? 'date_time'
+    );
     if (headerType === 'none') return null;
-    const title = String(
-      this._config?.sidebar_title ||
-        this._config?.title ||
-        this.storageKey ||
-        'Smart home'
-    ).trim();
-    const userName = this._getSidebarUserName_?.() || 'Home';
-    const initial = userName.trim().charAt(0).toUpperCase() || 'H';
-    const cardsCount = this.sidebarCanvas?.querySelectorAll?.('.ddc-sidebar-card-wrapper')?.length
-      ?? this._normalizeSidebarCards_(this.sidebarCards || []).length;
-    const statusRows = this._getSidebarStatusRows_?.() || [];
-    const unavailable = statusRows.find((row) => row.id === 'unavailable');
-    const liveLabel = unavailable && Number(unavailable.value) > 0
-      ? `${unavailable.value} offline`
-      : 'Live';
-    const people = this._getSidebarPeople_?.() || [];
-    const homePeople = people.filter((person) => person.isHome);
     const weather = this._getSidebarWeatherData_?.() || {};
     const timeZone = (() => {
       try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
@@ -1190,103 +1179,32 @@ const sidebarMethods = {
 
     const headerBodies = {
       clock: `
-        <div class="ddc-sidebar-header-main">
-          <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:clock-outline"></ha-icon></div>
-          <div class="ddc-sidebar-header-copy">
-            <span>${safe(this._formatSidebarWeekday_(now))}</span>
-            <strong>${safe(this._formatSidebarTime_(now))}</strong>
-            <em>${safe(timeZone || this._formatSidebarDate_(now))}</em>
-          </div>
-          <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
-            <i aria-hidden="true"></i>
-            <span>${safe(liveLabel)}</span>
-          </div>
-        </div>
-        <div class="ddc-sidebar-header-stats" aria-hidden="true">
-          <span><b>${safe(now.getDate())}</b> ${safe(this._formatSidebarMonth_(now))}</span>
-          <span><b>${safe(cardsCount)}</b> cards</span>
-        </div>
+        <small>Local time</small>
+        <strong>${safe(this._formatSidebarTime_(now))}</strong>
+        <em>${safe(timeZone || this._formatSidebarDate_(now))}</em>
       `,
       date_time: `
-        <div class="ddc-sidebar-header-main">
-          <div class="ddc-sidebar-header-mark ddc-sidebar-header-date-mark" aria-hidden="true">
-            <span>${safe(this._formatSidebarMonth_(now))}</span>
-            <b>${safe(now.getDate())}</b>
-          </div>
-          <div class="ddc-sidebar-header-copy">
-            <span>${safe(this._formatSidebarTime_(now))}</span>
-            <strong>${safe(this._formatSidebarWeekday_(now))}</strong>
-            <em>${safe(this._formatSidebarLongDate_(now))}</em>
-          </div>
-          <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
-            <i aria-hidden="true"></i>
-            <span>${safe(liveLabel)}</span>
-          </div>
-        </div>
-      `,
-      people: `
-        <button type="button" class="ddc-sidebar-header-main ddc-sidebar-header-button" data-sidebar-header-action="people">
-          <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:account-group-outline"></ha-icon></div>
-          <div class="ddc-sidebar-header-copy">
-            <span>Presence</span>
-            <strong>${safe(homePeople.length)} home</strong>
-            <em>${safe(Math.max(0, people.length - homePeople.length))} away / ${safe(people.length)} total</em>
-          </div>
-          <div class="ddc-sidebar-header-avatars" aria-hidden="true">
-            ${(homePeople.length ? homePeople : people).slice(0, 3).map((person) => this._sidebarPersonAvatarMarkup_(person, 'small')).join('')}
-          </div>
-        </button>
-      `,
-      home: `
-        <div class="ddc-sidebar-header-main">
-          <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="mdi:home-analytics"></ha-icon></div>
-          <div class="ddc-sidebar-header-copy">
-            <span>${safe(liveLabel)}</span>
-            <strong>${safe(title)}</strong>
-            <em>${safe(statusRows.slice(0, 2).map((row) => `${row.label}: ${row.value}`).join(' / ') || userName)}</em>
-          </div>
-          <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
-            <i aria-hidden="true"></i>
-            <span>${safe(liveLabel)}</span>
-          </div>
-        </div>
+        <small>${safe(this._formatSidebarWeekday_(now))}</small>
+        <strong>${safe(this._formatSidebarTime_(now))}</strong>
+        <em>${safe(this._formatSidebarLongDate_(now))}</em>
       `,
       weather: `
-        <button type="button" class="ddc-sidebar-header-main ddc-sidebar-header-button" data-sidebar-more-info="${safe(weather.entityId || '')}">
-          <div class="ddc-sidebar-header-mark" aria-hidden="true"><ha-icon icon="${safe(weather.icon || 'mdi:weather-partly-cloudy')}"></ha-icon></div>
-          <div class="ddc-sidebar-header-copy">
-            <span>${safe(weather.place || 'Weather')}</span>
+        <button type="button" class="ddc-sidebar-weather" data-sidebar-more-info="${safe(weather.entityId || '')}">
+          <small>${safe(weather.place || 'Weather')}</small>
+          <span class="ddc-sidebar-weather-reading">
+            <ha-icon icon="${safe(weather.icon || 'mdi:weather-partly-cloudy')}" aria-hidden="true"></ha-icon>
             <strong>${safe(weather.temperature || '--')}</strong>
-            <em>${safe([weather.state, weather.humidity, weather.wind].filter(Boolean).join(' / ') || 'Current conditions')}</em>
-          </div>
-          <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+          </span>
+          <em>${safe([weather.state, weather.humidity, weather.wind].filter(Boolean).join(' / ') || 'Current conditions')}</em>
         </button>
-      `,
-      profile: `
-        <div class="ddc-sidebar-header-main">
-          <div class="ddc-sidebar-header-mark" aria-hidden="true">${safe(initial)}</div>
-          <div class="ddc-sidebar-header-copy">
-            <span>${safe(this._formatSidebarTime_(now))}</span>
-            <strong>${safe(userName)}</strong>
-            <em>${safe(this._config?.sidebar_user_role || title)}</em>
-          </div>
-          <div class="ddc-sidebar-live-pill" title="${safe(liveLabel)}">
-            <i aria-hidden="true"></i>
-            <span>${safe(liveLabel)}</span>
-          </div>
-        </div>
       `,
     };
 
     const header = document.createElement('section');
-    header.className = `ddc-sidebar-header ddc-sidebar-header-${headerType}`;
+    header.className = `ddc-sidebar-header ddc-sidebar-mast ddc-sidebar-mast-${headerType}`;
     header.dataset.sidebarHeader = headerType;
     header.setAttribute('aria-label', `${headerType.replace(/_/g, ' ')} sidebar header`);
     header.innerHTML = headerBodies[headerType] || headerBodies.clock;
-    header.querySelector('[data-sidebar-header-action="people"]')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this._openSidebarPeoplePopup_?.();
-    });
     header.querySelectorAll?.('[data-sidebar-more-info]').forEach((button) => {
       button.addEventListener('click', (ev) => {
         ev.stopPropagation();

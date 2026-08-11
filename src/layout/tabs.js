@@ -130,7 +130,7 @@ const tabsLayoutMethods = {
     } catch {}
     if (!hasLayerMenu) this._closeLayersMenu_?.({ render: false });
     if (!this.__layersMenuOpen) this._removeLayerMenuDismissHandlers_?.();
-    for (const t of (shouldRenderTabs ? tabs : [])) {
+    for (const [tabIndex, t] of (shouldRenderTabs ? tabs : []).entries()) {
       const btn = document.createElement('button');
       btn.className = [
         'ddc-tab',
@@ -140,7 +140,7 @@ const tabsLayoutMethods = {
       btn.dataset.tabId = t.id;
       btn.title = t.label || t.id;
       btn.setAttribute('aria-label', t.label || t.id);
-      btn.innerHTML = `${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
+      btn.innerHTML = `<span class="ddc-tab-index" aria-hidden="true">${String(tabIndex + 1).padStart(2, '0')}</span>${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
       btn.type = 'button';
       btn.addEventListener('click', (ev) => {
         ev.preventDefault?.();
