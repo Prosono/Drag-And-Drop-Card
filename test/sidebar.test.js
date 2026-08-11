@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { installSidebarMethods } from '../src/layout/sidebar.js';
 import { installConfigHelperMethods } from '../src/core/config-normalization.js';
+import { buildTabButtonMarkup } from '../src/layout/tabs.js';
 
 class SidebarHarness {}
 installSidebarMethods(SidebarHarness.prototype);
@@ -33,6 +34,19 @@ test('Sidebar navigation is global whenever the dashboard Sidebar is enabled', (
   harness.sidebarHeader = 'clock';
   assert.equal(harness._isSidebarNavigationActive_(), true);
   assert.equal(harness._sidebarHasItem_('navigation'), true);
+});
+
+test('Sidebar tabs use dedicated rail markup without changing standard tabs', () => {
+  const tab = { id: 'lights', label: 'Lights', icon: 'mdi:lightbulb-outline' };
+  const standard = buildTabButtonMarkup(tab, 1);
+  const sidebar = buildTabButtonMarkup(tab, 1, { sidebar: true });
+
+  assert.match(standard, /ddc-tab-label/);
+  assert.doesNotMatch(standard, /ddc-sidebar-tab/);
+  assert.match(sidebar, /ddc-sidebar-tab-indicator/);
+  assert.match(sidebar, /ddc-sidebar-tab-icon/);
+  assert.match(sidebar, /ddc-sidebar-tab-arrow/);
+  assert.match(sidebar, />02</);
 });
 
 test('Sidebar mast uses the header allowed by the selected structure', () => {
@@ -134,7 +148,10 @@ test('Sidebar settings expose Minimal, Essentials and Canvas with live preview',
   assert.match(controller, /updateSidebarSettingsPreview/);
   assert.match(controller, /this\._renderSidebar_\?\.\(\)/);
   assert.match(settingsStyles, /Sidebar Studio — architectural control-rail redesign/);
+  assert.match(settingsStyles, /\.sidebar-preview-nav-icon/);
   assert.match(shell, /Sidebar control rail — solid, architectural, and purpose-led/);
   assert.match(shell, /--ddc-rail-active:oklch/);
-  assert.match(tabs, /class="ddc-tab-index" aria-hidden="true"/);
+  assert.match(shell, /\.ddc-tabs-sidebar \.ddc-sidebar-tab/);
+  assert.match(tabs, /if \(sidebarNavActive\)/);
+  assert.match(tabs, /buildTabButtonMarkup/);
 });

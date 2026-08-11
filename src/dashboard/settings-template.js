@@ -1162,9 +1162,9 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
                 <small>Tuesday</small><span class="sidebar-preview-time">19:42</span><em>11 August</em>
               </div>
               <div class="sidebar-preview-nav" aria-hidden="true">
-                <span class="active"><i>01</i><ha-icon icon="mdi:home-outline"></ha-icon><b>Home</b></span>
-                <span><i>02</i><ha-icon icon="mdi:lightbulb-outline"></ha-icon><b>Lights</b></span>
-                <span><i>03</i><ha-icon icon="mdi:thermometer"></ha-icon><b>Climate</b></span>
+                <span class="active"><i>01</i><span class="sidebar-preview-nav-icon"><ha-icon icon="mdi:home-outline"></ha-icon></span><b>Home</b></span>
+                <span><i>02</i><span class="sidebar-preview-nav-icon"><ha-icon icon="mdi:lightbulb-outline"></ha-icon></span><b>Lights</b></span>
+                <span><i>03</i><span class="sidebar-preview-nav-icon"><ha-icon icon="mdi:thermometer"></ha-icon></span><b>Climate</b></span>
               </div>
               <div class="sidebar-preview-canvas" id="ddc-sidebar-preview-canvas" aria-hidden="true">
                 <i></i><i></i><i></i>

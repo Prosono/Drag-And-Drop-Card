@@ -7,6 +7,22 @@
 
 import { normalizeTabsSize } from '../core/config-normalization.js';
 
+export function buildTabButtonMarkup(tab = {}, tabIndex = 0, { sidebar = false } = {}) {
+  const label = tab.label ?? tab.id ?? '';
+  if (!sidebar) {
+    return `${tab.icon ? `<ha-icon icon="${tab.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${label}</span>`;
+  }
+  return `
+    <span class="ddc-sidebar-tab-indicator" aria-hidden="true"></span>
+    <span class="ddc-sidebar-tab-index" aria-hidden="true">${String(tabIndex + 1).padStart(2, '0')}</span>
+    <span class="ddc-sidebar-tab-icon" aria-hidden="true">
+      <ha-icon icon="${tab.icon || 'mdi:view-dashboard-outline'}"></ha-icon>
+    </span>
+    <span class="ddc-tab-label">${label}</span>
+    <ha-icon class="ddc-sidebar-tab-arrow" icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+  `;
+}
+
 export function moveTabById(tabs = [], tabId = '', offset = 0) {
   const next = Array.isArray(tabs) ? tabs.slice() : [];
   const from = next.findIndex((tab) => String(tab?.id || '') === String(tabId || ''));
@@ -140,7 +156,12 @@ const tabsLayoutMethods = {
       btn.dataset.tabId = t.id;
       btn.title = t.label || t.id;
       btn.setAttribute('aria-label', t.label || t.id);
-      btn.innerHTML = `<span class="ddc-tab-index" aria-hidden="true">${String(tabIndex + 1).padStart(2, '0')}</span>${t.icon ? `<ha-icon icon="${t.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${t.label ?? t.id}</span>`;
+      if (sidebarNavActive) {
+        btn.classList.add('ddc-sidebar-tab');
+        btn.innerHTML = buildTabButtonMarkup(t, tabIndex, { sidebar: true });
+      } else {
+        btn.innerHTML = buildTabButtonMarkup(t, tabIndex);
+      }
       btn.type = 'button';
       btn.addEventListener('click', (ev) => {
         ev.preventDefault?.();

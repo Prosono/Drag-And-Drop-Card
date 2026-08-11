@@ -3303,17 +3303,30 @@ export function getSettingsStyles() {
     font-variant-numeric:tabular-nums;
     letter-spacing:-.06em;
   }
-  .sidebar-preview-nav{ display:grid; gap:4px; }
+  .sidebar-preview-nav{ display:grid; gap:0; }
   .sidebar-preview-nav > span{
+    position:relative;
     min-width:0;
-    min-height:39px;
+    min-height:43px;
     display:grid;
-    grid-template-columns:18px 18px minmax(0, 1fr);
+    grid-template-columns:14px 28px minmax(0, 1fr);
     align-items:center;
-    gap:7px;
-    padding:0 8px;
-    border-radius:4px;
+    gap:8px;
+    padding:0 2px;
+    border-bottom:1px solid oklch(30% .014 255);
+    border-radius:0;
     color:oklch(67% .018 255);
+  }
+  .sidebar-preview-nav > span::before{
+    content:"";
+    position:absolute;
+    left:-9px;
+    top:50%;
+    width:2px;
+    height:0;
+    background:oklch(93% .014 85);
+    transform:translateY(-50%);
+    opacity:0;
   }
   .sidebar-preview-nav > span i{
     font-size:.48rem;
@@ -3321,7 +3334,16 @@ export function getSettingsStyles() {
     font-variant-numeric:tabular-nums;
     opacity:.66;
   }
-  .sidebar-preview-nav > span ha-icon{ --mdc-icon-size:15px; }
+  .sidebar-preview-nav-icon{
+    width:28px;
+    height:28px;
+    display:grid;
+    place-items:center;
+    border:1px solid oklch(34% .014 255);
+    border-radius:2px;
+    color:inherit;
+  }
+  .sidebar-preview-nav > span ha-icon{ --mdc-icon-size:14px; }
   .sidebar-preview-nav > span b{
     overflow:hidden;
     color:inherit;
@@ -3330,9 +3352,18 @@ export function getSettingsStyles() {
     text-overflow:ellipsis;
   }
   .sidebar-preview-nav > span.active{
+    color:oklch(94% .01 85);
+    background:transparent;
+    box-shadow:none;
+  }
+  .sidebar-preview-nav > span.active::before{
+    height:22px;
+    opacity:1;
+  }
+  .sidebar-preview-nav > span.active .sidebar-preview-nav-icon{
+    border-color:oklch(93% .014 85);
     color:oklch(20% .014 255);
     background:oklch(93% .014 85);
-    box-shadow:none;
   }
   .sidebar-preview-stage[data-sidebar-type="minimal"] .sidebar-preview-header,
   .sidebar-preview-stage[data-sidebar-type="minimal"] .sidebar-preview-canvas,
@@ -3342,7 +3373,13 @@ export function getSettingsStyles() {
     display:grid;
     grid-template-columns:1fr;
     justify-items:center;
+    min-height:39px;
     padding:0;
+    border-bottom:0;
+  }
+  .sidebar-preview-stage[data-sidebar-type="minimal"] .sidebar-preview-nav-icon{
+    width:30px;
+    height:30px;
   }
   .sidebar-preview-canvas{
     position:relative;
