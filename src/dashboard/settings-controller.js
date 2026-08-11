@@ -257,14 +257,22 @@ const dashboardSettingsMethods = {
     const outTabsSize        = modal.querySelector('#ddc-tabsSizeOut');
     const chkSidebarEnabled  = modal.querySelector('#ddc-setting-sidebarEnabled');
     const inpSidebarCanvasHeight = modal.querySelector('#ddc-setting-sidebarCanvasHeight');
-    const sidebarItemInputs = Array.from(modal.querySelectorAll('[id^="ddc-setting-sidebarItem"]'));
-    const sidebarHeaderInputs = Array.from(modal.querySelectorAll('input[name="ddc-sidebar-header"]'));
-    const sidebarOrderListEl = modal.querySelector('#ddc-sidebar-order-list');
-    const inpSidebarHomeImage = modal.querySelector('#ddc-setting-sidebarHomeImage');
-    const inpSidebarHomeImageFile = modal.querySelector('#ddc-setting-sidebarHomeImageFile');
-    const btnSidebarHomeImageClear = modal.querySelector('#ddc-setting-sidebarHomeImageClear');
-    const sidebarHomeImagePreview = modal.querySelector('#ddc-setting-sidebarHomeImagePreview');
-    const inpSidebarCalendarEntities = modal.querySelector('#ddc-setting-sidebarCalendarEntities');
+    const outSidebarCanvasHeight = modal.querySelector('#ddc-sidebarCanvasHeightOut');
+    const sidebarTypeInputs = Array.from(modal.querySelectorAll('input[name="ddc-sidebar-type"]'));
+    const selSidebarHeader = modal.querySelector('#ddc-setting-sidebarHeader');
+    const sidebarContextControls = modal.querySelector('#ddc-sidebar-context-controls');
+    const sidebarHeaderSetting = modal.querySelector('#ddc-sidebar-header-setting');
+    const sidebarCanvasHeightSetting = modal.querySelector('#ddc-sidebar-canvas-height-setting');
+    const sidebarPreview = modal.querySelector('#ddc-sidebar-preview');
+    const sidebarPreviewHeader = modal.querySelector('#ddc-sidebar-preview-header');
+    const initialSidebarSettings = {
+      enabled: !!this.sidebarEnabled,
+      type: this._normalizeSidebarType_?.(this.sidebarType) || 'minimal',
+      header: this._normalizeSidebarHeader_?.(this.sidebarHeader) || 'date_time',
+      canvasHeight: this._normalizeSidebarCanvasHeight_?.(this.sidebarCanvasHeight) || 520,
+      cards: this._cloneJson_?.(this.sidebarCards || this._config?.sidebar_cards || []) || [],
+    };
+    let sidebarSettingsCommitted = false;
     const chkLayersEnabled   = modal.querySelector('#ddc-setting-layersEnabled');
     const chkLayersButtonDetails = modal.querySelector('#ddc-setting-layersButtonDetails');
     const layersListEl       = modal.querySelector('#ddc-layers-list');
@@ -1196,118 +1204,99 @@ const dashboardSettingsMethods = {
       rngTabsSize.addEventListener('input', syncTabsSizeOutput);
       syncTabsSizeOutput();
     }
-    const sidebarItemsForSettings = this._normalizeSidebarItems_(this.sidebarItems, { enabled: !!this.sidebarEnabled });
-    if (chkSidebarEnabled) chkSidebarEnabled.checked = !!this.sidebarEnabled;
-    const sidebarHeaderForSettings = this._normalizeSidebarHeader_(this.sidebarHeader);
-    sidebarHeaderInputs.forEach((input) => {
-      input.checked = input.value === sidebarHeaderForSettings;
+    let sidebarHeaderDraft = initialSidebarSettings.header;
+    const getSidebarTypeDraft = () => this._normalizeSidebarType_?.(
+      sidebarTypeInputs.find((input) => input.checked)?.value || initialSidebarSettings.type
+    ) || 'minimal';
+    const sidebarHeaderOptionsForType = (type) => {
+      if (type === 'essentials') {
+        return [
+          { value: 'date_time', label: 'Date & time' },
+          { value: 'weather', label: 'Weather' },
+        ];
+      }
+      if (type === 'canvas') {
+        return [
+          { value: 'clock', label: 'Clock' },
+          { value: 'date_time', label: 'Date & time' },
+          { value: 'none', label: 'No header' },
+        ];
+      }
+      return [];
+    };
+    const syncSidebarHeaderOptions = (type) => {
+      const options = sidebarHeaderOptionsForType(type);
+      if (!selSidebarHeader) return 'none';
+      const allowed = options.map((option) => option.value);
+      if (!allowed.includes(sidebarHeaderDraft)) {
+        sidebarHeaderDraft = type === 'essentials' ? 'date_time' : (type === 'canvas' ? 'clock' : 'none');
+      }
+      selSidebarHeader.innerHTML = options.map((option) => `<option value="${option.value}">${option.label}</option>`).join('');
+      selSidebarHeader.value = sidebarHeaderDraft;
+      return sidebarHeaderDraft;
+    };
+    const updateSidebarSettingsPreview = ({ applyToDashboard = true } = {}) => {
+      const enabled = !!chkSidebarEnabled?.checked;
+      const type = getSidebarTypeDraft();
+      const header = syncSidebarHeaderOptions(type);
+      const minHeight = type === 'canvas' ? 360 : 280;
+      const maxHeight = type === 'essentials' ? 440 : 1200;
+      if (inpSidebarCanvasHeight) {
+        inpSidebarCanvasHeight.min = String(minHeight);
+        inpSidebarCanvasHeight.max = String(maxHeight);
+      }
+      const normalizedHeight = this._normalizeSidebarCanvasHeight_?.(inpSidebarCanvasHeight?.value || initialSidebarSettings.canvasHeight) || 520;
+      const height = Math.max(minHeight, Math.min(maxHeight, normalizedHeight));
+      if (inpSidebarCanvasHeight) inpSidebarCanvasHeight.value = String(height);
+      if (outSidebarCanvasHeight) outSidebarCanvasHeight.textContent = `${height} px`;
+      sidebarContextControls?.classList?.toggle?.('is-minimal', type === 'minimal');
+      if (sidebarHeaderSetting) sidebarHeaderSetting.hidden = type === 'minimal';
+      if (sidebarCanvasHeightSetting) sidebarCanvasHeightSetting.hidden = type === 'minimal';
+      if (sidebarPreview) {
+        sidebarPreview.dataset.sidebarType = type;
+        sidebarPreview.dataset.sidebarEnabled = enabled ? 'true' : 'false';
+      }
+      if (sidebarPreviewHeader) {
+        sidebarPreviewHeader.hidden = type === 'minimal' || header === 'none';
+        sidebarPreviewHeader.innerHTML = header === 'weather'
+          ? `<span class="sidebar-preview-time">18°</span><small>Partly cloudy</small>`
+          : `<span class="sidebar-preview-time">19:42</span><small>Tuesday, 11 August</small>`;
+      }
+      if (!applyToDashboard) return;
+      this.sidebarEnabled = enabled;
+      this.sidebarType = type;
+      this.sidebarHeader = header;
+      this.sidebarCanvasHeight = height;
+      this.sidebarItems = ['navigation'];
+      this._config = {
+        ...(this._config || {}),
+        sidebar_enabled: enabled,
+        sidebar_type: type,
+        sidebar_items: ['navigation'],
+        sidebar_header: header,
+        sidebar_canvas_height: height,
+        sidebar_cards: this._cloneJson_?.(this.sidebarCards || initialSidebarSettings.cards) || initialSidebarSettings.cards,
+      };
+      this._renderTabs?.();
+      this._renderSidebar_?.();
+      this._applyAutoScale?.();
+    };
+
+    if (chkSidebarEnabled) chkSidebarEnabled.checked = initialSidebarSettings.enabled;
+    sidebarTypeInputs.forEach((input) => {
+      input.checked = input.value === initialSidebarSettings.type;
+      input.addEventListener('change', () => updateSidebarSettingsPreview());
     });
     if (inpSidebarCanvasHeight) {
-      inpSidebarCanvasHeight.value = String(this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight));
+      inpSidebarCanvasHeight.value = String(initialSidebarSettings.canvasHeight);
+      inpSidebarCanvasHeight.addEventListener('input', () => updateSidebarSettingsPreview());
     }
-    sidebarItemInputs.forEach((input) => {
-      input.checked = sidebarItemsForSettings.includes(input.value);
+    chkSidebarEnabled?.addEventListener('change', () => updateSidebarSettingsPreview());
+    selSidebarHeader?.addEventListener('change', () => {
+      sidebarHeaderDraft = this._normalizeSidebarHeader_?.(selSidebarHeader.value) || selSidebarHeader.value;
+      updateSidebarSettingsPreview();
     });
-    const sidebarDefinitions = this._getSidebarItemDefinitions_?.() || [];
-    const sidebarDefinitionById = new Map(sidebarDefinitions.map((item) => [item.id, item]));
-    let sidebarOrderDraft = this._normalizeSidebarItems_(sidebarItemsForSettings, { enabled: !!this.sidebarEnabled });
-    const renderSidebarOrderList = () => {
-      if (!sidebarOrderListEl) return;
-      const safe = (value) => this._safe?.(value) || String(value ?? '');
-      sidebarOrderListEl.innerHTML = '';
-      const checked = sidebarItemInputs.filter((input) => input.checked).map((input) => input.value);
-      sidebarOrderDraft = sidebarOrderDraft.filter((item) => checked.includes(item));
-      checked.forEach((item) => {
-        if (!sidebarOrderDraft.includes(item)) sidebarOrderDraft.push(item);
-      });
-      if (!sidebarOrderDraft.length) {
-        sidebarOrderListEl.innerHTML = `
-          <div class="sidebar-order-empty">
-            <ha-icon icon="mdi:sort-variant-off" aria-hidden="true"></ha-icon>
-            <span>Select modules above to arrange the Sidebar.</span>
-          </div>
-        `;
-        return;
-      }
-      sidebarOrderDraft.forEach((item, index) => {
-        const def = sidebarDefinitionById.get(item) || { id: item, label: item, icon: 'mdi:drag' };
-        const row = document.createElement('div');
-        row.className = 'sidebar-order-row';
-        row.dataset.sidebarOrderItem = item;
-        row.innerHTML = `
-          <div class="sidebar-order-row-main">
-            <span class="sidebar-order-handle"><ha-icon icon="mdi:drag" aria-hidden="true"></ha-icon></span>
-            <span class="sidebar-order-icon"><ha-icon icon="${safe(def.icon)}" aria-hidden="true"></ha-icon></span>
-            <strong>${safe(def.label)}</strong>
-          </div>
-          <div class="sidebar-order-actions">
-            <button type="button" class="icon-btn" data-sidebar-order-move="-1" aria-label="Move ${safe(def.label)} up" ${index === 0 ? 'disabled' : ''}>
-              <ha-icon icon="mdi:chevron-up"></ha-icon>
-            </button>
-            <button type="button" class="icon-btn" data-sidebar-order-move="1" aria-label="Move ${safe(def.label)} down" ${index === sidebarOrderDraft.length - 1 ? 'disabled' : ''}>
-              <ha-icon icon="mdi:chevron-down"></ha-icon>
-            </button>
-          </div>
-        `;
-        row.querySelectorAll('[data-sidebar-order-move]').forEach((button) => {
-          button.addEventListener('click', () => {
-            const direction = Number(button.dataset.sidebarOrderMove || 0);
-            const nextIndex = index + direction;
-            if (nextIndex < 0 || nextIndex >= sidebarOrderDraft.length) return;
-            const [moved] = sidebarOrderDraft.splice(index, 1);
-            sidebarOrderDraft.splice(nextIndex, 0, moved);
-            renderSidebarOrderList();
-          });
-        });
-        sidebarOrderListEl.appendChild(row);
-      });
-    };
-    const syncSidebarOrderDraft = () => renderSidebarOrderList();
-    sidebarItemInputs.forEach((input) => input.addEventListener('change', syncSidebarOrderDraft));
-    syncSidebarOrderDraft();
-
-    const updateSidebarHomeImagePreview = () => {
-      if (!sidebarHomeImagePreview) return;
-      const src = String(inpSidebarHomeImage?.value || '').trim();
-      sidebarHomeImagePreview.classList.toggle('has-image', !!src);
-      sidebarHomeImagePreview.innerHTML = src
-        ? `<img src="${this._safe(src)}" alt="" loading="lazy" />`
-        : `<ha-icon icon="mdi:image-outline" aria-hidden="true"></ha-icon><span>No house image selected</span>`;
-    };
-    if (inpSidebarHomeImage) {
-      inpSidebarHomeImage.value = this._getSidebarHomeImage_?.() || '';
-      inpSidebarHomeImage.addEventListener('input', updateSidebarHomeImagePreview);
-    }
-    updateSidebarHomeImagePreview();
-    inpSidebarHomeImageFile?.addEventListener('change', () => {
-      const file = inpSidebarHomeImageFile.files?.[0];
-      if (!file || !inpSidebarHomeImage) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        inpSidebarHomeImage.value = String(reader.result || '');
-        updateSidebarHomeImagePreview();
-      };
-      reader.readAsDataURL(file);
-    });
-    btnSidebarHomeImageClear?.addEventListener('click', () => {
-      if (inpSidebarHomeImage) inpSidebarHomeImage.value = '';
-      if (inpSidebarHomeImageFile) inpSidebarHomeImageFile.value = '';
-      updateSidebarHomeImagePreview();
-    });
-    if (inpSidebarCalendarEntities) {
-      inpSidebarCalendarEntities.value = this._normalizeSidebarCalendarEntities_(
-        this.sidebarCalendarEntities ?? this._config?.sidebar_calendar_entities ?? this._config?.sidebar_calendars ?? []
-      ).join(', ');
-    }
-    const sidebarStyleForSettings = this._normalizeSidebarStyle_(this.sidebarStyle);
-    const sidebarDensityForSettings = this._normalizeSidebarDensity_(this.sidebarDensity);
-    const sidebarAccentForSettings = this._normalizeSidebarAccent_(this.sidebarAccent);
-    const styleInput = modal.querySelector(`input[name="ddc-sidebar-style"][value="${sidebarStyleForSettings}"]`);
-    const densityInput = modal.querySelector(`input[name="ddc-sidebar-density"][value="${sidebarDensityForSettings}"]`);
-    const accentInput = modal.querySelector(`input[name="ddc-sidebar-accent"][value="${sidebarAccentForSettings}"]`);
-    if (styleInput) styleInput.checked = true;
-    if (densityInput) densityInput.checked = true;
-    if (accentInput) accentInput.checked = true;
+    updateSidebarSettingsPreview({ applyToDashboard: false });
     renderDashboardThemeOptions();
 
     const yCfg = this._config?.background_youtube || {};
@@ -2716,6 +2705,24 @@ const dashboardSettingsMethods = {
       if (!editorThemeModeCommitted) {
         this._setEditorThemeMode_?.(initialEditorThemeMode, { persist: false });
       }
+      if (!sidebarSettingsCommitted) {
+        this.sidebarEnabled = initialSidebarSettings.enabled;
+        this.sidebarType = initialSidebarSettings.type;
+        this.sidebarHeader = initialSidebarSettings.header;
+        this.sidebarCanvasHeight = initialSidebarSettings.canvasHeight;
+        this.sidebarItems = ['navigation'];
+        this.sidebarCards = this._cloneJson_?.(initialSidebarSettings.cards) || initialSidebarSettings.cards;
+        this._config = {
+          ...(this._config || {}),
+          sidebar_enabled: initialSidebarSettings.enabled,
+          sidebar_type: initialSidebarSettings.type,
+          sidebar_items: ['navigation'],
+          sidebar_header: initialSidebarSettings.header,
+          sidebar_canvas_height: initialSidebarSettings.canvasHeight,
+          sidebar_cards: this._cloneJson_?.(initialSidebarSettings.cards) || initialSidebarSettings.cards,
+        };
+        try { this._renderTabs?.(); this._renderSidebar_?.(); this._applyAutoScale?.(); } catch {}
+      }
       try { closeFeatureEditor(); } catch {}
       try { this.__ddcGridRO?.disconnect?.(); this.__ddcGridRO = null; } catch{}
       try { clearTimeout(particlesPreviewTimer); } catch {}
@@ -2784,6 +2791,15 @@ const dashboardSettingsMethods = {
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
       const newTabsSize = this._normalizeTabsSize_(rngTabsSize?.value ?? this.tabsSize);
+      const newSidebarEnabled = !!chkSidebarEnabled?.checked;
+      const newSidebarType = this._normalizeSidebarType_?.(getSidebarTypeDraft()) || 'minimal';
+      const newSidebarHeader = this._getEffectiveSidebarHeader_?.(
+        newSidebarType,
+        selSidebarHeader?.value || sidebarHeaderDraft
+      ) || 'none';
+      const newSidebarCanvasHeight = this._normalizeSidebarCanvasHeight_?.(
+        inpSidebarCanvasHeight?.value || this.sidebarCanvasHeight
+      ) || 520;
       const newLayersEnabled = !!chkLayersEnabled?.checked;
       const newLayersButtonDetails = !!chkLayersButtonDetails?.checked;
       const normalizedLayers = normalizeLayerDrafts(
@@ -2949,31 +2965,45 @@ const dashboardSettingsMethods = {
         this.tabsPosition = newTabsPosition;
         this.tabsSize = newTabsSize;
         this._syncTabsSize_?.();
-        this.sidebarEnabled = false;
-        this.sidebarItems = [];
-        this.sidebarCards = [];
+        this.sidebarEnabled = newSidebarEnabled;
+        this.sidebarType = newSidebarType;
+        this.sidebarItems = ['navigation'];
+        this.sidebarHeader = newSidebarHeader;
+        this.sidebarCanvasHeight = newSidebarCanvasHeight;
+        this.sidebarCards = this._normalizeSidebarCards_(this.sidebarCards || initialSidebarSettings.cards);
         this._config = this._config || {};
         if (this._config.options) {
           this._config.options = {
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
             tabs_size: this.tabsSize,
+            sidebar_enabled: this.sidebarEnabled,
+            sidebar_type: this.sidebarType,
+            sidebar_items: ['navigation'],
+            sidebar_header: this.sidebarHeader,
+            sidebar_canvas_height: this.sidebarCanvasHeight,
+            sidebar_cards: this._cloneJson_(this.sidebarCards),
             card_overflow: newCardOverflow,
             layers_enabled: !!this.layersEnabled,
             layers_button_details: !!this.layersButtonDetails,
             layers: this._cloneJson_(normalizedLayers),
           };
-          this._deleteParkedSidebarOptions_(this._config.options);
         }
         this._config.tabs_position = this.tabsPosition;
         this._config.tabs_size = this.tabsSize;
-        this._deleteParkedSidebarOptions_(this._config);
+        this._config.sidebar_enabled = this.sidebarEnabled;
+        this._config.sidebar_type = this.sidebarType;
+        this._config.sidebar_items = ['navigation'];
+        this._config.sidebar_header = this.sidebarHeader;
+        this._config.sidebar_canvas_height = this.sidebarCanvasHeight;
+        this._config.sidebar_cards = this._cloneJson_(this.sidebarCards);
         this._config.layers_enabled = !!this.layersEnabled;
         this._config.layers_button_details = !!this.layersButtonDetails;
         this._config.layers = this._cloneJson_(normalizedLayers);
         this._setDashboardLayers_(normalizedLayers, { refresh: true, persist: true });
         this._syncTabsPlacement_?.();
         this._renderTabs?.();
+        this._renderSidebar_?.();
         this._applyActiveTab?.();
         this._syncTabsWidth_?.();
         // Disable overlap
@@ -3218,6 +3248,7 @@ const dashboardSettingsMethods = {
       } catch (err) {
         console.warn('[drag-and-drop-card] Failed to apply settings', err);
       }
+      sidebarSettingsCommitted = true;
       closeModal();
     });
   }

@@ -11139,6 +11139,188 @@ export function getDashboardShellTemplate() {
   from { stroke-dashoffset: 0; }
   to   { stroke-dashoffset: -24; }
 }
+
+/* Purpose-based global Sidebar */
+.ddc-root.ddc-sidebar-type-minimal{
+  --ddc-sidebar-width:clamp(76px, 6.4vw, 96px);
+  --ddc-sidebar-gap:clamp(14px, 2vw, 22px);
+}
+.ddc-root.ddc-sidebar-type-essentials{
+  --ddc-sidebar-width:clamp(236px, 17vw, 286px);
+}
+.ddc-root.ddc-sidebar-type-canvas{
+  --ddc-sidebar-width:clamp(300px, 23vw, 390px);
+  --ddc-sidebar-gap:clamp(20px, 2.8vw, 34px);
+}
+.ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:14px;
+  height:max(480px, var(--ddc-sidebar-canvas-height, 0px));
+  max-height:calc(100dvh - var(--ddc-sidebar-top-offset) - max(env(safe-area-inset-bottom, 0px), 14px));
+  overflow-y:auto;
+  border-radius:26px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.065), transparent 34%),
+    color-mix(in oklab, #09111d 94%, var(--ddc-sidebar-accent) 6%);
+  border-color:rgba(148,163,184,.16);
+  box-shadow:0 22px 52px rgba(2,6,23,.3), inset 0 1px 0 rgba(255,255,255,.065);
+}
+.ddc-root.ddc-sidebar-layout > .ddc-sidebar::before{
+  inset:20px auto 20px 0;
+  width:2px;
+  opacity:.7;
+}
+.ddc-root.ddc-sidebar-type-minimal > .ddc-sidebar{
+  height:auto;
+  min-height:0;
+  max-height:calc(100dvh - var(--ddc-sidebar-top-offset) - 18px);
+  padding:10px;
+  border-radius:24px;
+  overflow:hidden auto;
+}
+.ddc-sidebar-navigation{
+  min-width:0;
+  display:block;
+}
+.ddc-root.ddc-sidebar-type-minimal .ddc-sidebar-navigation{
+  display:grid;
+  align-content:center;
+  flex:1 1 auto;
+}
+.ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+  gap:8px;
+}
+.ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  width:54px;
+  min-width:54px;
+  min-height:54px;
+  height:54px;
+  justify-content:center;
+  align-self:center;
+  padding:0;
+  border-radius:16px;
+}
+.ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab .ddc-tab-label{
+  display:none;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header{
+  padding:11px 12px;
+  border-radius:17px;
+  background:rgba(255,255,255,.042);
+  border-color:rgba(148,163,184,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-main,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-main{
+  grid-template-columns:auto minmax(0, 1fr);
+  gap:10px;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-weather .ddc-sidebar-header-main{
+  grid-template-columns:auto minmax(0, 1fr) auto;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-live-pill,
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-stats,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-live-pill,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-stats{
+  display:none;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-mark,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-mark{
+  width:42px;
+  height:42px;
+  border-radius:13px;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-copy strong,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-copy strong{
+  font-size:17px;
+  line-height:1.05;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-copy em,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-copy em{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-workspace{
+  flex:0 0 auto;
+}
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-workspace{
+  flex:1 1 auto;
+  min-height:0;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-canvas{
+  height:min(var(--ddc-sidebar-canvas-frame-height, 360px), 440px);
+  min-height:240px;
+}
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas{
+  height:var(--ddc-sidebar-canvas-frame-height, 640px);
+  min-height:360px;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-canvas.is-empty:not(.is-editing),
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas.is-empty:not(.is-editing){
+  height:84px;
+  min-height:84px;
+}
+.ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
+.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  min-height:46px;
+  padding-inline:11px;
+  border-radius:13px;
+}
+@container ddc-root (min-width:721px) and (max-width:980px){
+  .ddc-root.ddc-sidebar-layout{
+    grid-template-columns:var(--ddc-sidebar-width) minmax(0,1fr);
+    grid-template-areas:"toolbar toolbar" "sidebar canvas";
+    column-gap:var(--ddc-sidebar-gap);
+    row-gap:0;
+  }
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+    position:sticky;
+    top:var(--ddc-sidebar-top-offset);
+    justify-self:center;
+    display:flex;
+    width:100%;
+    height:max(480px, var(--ddc-sidebar-canvas-height, 0px));
+    max-height:calc(100dvh - var(--ddc-sidebar-top-offset) - 14px);
+    padding:12px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    border-radius:22px;
+  }
+}
+@container ddc-root (max-width:720px){
+  .ddc-root.ddc-sidebar-layout > .ddc-sidebar{
+    display:flex;
+    width:100%;
+    height:auto;
+    max-height:none;
+    padding:10px;
+    overflow:visible;
+    border-radius:18px;
+  }
+  .ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller,
+  .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller,
+  .ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+    display:flex;
+    flex-direction:row;
+    gap:7px;
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
+  .ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
+  .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
+  .ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+    width:auto;
+    min-width:52px;
+    height:50px;
+    min-height:50px;
+    flex:0 0 auto;
+  }
+}
 /* === GRID SELECT PATCH END (styles) === */
 </style>
         <div class="ddc-page-bg-host" id="ddcPageBgHost" aria-hidden="true"></div>

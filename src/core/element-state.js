@@ -20,11 +20,12 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.tabsSize = 100;
   instance.cardOverflow = 'auto';
   instance.sidebarEnabled = false;
+  instance.sidebarType = 'minimal';
   instance.sidebarItems = ['navigation'];
   instance.sidebarStyle = 'glass';
   instance.sidebarDensity = 'comfortable';
   instance.sidebarAccent = 'blue';
-  instance.sidebarHeader = 'clock';
+  instance.sidebarHeader = 'date_time';
   instance.sidebarCanvasHeight = 520;
   instance.sidebarCards = [];
   instance.sidebarCanvas = null;

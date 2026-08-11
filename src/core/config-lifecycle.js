@@ -161,6 +161,9 @@ const setConfigMethods = {
         this.tabsSize = this._normalizeTabsSize_(config.tabs_size);
         this._syncTabsSize_?.();
         this.sidebarEnabled = hasSidebarEnabled ? !!config.sidebar_enabled : legacyLeftRail;
+        this.sidebarType = this._normalizeSidebarType_(
+          config.sidebar_type ?? config.sidebarType ?? (legacyLeftRail ? 'minimal' : this.sidebarType)
+        );
         this.sidebarItems = this._normalizeSidebarItems_(config.sidebar_items ?? config.sidebar_content, {
           enabled: this.sidebarEnabled,
           legacyLeft: legacyLeftRail,
@@ -168,7 +171,7 @@ const setConfigMethods = {
         this.sidebarStyle = this._normalizeSidebarStyle_(config.sidebar_style ?? config.sidebarStyle);
         this.sidebarDensity = this._normalizeSidebarDensity_(config.sidebar_density ?? config.sidebarDensity);
         this.sidebarAccent = this._normalizeSidebarAccent_(config.sidebar_accent ?? config.sidebarAccent);
-        this.sidebarHeader = this._normalizeSidebarHeader_(config.sidebar_header ?? config.sidebarHeader ?? config.sidebar_header_type ?? this.sidebarHeader ?? 'clock');
+        this.sidebarHeader = this._normalizeSidebarHeader_(config.sidebar_header ?? config.sidebarHeader ?? config.sidebar_header_type ?? this.sidebarHeader ?? 'date_time');
         this.sidebarCanvasHeight = this._normalizeSidebarCanvasHeight_(config.sidebar_canvas_height ?? config.sidebarCanvasHeight ?? this.sidebarCanvasHeight ?? 520);
         this.sidebarCards = this._normalizeSidebarCards_(config.sidebar_cards ?? config.sidebarCards ?? this.sidebarCards ?? []);
         this.sidebarHomeImage = String(config.sidebar_home_image ?? config.sidebar_house_image ?? config.sidebarHomeImage ?? '').trim();

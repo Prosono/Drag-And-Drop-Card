@@ -1695,6 +1695,7 @@ const converterMethods = {
       connectors: [],
       responsive_connectors: {},
       sidebar_enabled: false,
+      sidebar_type: 'minimal',
       sidebar_cards: [],
       background_mode: 'none',
       container_background: 'transparent',

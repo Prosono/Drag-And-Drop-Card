@@ -144,19 +144,9 @@ const configHelperMethods = {
   },
 
   _parkedSidebarOptionKeys_() {
-    return [
-      'sidebar_enabled', 'sidebar_items', 'sidebar_content', 'sidebar_style',
-      'sidebar_density', 'sidebar_accent', 'sidebar_header', 'sidebar_header_type',
-      'sidebar_canvas_height', 'sidebar_cards', 'sidebar_home_image',
-      'sidebar_house_image', 'sidebar_home_image_url', 'sidebar_calendar_entities',
-      'sidebar_calendars', 'sidebar_weather_entity', 'sidebar_title',
-      'sidebar_user_name', 'sidebar_user_role',
-      'sidebarEnabled', 'sidebarItems', 'sidebarContent', 'sidebarStyle',
-      'sidebarDensity', 'sidebarAccent', 'sidebarHeader', 'sidebarHeaderType',
-      'sidebarCanvasHeight', 'sidebarCards', 'sidebarHomeImage',
-      'sidebarHouseImage', 'sidebarCalendarEntities', 'sidebarCalendars',
-      'sidebarWeatherEntity', 'sidebarTitle', 'sidebarUserName', 'sidebarUserRole',
-    ];
+    // Kept as a compatibility hook for snapshots produced while Sidebar was
+    // temporarily disabled. Sidebar options are first-class dashboard data now.
+    return [];
   },
 
   _deleteParkedSidebarOptions_(target = null) {

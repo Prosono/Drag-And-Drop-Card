@@ -75,6 +75,12 @@ const dashboardApiMethods = {
       tabs_size: this._normalizeTabsSize_(this.tabsSize),
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
+      sidebar_enabled: !!this.sidebarEnabled,
+      sidebar_type: this._normalizeSidebarType_(this.sidebarType),
+      sidebar_items: ['navigation'],
+      sidebar_header: this._getEffectiveSidebarHeader_(this.sidebarType, this.sidebarHeader),
+      sidebar_canvas_height: this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight),
+      sidebar_cards: this._cloneJson_(this._normalizeSidebarCards_(this.sidebarCards || cfg.sidebar_cards || [])),
       layers_enabled: !!this.layersEnabled,
       layers_button_details: !!this.layersButtonDetails,
       layers: this._cloneJson_(this.layers || []),
@@ -301,6 +307,9 @@ const dashboardApiMethods = {
     if ('sidebar_enabled' in opts) {
       this.sidebarEnabled = !!opts.sidebar_enabled;
     }
+    if ('sidebar_type' in opts || 'sidebarType' in opts) {
+      this.sidebarType = this._normalizeSidebarType_(opts.sidebar_type ?? opts.sidebarType);
+    }
     if ('sidebar_items' in opts || 'sidebar_content' in opts) {
       this.sidebarItems = this._normalizeSidebarItems_(opts.sidebar_items ?? opts.sidebar_content, { enabled: !!this.sidebarEnabled });
     } else if ('sidebar_enabled' in opts) {
@@ -367,7 +376,7 @@ const dashboardApiMethods = {
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'sidebar_enabled' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
+    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'sidebar_enabled' in opts || 'sidebar_type' in opts || 'sidebarType' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
       this._renderTabs?.();
       this._renderSidebar_?.();
       this._applyActiveTab?.();
@@ -424,6 +433,11 @@ const dashboardApiMethods = {
       tabs_size: { type: 'number' },
       default_tab: { type: 'string' },
       hide_tabs_when_single: { type: 'boolean' },
+      sidebar_enabled: { type: 'boolean' },
+      sidebar_type: { type: 'string' },
+      sidebar_header: { type: 'string' },
+      sidebar_canvas_height: { type: 'number' },
+      sidebar_cards: { type: 'array' },
       layers_enabled: { type: 'boolean' },
       layers_button_details: { type: 'boolean' },
       layers: { type: 'array' },
@@ -484,6 +498,11 @@ const dashboardApiMethods = {
       tabsSize: 'tabs_size',
       defaultTab: 'default_tab',
       hideTabsWhenSingle: 'hide_tabs_when_single',
+      sidebarEnabled: 'sidebar_enabled',
+      sidebarType: 'sidebar_type',
+      sidebarHeader: 'sidebar_header',
+      sidebarCanvasHeight: 'sidebar_canvas_height',
+      sidebarCards: 'sidebar_cards',
       layersEnabled: 'layers_enabled',
       enable_layers: 'layers_enabled',
       layersButtonDetails: 'layers_button_details',
