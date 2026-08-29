@@ -32,7 +32,8 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       <ha-icon icon="mdi:tab" aria-hidden="true"></ha-icon>
       <span>Tabs</span>
     </button>
-    <button type="button" class="settings-tab" id="ddc-settings-tab-sidebar" data-settings-tab="sidebar" role="tab" aria-selected="false">
+    <!-- Temporarily hidden while Sidebar Studio is held back for further work. -->
+    <button type="button" class="settings-tab" id="ddc-settings-tab-sidebar" data-settings-tab="sidebar" data-feature-status="deferred" role="tab" aria-selected="false" aria-hidden="true" tabindex="-1" hidden>
       <ha-icon icon="mdi:page-layout-sidebar-left" aria-hidden="true"></ha-icon>
       <span>Sidebar</span>
     </button>

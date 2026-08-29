@@ -131,14 +131,15 @@ test('dashboard option normalization preserves Sidebar data', () => {
   });
 });
 
-test('Sidebar settings expose Minimal, Essentials and Canvas with live preview', async () => {
+test('Sidebar settings stay implemented but are hidden while the feature is deferred', async () => {
   const template = await readFile(new URL('../src/dashboard/settings-template.js', import.meta.url), 'utf8');
   const controller = await readFile(new URL('../src/dashboard/settings-controller.js', import.meta.url), 'utf8');
   const settingsStyles = await readFile(new URL('../src/styles/dashboard-settings-styles.js', import.meta.url), 'utf8');
   const shell = await readFile(new URL('../src/dashboard/shell-template.js', import.meta.url), 'utf8');
   const tabs = await readFile(new URL('../src/layout/tabs.js', import.meta.url), 'utf8');
 
-  assert.match(template, /data-settings-tab="sidebar"/);
+  assert.match(template, /id="ddc-settings-tab-sidebar"[^>]*data-settings-tab="sidebar"[^>]*data-feature-status="deferred"[^>]*aria-hidden="true"[^>]*hidden/);
+  assert.match(controller, /filter\(\(btn\) => !btn\.hidden && btn\.getAttribute\('aria-hidden'\) !== 'true'\)/);
   assert.match(template, /name="ddc-sidebar-type" value="minimal"/);
   assert.match(template, /name="ddc-sidebar-type" value="essentials"/);
   assert.match(template, /name="ddc-sidebar-type" value="canvas"/);

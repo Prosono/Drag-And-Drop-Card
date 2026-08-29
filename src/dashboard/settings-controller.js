@@ -61,7 +61,11 @@ const dashboardSettingsMethods = {
     this.__settingsModal = modal;
     this.shadowRoot.appendChild(modal);
 
-    const settingsTabs = Array.from(modal.querySelectorAll('[data-settings-tab]'));
+    // Deferred settings can remain in the template for later development, but
+    // must not participate in keyboard navigation, persisted tab restoration,
+    // or section activation while their tab is hidden.
+    const settingsTabs = Array.from(modal.querySelectorAll('[data-settings-tab]'))
+      .filter((btn) => !btn.hidden && btn.getAttribute('aria-hidden') !== 'true');
     const settingsSections = Array.from(modal.querySelectorAll('[data-settings-section]'));
     const settingsBody = modal.querySelector('.settings-body');
     const settingsTabKeys = new Set(settingsTabs.map((btn) => btn.dataset.settingsTab).filter(Boolean));
