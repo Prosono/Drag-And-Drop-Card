@@ -8,3 +8,13 @@ examples/ddc-card-neo-score-energy-html-fixed.json
 examples/ddc-card-media-player-color-bridge.json
 examples/ddc-card-laundry-service-matrix-table-card.json
 examples/ddc-card-bosch-wgg246f1sn-e18-text-card.json
+examples/ddc-card-apple-home-status.json
+examples/ddc-card-apple-now-playing.json
+examples/ddc-card-apple-reminders.json
+examples/ddc-card-apple-weather.json
+examples/ddc-card-cupertino-batteries.json
+examples/ddc-card-cupertino-calendar.json
+examples/ddc-card-home-pulse.json
+scripts/generate-apple-widget-pack-01.mjs
+scripts/generate-cupertino-calendar-battery-card.mjs
+scripts/generate-home-pulse-card.mjs

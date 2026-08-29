@@ -5,6 +5,8 @@
  * and decides whether an existing layout must be reloaded after a config change.
  */
 
+import { lovelaceCardConfigSignature } from '../storage/lovelace-card-reconciliation.js';
+
 export function resolveConfiguredActiveTab({
   tabs = [],
   defaultTab = 'default',
@@ -26,6 +28,11 @@ export function resolveConfiguredActiveTab({
 const setConfigMethods = {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+      const incomingLovelaceCardConfigSignature = lovelaceCardConfigSignature(config);
+      const previousLovelaceCardConfigSignature = this.__incomingLovelaceCardConfigSignature;
+      const lovelaceCardConfigChanged = previousLovelaceCardConfigSignature !== undefined
+        && previousLovelaceCardConfigSignature !== incomingLovelaceCardConfigSignature;
+      this.__incomingLovelaceCardConfigSignature = incomingLovelaceCardConfigSignature;
       try { this.__lastSetConfigSource = this._cloneJson_?.(config) || JSON.parse(JSON.stringify(config)); } catch {}
       const inHaConfigPreview = this._isInHaEditorPreview?.();
       if (this.__haConfigPreviewMode && !inHaConfigPreview) {
@@ -278,6 +285,12 @@ const setConfigMethods = {
         } else {
           this._initialLoad(true, editorLoadOptions);
         }
+      } else if (lovelaceCardConfigChanged && this.__booted) {
+        this._initialLoad(true, {
+          ...(editorLoadOptions || {}),
+          replaceExisting: true,
+          reason: 'lovelace-card-config-changed',
+        });
       } else if (!this.__booted && this.__probed) {
         const shouldWaitForBackendSnapshot = !!(
           this.__backendProbePending

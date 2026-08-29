@@ -5,6 +5,8 @@
  * then builds the active responsive layout and refreshes post-load UI state.
  */
 
+import { reconcileLovelaceCardConfig } from '../storage/lovelace-card-reconciliation.js';
+
 export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot, { preferLocal = false } = {}) {
   if (preferLocal && localSnapshot && typeof localSnapshot === 'object') {
     return { source: 'local-replacement', snapshot: localSnapshot };
@@ -204,7 +206,10 @@ const initialLoadMethods = {
   /* ------------------------ Initial load / rebuild ------------------------ */
     async _initialLoad(force = false, options = {}) {
       // prevent multiple parallel boots
-      if (this.__booting) return;
+      if (this.__booting) {
+        this.__pendingInitialLoad = { force, options };
+        return;
+      }
       const loadSeq = (Number(this.__initialLoadSeq || 0) || 0) + 1;
       this.__initialLoadSeq = loadSeq;
       const isCurrentLoad = () => (
@@ -293,17 +298,6 @@ const initialLoadMethods = {
           saved = selectedInitialSnapshot.snapshot;
         }
 
-        // The shared backend is authoritative whenever it is reachable. A browser-local
-        // timestamp may be newer because of clock skew or an old offline session and must
-        // never overwrite a valid shared snapshot during refresh.
-        if (syncedWithBackend) {
-          this._dbgPush('boot', 'Using authoritative backend snapshot');
-          try {
-            localStorage.setItem(`ddc_local_${this.storageKey}`, JSON.stringify(saved));
-          } catch {}
-          try { this._writeRuntimeLayoutCache_?.(saved); } catch {}
-        }
-
         // Fallback: localStorage (and migrate to backend if possible)
         if (!saved && this.storageKey) {
           if (local) {
@@ -330,6 +324,44 @@ const initialLoadMethods = {
         if (!saved && this._config?.cards?.length) {
           this._dbgPush('boot', 'Using embedded config');
           saved = { cards: this._config.cards };
+        }
+
+        // The backend owns the canvas/layout state, while the embedded
+        // Lovelace card config remains the integration point for external
+        // tools using lovelace/config/save. Apply only externally changed
+        // nested card content and preserve backend geometry and tab state.
+        if (saved && this._config && Array.isArray(this._config.cards)) {
+          const reconciled = reconcileLovelaceCardConfig(saved, this._config);
+          saved = this._normalizeDashboardPayload_?.(reconciled.snapshot) || reconciled.snapshot;
+          this.__lovelaceCardConfigBaseline = this._cloneJson_?.(reconciled.baseline) || reconciled.baseline;
+          if (syncedWithBackend) authoritativeBackendSnapshot = this._cloneJson_?.(saved) || saved;
+
+          if (reconciled.changed) {
+            this._dbgPush('boot', 'Reconciled Lovelace card content with stored layout', {
+              contentChanged: reconciled.contentChanged,
+              migratedBaseline: reconciled.legacy,
+            });
+            if (syncedWithBackend && this._backendOK && this.storageKey) {
+              try {
+                await this._saveLayoutToBackend(this.storageKey, saved);
+                this._dbgPush('boot', 'Stored reconciled Lovelace baseline in backend');
+              } catch (e) {
+                this._dbgPush('boot', 'Could not store reconciled Lovelace baseline', { error: String(e) });
+              }
+            } else if (this.storageKey) {
+              try { localStorage.setItem(`ddc_local_${this.storageKey}`, JSON.stringify(saved)); } catch {}
+            }
+          }
+        }
+
+        // The shared backend remains authoritative for layout whenever it is
+        // reachable. Local/runtime caches receive the reconciled snapshot.
+        if (syncedWithBackend) {
+          this._dbgPush('boot', 'Using authoritative backend layout snapshot');
+          try {
+            localStorage.setItem(`ddc_local_${this.storageKey}`, JSON.stringify(saved));
+          } catch {}
+          try { this._writeRuntimeLayoutCache_?.(saved); } catch {}
         }
 
         const hasSavedCards = Array.isArray(saved?.cards) && saved.cards.length > 0;
@@ -474,6 +506,7 @@ const initialLoadMethods = {
         if (entriesToBuild.length) {
           this._writeRuntimeLayoutCache_?.({
             version: 3,
+            lovelace_card_config_baseline: this._cloneJson_?.(this.__lovelaceCardConfigBaseline),
             options: this._exportableOptions?.() || {},
             cards: this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || entriesToBuild,
             responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_?.(
@@ -552,6 +585,14 @@ const initialLoadMethods = {
           if (shouldRefreshBackend) {
             this._queueBackendRefresh_?.(this.__backendRefreshReason || 'backend-probe-refresh');
           }
+        }
+        const pendingInitialLoad = this.__pendingInitialLoad;
+        this.__pendingInitialLoad = null;
+        if (pendingInitialLoad && !this.__dashboardConverterImporting && !this.__ddcImportingDashboard) {
+          queueMicrotask(() => this._initialLoad(
+            !!pendingInitialLoad.force,
+            pendingInitialLoad.options || {}
+          ));
         }
       }
     }

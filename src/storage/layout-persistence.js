@@ -5,6 +5,12 @@
  * backend/local fallback behavior consistent.
  */
 
+import {
+  LOVELACE_CARD_CONFIG_BASELINE_KEY,
+  createLovelaceCardConfigBaseline,
+  lovelaceCardConfigSignature,
+} from './lovelace-card-reconciliation.js';
+
 const DDC_MERGE_MISSING = Symbol('ddc-merge-missing');
 
 function ddcStorageKeyFromCard(card = {}) {
@@ -319,6 +325,8 @@ const persistenceMethods = {
     this.config = merged;
     this._config = { ...(this._config || {}), id };
     this.__lastSetConfigSource = this._cloneJson_?.(merged) || merged;
+    this.__lovelaceCardConfigBaseline = createLovelaceCardConfigBaseline(merged);
+    this.__incomingLovelaceCardConfigSignature = lovelaceCardConfigSignature(merged);
     this.requestUpdate?.();
     return true;
   },
@@ -560,6 +568,9 @@ const persistenceMethods = {
     let payload = {
        version: 3,
        updated_at: savedAt,
+       ...(this.__lovelaceCardConfigBaseline
+         ? { [LOVELACE_CARD_CONFIG_BASELINE_KEY]: this._cloneJson_(this.__lovelaceCardConfigBaseline) }
+         : {}),
        options: this._exportableOptions(),
        cards: desktopCards,
        responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, desktopCards)),
