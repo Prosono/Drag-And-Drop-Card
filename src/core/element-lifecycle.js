@@ -131,6 +131,7 @@ const lifecycleMethods = {
         requestAnimationFrame(() => this._syncPageBackgroundToView_?.());
         this._ensureScreenSaverStyles?.();
         this._updateScreensaverSettings?.();
+        this._updateTabsAutoReturnSettings_?.();
       } catch {}
 
       if (!this.__autoFillAfterDragHandler) {
@@ -229,6 +230,7 @@ const lifecycleMethods = {
         this.__containerBlankMouseDown = null;
       }
       try { this._uninstallMiddleMousePan_?.(); } catch {}
+      try { this._closeConnectorPointMenu_?.(); } catch {}
       this.__uiBindingsReady = false;
 
       try { this._destroyParticles_?.(); } catch {}
@@ -247,6 +249,7 @@ const lifecycleMethods = {
       try { this._clearBubblePopupHashListeners_?.(); } catch {}
 
       try {
+        this._detachTabsAutoReturnListeners_?.();
         if (this._screensaverTimer) { clearTimeout(this._screensaverTimer); this._screensaverTimer = null; }
         if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
         if (this.__sidebarClockInterval) { clearInterval(this.__sidebarClockInterval); this.__sidebarClockInterval = null; }

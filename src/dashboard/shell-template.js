@@ -10634,16 +10634,99 @@ export function getDashboardShellTemplate() {
   pointer-events:stroke;
   cursor:pointer;
 }
+.ddc-connectors-layer .ddc-connector-handle-hit{
+  fill:transparent;
+  stroke:none;
+  pointer-events:all;
+  cursor:grab;
+  touch-action:none;
+}
 .ddc-connectors-layer .ddc-connector-handle{
   fill:color-mix(in oklab, var(--primary-color, #ff9800) 84%, #ffffff 12%);
   stroke:rgba(255,255,255,.94);
   stroke-width:2.5;
   pointer-events:all;
   cursor:grab;
+  touch-action:none;
+  opacity:.68;
   filter:drop-shadow(0 7px 14px rgba(0,0,0,.28));
+  transition:opacity .14s ease, filter .14s ease;
+}
+.ddc-connectors-layer .ddc-connector:hover .ddc-connector-handle,
+.ddc-connectors-layer .ddc-connector.is-selected .ddc-connector-handle,
+.ddc-connectors-layer .ddc-connector-handle-hit:hover + .ddc-connector-handle,
+.ddc-connectors-layer .ddc-connector-handle:hover{
+  opacity:1;
+  filter:
+    drop-shadow(0 0 9px color-mix(in oklab, var(--primary-color, #ff9800) 30%, transparent))
+    drop-shadow(0 7px 14px rgba(0,0,0,.32));
+}
+.ddc-connectors-layer .ddc-connector:hover .ddc-connector-line{
+  opacity:1;
+  filter:drop-shadow(0 0 8px color-mix(in oklab, currentColor 28%, transparent));
 }
 .ddc-connectors-layer .ddc-connector-handle:active{
   cursor:grabbing;
+}
+.ddc-connectors-layer .ddc-connector-handle-hit:active{
+  cursor:grabbing;
+}
+.ddc-connector-point-menu{
+  position:fixed;
+  z-index:1000003;
+  width:max-content;
+  min-width:190px;
+  padding:7px;
+  border:1px solid color-mix(in srgb, var(--divider-color, rgba(148,163,184,.28)) 82%, transparent);
+  border-radius:13px;
+  background:color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #171b22)) 96%, transparent);
+  box-shadow:0 18px 44px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08);
+  color:var(--primary-text-color, #f8fafc);
+  backdrop-filter:blur(18px) saturate(1.18);
+  -webkit-backdrop-filter:blur(18px) saturate(1.18);
+}
+.ddc-connector-point-menu-label{
+  padding:5px 9px 7px;
+  color:var(--secondary-text-color, #94a3b8);
+  font-size:11px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.ddc-connector-point-menu button{
+  width:100%;
+  min-height:40px;
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  padding:8px 9px;
+  border:0;
+  border-radius:9px;
+  color:var(--error-color, #ef4444);
+  background:transparent;
+  font:inherit;
+  font-size:13px;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+}
+.ddc-connector-point-menu button:hover,
+.ddc-connector-point-menu button:focus-visible{
+  outline:none;
+  background:color-mix(in srgb, var(--error-color, #ef4444) 13%, transparent);
+}
+.ddc-connector-point-menu ha-icon{
+  --mdc-icon-size:19px;
+}
+.ddc-connector-point-menu kbd{
+  padding:3px 6px;
+  border:1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius:6px;
+  color:var(--secondary-text-color, #94a3b8);
+  background:color-mix(in srgb, var(--primary-text-color, #fff) 5%, transparent);
+  font:700 10px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .ddc-connectors-layer .ddc-connector.is-idle .ddc-connector-line{
   opacity:.68;

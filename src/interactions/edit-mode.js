@@ -138,6 +138,9 @@ const editModeMethods = {
     const entering = (force === null) ? !this.editMode : !!force;
     const editModeChanged = entering !== !!this.editMode;
     const wasOff   = !this.editMode && entering;
+    if (!entering) {
+      try { this._closeConnectorPointMenu_?.(); } catch {}
+    }
     // EDIT MODE PIN gate
     try {
       const cfgPin = (this.config && this.config.edit_mode_pin != null) ? String(this.config.edit_mode_pin) : '';
@@ -307,6 +310,7 @@ const editModeMethods = {
       if (typeof this._resetScreensaverTimer === 'function') {
         this._resetScreensaverTimer();
       }
+      this._resetTabsAutoReturnTimer_?.();
     } catch {}
   
     const wraps = this.cardContainer?.querySelectorAll?.('.card-wrapper') || [];

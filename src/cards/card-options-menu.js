@@ -450,6 +450,71 @@ const cardSettingsMenuMethods = {
     return { x: nextX, y: nextY };
   },
 
+  _updateCardSizeFromSettings_(wrap, dimensions = {}) {
+    if (!wrap) return null;
+    const numberOr = (value, fallback = 0) => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const rect = wrap.getBoundingClientRect?.() || {};
+    const scaleX = Math.max(0.0001, numberOr(this.__pointerScaleX, 1));
+    const scaleY = Math.max(0.0001, numberOr(this.__pointerScaleY, 1));
+    const currentWidth = Math.max(1, numberOr(
+      wrap.style?.width,
+      numberOr(wrap.offsetWidth, numberOr(rect.width, 0) / scaleX)
+    ));
+    const currentHeight = Math.max(1, numberOr(
+      wrap.style?.height,
+      numberOr(wrap.offsetHeight, numberOr(rect.height, 0) / scaleY)
+    ));
+    const gridSize = Math.max(1, numberOr(this.gridSize, numberOr(this._config?.grid, 1)));
+    const snapSize = (value, fallback) => Math.max(
+      gridSize,
+      Math.round(numberOr(value, fallback) / gridSize) * gridSize
+    );
+    const x = numberOr(wrap.getAttribute?.('data-x'), numberOr(wrap.getAttribute?.('data-x-raw'), 0));
+    const y = Math.max(0, numberOr(wrap.getAttribute?.('data-y'), numberOr(wrap.getAttribute?.('data-y-raw'), 0)));
+    let nextWidth = snapSize(dimensions.width, currentWidth);
+    let nextHeight = snapSize(dimensions.height, currentHeight);
+
+    if (this._isContainerFixed?.()) {
+      const { w: canvasWidth = 0, h: canvasHeight = 0 } = this._getContainerSize?.() || {};
+      const edgeBuffer = Math.max(0, numberOr(this._getCanvasEdgeBufferPx_?.(), 0));
+      if (numberOr(canvasWidth, 0) > 0) {
+        nextWidth = Math.min(nextWidth, Math.max(gridSize, numberOr(canvasWidth, 0) - edgeBuffer - x));
+      }
+      if (numberOr(canvasHeight, 0) > 0) {
+        nextHeight = Math.min(nextHeight, Math.max(gridSize, numberOr(canvasHeight, 0) - edgeBuffer - y));
+      }
+    }
+
+    nextWidth = Math.max(gridSize, Math.round(nextWidth));
+    nextHeight = Math.max(gridSize, Math.round(nextHeight));
+    const proposed = typeof this._rectFor === 'function'
+      ? [this._rectFor(wrap, x, y, nextWidth, nextHeight)]
+      : [{ el: wrap, x, y, w: nextWidth, h: nextHeight }];
+    if (this.disableOverlap && this._anyCollisionFor?.(proposed, new Set([wrap]))) {
+      this._toast?.('That size would overlap another card.');
+      return { width: Math.round(currentWidth), height: Math.round(currentHeight) };
+    }
+
+    wrap.style.width = `${nextWidth}px`;
+    wrap.style.height = `${nextHeight}px`;
+    this._syncCompactEditUiForWrapper_?.(wrap);
+    this._syncAnchoredConnectorPointsForCurrentLayout_?.({ reason: null, render: false });
+    this._scheduleConnectorsRender_?.({ syncAnchors: true });
+    this._resizeContainer?.();
+    this._persistCurrentResponsiveProfileToMemory_?.();
+    this.__ddcTextLockDirty = true;
+    this._scheduleTextResizeLockRefresh_?.(true);
+    try {
+      const mode = this._normalizeContainerSizeMode_?.(this.containerSizeMode || this.container_size_mode);
+      if (mode === 'auto' || this.autoResizeCards) this._applyAutoScale?.();
+    } catch {}
+    this._queueSave?.('card-size-change');
+    return { width: nextWidth, height: nextHeight };
+  },
+
   /**
    * Open or toggle a small settings menu attached to a card wrapper. This menu
    * exposes placement, visibility, styling and overflow controls for one
@@ -502,7 +567,7 @@ const cardSettingsMenuMethods = {
     titleEl.textContent = 'Card Settings';
     const subtitle = document.createElement('p');
     subtitle.className = 'ddc-card-settings-subtitle';
-    subtitle.textContent = 'Fine-tune visibility, layers and per-card styling for this card without leaving edit mode.';
+    subtitle.textContent = 'Fine-tune placement, size, visibility, layers and per-card styling without leaving edit mode.';
     headCopy.append(kicker, titleEl, subtitle);
     const closeBtn = document.createElement('button');
     closeBtn.className = 'ddc-card-settings-close';
@@ -839,6 +904,58 @@ const cardSettingsMenuMethods = {
       color: 'var(--secondary-text-color, #9ca3af)'
     });
     visibilitySection.appendChild(positionHint);
+
+    const sizeFields = document.createElement('div');
+    sizeFields.className = 'ddc-card-position-fields ddc-card-size-fields';
+    const makeSizeField = (axis, accessibleLabel, value) => {
+      const field = document.createElement('label');
+      field.className = 'ddc-card-position-field ddc-card-size-field';
+      const axisLabel = document.createElement('span');
+      axisLabel.textContent = axis;
+      axisLabel.title = accessibleLabel;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.inputMode = 'numeric';
+      input.min = gridStep;
+      input.step = gridStep;
+      input.value = String(Math.max(Number(gridStep), Math.round(Number(value) || Number(gridStep))));
+      input.setAttribute('aria-label', `${accessibleLabel} in pixels`);
+      input.setAttribute('data-card-size-axis', accessibleLabel.toLowerCase());
+      stopInteractive(input);
+      field.append(axisLabel, input);
+      return { field, input };
+    };
+    const renderedRect = wrap.getBoundingClientRect?.() || {};
+    const currentWidth = parseFloat(wrap.style?.width)
+      || Number(wrap.offsetWidth)
+      || (Number(renderedRect.width) / Math.max(0.0001, Number(this.__pointerScaleX) || 1));
+    const currentHeight = parseFloat(wrap.style?.height)
+      || Number(wrap.offsetHeight)
+      || (Number(renderedRect.height) / Math.max(0.0001, Number(this.__pointerScaleY) || 1));
+    const widthSize = makeSizeField('W', 'Width', currentWidth);
+    const heightSize = makeSizeField('H', 'Height', currentHeight);
+    const commitSize = () => {
+      const next = this._updateCardSizeFromSettings_(wrap, {
+        width: widthSize.input.value,
+        height: heightSize.input.value,
+      });
+      if (!next) return;
+      widthSize.input.value = String(next.width);
+      heightSize.input.value = String(next.height);
+    };
+    widthSize.input.addEventListener('change', commitSize);
+    heightSize.input.addEventListener('change', commitSize);
+    sizeFields.append(widthSize.field, heightSize.field);
+    const sizeRow = makeRow('Size', sizeFields);
+    sizeRow.classList.add('ddc-card-size-row');
+    visibilitySection.appendChild(sizeRow);
+    const sizeHint = document.createElement('div');
+    sizeHint.textContent = `Width and height use the dashboard grid (${gridStep} px). Changes are applied immediately.`;
+    Object.assign(sizeHint.style, {
+      fontSize: '.75rem',
+      color: 'var(--secondary-text-color, #9ca3af)'
+    });
+    visibilitySection.appendChild(sizeHint);
 
     if (Array.isArray(this.tabs) && this.tabs.length > 1) {
       const tabSelect = document.createElement('select');

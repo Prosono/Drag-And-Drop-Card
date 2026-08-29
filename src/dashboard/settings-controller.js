@@ -255,6 +255,10 @@ const dashboardSettingsMethods = {
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
     const rngTabsSize        = modal.querySelector('#ddc-setting-tabsSize');
     const outTabsSize        = modal.querySelector('#ddc-tabsSizeOut');
+    const chkTabsAutoReturn  = modal.querySelector('#ddc-setting-tabsAutoReturnEnabled');
+    const selTabsAutoReturnTab = modal.querySelector('#ddc-setting-tabsAutoReturnTab');
+    const inpTabsAutoReturnMinutes = modal.querySelector('#ddc-setting-tabsAutoReturnMinutes');
+    const tabsAutoReturnControls = modal.querySelector('#ddc-tabsAutoReturnControls');
     const chkSidebarEnabled  = modal.querySelector('#ddc-setting-sidebarEnabled');
     const inpSidebarCanvasHeight = modal.querySelector('#ddc-setting-sidebarCanvasHeight');
     const outSidebarCanvasHeight = modal.querySelector('#ddc-sidebarCanvasHeightOut');
@@ -1204,6 +1208,17 @@ const dashboardSettingsMethods = {
       rngTabsSize.addEventListener('input', syncTabsSizeOutput);
       syncTabsSizeOutput();
     }
+    if (chkTabsAutoReturn) chkTabsAutoReturn.checked = !!this.tabsAutoReturnEnabled;
+    if (inpTabsAutoReturnMinutes) {
+      const delay = this._normalizeTabsAutoReturnDelay_?.(this.tabsAutoReturnDelay) || (5 * 60 * 1000);
+      inpTabsAutoReturnMinutes.value = String(Math.max(1, Math.round(delay / 60000)));
+    }
+    const syncTabsAutoReturnControls = () => {
+      if (tabsAutoReturnControls) tabsAutoReturnControls.hidden = !chkTabsAutoReturn?.checked;
+      chkTabsAutoReturn?.setAttribute('aria-expanded', String(!!chkTabsAutoReturn.checked));
+    };
+    chkTabsAutoReturn?.addEventListener('change', syncTabsAutoReturnControls);
+    syncTabsAutoReturnControls();
     let sidebarHeaderDraft = initialSidebarSettings.header;
     const getSidebarTypeDraft = () => this._normalizeSidebarType_?.(
       sidebarTypeInputs.find((input) => input.checked)?.value || initialSidebarSettings.type
@@ -2285,6 +2300,7 @@ const dashboardSettingsMethods = {
       if (!this.tabs.some((t) => t.id === this.activeTab)) {
         this.activeTab = this.defaultTab;
       }
+      try { syncTabsAutoReturnTargetOptions(out); } catch {}
 
       try { this._renderTabs?.(); } catch {}
       try { this._applyActiveTab?.(); } catch {}
@@ -2307,11 +2323,38 @@ const dashboardSettingsMethods = {
     const defaultTabId = () =>
       (this._config?.options?.default_tab) || this._config?.default_tab || (readTabs()[0]?.id);
 
+    const syncTabsAutoReturnTargetOptions = (tabs = readTabs()) => {
+      if (!selTabsAutoReturnTab) return;
+      const previous = String(
+        selTabsAutoReturnTab.value
+        || this.tabsAutoReturnTab
+        || this._config?.options?.tabs_auto_return_tab
+        || this._config?.tabs_auto_return_tab
+        || defaultTabId()
+        || ''
+      ).trim();
+      selTabsAutoReturnTab.innerHTML = '';
+      tabs.forEach((tab) => {
+        const option = document.createElement('option');
+        option.value = tab.id;
+        option.textContent = tab.label || tab.id;
+        selTabsAutoReturnTab.appendChild(option);
+      });
+      const resolved = this._resolveTabsAutoReturnTarget_?.(previous)
+        || tabs.find((tab) => tab.id === previous)?.id
+        || defaultTabId()
+        || tabs[0]?.id
+        || '';
+      selTabsAutoReturnTab.value = resolved;
+      selTabsAutoReturnTab.disabled = tabs.length < 2;
+    };
+
     const tabsListEl = modal.querySelector('#ddc-tabs-list');
 
     const renderTabs = () => {
       const tabs = readTabs();
       const def = defaultTabId();
+      syncTabsAutoReturnTargetOptions(tabs);
       tabsListEl.innerHTML = '';
 
       if (!tabs.length) {
@@ -2792,6 +2835,12 @@ const dashboardSettingsMethods = {
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
       const newTabsSize = this._normalizeTabsSize_(rngTabsSize?.value ?? this.tabsSize);
+      const newTabsAutoReturnEnabled = !!chkTabsAutoReturn?.checked;
+      const newTabsAutoReturnTab = this._resolveTabsAutoReturnTarget_?.(selTabsAutoReturnTab?.value)
+        || this.defaultTab;
+      const newTabsAutoReturnDelay = this._normalizeTabsAutoReturnDelay_(
+        Number(inpTabsAutoReturnMinutes?.value || 5) * 60000
+      );
       const newSidebarEnabled = !!chkSidebarEnabled?.checked;
       const newSidebarType = this._normalizeSidebarType_?.(getSidebarTypeDraft()) || 'minimal';
       const newSidebarHeader = this._getEffectiveSidebarHeader_?.(
@@ -2965,6 +3014,9 @@ const dashboardSettingsMethods = {
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
         this.tabsSize = newTabsSize;
+        this.tabsAutoReturnEnabled = newTabsAutoReturnEnabled;
+        this.tabsAutoReturnTab = newTabsAutoReturnTab;
+        this.tabsAutoReturnDelay = newTabsAutoReturnDelay;
         this._syncTabsSize_?.();
         this.sidebarEnabled = newSidebarEnabled;
         this.sidebarType = newSidebarType;
@@ -2978,6 +3030,9 @@ const dashboardSettingsMethods = {
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
             tabs_size: this.tabsSize,
+            tabs_auto_return_enabled: this.tabsAutoReturnEnabled,
+            tabs_auto_return_tab: this.tabsAutoReturnTab,
+            tabs_auto_return_delay: this.tabsAutoReturnDelay,
             sidebar_enabled: this.sidebarEnabled,
             sidebar_type: this.sidebarType,
             sidebar_items: ['navigation'],
@@ -2992,6 +3047,9 @@ const dashboardSettingsMethods = {
         }
         this._config.tabs_position = this.tabsPosition;
         this._config.tabs_size = this.tabsSize;
+        this._config.tabs_auto_return_enabled = this.tabsAutoReturnEnabled;
+        this._config.tabs_auto_return_tab = this.tabsAutoReturnTab;
+        this._config.tabs_auto_return_delay = this.tabsAutoReturnDelay;
         this._config.sidebar_enabled = this.sidebarEnabled;
         this._config.sidebar_type = this.sidebarType;
         this._config.sidebar_items = ['navigation'];
@@ -3007,6 +3065,7 @@ const dashboardSettingsMethods = {
         this._renderSidebar_?.();
         this._applyActiveTab?.();
         this._syncTabsWidth_?.();
+        this._updateTabsAutoReturnSettings_?.();
         // Disable overlap
         this.disableOverlap = newOverlap;
         // Container background
@@ -3191,6 +3250,9 @@ const dashboardSettingsMethods = {
           }
           this._config.card_overflow = this._normalizeCardOverflow_(this.cardOverflow);
           this._config.tabs_size = this._normalizeTabsSize_(this.tabsSize);
+          this._config.tabs_auto_return_enabled = !!this.tabsAutoReturnEnabled;
+          this._config.tabs_auto_return_tab = this._resolveTabsAutoReturnTarget_?.(this.tabsAutoReturnTab) || this.defaultTab;
+          this._config.tabs_auto_return_delay = this._normalizeTabsAutoReturnDelay_(this.tabsAutoReturnDelay);
           // Persist card shadow setting
           this._config.card_shadow            = !!this.cardShadowEnabled;
           this._config.card_shadow_intensity  = this._normalizeCardShadowIntensity_(this.cardShadowIntensity);

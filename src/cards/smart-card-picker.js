@@ -39,6 +39,23 @@ export function readVisualEditorConfig(editor) {
   return null;
 }
 
+export function resolveVisualEditorConfigForCommit(
+  currentConfig = {},
+  currentType = '',
+  editor = null,
+  editorHasEmittedChange = false,
+) {
+  const current = mergeVisualEditorConfig({}, currentType, currentConfig);
+  // Some Home Assistant card editors expose a stale value from getConfig()
+  // after emitting the correct config-changed event. Once an editor event has
+  // updated our local config, that event is the freshest source of truth.
+  if (editorHasEmittedChange) return current;
+
+  const liveConfig = readVisualEditorConfig(editor);
+  if (!isConfigObject(liveConfig)) return current;
+  return mergeVisualEditorConfig(current, liveConfig.type || currentType, liveConfig);
+}
+
 export function bridgeHaFormCardEditor(formEl, type, initialConfig = {}) {
   if (!formEl) return formEl;
   const cardType = String(type || initialConfig?.type || '').trim();
@@ -3087,6 +3104,7 @@ const smartPickerMethods = {
     let commitInFlight = false;
     let yamlEditorApi = null;
     let visualEditor = null;
+    let visualEditorHasEmittedChange = false;
     let editor = null;
     let pickSeq = 0; // stale-select guard
     let previewSeq = 0;
@@ -4852,6 +4870,7 @@ const smartPickerMethods = {
 
       const mountVisualEditor = async (cfg) => {
         const seq = ++pickSeq;
+        visualEditorHasEmittedChange = false;
         editorSpin.hidden = false;
         editorHost.innerHTML = '';
         cleanupSubElementEditor();
@@ -4943,6 +4962,7 @@ const smartPickerMethods = {
         const onChange = async (e) => {
           const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
           if (!isConfigObject(next)) return;
+          visualEditorHasEmittedChange = true;
           const nextType = next.type || currentType;
           currentType = nextType;
           currentConfig = this._shapeBySchema(
@@ -5122,15 +5142,15 @@ const smartPickerMethods = {
       commitInFlight = true;
       enableCommit(false);
       try {
-        const liveConfig = readVisualEditorConfig(visualEditor);
-        if (isConfigObject(liveConfig)) {
-          const liveType = liveConfig.type || currentType;
-          currentType = liveType;
-          currentConfig = this._shapeBySchema(
-            liveType,
-            mergeVisualEditorConfig(currentConfig, liveType, liveConfig)
-          );
-        }
+        const resolvedConfig = resolveVisualEditorConfigForCommit(
+          currentConfig,
+          currentType,
+          visualEditor,
+          visualEditorHasEmittedChange,
+        );
+        const resolvedType = resolvedConfig.type || currentType;
+        currentType = resolvedType;
+        currentConfig = this._shapeBySchema(resolvedType, resolvedConfig);
       } catch {}
       const finalCfg = this._shapeBySchema(currentType, currentConfig);
       if (typeof onCommit === 'function') {

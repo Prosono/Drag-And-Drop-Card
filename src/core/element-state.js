@@ -18,6 +18,9 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.layersEnabled = false;
   instance.layersButtonDetails = false;
   instance.tabsSize = 100;
+  instance.tabsAutoReturnEnabled = false;
+  instance.tabsAutoReturnTab = '';
+  instance.tabsAutoReturnDelay = 5 * 60 * 1000;
   instance.cardOverflow = 'auto';
   instance.sidebarEnabled = false;
   instance.sidebarType = 'minimal';

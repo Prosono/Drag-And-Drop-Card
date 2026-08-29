@@ -7,6 +7,7 @@ import {
   mergeVisualEditorConfig,
   mountCardPreviewElement,
   readVisualEditorConfig,
+  resolveVisualEditorConfigForCommit,
 } from '../src/cards/smart-card-picker.js';
 import { installCardBuilderMethods } from '../src/cards/card-renderer.js';
 
@@ -156,6 +157,71 @@ test('HA form card editor bridge exposes the latest visual value when saving', (
     name: 'Kitchen',
     tap_action: { action: 'toggle' },
   });
+});
+
+test('visual editor event keeps show_name false when editor getConfig is stale', () => {
+  const staleEditor = {
+    getConfig() {
+      return {
+        type: 'button',
+        entity: 'light.office',
+        show_name: true,
+        show_icon: true,
+      };
+    },
+  };
+
+  assert.deepEqual(
+    resolveVisualEditorConfigForCommit(
+      {
+        type: 'button',
+        entity: 'light.office',
+        show_name: false,
+        show_icon: true,
+      },
+      'button',
+      staleEditor,
+      true,
+    ),
+    {
+      type: 'button',
+      entity: 'light.office',
+      show_name: false,
+      show_icon: true,
+    },
+  );
+});
+
+test('visual editor config is still read as a fallback when no change event fires', () => {
+  const silentEditor = {
+    getConfig() {
+      return {
+        type: 'button',
+        entity: 'light.office',
+        show_name: false,
+      };
+    },
+  };
+
+  assert.deepEqual(
+    resolveVisualEditorConfigForCommit(
+      {
+        type: 'button',
+        entity: 'light.office',
+        show_name: true,
+        show_icon: true,
+      },
+      'button',
+      silentEditor,
+      false,
+    ),
+    {
+      type: 'button',
+      entity: 'light.office',
+      show_name: false,
+      show_icon: true,
+    },
+  );
 });
 
 test('saving a visual edit replaces and renders only the edited card', async () => {

@@ -559,6 +559,24 @@ export function getSettingsStyles() {
       background:color-mix(in oklab, var(--ha-card-background, #fff) 88%, transparent);
     }
     .tabs-card .tab-order-btn:disabled{ opacity:.38; cursor:not-allowed; }
+    .tab-auto-return-controls{
+      display:grid;
+      grid-template-columns:minmax(180px, 1fr) minmax(210px, 1fr);
+      gap:12px;
+    }
+    .tab-auto-return-controls[hidden]{ display:none; }
+    .tab-auto-return-field{
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+      min-width:0;
+      color:var(--secondary-text-color);
+      font-size:.82rem;
+      font-weight:700;
+    }
+    .tab-auto-return-field select{ width:100%; }
+    .tab-auto-return-delay{ display:flex; align-items:center; gap:8px; }
+    .tab-auto-return-delay input{ width:100%; min-width:0; }
     .layers-card .layer-toggle-row{
       display:flex;
       align-items:center;
@@ -2087,6 +2105,17 @@ export function getSettingsStyles() {
   .setting-subcontrol.is-disabled{
     opacity:.58;
   }
+  .dialog.modern .tab-auto-return-controls{
+    padding:12px;
+    border:1px solid var(--ddc-settings-line);
+    border-radius:12px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.03), transparent),
+      color-mix(in oklab, var(--ddc-settings-surface-raised) 90%, transparent);
+  }
+  .dialog.modern .tab-auto-return-field{
+    color:var(--ddc-settings-muted);
+  }
   .setting-doc-link{
     width:fit-content;
     max-width:min(760px, calc(100% - 36px));
@@ -2675,6 +2704,7 @@ export function getSettingsStyles() {
     .tabs-card .tab-icon-wrap{ min-width:0; flex:1 1 220px; }
     .tabs-card .tab-icon-wrap input{ width:min(160px, 100%) !important; min-width:0; }
     .tabs-card .tab-actions{ width:100%; justify-content:space-between; flex-wrap:wrap; }
+    .tab-auto-return-controls{ grid-template-columns:1fr; }
   }
 
   /* Purpose-based Sidebar settings */

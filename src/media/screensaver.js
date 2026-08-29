@@ -963,6 +963,9 @@ const screenSaverMethods = {
     if (!this._shouldUseScreensaver()) return;
     this._ensureScreenSaverOverlay();
     if (!this.screenSaverOverlay) return;
+    // The screen saver owns the idle state. Never allow an automatic tab
+    // return to keep running behind the full-screen overlay.
+    this._clearTabsAutoReturnTimer_?.();
     this.screensaverActive = true;
     this._renderScreenSaverOverlayContent_?.();
     this.screenSaverOverlay.classList.add('active');
@@ -1020,6 +1023,9 @@ const screenSaverMethods = {
       this._clockInterval = null;
     }
     this._restoreDashboardAfterScreenSaver_?.();
+    // Start a fresh tab-return countdown after dismissal instead of switching
+    // tabs immediately based on idle time accumulated behind the screen saver.
+    this._resetTabsAutoReturnTimer_?.();
     // When user interacts, restart the timer to count idle time again
     if (wasActive && reschedule) this._resetScreensaverTimer();
   },
@@ -1155,6 +1161,7 @@ const screenSaverMethods = {
         this._deactivateScreenSaver();
       }
     }
+    this._resetTabsAutoReturnTimer_?.();
   },
 
   /**

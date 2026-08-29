@@ -7,6 +7,56 @@
 
 import { normalizeTabsSize } from '../core/config-normalization.js';
 
+const DEFAULT_TABS_AUTO_RETURN_DELAY = 5 * 60 * 1000;
+const MIN_TABS_AUTO_RETURN_DELAY = 60 * 1000;
+const MAX_TABS_AUTO_RETURN_DELAY = 24 * 60 * 60 * 1000;
+const TAB_AUTO_RETURN_ACTIVITY_EVENTS = [
+  'mousemove',
+  'mousedown',
+  'click',
+  'keydown',
+  'wheel',
+  'scroll',
+  'touchstart',
+  'touchmove',
+  'touchend',
+  'pointerdown',
+  'pointermove',
+  'pointerup',
+];
+
+export function normalizeTabsAutoReturnDelay(value) {
+  const delay = Number(value);
+  if (!Number.isFinite(delay) || delay <= 0) return DEFAULT_TABS_AUTO_RETURN_DELAY;
+  return Math.max(MIN_TABS_AUTO_RETURN_DELAY, Math.min(MAX_TABS_AUTO_RETURN_DELAY, Math.round(delay)));
+}
+
+export function resolveTabsAutoReturnTarget(tabs = [], requestedTab = '', defaultTab = '') {
+  const valid = (Array.isArray(tabs) ? tabs : [])
+    .map((tab) => String(tab?.id || '').trim())
+    .filter(Boolean);
+  const requested = String(requestedTab || '').trim();
+  const fallback = String(defaultTab || '').trim();
+  if (requested && valid.includes(requested)) return requested;
+  if (fallback && valid.includes(fallback)) return fallback;
+  return valid[0] || fallback || requested || 'default';
+}
+
+export function shouldDeferTabAutoReturnToScreensaver({
+  screenSaverEnabled = false,
+  screenSaverDelay = 0,
+  tabsAutoReturnDelay = 0,
+} = {}) {
+  if (!screenSaverEnabled) return false;
+  const screenDelay = Number(screenSaverDelay);
+  const tabDelay = Number(tabsAutoReturnDelay);
+  return Number.isFinite(screenDelay)
+    && screenDelay > 0
+    && Number.isFinite(tabDelay)
+    && tabDelay > 0
+    && screenDelay <= tabDelay;
+}
+
 export function buildTabButtonMarkup(tab = {}, tabIndex = 0, { sidebar = false } = {}) {
   const label = tab.label ?? tab.id ?? '';
   if (!sidebar) {
@@ -40,6 +90,83 @@ const tabsLayoutMethods = {
     const valid = Array.isArray(this.tabs) ? this.tabs.map(t => t.id) : [];
     if (!valid.length) return this.defaultTab || 'default';
     return (tabId && valid.includes(tabId)) ? tabId : (this.defaultTab || valid[0]);
+  },
+
+  _normalizeTabsAutoReturnDelay_(value) {
+    return normalizeTabsAutoReturnDelay(value);
+  },
+
+  _resolveTabsAutoReturnTarget_(requestedTab = this.tabsAutoReturnTab) {
+    return resolveTabsAutoReturnTarget(this.tabs, requestedTab, this.defaultTab);
+  },
+
+  _clearTabsAutoReturnTimer_() {
+    if (!this.__tabsAutoReturnTimer) return;
+    clearTimeout(this.__tabsAutoReturnTimer);
+    this.__tabsAutoReturnTimer = null;
+  },
+
+  _shouldUseTabsAutoReturn_() {
+    try {
+      if (!this.tabsAutoReturnEnabled || this.editMode || this.screensaverActive || !this.isConnected) return false;
+      if (typeof this._isInHaEditorPreview === 'function' && this._isInHaEditorPreview()) return false;
+      const tabs = Array.isArray(this.tabs) ? this.tabs : [];
+      if (tabs.length < 2) return false;
+      const target = this._resolveTabsAutoReturnTarget_();
+      if (!target || this.activeTab === target) return false;
+      if (shouldDeferTabAutoReturnToScreensaver({
+        screenSaverEnabled: this.screenSaverEnabled,
+        screenSaverDelay: this.screenSaverDelay,
+        tabsAutoReturnDelay: this.tabsAutoReturnDelay,
+      })) return false;
+    } catch {
+      return false;
+    }
+    return true;
+  },
+
+  _resetTabsAutoReturnTimer_() {
+    this._clearTabsAutoReturnTimer_?.();
+    if (!this._shouldUseTabsAutoReturn_?.()) return false;
+    const delay = this._normalizeTabsAutoReturnDelay_(this.tabsAutoReturnDelay);
+    this.tabsAutoReturnDelay = delay;
+    this.__tabsAutoReturnTimer = setTimeout(() => {
+      this.__tabsAutoReturnTimer = null;
+      if (!this._shouldUseTabsAutoReturn_?.()) return;
+      const target = this._resolveTabsAutoReturnTarget_?.();
+      if (!target || target === this.activeTab || this.screensaverActive) return;
+      this._switchActiveTab_?.(target, { reason: 'auto-return' })?.catch?.((err) => {
+        console.warn('[ddc:tabs] Could not return to the configured tab', err);
+      });
+    }, delay);
+    return true;
+  },
+
+  _attachTabsAutoReturnListeners_() {
+    if (this.__tabsAutoReturnActivityHandler || typeof document === 'undefined') return;
+    this.__tabsAutoReturnActivityHandler = () => this._resetTabsAutoReturnTimer_?.();
+    this.__tabsAutoReturnActivityEvents = TAB_AUTO_RETURN_ACTIVITY_EVENTS.slice();
+    this.__tabsAutoReturnActivityEvents.forEach((eventName) => {
+      document.addEventListener(eventName, this.__tabsAutoReturnActivityHandler, true);
+    });
+  },
+
+  _detachTabsAutoReturnListeners_() {
+    this._clearTabsAutoReturnTimer_?.();
+    if (!this.__tabsAutoReturnActivityHandler || typeof document === 'undefined') return;
+    (this.__tabsAutoReturnActivityEvents || []).forEach((eventName) => {
+      document.removeEventListener(eventName, this.__tabsAutoReturnActivityHandler, true);
+    });
+    this.__tabsAutoReturnActivityHandler = null;
+    this.__tabsAutoReturnActivityEvents = null;
+  },
+
+  _updateTabsAutoReturnSettings_() {
+    this.tabsAutoReturnDelay = this._normalizeTabsAutoReturnDelay_(this.tabsAutoReturnDelay);
+    this.tabsAutoReturnTab = this._resolveTabsAutoReturnTarget_(this.tabsAutoReturnTab);
+    if (this.tabsAutoReturnEnabled && this.isConnected) this._attachTabsAutoReturnListeners_?.();
+    else this._detachTabsAutoReturnListeners_?.();
+    this._resetTabsAutoReturnTimer_?.();
   },
 
   _syncWrapperTabAssignmentsFromActiveLayout_() {
@@ -225,6 +352,7 @@ const tabsLayoutMethods = {
     // dashboard. Never let it flash while cards are being swapped or hydrated.
     try { this._hideEmptyPlaceholder?.(); } catch {}
     this.activeTab = nextTab;
+    this._resetTabsAutoReturnTimer_?.();
     try { this._closeLayersMenu_?.({ render: false }); } catch {}
     try { localStorage.setItem(`ddc_lasttab_${this.storageKey}`, nextTab); } catch {}
     try { this._syncWrapperTabAssignmentsFromActiveLayout_?.(); } catch {}

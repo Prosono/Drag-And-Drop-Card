@@ -187,6 +187,15 @@ const configHelperMethods = {
     if ('tabsSize' in next && !('tabs_size' in next)) {
       next.tabs_size = next.tabsSize;
     }
+    if ('tabsAutoReturnEnabled' in next && !('tabs_auto_return_enabled' in next)) {
+      next.tabs_auto_return_enabled = next.tabsAutoReturnEnabled;
+    }
+    if ('tabsAutoReturnTab' in next && !('tabs_auto_return_tab' in next)) {
+      next.tabs_auto_return_tab = next.tabsAutoReturnTab;
+    }
+    if ('tabsAutoReturnDelay' in next && !('tabs_auto_return_delay' in next)) {
+      next.tabs_auto_return_delay = next.tabsAutoReturnDelay;
+    }
     if ('tabs_size' in next) {
       next.tabs_size = this._normalizeTabsSize_(next.tabs_size);
     }
@@ -205,6 +214,9 @@ const configHelperMethods = {
     delete next.autoViewportMaxWidth;
     delete next.autoScaleMax;
     delete next.tabsSize;
+    delete next.tabsAutoReturnEnabled;
+    delete next.tabsAutoReturnTab;
+    delete next.tabsAutoReturnDelay;
     delete next.cardOverflow;
     delete next.defaultCardOverflow;
     delete next.default_card_overflow;

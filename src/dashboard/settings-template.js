@@ -1072,6 +1072,32 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Scales the tab controls while preserving touch-friendly sizing and viewport alignment.</div>
       </div>
 
+      <div class="setting tab-auto-return-setting" role="group" aria-labelledby="lbl-tabs-auto-return">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:timer-sync-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-tabs-auto-return" for="ddc-setting-tabsAutoReturnEnabled">Automatic tab return</label>
+          </div>
+          <div class="control">
+            <ha-switch id="ddc-setting-tabsAutoReturnEnabled" aria-describedby="ddc-tabs-auto-return-hint" aria-controls="ddc-tabsAutoReturnControls" aria-expanded="false"></ha-switch>
+          </div>
+        </div>
+        <div class="setting-subcontrol tab-auto-return-controls" id="ddc-tabsAutoReturnControls" hidden>
+          <label class="tab-auto-return-field" for="ddc-setting-tabsAutoReturnTab">
+            <span>Return to</span>
+            <select id="ddc-setting-tabsAutoReturnTab"></select>
+          </label>
+          <label class="tab-auto-return-field" for="ddc-setting-tabsAutoReturnMinutes">
+            <span>After no activity for</span>
+            <span class="tab-auto-return-delay">
+              <input type="number" id="ddc-setting-tabsAutoReturnMinutes" min="1" max="1440" step="1" inputmode="numeric" />
+              <span class="unit">min</span>
+            </span>
+          </label>
+        </div>
+        <div class="hint" id="ddc-tabs-auto-return-hint">Returns to the selected tab after inactivity. The screen saver always takes priority and restarts this countdown when dismissed.</div>
+      </div>
+
       <!-- Current tabs list -->
       <div id="ddc-tabs-list" class="setting" aria-live="polite"></div>
 

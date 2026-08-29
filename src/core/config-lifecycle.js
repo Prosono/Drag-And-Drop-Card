@@ -189,6 +189,9 @@ const setConfigMethods = {
       this._setDashboardLayers_(config.layers || [], { refresh: false });
       this.defaultTab         = config.default_tab || (this.tabs[0]?.id ?? 'default');
       this.hideTabsWhenSingle = (config.hide_tabs_when_single !== false);
+      this.tabsAutoReturnEnabled = !!config.tabs_auto_return_enabled;
+      this.tabsAutoReturnDelay = this._normalizeTabsAutoReturnDelay_(config.tabs_auto_return_delay);
+      this.tabsAutoReturnTab = this._resolveTabsAutoReturnTarget_(config.tabs_auto_return_tab);
       let persistedActiveTab = '';
       try { persistedActiveTab = localStorage.getItem(`ddc_lasttab_${this.storageKey}`) || ''; } catch {}
       this.activeTab = resolveConfiguredActiveTab({
@@ -200,6 +203,7 @@ const setConfigMethods = {
         sameDashboard: !keyChanged,
       });
       this._syncTabsPlacement_?.();
+      this._updateTabsAutoReturnSettings_?.();
 
 
 

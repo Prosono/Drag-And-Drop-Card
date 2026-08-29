@@ -75,6 +75,9 @@ const dashboardApiMethods = {
       tabs_size: this._normalizeTabsSize_(this.tabsSize),
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
+      tabs_auto_return_enabled: !!this.tabsAutoReturnEnabled,
+      tabs_auto_return_tab: this._resolveTabsAutoReturnTarget_?.(this.tabsAutoReturnTab) || this.tabsAutoReturnTab || this.defaultTab,
+      tabs_auto_return_delay: this._normalizeTabsAutoReturnDelay_?.(this.tabsAutoReturnDelay) || this.tabsAutoReturnDelay,
       sidebar_enabled: !!this.sidebarEnabled,
       sidebar_type: this._normalizeSidebarType_(this.sidebarType),
       sidebar_items: ['navigation'],
@@ -304,6 +307,15 @@ const dashboardApiMethods = {
     if ('hide_tabs_when_single' in opts) {
       this.hideTabsWhenSingle = opts.hide_tabs_when_single !== false;
     }
+    if ('tabs_auto_return_enabled' in opts) {
+      this.tabsAutoReturnEnabled = !!opts.tabs_auto_return_enabled;
+    }
+    if ('tabs_auto_return_delay' in opts) {
+      this.tabsAutoReturnDelay = this._normalizeTabsAutoReturnDelay_(opts.tabs_auto_return_delay);
+    }
+    if ('tabs_auto_return_tab' in opts) {
+      this.tabsAutoReturnTab = String(opts.tabs_auto_return_tab || '').trim();
+    }
     if ('sidebar_enabled' in opts) {
       this.sidebarEnabled = !!opts.sidebar_enabled;
     }
@@ -358,6 +370,8 @@ const dashboardApiMethods = {
       if (!validTabIds.has(this.defaultTab)) this.defaultTab = this.tabs[0]?.id || 'default';
       if (!validTabIds.has(this.activeTab)) this.activeTab = this.defaultTab;
     }
+    this.tabsAutoReturnTab = this._resolveTabsAutoReturnTarget_?.(this.tabsAutoReturnTab) || this.defaultTab;
+    this._updateTabsAutoReturnSettings_?.();
 
 
     this._applyDashboardThemeStyling_?.();
@@ -376,7 +390,7 @@ const dashboardApiMethods = {
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'sidebar_enabled' in opts || 'sidebar_type' in opts || 'sidebarType' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
+    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'tabs_auto_return_enabled' in opts || 'tabs_auto_return_tab' in opts || 'tabs_auto_return_delay' in opts || 'sidebar_enabled' in opts || 'sidebar_type' in opts || 'sidebarType' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
       this._renderTabs?.();
       this._renderSidebar_?.();
       this._applyActiveTab?.();
@@ -433,6 +447,9 @@ const dashboardApiMethods = {
       tabs_size: { type: 'number' },
       default_tab: { type: 'string' },
       hide_tabs_when_single: { type: 'boolean' },
+      tabs_auto_return_enabled: { type: 'boolean' },
+      tabs_auto_return_tab: { type: 'string' },
+      tabs_auto_return_delay: { type: 'number' },
       sidebar_enabled: { type: 'boolean' },
       sidebar_type: { type: 'string' },
       sidebar_header: { type: 'string' },
@@ -498,6 +515,9 @@ const dashboardApiMethods = {
       tabsSize: 'tabs_size',
       defaultTab: 'default_tab',
       hideTabsWhenSingle: 'hide_tabs_when_single',
+      tabsAutoReturnEnabled: 'tabs_auto_return_enabled',
+      tabsAutoReturnTab: 'tabs_auto_return_tab',
+      tabsAutoReturnDelay: 'tabs_auto_return_delay',
       sidebarEnabled: 'sidebar_enabled',
       sidebarType: 'sidebar_type',
       sidebarHeader: 'sidebar_header',

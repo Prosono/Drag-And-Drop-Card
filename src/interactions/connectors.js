@@ -1081,7 +1081,7 @@ const connectorMethods = {
   _insertConnectorPointAtEvent_(connectorId, ev) {
     const point = this._snapConnectorPointToCellOrigin_(this._eventToConnectorPoint_(ev));
     let changed = false;
-    this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    const nextEntries = (this._cloneJson_(this._getCurrentConnectorEntries_()) || []).map((entry) => {
       if (entry.id !== connectorId) return entry;
       const next = this._normalizeConnectorEntry_(entry);
       const points = Array.isArray(next.points) ? [...next.points] : [];
@@ -1098,13 +1098,19 @@ const connectorMethods = {
       points.splice(bestIndex + 1, 0, point);
       changed = true;
       return { ...next, points, auto_route: false };
-    }), { reason: changed ? 'connector-junction-add' : null, render: true });
-    if (changed) this._selectedConnectorId = connectorId;
+    });
+    if (changed) {
+      this._selectedConnectorId = connectorId;
+      this._setCurrentConnectorEntries_(nextEntries, {
+        reason: 'connector-junction-add',
+        render: true,
+      });
+    }
   },
 
   _insertConnectorMidpoint_(connectorId) {
     let changed = false;
-    this._updateCurrentConnectorEntries_((entries) => entries.map((entry) => {
+    const nextEntries = (this._cloneJson_(this._getCurrentConnectorEntries_()) || []).map((entry) => {
       if (entry.id !== connectorId) return entry;
       const next = this._normalizeConnectorEntry_(entry);
       const points = Array.isArray(next.points) ? [...next.points] : [];
@@ -1152,8 +1158,136 @@ const connectorMethods = {
       points.splice(bestIndex + 1, 0, bendPoint);
       changed = true;
       return { ...next, points, auto_route: false };
-    }), { reason: changed ? 'connector-junction-add' : null, render: true });
-    if (changed) this._selectedConnectorId = connectorId;
+    });
+    if (changed) {
+      this._selectedConnectorId = connectorId;
+      this._setCurrentConnectorEntries_(nextEntries, {
+        reason: 'connector-junction-add',
+        render: true,
+      });
+    }
+  },
+
+  _removeConnectorPoint_(connectorId, pointIndex, { renderPoints = null } = {}) {
+    const id = String(connectorId || '').trim();
+    const index = Number(pointIndex);
+    if (!id || !Number.isInteger(index)) return false;
+    let changed = false;
+    const nextEntries = (this._getCurrentConnectorEntries_() || []).map((entry) => {
+      if (entry.id !== id) return entry;
+      const useRenderedRoute = this._isConnectorAutoRoute_(entry)
+        && Array.isArray(renderPoints)
+        && renderPoints.length >= 2;
+      const sourcePoints = useRenderedRoute ? renderPoints : entry.points;
+      const points = (Array.isArray(sourcePoints) ? sourcePoints : [])
+        .map((point) => this._normalizeConnectorPoint_(point));
+      if (points.length <= 2 || index <= 0 || index >= points.length - 1) return entry;
+      points.splice(index, 1);
+      changed = true;
+      return {
+        ...entry,
+        points,
+        // Removing an auto-generated corner intentionally turns the current
+        // visible route into a manual route so the deleted point stays gone.
+        auto_route: false,
+      };
+    });
+    if (!changed) return false;
+    this._selectedConnectorId = id;
+    this._setCurrentConnectorEntries_(nextEntries, {
+      reason: 'connector-junction-remove',
+      render: true,
+    });
+    return true;
+  },
+
+  _simplifyConnectorRoute_(connectorId) {
+    const id = String(connectorId || '').trim();
+    const connector = this._getConnectorById_(id);
+    if (!connector) return false;
+    const renderPoints = this._getConnectorRenderPoints_(connector);
+    if (!Array.isArray(renderPoints) || renderPoints.length < 2) return false;
+    const first = this._normalizeConnectorPoint_(renderPoints[0]);
+    const last = this._normalizeConnectorPoint_(renderPoints[renderPoints.length - 1]);
+    this._setCurrentConnectorEntries_((this._getCurrentConnectorEntries_() || []).map((entry) => (
+      entry.id === id
+        ? { ...entry, points: [first, last], auto_route: false }
+        : entry
+    )), { reason: 'connector-route-simplify', render: true });
+    this._selectedConnectorId = id;
+    return true;
+  },
+
+  _closeConnectorPointMenu_() {
+    try { this.__connectorPointMenuCleanup?.(); } catch {}
+    this.__connectorPointMenuCleanup = null;
+    try { this.__connectorPointMenu?.remove?.(); } catch {}
+    this.__connectorPointMenu = null;
+  },
+
+  _openConnectorPointMenu_(connectorId, pointIndex, renderPoints, ev) {
+    if (!this.editMode || !this.shadowRoot) return;
+    this._closeConnectorPointMenu_?.();
+    const menu = document.createElement('div');
+    menu.className = 'ddc-connector-point-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Bend point actions');
+    menu.innerHTML = `
+      <div class="ddc-connector-point-menu-label">Bend point</div>
+      <button type="button" role="menuitem" class="ddc-connector-point-menu-remove">
+        <ha-icon icon="mdi:vector-point-minus"></ha-icon>
+        <span>Remove bend</span>
+        <kbd>Delete</kbd>
+      </button>`;
+    this.shadowRoot.appendChild(menu);
+    this.__connectorPointMenu = menu;
+
+    const clientX = Number(ev?.clientX) || 0;
+    const clientY = Number(ev?.clientY) || 0;
+    menu.style.left = `${clientX + 8}px`;
+    menu.style.top = `${clientY + 8}px`;
+    requestAnimationFrame(() => {
+      if (!menu.isConnected) return;
+      const rect = menu.getBoundingClientRect();
+      const left = Math.max(8, Math.min(clientX + 8, window.innerWidth - rect.width - 8));
+      const top = Math.max(8, Math.min(clientY + 8, window.innerHeight - rect.height - 8));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.querySelector('button')?.focus?.({ preventScroll: true });
+    });
+
+    const remove = () => {
+      const removed = this._removeConnectorPoint_(connectorId, pointIndex, { renderPoints });
+      this._closeConnectorPointMenu_?.();
+      if (removed) this._toast?.('Bend point removed.');
+    };
+    const onPointerDown = (event) => {
+      if (event.composedPath?.().includes(menu)) return;
+      this._closeConnectorPointMenu_?.();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this._closeConnectorPointMenu_?.();
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        remove();
+      }
+    };
+    const onViewportChange = () => this._closeConnectorPointMenu_?.();
+    menu.querySelector('.ddc-connector-point-menu-remove')?.addEventListener('click', remove);
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('resize', onViewportChange, true);
+    window.addEventListener('scroll', onViewportChange, true);
+    this.__connectorPointMenuCleanup = () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('resize', onViewportChange, true);
+      window.removeEventListener('scroll', onViewportChange, true);
+    };
   },
 
   _getConnectorById_(connectorId) {
@@ -2249,9 +2383,12 @@ const connectorMethods = {
         <section class="ddc-connector-section" data-connector-panel="shape" hidden>
           <div class="ddc-connector-section-head">
             <div class="ddc-connector-section-title">Shape</div>
-            <p>Auto-routed lines stay clean. Add a bend only when you want manual control.</p>
+            <p>Start simple, then add only the bends you need.</p>
           </div>
           <div class="ddc-connector-actions">
+            <button class="btn secondary" id="connectorSimplifyBtn" type="button">
+              <ha-icon icon="mdi:vector-line"></ha-icon><span>Simplify line</span>
+            </button>
             <button class="btn secondary" id="connectorAddBendBtn" type="button">
               <ha-icon icon="mdi:vector-polyline-edit"></ha-icon><span>Add bend</span>
             </button>
@@ -2277,7 +2414,7 @@ const connectorMethods = {
               <input id="connectorZIndex" class="input" type="number" min="1" max="9999" step="1" value="${connectorZ}" />
             </label>
           </div>
-          <p class="ddc-connector-help">Corner handles are always shown for selected routed lines. Layer order controls how lines stack against cards and other lines.</p>
+          <p class="ddc-connector-help">Drag a handle to move it. Right-click a bend and choose <strong>Remove bend</strong>; double-click also removes it. Simplify line removes every bend at once.</p>
         </section>
   
         <div class="ddc-connector-footer-actions">
@@ -2529,6 +2666,11 @@ const connectorMethods = {
       this._renderConnectors_?.();
       requestAnimationFrame(() => this._openConnectorSettings_?.(connectorId));
     });
+    $('#connectorSimplifyBtn')?.addEventListener('click', () => {
+      this._simplifyConnectorRoute_?.(connectorId);
+      this._selectedConnectorId = connectorId;
+      requestAnimationFrame(() => this._openConnectorSettings_?.(connectorId));
+    });
     const syncConnectorZInput = () => {
       currentConnector = this._getConnectorById_(connectorId) || currentConnector;
       const zInput = $('#connectorZIndex');
@@ -2659,6 +2801,11 @@ const connectorMethods = {
         : this._getConnectorResolvedState_(connector);
       const color = state.active ? String(connector.active_color || this._defaultConnectorConfig_().active_color) : String(connector.inactive_color || this._defaultConnectorConfig_().inactive_color);
       const thickness = Math.max(2, Math.min(28, Number(connector.thickness) || 10));
+      const editUiScale = Math.max(
+        0.15,
+        Number(this.__pointerScaleX) || 1,
+        Number(this.__pointerScaleY) || 1,
+      );
       const rounded = connector.rounded !== false;
       const lineStyle = String(connector.line_style || '').toLowerCase();
       const arrows = String(connector.arrows || 'end').toLowerCase();
@@ -2735,7 +2882,11 @@ const connectorMethods = {
       const hit = document.createElementNS(svgNs, 'path');
       hit.setAttribute('class', 'ddc-connector-hit');
       hit.setAttribute('d', d);
-      hit.setAttribute('stroke-width', String(Math.max(18, thickness + 14)));
+      // Keep a generous invisible interaction rail around the visible line.
+      // This mirrors diagram editors, where precise line art does not require
+      // pixel-perfect pointing to select or edit it.
+      const lineHitWidth = Math.max(28, (thickness * editUiScale) + 20) / editUiScale;
+      hit.setAttribute('stroke-width', String(lineHitWidth));
       hit.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -2960,10 +3111,23 @@ const connectorMethods = {
           if (generatedTerminalGuard && !cornerIndexSet.has(index) && targetAnchor && index < lastIndex && index >= lastIndex - generatedTerminalGuard) return false;
           return true;
         });
-      if (selected && this.editMode && editableHandles.length) {
+      // Waypoints are editing affordances, not selection affordances. Display
+      // them for every connector while editing so the user can grab a bend
+      // directly without first selecting its line.
+      if (this.editMode && editableHandles.length) {
         editableHandles.forEach(({ point, index }) => {
-          const handleSize = Math.max(11, Math.min(22, thickness * 1.15));
+          const handleScreenSize = Math.max(11, Math.min(18, thickness * editUiScale * 1.1));
+          const handleSize = handleScreenSize / editUiScale;
           const handleRadius = Math.max(3, Math.min(7, handleSize * 0.32));
+          const hitSize = Math.max(32, Math.min(44, handleScreenSize + 22)) / editUiScale;
+          const handleHit = document.createElementNS(svgNs, 'rect');
+          handleHit.setAttribute('class', 'ddc-connector-handle-hit');
+          handleHit.setAttribute('x', String(point.x - (hitSize / 2)));
+          handleHit.setAttribute('y', String(point.y - (hitSize / 2)));
+          handleHit.setAttribute('width', String(hitSize));
+          handleHit.setAttribute('height', String(hitSize));
+          handleHit.setAttribute('rx', String(Math.max(7, handleRadius + 4)));
+          handleHit.setAttribute('ry', String(Math.max(7, handleRadius + 4)));
           const handle = document.createElementNS(svgNs, 'rect');
           handle.setAttribute('class', 'ddc-connector-handle');
           handle.setAttribute('x', String(point.x - (handleSize / 2)));
@@ -2972,9 +3136,19 @@ const connectorMethods = {
           handle.setAttribute('height', String(handleSize));
           handle.setAttribute('rx', String(handleRadius));
           handle.setAttribute('ry', String(handleRadius));
-          handle.addEventListener('pointerdown', (ev) => {
+          const isRemovableBend = index > 0 && index < points.length - 1 && points.length > 2;
+          const handleTitle = document.createElementNS(svgNs, 'title');
+          handleTitle.textContent = isRemovableBend
+            ? 'Drag to move · Right-click to remove bend'
+            : 'Drag to move connector endpoint';
+          handle.appendChild(handleTitle);
+          const beginHandleDrag = (ev) => {
+              if (typeof ev.button === 'number' && ev.button !== 0) return;
               ev.preventDefault();
               ev.stopPropagation();
+              this._selectedConnectorId = connector.id;
+              group.classList.add('is-selected');
+              surface.classList.add('is-selected');
               const isEndpoint = index === 0 || index === points.length - 1;
               const dragBasePoints = points.map((p) => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 }));
               const dragTabId = this._normalizeTabId(connector.tabId || connector.tab_id || this.activeTab || this.defaultTab);
@@ -3065,20 +3239,25 @@ const connectorMethods = {
               window.addEventListener('pointermove', onMove, true);
               window.addEventListener('pointerup', onUp, true);
               window.addEventListener('pointercancel', onUp, true);
-          });
-          handle.addEventListener('dblclick', (ev) => {
+          };
+          const removeHandlePoint = (ev) => {
               ev.preventDefault();
               ev.stopPropagation();
-              if (autoRoute) return;
-              if (index === 0 || index === points.length - 1 || points.length <= 2) return;
-              this._setCurrentConnectorEntries_((this._getCurrentConnectorEntries_() || []).map((entry) => {
-                if (entry.id !== connector.id) return entry;
-                const nextPoints = Array.isArray(entry.points) ? [...entry.points] : points.map((p) => ({ ...p }));
-                nextPoints.splice(index, 1);
-                return { ...entry, points: nextPoints };
-              }), { reason: 'connector-junction-remove', render: true });
+              this._removeConnectorPoint_?.(connector.id, index, { renderPoints: points });
+          };
+          const openHandleMenu = (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (!isRemovableBend) return;
+              this._selectedConnectorId = connector.id;
+              this._openConnectorPointMenu_?.(connector.id, index, points, ev);
+          };
+          [handleHit, handle].forEach((target) => {
+            target.addEventListener('pointerdown', beginHandleDrag);
+            target.addEventListener('dblclick', removeHandlePoint);
+            target.addEventListener('contextmenu', openHandleMenu);
           });
-          group.appendChild(handle);
+          group.append(handleHit, handle);
         });
       }
   
