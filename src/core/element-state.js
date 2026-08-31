@@ -48,8 +48,15 @@ export function initializeDragAndDropCardInstance(instance) {
   instance.__backendProbeRetryAttempts = 0;
   instance.__backendRefreshTimer = 0;
   instance.__backendRefreshReason = '';
+  instance.__backendStorageKeys = null;
+  instance.__lastBackendLoadResult = null;
+  instance.__backendSnapshotRetryTimer = 0;
+  instance.__backendSnapshotRetryAttempts = 0;
   instance.__initialLoadSeq = 0;
+  instance.__storageIdentityEpoch = 0;
+  instance.__storageDashboardRoute = undefined;
   instance.__lastSyncedDashboardPayload = null;
+  instance.__lastSyncedDashboardStorageKey = '';
   instance.__ddcAnonymousConfigSource = null;
   instance.__ddcAnonymousStorageKey = '';
   instance.__helpersPreloadQueued = false;

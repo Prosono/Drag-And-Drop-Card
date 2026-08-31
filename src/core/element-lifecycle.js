@@ -73,6 +73,23 @@ const lifecycleMethods = {
     return true;
   },
 
+  _scheduleBackendSnapshotRetry_(reason = 'backend-load-retry') {
+    if (this.__backendSnapshotRetryTimer || !this._backendOK || !this.storageKey) return false;
+    const attempt = (Number(this.__backendSnapshotRetryAttempts || 0) || 0) + 1;
+    const delays = [500, 1500, 5000, 15000];
+    if (attempt > delays.length) return false;
+    this.__backendSnapshotRetryAttempts = attempt;
+    this.__backendSnapshotRetryTimer = setTimeout(() => {
+      this.__backendSnapshotRetryTimer = 0;
+      if (!this.isConnected || shouldDeferBackendRefresh(this)) return;
+      this._initialLoad?.(true, {
+        preserveExistingOnEmpty: true,
+        reason,
+      });
+    }, delays[attempt - 1]);
+    return true;
+  },
+
   // === Initial autosize kick (view-mode safe) ===
     _startInitialAutosize() {
     try {
@@ -206,6 +223,19 @@ const lifecycleMethods = {
     },
 
   disconnectedCallback() {
+      // A dashboard navigation can detach the old card while backend reads,
+      // card builds, or a debounced autosave are still pending. Invalidate all
+      // of them so a detached DEV card cannot commit after PRD is mounted.
+      const interruptedStorageWork = !!(this.__booting || this._loading);
+      clearTimeout(this._saveTimer);
+      this._saveTimer = null;
+      this.__storageIdentityEpoch = (Number(this.__storageIdentityEpoch || 0) || 0) + 1;
+      this.__initialLoadSeq = (Number(this.__initialLoadSeq || 0) || 0) + 1;
+      this.__cardBuildSeq = (Number(this.__cardBuildSeq || 0) || 0) + 1;
+      if (interruptedStorageWork) {
+        this.__backendRefreshPending = true;
+        this.__backendRefreshReason = 'reconnected-after-interrupted-load';
+      }
       try { this._clearEditorAppearance_?.(); } catch {}
       try { this._uninstallGridObservers_(); } catch {}
       try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
@@ -310,6 +340,10 @@ const lifecycleMethods = {
         clearTimeout(this.__backendRefreshTimer);
         this.__backendRefreshTimer = 0;
       }
+      if (this.__backendSnapshotRetryTimer) {
+        clearTimeout(this.__backendSnapshotRetryTimer);
+        this.__backendSnapshotRetryTimer = 0;
+      }
       try { clearTimeout(this.__connectorRenderSettleTimer1); } catch {}
       try { clearTimeout(this.__connectorRenderSettleTimer2); } catch {}
       this.__connectorRenderSettleTimer1 = 0;
@@ -336,7 +370,10 @@ const lifecycleMethods = {
       if (!this.__probed && hassApiReady) {
         this.__probed = true;
         this.__backendProbePending = true;
-        if (!this.__booted && this.__cfgReady && this._hasFastInitialLayout_?.()) {
+        // A browser cache is only a rendering fallback. For a shared
+        // storage_key, wait for the backend probe so stale localStorage can
+        // never become the first writable source of truth.
+        if (!this.__booted && this.__cfgReady && !this.storageKey && this._hasFastInitialLayout_?.()) {
           this.__booted = true;
           this._initialLoad(false);
         }

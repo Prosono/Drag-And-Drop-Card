@@ -1610,27 +1610,33 @@ const converterMethods = {
   },
 
   async _persistDashboardConverterSnapshot_(snapshot = {}) {
+    const storageOperation = this._captureStorageOperation_?.(this.storageKey);
+    const targetStorageKey = storageOperation?.key || String(this.storageKey || '').trim();
+    const isCurrentOperation = () => (
+      !storageOperation || this._isStorageOperationCurrent_?.(storageOperation) !== false
+    );
     const normalized = this._normalizeDashboardPayload_?.(snapshot) || snapshot;
     if (!Array.isArray(normalized?.cards) || !normalized.cards.length) {
       throw new Error('Refusing to persist an empty converted dashboard snapshot.');
     }
-    try { this._writeRuntimeLayoutCache_?.(normalized); } catch {}
-    try { localStorage.setItem(`ddc_local_${this.storageKey || 'default'}`, JSON.stringify(normalized)); } catch {}
+    try { this._writeRuntimeLayoutCache_?.(normalized, targetStorageKey); } catch {}
+    try { localStorage.setItem(`ddc_local_${targetStorageKey || 'default'}`, JSON.stringify(normalized)); } catch {}
 
     let backend = 'local';
-    if (this.storageKey && this._backendOK) {
+    if (targetStorageKey && this._backendOK) {
       try {
-        await this._saveLayoutToBackend(this.storageKey, normalized);
-        this._clearPendingDashboardReplacement_?.();
-        this.__lastSyncedDashboardPayload = this._cloneJson_?.(normalized) || normalized;
+        await this._saveLayoutToBackend(targetStorageKey, normalized);
+        if (!isCurrentOperation()) return { snapshot: normalized, backend: 'superseded' };
+        this._clearPendingDashboardReplacement_?.(targetStorageKey);
+        this._recordLastSyncedDashboardPayload_?.(targetStorageKey, normalized);
         backend = 'saved';
       } catch (err) {
         this._markPendingDashboardReplacement_?.();
         backend = 'pending';
         console.warn('[drag-and-drop-card] Converted dashboard backend commit is pending', err);
       }
-    } else if (this.storageKey) {
-      this._markPendingDashboardReplacement_?.();
+    } else if (targetStorageKey) {
+      this._markPendingDashboardReplacement_?.(targetStorageKey);
       backend = 'pending';
     }
     return { snapshot: normalized, backend };

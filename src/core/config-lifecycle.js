@@ -5,8 +5,6 @@
  * and decides whether an existing layout must be reloaded after a config change.
  */
 
-import { lovelaceCardConfigSignature } from '../storage/lovelace-card-reconciliation.js';
-
 export function resolveConfiguredActiveTab({
   tabs = [],
   defaultTab = 'default',
@@ -28,11 +26,6 @@ export function resolveConfiguredActiveTab({
 const setConfigMethods = {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
-      const incomingLovelaceCardConfigSignature = lovelaceCardConfigSignature(config);
-      const previousLovelaceCardConfigSignature = this.__incomingLovelaceCardConfigSignature;
-      const lovelaceCardConfigChanged = previousLovelaceCardConfigSignature !== undefined
-        && previousLovelaceCardConfigSignature !== incomingLovelaceCardConfigSignature;
-      this.__incomingLovelaceCardConfigSignature = incomingLovelaceCardConfigSignature;
       try { this.__lastSetConfigSource = this._cloneJson_?.(config) || JSON.parse(JSON.stringify(config)); } catch {}
       const inHaConfigPreview = this._isInHaEditorPreview?.();
       if (this.__haConfigPreviewMode && !inHaConfigPreview) {
@@ -65,6 +58,26 @@ const setConfigMethods = {
       this._config = config;
       this.storageKey = stableKey || undefined;
       const keyChanged = prevKey !== this.storageKey;
+      let dashboardRoute;
+      try { dashboardRoute = this._getCurrentDashboardUrlPath_?.() ?? null; } catch { dashboardRoute = null; }
+      const previousDashboardRoute = this.__storageDashboardRoute;
+      const dashboardRouteChanged = previousDashboardRoute !== undefined
+        && previousDashboardRoute !== dashboardRoute;
+      const storageScopeChanged = keyChanged || dashboardRouteChanged;
+      this.__storageDashboardRoute = dashboardRoute;
+      if (storageScopeChanged) {
+        // Home Assistant may reuse the same custom-card element while moving
+        // between dashboards. Cancel every delayed/in-flight operation that
+        // belongs to the previous storage scope before applying the new one.
+        this.__storageIdentityEpoch = (Number(this.__storageIdentityEpoch || 0) || 0) + 1;
+        clearTimeout(this._saveTimer);
+        this._saveTimer = null;
+        this.__lastSyncedDashboardPayload = null;
+        this.__lastSyncedDashboardStorageKey = '';
+        this.__lastBackendLoadResult = null;
+        this.__backendSnapshotRetryAttempts = 0;
+        this.__cardBuildSeq = (Number(this.__cardBuildSeq || 0) || 0) + 1;
+      }
       this._syncEditorsStorageKey();
       this.gridSize                 = Number(config.grid ?? 10);
       this.connectorGridSize        = Number(config.connector_grid_size ?? config.connector_grid ?? config.line_grid_size ?? config.line_grid ?? 0) || 0;
@@ -200,7 +213,7 @@ const setConfigMethods = {
         previousActiveTab,
         persistedActiveTab,
         transitionTarget: this.__tabTransitionTarget,
-        sameDashboard: !keyChanged,
+        sameDashboard: !storageScopeChanged,
       });
       this._syncTabsPlacement_?.();
       this._updateTabsAutoReturnSettings_?.();
@@ -210,7 +223,7 @@ const setConfigMethods = {
       if (this.cardContainer) this._applyContainerSizingFromConfig(false);
 
         // IMPORTANT: do NOT autosave a layout snapshot while the key is changing/booting
-      if (this.editMode && !this.__booting && !keyChanged) {
+      if (this.editMode && !this.__booting && !storageScopeChanged) {
         try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
       }
       // Grid-related
@@ -282,24 +295,18 @@ const setConfigMethods = {
             ? { replaceExisting: true, reason: 'fresh-empty-card' }
             : { preserveExistingOnEmpty: true, reason: 'ha-native-edit' })
         : undefined;
-      if (keyChanged && this.__booted) {
+      if (storageScopeChanged && this.__booted) {
         if (haNativeEditActive && hasRenderedCards && !freshEmptyConfig) {
           this._syncEmptyStateUI?.();
           this._applyAutoScale?.({ force: true });
         } else {
           this._initialLoad(true, editorLoadOptions);
         }
-      } else if (lovelaceCardConfigChanged && this.__booted) {
-        this._initialLoad(true, {
-          ...(editorLoadOptions || {}),
-          replaceExisting: true,
-          reason: 'lovelace-card-config-changed',
-        });
       } else if (!this.__booted && this.__probed) {
         const shouldWaitForBackendSnapshot = !!(
           this.__backendProbePending
           && this.storageKey
-          && !this._hasFastInitialLayout_?.()
+          && !this._hasPendingDashboardReplacement_?.()
         );
         if (shouldWaitForBackendSnapshot) return;
         this.__booted = true;

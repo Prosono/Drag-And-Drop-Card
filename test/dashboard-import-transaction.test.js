@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDashboardConverterMethods } from '../src/storage/dashboard-converter.js';
+import { installDesignImportExportMethods } from '../src/storage/import-export.js';
 import { installResponsiveModelMethods } from '../src/layout/responsive-layouts.js';
 import {
   installLifecycleMethods,
@@ -285,6 +286,41 @@ test('a transient backend probe failure retries and refreshes the empty dashboar
   assert.equal(harness._backendOK, true);
 });
 
+test('a shared dashboard waits for the backend probe instead of booting from stale local cache', async () => {
+  let finishProbe;
+  class ProbeHarness {
+    constructor() {
+      this.storageKey = 'layout_shared';
+      this.__booted = false;
+      this.__cfgReady = true;
+      this.isConnected = true;
+      this.cardContainer = { children: [] };
+      this.loads = 0;
+    }
+    _hasHassApi_() { return true; }
+    _hasFastInitialLayout_() { return true; }
+    _probeBackend() {
+      return new Promise((resolve) => {
+        finishProbe = () => {
+          this._backendOK = true;
+          resolve(true);
+        };
+      });
+    }
+    _initialLoad() { this.loads += 1; }
+  }
+  installLifecycleMethods(ProbeHarness.prototype);
+  const harness = new ProbeHarness();
+
+  harness.hass = { callApi: async () => ({}) };
+  await Promise.resolve();
+  assert.equal(harness.loads, 0);
+
+  finishProbe();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(harness.loads, 1);
+});
+
 test('an in-flight backend load cannot apply stale state after an import starts', async () => {
   let resolveBackend;
   let appliedOptions = false;
@@ -325,6 +361,140 @@ test('an in-flight backend load cannot apply stale state after an import starts'
   assert.equal(appliedOptions, false);
   assert.equal(appliedPackages, false);
   assert.equal(harness.__booting, false);
+});
+
+test('an in-flight DEV load cannot apply after navigation changes the dashboard route', async () => {
+  let resolveBackend;
+  let markBackendStarted;
+  const backendStarted = new Promise((resolve) => { markBackendStarted = resolve; });
+  let appliedOptions = false;
+  class InitialLoadHarness {
+    constructor() {
+      this.route = 'dev-dashboard';
+      this.storageKey = 'layout_shared_name';
+      this._backendOK = true;
+      this.__storageIdentityEpoch = 1;
+      this.__initialLoadSeq = 0;
+      this.__booting = false;
+      this._config = {};
+    }
+
+    _getCurrentDashboardUrlPath_() { return this.route; }
+    _beginDashboardLoadingAnimation_() { return null; }
+    _dbgPush() {}
+    _readLocalLayoutSnapshot_() { return null; }
+    _hasPendingDashboardReplacement_() { return false; }
+    _loadLayoutFromBackend() {
+      markBackendStarted();
+      return new Promise((resolve) => { resolveBackend = resolve; });
+    }
+    _cloneJson_(value) { return structuredClone(value); }
+    _normalizeDashboardPayload_(value) { return structuredClone(value); }
+    _applyImportedOptions() { appliedOptions = true; }
+    _setDashboardPackages_() {}
+  }
+  installPersistenceMethods(InitialLoadHarness.prototype);
+  installInitialLoadMethods(InitialLoadHarness.prototype);
+  const harness = new InitialLoadHarness();
+  harness._getCurrentDashboardUrlPath_ = () => harness.route;
+  harness._loadLayoutFromBackend = () => {
+    markBackendStarted();
+    return new Promise((resolve) => { resolveBackend = resolve; });
+  };
+
+  const load = harness._initialLoad(true);
+  await backendStarted;
+  harness.route = 'prd-dashboard';
+  resolveBackend({
+    options: { tabs: [{ id: 'dev', label: 'DEV' }], default_tab: 'dev' },
+    cards: [{ id: 'dev-card', tabId: 'dev', card: { type: 'tile' } }],
+  });
+  await load;
+
+  assert.equal(appliedOptions, false);
+  assert.equal(harness.__booting, false);
+});
+
+test('initial load keeps the backend snapshot authoritative over embedded Lovelace cards', async () => {
+  const backendCard = {
+    id: 'backend-card',
+    card: { type: 'entities', title: 'Backend current', entities: ['light.kitchen'] },
+    position: { x: 320, y: 40 },
+    size: { width: 240, height: 180 },
+  };
+  let builtEntries = null;
+  let backendWrites = 0;
+
+  class InitialLoadHarness {
+    constructor() {
+      this.storageKey = 'layout_prd';
+      this._backendOK = true;
+      this.__initialLoadSeq = 0;
+      this.__booting = false;
+      this._config = {
+        storage_key: this.storageKey,
+        cards: [{
+          ...structuredClone(backendCard),
+          card: { ...structuredClone(backendCard.card), title: 'Stale Lovelace copy' },
+        }],
+      };
+      this.config = structuredClone(this._config);
+      this.cardContainer = { querySelector: () => null };
+    }
+    _beginDashboardLoadingAnimation_() { return null; }
+    _normalizeContainerSizeMode_() { return 'fixed_custom'; }
+    _dbgPush() {}
+    _readLocalLayoutSnapshot_() { return null; }
+    _hasPendingDashboardReplacement_() { return false; }
+    async _loadLayoutFromBackend() {
+      return { version: 3, cards: [structuredClone(backendCard)], packages: [] };
+    }
+    async _saveLayoutToBackend() { backendWrites += 1; }
+    _cloneJson_(value) { return structuredClone(value); }
+    _normalizeDashboardPayload_(value) { return structuredClone(value); }
+    _setDashboardPackages_() {}
+    _applyImportedOptions() {}
+    _normalizeResponsiveViewportProfiles_(value) { return value || {}; }
+    _normalizeResponsiveLayouts_(cards) { return { desktop_landscape: structuredClone(cards) }; }
+    _getRequestedResponsiveProfile_() { return 'desktop'; }
+    _getRequestedResponsiveOrientation_() { return 'landscape'; }
+    _getRuntimeResponsiveLayoutKey_() { return 'desktop_landscape'; }
+    _getPrimaryResponsiveLayoutKey_() { return 'desktop_landscape'; }
+    _serializeResponsiveLayouts_(layouts) { return structuredClone(layouts); }
+    async _buildCardsFromEntries_(entries) { builtEntries = structuredClone(entries); }
+    _exportableOptions() { return {}; }
+    _exportDashboardPackages_() { return []; }
+    _updateStoreBadge() {}
+    _syncEmptyStateUI() {}
+    _processCardModOnce() {}
+    _updateApplyBtn() {}
+    _resetLayoutHistory_() {}
+    _renderTabs() {}
+    _renderLayersBar_() {}
+    _applyActiveTab() {}
+    _applyVisibility_() {}
+    _applyBackgroundFromConfig() {}
+    _scheduleCardHelpersPreload_() {}
+  }
+  installInitialLoadMethods(InitialLoadHarness.prototype);
+  const harness = new InitialLoadHarness();
+
+  await harness._initialLoad(true);
+
+  assert.equal(builtEntries[0].card.title, 'Backend current');
+  assert.equal(harness._config.cards[0].card.title, 'Backend current');
+  assert.equal(backendWrites, 0);
+});
+
+test('a second initial load is not queued while the authoritative load is still running', async () => {
+  class InitialLoadHarness {}
+  installInitialLoadMethods(InitialLoadHarness.prototype);
+  const harness = new InitialLoadHarness();
+  harness.__booting = true;
+
+  await harness._initialLoad(true, { replaceExisting: true });
+
+  assert.equal(harness.__pendingInitialLoad, undefined);
 });
 
 test('Lovelace storage lookup finds the correct keyed DDC card inside sections', () => {
@@ -388,6 +558,60 @@ test('converter config persistence does not dispatch a competing event after sto
 
   assert.equal(await harness._persistDashboardConverterConfig_(), true);
   assert.deepEqual(order, ['storage']);
+});
+
+test('portable design import uses one Lovelace writer', async () => {
+  class DesignImportHarness {
+    constructor() {
+      this.calls = [];
+    }
+    async _persistThisCardConfigToStorage_(options) {
+      this.calls.push(options);
+      return true;
+    }
+    dispatchEvent() {
+      this.calls.push('event');
+    }
+    _deleteParkedSidebarOptions_() {}
+  }
+  installDesignImportExportMethods(DesignImportHarness.prototype);
+  const harness = new DesignImportHarness();
+
+  const result = await harness._persistImportedDesignConfig_();
+
+  assert.equal(result, 'storage');
+  assert.deepEqual(harness.calls, [{ captureLive: false }]);
+});
+
+test('portable design import dispatches one fallback event only when direct storage is unavailable', async () => {
+  const previousCustomEvent = globalThis.CustomEvent;
+  globalThis.CustomEvent = class CustomEvent {
+    constructor(type, options = {}) {
+      this.type = type;
+      Object.assign(this, options);
+    }
+  };
+  try {
+    class DesignImportHarness {
+      constructor() {
+        this._config = { storage_key: 'layout_prd', cards: [{ id: 'imported' }] };
+        this.events = [];
+      }
+      async _persistThisCardConfigToStorage_() { return false; }
+      dispatchEvent(event) { this.events.push(event); }
+      _deleteParkedSidebarOptions_() {}
+    }
+    installDesignImportExportMethods(DesignImportHarness.prototype);
+    const harness = new DesignImportHarness();
+
+    assert.equal(await harness._persistImportedDesignConfig_(), 'event');
+    assert.equal(harness.events.length, 1);
+    assert.equal(harness.events[0].type, 'config-changed');
+    assert.deepEqual(harness.events[0].detail.config.cards, [{ id: 'imported' }]);
+  } finally {
+    if (previousCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = previousCustomEvent;
+  }
 });
 
 test('ID seeding updates the keyed target instead of the first unidentified DDC card', async () => {
@@ -505,4 +729,64 @@ test('full card persistence seeds its ID and imported tabs in one Lovelace save'
   assert.deepEqual(new Set(stored.cards.map((entry) => entry.tabId)), new Set(['home', 'climate']));
   assert.equal(harness.config.id, stored.id);
   assert.equal(harness._config.id, stored.id);
+});
+
+test('explicit DDC persistence writes the current runtime card snapshot', async () => {
+  const originalNested = {
+    id: 'entities-card',
+    card: { type: 'entities', entities: ['light.kitchen'] },
+    position: { x: 10, y: 20 },
+    size: { width: 240, height: 180 },
+  };
+  const externalNested = structuredClone(originalNested);
+  externalNested.card.title = 'External title';
+  let saved = null;
+
+  class StorageHarness {
+    constructor() {
+      this.storageKey = 'layout_target';
+      this._config = {
+        type: 'custom:drag-and-drop-card',
+        id: 'ddc-main',
+        storage_key: this.storageKey,
+      };
+      this.config = structuredClone(this._config);
+      this._responsiveLayouts = {
+        desktop_landscape: [{
+          ...structuredClone(originalNested),
+          position: { x: 600, y: 20 },
+        }],
+      };
+      this.hass = {
+        callWS: async (message) => {
+          if (message.type === 'lovelace/config/save') {
+            saved = structuredClone(message.config);
+            return true;
+          }
+          return {
+            views: [{
+              cards: [{
+                ...structuredClone(this._config),
+                cards: [structuredClone(externalNested)],
+              }],
+            }],
+          };
+        },
+      };
+    }
+    _getPrimaryResponsiveLayoutKey_() { return 'desktop_landscape'; }
+    _serializeResponsiveLayouts_(layouts) { return structuredClone(layouts); }
+    _cloneJson_(value) { return structuredClone(value); }
+    requestUpdate() {}
+  }
+  installPersistenceMethods(StorageHarness.prototype);
+  const harness = new StorageHarness();
+  harness._getCurrentDashboardUrlPath_ = () => null;
+  harness._getLovelace = () => ({ current_view: 0 });
+
+  assert.equal(await harness._persistThisCardConfigToStorage_(), true);
+
+  const stored = saved.views[0].cards[0].cards[0];
+  assert.equal(stored.card.title, undefined);
+  assert.equal(stored.position.x, 600);
 });

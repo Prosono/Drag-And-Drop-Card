@@ -72,6 +72,32 @@ test('runtime layout cache never falls back to the last unrelated Drag & Drop da
   }
 });
 
+test('runtime layout cache does not share a card-id alias across DEV and PRD keys', () => {
+  const previousCache = globalThis.__ddcRuntimeLayoutCache;
+  try {
+    globalThis.__ddcRuntimeLayoutCache = new Map();
+    const prd = new DashboardIdentityHarness();
+    prd.storageKey = 'layout_prd';
+    prd.config = { type: 'custom:drag-and-drop-card', id: 'copied-card-id', storage_key: 'layout_prd' };
+    prd._config = { ...prd.config };
+    prd._normalizeDashboardPayload_ = (value) => value;
+    prd._cloneJson_ = (value) => structuredClone(value);
+    prd._writeRuntimeLayoutCache_({ cards: [{ id: 'prd-card' }] });
+
+    const dev = new DashboardIdentityHarness();
+    dev.storageKey = 'layout_dev';
+    dev.config = { type: 'custom:drag-and-drop-card', id: 'copied-card-id', storage_key: 'layout_dev' };
+    dev._config = { ...dev.config };
+    dev._normalizeDashboardPayload_ = (value) => value;
+    dev._cloneJson_ = (value) => structuredClone(value);
+
+    assert.deepEqual(Array.from(globalThis.__ddcRuntimeLayoutCache.keys()), ['layout_prd']);
+    assert.equal(dev._readRuntimeLayoutCache_(), null);
+  } finally {
+    globalThis.__ddcRuntimeLayoutCache = previousCache;
+  }
+});
+
 test('the empty dashboard widget is visible immediately in HA dashboard edit mode but not inside the compact card preview', () => {
   const harness = new DashboardIdentityHarness();
   harness._isHaEditorBlockingEmptyState_ = () => true;
