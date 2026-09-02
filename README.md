@@ -37,6 +37,20 @@ Drag & Drop Card is a freeform canvas for the Home Assistant Lovelace UI. Arrang
 
 > **New here?** Follow the illustrated [HADS start guide](https://hads.smarti.dev/wiki/start-here) for the fastest path from installation to your first dashboard. This README is the detailed reference for configuration and advanced features.
 
+<a id="support-the-project"></a>
+
+## ☕ Support the project
+
+If Drag & Drop Card saves you time, you can support the project by [starring the repository](https://github.com/Prosono/Drag-And-Drop-Card), sharing your dashboards, reporting useful feedback, or buying me a coffee.
+
+<p align="center">
+  <a href="https://buymeacoffee.com/prosono">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="217" height="60">
+  </a>
+</p>
+
+---
+
 ## 📑 Contents
 
 - [Features](#features)
@@ -1065,20 +1079,6 @@ npm run build
 5. Open a pull request that explains what changed and how it was verified.
 
 Please keep the project self-contained: runtime dependencies must be bundled, not loaded from an external CDN. By contributing, you agree that your contribution is provided under the project's MIT license.
-
----
-
-<a id="support-the-project"></a>
-
-## ☕ Support the project
-
-If Drag & Drop Card saves you time, you can support the project by [starring the repository](https://github.com/Prosono/Drag-And-Drop-Card), sharing your dashboards, reporting useful feedback, or buying me a coffee.
-
-<p align="center">
-  <a href="https://buymeacoffee.com/prosono">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="217" height="60">
-  </a>
-</p>
 
 ---
 
