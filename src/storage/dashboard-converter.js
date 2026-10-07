@@ -48,10 +48,11 @@ const converterMethods = {
     if (Array.isArray(source?.config?.views)) return source.config;
     if (Array.isArray(source?.lovelace?.views)) return source.lovelace;
     if (Array.isArray(source?.lovelace?.config?.views)) return source.lovelace.config;
-    if (Array.isArray(source.cards)) {
+    if (Array.isArray(source.cards) || Array.isArray(source.sections)) {
       return {
         title: source.title || 'Imported dashboard',
         views: [{
+          ...source,
           title: source.title || 'Imported',
           path: source.path || 'imported',
           icon: source.icon || 'mdi:view-dashboard-outline',
@@ -88,6 +89,7 @@ const converterMethods = {
   _dashboardConverterViewLayoutMode_(view = {}) {
     const type = String(view?.type || '').trim().toLowerCase();
     if (type === 'panel' || view?.panel === true) return 'panel';
+    if (type === 'sections' || (!type && Array.isArray(view.sections))) return 'sections';
     if (type === 'custom:horizontal-layout' || type === 'horizontal') return 'horizontal';
     if (type === 'custom:vertical-layout' || type === 'vertical') return 'vertical';
     if (type === 'custom:masonry-layout' || type === 'masonry') return 'masonry';
@@ -791,7 +793,17 @@ const converterMethods = {
         };
         cards.forEach((card) => {
           const layoutCardMode = this._dashboardConverterLayoutCardMode_(card);
-          if (layoutCardMode && Array.isArray(card.cards)) {
+          // Only flatten a bare layout wrapper. Decorations, visibility, view placement,
+          // and unknown options need the original custom card to retain their behavior.
+          const supportedLayoutKeys = new Set([
+            'type', 'width', 'column_width', 'columnWidth', 'column-width', 'max_width', 'max-width',
+            'max_cols', 'maxCols', 'max-cols', 'columns', 'rtl', 'column_widths', 'columnWidths',
+            'column-widths', 'margin', 'padding', 'card_margin', 'cardMargin', 'card-margin',
+          ]);
+          const bareLayout = Object.keys(card).every((key) => ['type', 'cards', 'layout_type', 'layoutType', 'layout'].includes(key))
+            && (!card.layout || typeof card.layout === 'string'
+              || Object.keys(card.layout).every((key) => supportedLayoutKeys.has(key)));
+          if (layoutMode !== 'panel' && cards.length === 1 && bareLayout && layoutCardMode && Array.isArray(card.cards)) {
             flushNative();
             addBlock(card.cards, layoutCardMode, this._dashboardConverterLayoutOptions_(card), 'layout-card');
             return;
@@ -820,7 +832,11 @@ const converterMethods = {
             viewTitle: title,
             path: `views[${viewIndex}].sections[${sectionIndex}].cards`,
           }));
-          addBlock(sectionCards, 'grid', this._dashboardConverterLayoutOptions_(section), `section-${sectionIndex + 1}`);
+          addBlock(sectionCards, 'section', {
+            max_columns: view.max_columns,
+            dense_section_placement: view.dense_section_placement === true,
+            column_span: section?.column_span,
+          }, `section-${sectionIndex + 1}`);
         });
       }
 
@@ -1218,6 +1234,90 @@ const converterMethods = {
     return { entries, bottom };
   },
 
+  // Sections have their own twelve-column grid. Pack cards inside each section
+  // first, then place entire sections in rows so unrelated rooms stay together.
+  _packDashboardConverterSections_(blocks = [], metrics = {}, offsetY = 0) {
+    const { canvasWidth, margin, gap } = metrics;
+    const positiveInt = (value, fallback, max) => {
+      const number = Number(value);
+      return Number.isFinite(number) && number > 0 ? Math.min(max, Math.max(1, Math.floor(number))) : fallback;
+    };
+    const options = blocks[0]?.items[0]?.layoutOptions || {};
+    const maxColumns = positiveInt(options.max_columns, 4, 100);
+    const available = canvasWidth - margin * 2;
+    const columns = Math.max(1, Math.min(maxColumns, Math.floor((available + gap) / (320 + gap))));
+    const sectionWidth = (available - gap * (columns - 1)) / columns;
+    const occupied = [];
+    const rowHeights = [];
+    const sections = [];
+    let cursor = 0;
+
+    blocks.forEach((block) => {
+      const span = positiveInt(block.items[0]?.layoutOptions?.column_span, 1, columns);
+      let slot = options.dense_section_placement ? 0 : cursor;
+      while (slot % columns + span > columns || Array.from({ length: span }, (_, i) => occupied[slot + i]).some(Boolean)) slot += 1;
+      for (let i = 0; i < span; i += 1) occupied[slot + i] = true;
+      cursor = slot + span;
+      const width = sectionWidth * span + gap * (span - 1);
+      const cellGap = 8;
+      const cellWidth = (width - cellGap * 11) / 12;
+      const rectangles = [];
+      let cardCursor = 0;
+      const entries = [];
+      block.items.forEach((item) => {
+        if (item.isLayoutBreak) return;
+        const card = item.card;
+        const defaultColumns = card.type === 'tile' || card.type === 'button' ? 6 : 12;
+        const cardSpan = card.grid_options?.columns === 'full' ? 12 : positiveInt(card.grid_options?.columns, defaultColumns, 12);
+        const cardWidth = cellWidth * cardSpan + cellGap * (cardSpan - 1);
+        const hints = this._dashboardConverterCardSizeHints_(card);
+        const estimatedHeight = this._dashboardConverterCardHeightForWidth_(card, cardWidth);
+        const rows = positiveInt(card.grid_options?.rows, Math.max(1, Math.ceil((estimatedHeight + cellGap) / 56)), 10000);
+        const height = hints.explicitHeight ? hints.height : rows * 56 - cellGap;
+        const occupiedRows = Math.max(rows, Math.ceil((height + cellGap) / 56));
+        let cell = cardCursor;
+        const fits = (candidate) => {
+          if (candidate % 12 + cardSpan > 12) return false;
+          const x = candidate % 12;
+          const y = Math.floor(candidate / 12);
+          return !rectangles.some((rect) => x < rect.x + rect.width && x + cardSpan > rect.x
+            && y < rect.y + rect.height && y + occupiedRows > rect.y);
+        };
+        while (!fits(cell)) cell += 1;
+        rectangles.push({ x: cell % 12, y: Math.floor(cell / 12), width: cardSpan, height: occupiedRows });
+        cardCursor = cell + cardSpan;
+        entries.push({
+          id: item.id,
+          card: this._cloneJson_?.(card) || JSON.parse(JSON.stringify(card)),
+          position: { x: (cell % 12) * (cellWidth + cellGap), y: Math.floor(cell / 12) * 56 },
+          size: { width: cardWidth, height },
+          z: item.z,
+          tabId: item.tabId,
+          ...this._dashboardConverterEntryStyle_(item),
+        });
+      });
+      const height = entries.reduce((max, entry) => Math.max(max, entry.position.y + entry.size.height), 0);
+      const row = Math.floor(slot / columns);
+      rowHeights[row] = Math.max(rowHeights[row] || 0, height);
+      sections.push({ entries, row, column: slot % columns });
+    });
+    const rowOffsets = [];
+    let bottom = offsetY + margin;
+    rowHeights.forEach((height, row) => {
+      rowOffsets[row] = bottom;
+      bottom += height + gap;
+    });
+    const entries = sections.flatMap((section) => section.entries.map((entry) => ({
+      ...entry,
+      position: {
+        x: Math.round(margin + section.column * (sectionWidth + gap) + entry.position.x),
+        y: Math.round(rowOffsets[section.row] + entry.position.y),
+      },
+      size: { width: Math.round(entry.size.width), height: Math.round(entry.size.height) },
+    })));
+    return { entries, bottom: entries.length ? bottom - gap : offsetY };
+  },
+
   _packDashboardConverterPanelBlock_(group = [], metrics = {}, offsetY = 0) {
     const { canvasWidth, margin, gap } = metrics;
     const width = Math.max(180, Math.round(canvasWidth - margin * 2));
@@ -1333,7 +1433,16 @@ const converterMethods = {
       });
 
       let offsetY = 0;
-      return Array.from(blocks.values()).flatMap((block) => {
+      const orderedBlocks = Array.from(blocks.values());
+      return orderedBlocks.flatMap((block, index) => {
+        if (block.mode === 'section') {
+          if (orderedBlocks[index - 1]?.mode === 'section') return [];
+          const sectionBlocks = [];
+          for (let i = index; i < orderedBlocks.length && orderedBlocks[i].mode === 'section'; i += 1) sectionBlocks.push(orderedBlocks[i]);
+          const packed = this._packDashboardConverterSections_(sectionBlocks, metrics, offsetY);
+          offsetY = packed.bottom + gap;
+          return packed.entries;
+        }
         const mode = block.mode || 'grid';
         const packed =
           mode === 'panel'
@@ -1618,6 +1727,11 @@ const converterMethods = {
     const normalized = this._normalizeDashboardPayload_?.(snapshot) || snapshot;
     if (!Array.isArray(normalized?.cards) || !normalized.cards.length) {
       throw new Error('Refusing to persist an empty converted dashboard snapshot.');
+    }
+    if (this._getStorageMode_?.() === 'lovelace') {
+      // The complete imported config is saved by _persistDashboardConverterConfig_.
+      // Do not create a backend replacement marker for a Lovelace-owned layout.
+      return { snapshot: normalized, backend: 'lovelace' };
     }
     try { this._writeRuntimeLayoutCache_?.(normalized, targetStorageKey); } catch {}
     try { localStorage.setItem(`ddc_local_${targetStorageKey || 'default'}`, JSON.stringify(normalized)); } catch {}

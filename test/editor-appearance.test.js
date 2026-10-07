@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { getDashboardShellTemplate } from '../src/dashboard/shell-template.js';
 
 import {
   installDashboardVisualMethods,
@@ -35,6 +36,47 @@ class EditorAppearanceHarness {
 }
 
 installDashboardVisualMethods(EditorAppearanceHarness.prototype);
+
+test('editor accents and button labels stay readable with opposite dashboard colors (#31)', () => {
+  const css = getDashboardShellTemplate();
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/../g).map((part) => {
+      const value = parseInt(part, 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const contrast = (a, b) => {
+    const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (values[0] + 0.05) / (values[1] + 0.05);
+  };
+  for (const mode of ['light', 'dark']) {
+    const block = css.split(`.smart-picker-modal[data-ddc-theme="${mode}"]{`)[1].split('}')[0];
+    const inherited = mode === 'light' ? '#ffffff' : '#000000';
+    const palette = {
+      '--primary-color': inherited,
+      '--accent-color': inherited,
+      '--text-primary-color': inherited,
+      '--mdc-theme-primary': inherited,
+      '--mdc-theme-secondary': inherited,
+      ...Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()])),
+    };
+    const resolve = (name) => palette[name].replace(/var\((--[\w-]+)\)/g, (_, key) => resolve(key));
+    for (const token of ['--primary-color', '--accent-color', '--mdc-theme-primary', '--mdc-theme-secondary']) {
+      assert.ok(contrast(resolve(token), resolve('--card-background-color')) >= 4.5, `${mode}: ${token} on editor surface`);
+    }
+    assert.ok(contrast(resolve('--text-primary-color'), resolve('--primary-color')) >= 4.5, `${mode}: button label`);
+    assert.ok(contrast(resolve('--mdc-theme-on-primary'), resolve('--mdc-theme-primary')) >= 4.5, `${mode}: Material button label`);
+    // HA defines these aliases on html, where they resolve before inheritance.
+    // Changing only card-background-color inside the editor cannot update them.
+    for (const token of ['--wa-color-surface-default', '--wa-color-surface-raised', '--wa-form-control-background-color']) {
+      assert.equal(resolve(token), resolve('--card-background-color'), `${mode}: entity picker ${token}`);
+      assert.ok(contrast(resolve('--wa-color-text-normal'), resolve(token)) >= 4.5, `${mode}: popup text`);
+      assert.ok(contrast(resolve('--wa-form-control-placeholder-color'), resolve(token)) >= 4.5, `${mode}: search placeholder`);
+    }
+    assert.ok(contrast(resolve('--primary-text-color'), resolve('--ha-color-fill-primary-quiet-resting')) >= 4.5, `${mode}: selected entity`);
+  }
+});
 
 function withLocalStorage(run) {
   const previous = globalThis.localStorage;

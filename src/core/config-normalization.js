@@ -1,3 +1,5 @@
+import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
+import { normalizeTabStyle } from '../layout/tab-style.js';
 /*
  * Configuration normalization, cloning, storage-key, and sanitization helpers.
  *
@@ -196,6 +198,8 @@ const configHelperMethods = {
     if ('tabsAutoReturnDelay' in next && !('tabs_auto_return_delay' in next)) {
       next.tabs_auto_return_delay = next.tabsAutoReturnDelay;
     }
+    if ('sidebar_appearance' in next) next.sidebar_appearance = normalizeSidebarAppearance(next.sidebar_appearance);
+    if ('tabs_style' in next) next.tabs_style = normalizeTabStyle(next.tabs_style);
     if ('tabs_size' in next) {
       next.tabs_size = this._normalizeTabsSize_(next.tabs_size);
     }

@@ -387,7 +387,7 @@ const designImportExportMethods = {
       'container_preset','container_preset_orientation',
   
       // Tabs
-      'tabs','tabs_position','tabs_size','default_tab','hide_tabs_when_single','sidebar_enabled','sidebar_type','sidebar_items','sidebar_style','sidebar_density','sidebar_accent','sidebar_header','sidebar_canvas_height','sidebar_cards','sidebar_home_image','sidebar_calendar_entities','layers_enabled','layers_button_details',
+      'tabs','tabs_position','tabs_size','tabs_style','default_tab','hide_tabs_when_single','sidebar_enabled','sidebar_type','sidebar_appearance','sidebar_items','sidebar_style','sidebar_density','sidebar_accent','sidebar_header','sidebar_canvas_height','sidebar_cards','sidebar_home_image','sidebar_calendar_entities','layers_enabled','layers_button_details',
       'layers',
   
       // HA chrome
@@ -505,6 +505,7 @@ const designImportExportMethods = {
         runtimeImportedOptions.default_tab = runtimeImportedOptions.default_tab ?? compatDefaultTab;
         runtimeImportedOptions.hide_tabs_when_single = runtimeImportedOptions.hide_tabs_when_single ?? compatHideSingle;
         if (!ADOPT_IMPORTED_STORAGE_KEY) delete runtimeImportedOptions.storage_key;
+        delete runtimeImportedOptions.storage_mode;
   
         // ---- APPLY OPTIONS (with hard-replace or merge) ----
         if (json.options) {

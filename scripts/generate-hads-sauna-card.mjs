@@ -1,0 +1,18 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { startCard } from './hads-control-cards/shared.js';
+import { definition } from './hads-sauna-card/definition.js';
+import { saunaFeature } from './hads-sauna-card/feature.js';
+import { saunaModel } from './hads-sauna-card/model.js';
+const source = new URL('./hads-sauna-card/', import.meta.url);
+const output = new URL('../examples/hads-sauna-card/', import.meta.url);
+const photo = await readFile(new URL('assets/sauna-morning.jpg', output));
+const html = (await readFile(new URL('card.html', source), 'utf8')).replace('__SAUNA_IMAGE__', 'data:image/jpeg;base64,' + photo.toString('base64'));
+const css = await readFile(new URL('./hads-control-cards/shared.css', import.meta.url), 'utf8') + '\n' + await readFile(new URL('card.css', source), 'utf8');
+const js = `return (${startCard.toString()})({hass,states,config,root,host,helpers,ddc,reason},${JSON.stringify(definition)},function(api){return (${saunaFeature.toString()})(api,${saunaModel.toString()});});`;
+const card = { type: 'custom:ddc-html-card', title: '', html, css, js, rerun_on_hass_update: false, [definition.key]: definition.defaults };
+const entry = { id: 'ddc_card_hads_sauna_1_0_0', card, position: { x: 0, y: 0 }, size: { width: 940, height: 580 }, z: 1, tabId: 'default', overflow: 'hidden' };
+const mobile = { ...entry, size: { width: 340, height: 740 } };
+const payload = { kind: 'ddc-card', version: 2, entry, responsive_entries: { mobile_portrait: mobile, mobile_landscape: mobile }, connectors: [], responsive_connectors: {} };
+await mkdir(output, { recursive: true });
+await writeFile(new URL('hads-sauna-card-1-0-0.json', output), JSON.stringify(payload, null, 2) + '\n');
+console.log('Generated examples/hads-sauna-card/hads-sauna-card-1-0-0.json');

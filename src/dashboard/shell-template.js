@@ -1,9 +1,14 @@
+import { sidebarWidgetCss } from '../layout/sidebar-widgets.js';
+import { sidebarAppearanceCss } from '../layout/sidebar-appearance.js';
+import { tabStyleCss } from '../layout/tab-style.js';
 /*
  * Main dashboard shadow DOM template.
  *
  * The shell template contains the persistent canvas, toolbar, tabs, layers, sidebar, preview controls,
  * and global dashboard styles used before individual cards are rendered.
  */
+
+import { editorControlAliases } from '../styles/editor-control-styles.js';
 
 export function getDashboardShellTemplate() {
   return `
@@ -5384,6 +5389,15 @@ export function getDashboardShellTemplate() {
       :host([data-ddc-editor-theme="light"]) .ddc-selection-arrange-toolbar,
       :host([data-ddc-editor-theme="light"]) .ddc-connector-inspector,
       .smart-picker-modal[data-ddc-theme="light"]{
+        ${editorControlAliases}
+        /* Keep accent/foreground pairs local too: dark HA themes may use white accents. */
+        --primary-color:#0369a1;
+        --accent-color:#0369a1;
+        --rgb-primary-color:3,105,161;
+        --rgb-accent-color:3,105,161;
+        --text-primary-color:#ffffff;
+        --mdc-theme-primary:var(--primary-color);
+        --mdc-theme-secondary:var(--accent-color);
         --primary-background-color:#eef3f8;
         --secondary-background-color:#f6f8fb;
         --card-background-color:#fbfcfe;
@@ -5470,6 +5484,9 @@ export function getDashboardShellTemplate() {
         --ha-color-on-neutral-normal:#455468;
         --ha-color-on-disabled-quiet:#8b96a8;
         --ha-color-on-disabled-normal:#7b8797;
+        --ha-color-fill-primary-quiet-resting:#eaf5fb;
+        --ha-color-fill-primary-quiet-hover:#dceef8;
+        --ha-color-border-primary-quiet:#a7cce3;
         --ha-color-fill-primary-normal-resting:color-mix(in oklab, var(--primary-color, #038bd1) 18%, #eaf5fb);
         --ha-color-fill-primary-normal-hover:color-mix(in oklab, var(--primary-color, #038bd1) 25%, #e4f1f8);
         --ha-color-fill-primary-loud-resting:var(--primary-color, #038bd1);
@@ -5522,6 +5539,15 @@ export function getDashboardShellTemplate() {
       :host([data-ddc-editor-theme="dark"]) .ddc-selection-arrange-toolbar,
       :host([data-ddc-editor-theme="dark"]) .ddc-connector-inspector,
       .smart-picker-modal[data-ddc-theme="dark"]{
+        ${editorControlAliases}
+        --primary-color:#60a5fa;
+        --accent-color:#60a5fa;
+        --rgb-primary-color:96,165,250;
+        --rgb-accent-color:96,165,250;
+        --text-primary-color:#0b1118;
+        --mdc-theme-primary:var(--primary-color);
+        --mdc-theme-secondary:var(--accent-color);
+        --mdc-theme-on-primary:var(--text-primary-color);
         --primary-background-color:#0b1118;
         --secondary-background-color:#121821;
         --card-background-color:#17212d;
@@ -5541,6 +5567,24 @@ export function getDashboardShellTemplate() {
         --input-fill-color:#0d131b;
         --input-ink-color:#eef5fb;
         --input-label-ink-color:#a8b6c6;
+        --ha-color-text-primary:#eef5fb;
+        --ha-color-text-secondary:#a8b6c6;
+        --ha-color-text-disabled:#738397;
+        --ha-color-form-background:#0d131b;
+        --ha-color-form-background-hover:#202e3e;
+        --ha-color-form-background-disabled:#121821;
+        --ha-color-border-neutral-quiet:#344457;
+        --ha-color-border-neutral-normal:#62748b;
+        --ha-color-border-neutral-loud:#a8b6c6;
+        --ha-color-fill-neutral-quiet-resting:#17212d;
+        --ha-color-fill-neutral-quiet-hover:#202e3e;
+        --ha-color-fill-neutral-normal-resting:#29394b;
+        --ha-color-fill-neutral-normal-hover:#344457;
+        --ha-color-fill-primary-quiet-resting:#1c3048;
+        --ha-color-fill-primary-quiet-hover:#243e5b;
+        --ha-color-fill-primary-normal-resting:#243e5b;
+        --ha-color-fill-primary-normal-hover:#2d4a6b;
+        --ha-color-border-primary-quiet:#365a80;
         color-scheme:dark;
         color:var(--primary-text-color);
       }
@@ -11231,7 +11275,7 @@ export function getDashboardShellTemplate() {
 .ddc-root.ddc-sidebar-type-essentials{
   --ddc-sidebar-width:clamp(236px, 17vw, 286px);
 }
-.ddc-root.ddc-sidebar-type-canvas{
+.ddc-root.ddc-sidebar-type-expanded{
   --ddc-sidebar-width:clamp(300px, 23vw, 390px);
   --ddc-sidebar-gap:clamp(20px, 2.8vw, 34px);
 }
@@ -11289,7 +11333,7 @@ export function getDashboardShellTemplate() {
   display:none;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header{
   padding:11px 12px;
   border-radius:17px;
   background:rgba(255,255,255,.042);
@@ -11297,7 +11341,7 @@ export function getDashboardShellTemplate() {
   box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-main,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-main{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header-main{
   grid-template-columns:auto minmax(0, 1fr);
   gap:10px;
 }
@@ -11306,23 +11350,23 @@ export function getDashboardShellTemplate() {
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-live-pill,
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-stats,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-live-pill,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-stats{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-live-pill,
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header-stats{
   display:none;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-mark,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-mark{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header-mark{
   width:42px;
   height:42px;
   border-radius:13px;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-copy strong,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-copy strong{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header-copy strong{
   font-size:17px;
   line-height:1.05;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-header-copy em,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-header-copy em{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-header-copy em{
   max-width:100%;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -11331,7 +11375,7 @@ export function getDashboardShellTemplate() {
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-workspace{
   flex:0 0 auto;
 }
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-workspace{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-workspace{
   flex:1 1 auto;
   min-height:0;
 }
@@ -11339,17 +11383,17 @@ export function getDashboardShellTemplate() {
   height:min(var(--ddc-sidebar-canvas-frame-height, 360px), 440px);
   min-height:240px;
 }
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-canvas{
   height:var(--ddc-sidebar-canvas-frame-height, 640px);
   min-height:360px;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-canvas.is-empty:not(.is-editing),
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas.is-empty:not(.is-editing){
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-canvas.is-empty:not(.is-editing){
   height:84px;
   min-height:84px;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
   min-height:46px;
   padding-inline:11px;
   border-radius:13px;
@@ -11387,7 +11431,7 @@ export function getDashboardShellTemplate() {
   }
   .ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller,
   .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller,
-  .ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
+  .ddc-root.ddc-sidebar-type-expanded .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tabs-scroller{
     display:flex;
     flex-direction:row;
     gap:7px;
@@ -11396,7 +11440,7 @@ export function getDashboardShellTemplate() {
   }
   .ddc-root.ddc-sidebar-type-minimal .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
   .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab,
-  .ddc-root.ddc-sidebar-type-canvas .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
+  .ddc-root.ddc-sidebar-type-expanded .ddc-sidebar .ddc-tabs.ddc-tabs-left .ddc-tab{
     width:auto;
     min-width:52px;
     height:50px;
@@ -11431,7 +11475,7 @@ export function getDashboardShellTemplate() {
 .ddc-root.ddc-sidebar-type-essentials{
   --ddc-sidebar-width:clamp(232px, 17vw, 270px);
 }
-.ddc-root.ddc-sidebar-type-canvas{
+.ddc-root.ddc-sidebar-type-expanded{
   --ddc-sidebar-width:clamp(310px, 23vw, 382px);
   --ddc-sidebar-gap:clamp(20px, 2.6vw, 34px);
 }
@@ -11827,7 +11871,7 @@ export function getDashboardShellTemplate() {
   height:min(var(--ddc-sidebar-canvas-frame-height, 360px), 440px);
   min-height:240px;
 }
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas{
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-canvas{
   min-height:360px;
 }
 .ddc-root.ddc-sidebar-layout .ddc-sidebar-canvas.is-editing{
@@ -11844,7 +11888,7 @@ export function getDashboardShellTemplate() {
   box-shadow:none;
 }
 .ddc-root.ddc-sidebar-type-essentials .ddc-sidebar-canvas.is-empty:not(.is-editing),
-.ddc-root.ddc-sidebar-type-canvas .ddc-sidebar-canvas.is-empty:not(.is-editing){
+.ddc-root.ddc-sidebar-type-expanded .ddc-sidebar-canvas.is-empty:not(.is-editing){
   height:76px;
   min-height:76px;
   border-style:solid;
@@ -11977,6 +12021,9 @@ export function getDashboardShellTemplate() {
   }
 }
 /* === GRID SELECT PATCH END (styles) === */
+${tabStyleCss()}
+${sidebarAppearanceCss()}
+${sidebarWidgetCss()}
 </style>
         <div class="ddc-page-bg-host" id="ddcPageBgHost" aria-hidden="true"></div>
         <div class="ddc-root">

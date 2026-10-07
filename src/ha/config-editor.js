@@ -125,9 +125,11 @@ function createGetConfigElement(CardClass) {
       const base = sanitizeConfigForEditor(editor._config || {});
       base.type = 'custom:drag-and-drop-card';
       base.storage_key = text.value || '';
-      delete base.cards;
-      delete base.responsive_layouts;
-      delete base.responsiveLayouts;
+      if (base.storage_mode !== 'lovelace') {
+        delete base.cards;
+        delete base.responsive_layouts;
+        delete base.responsiveLayouts;
+      }
       return base;
     };
     // Dispatch config-changed event when the value changes

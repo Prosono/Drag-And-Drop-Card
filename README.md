@@ -119,6 +119,26 @@ type: module
 
 Without the backend, the card falls back to browser `localStorage`. That is useful for testing, but the layout remains tied to that browser profile and can be lost when site data is cleared.
 
+### Advanced: layout storage
+
+**Dashboard Settings → Advanced → Layout storage** selects the authoritative layout source:
+
+- **DDC backend** (default) keeps the existing shared-backend behavior, with browser storage as a fallback. Editing the nested `cards` array through `lovelace/config/save` does not override a saved DDC backend layout.
+- **Lovelace** reads and writes the layout in Home Assistant's dashboard configuration. External updates are applied when Home Assistant delivers a changed configuration or the dashboard reloads. An existing DDC backend or browser snapshot cannot override this mode.
+
+Export a backup before switching. The settings dialog requires confirmation: switching **copies the currently displayed dashboard** into the selected destination, replacing its saved layout. It does not load that destination's older copy. Switching back requires a connected DDC backend. If the destination write fails, the active mode is not changed. A switch back involves two services: if the backend copy succeeds but the Lovelace mode update fails, the copied backend layout remains, while Lovelace stays active.
+
+Lovelace saving requires a UI-managed dashboard and permission to edit it. YAML-managed dashboards can read `storage_mode: lovelace`, but changes must be saved in their source YAML. Package definitions are retained in Lovelace mode; deployment of package files through the DDC backend is disabled. Avoid simultaneous editing in multiple browsers or tools: DDC rejects a save when it detects a changed card before writing, but Home Assistant's full-dashboard save is not an atomic conflict-resolution API.
+
+For external tools, set `storage_mode: lovelace` on the outer `custom:drag-and-drop-card`. In this mode, top-level `cards` defines membership and the primary desktop layout. Compact responsive entries inherit card content; explicit per-profile card overrides remain independent and should be updated separately. An empty `cards: []` clears the layout. Setting the mode directly in configuration uses that configuration immediately; only switching in the settings dialog copies the visible layout first.
+
+```yaml
+type: custom:drag-and-drop-card
+storage_key: my_dashboard
+storage_mode: lovelace
+cards: [] # Replace with your complete DDC card entries before applying.
+```
+
 ---
 
 <a id="quick-start"></a>
@@ -148,6 +168,12 @@ Now:
 - Use the **toolbar** to **Add** cards, **Import/Export**, **Apply**, or **Exit** edit mode.
 - **Ctrl/Cmd + S** applies (saves) the layout while in edit mode.
 - **Esc** exits edit mode.
+
+### Editor appearance
+
+The editor defaults to **Light**, independently of your Home Assistant dashboard theme. Change it using the **Editor** toolbar button or **Dashboard Settings → Appearance → Editor appearance**. Choose **Light**, **Dark**, or **Follow dashboard**.
+
+Light and Dark use their own accent and button-label colors to maintain contrast when the dashboard uses a different theme. Dashboard cards keep their viewing theme. This preference is saved locally in your browser for each dashboard (`storage_key`).
 
 <a id="dashboard-mode"></a>
 
@@ -303,6 +329,7 @@ Below is a summary of the main configuration options. Many have reasonable defau
 | `screen_saver_image`           | string    | _none_                     | Optional custom screen saver background image URL or uploaded data URL. |
 | `tabs`                         | array     | `[]`                       | Tab definitions (see Tabs section). |
 | `tabs_position`                | string    | `top`                      | Place the tab bar at the `top` or `bottom` of the viewport. |
+| `tabs_style`                   | object    | `{}`                       | Optional per-dashboard tab appearance overrides (see below). |
 | `tabs_size`                    | number    | `100`                      | Tab bar scale as a percentage from `80` to `140`. |
 | `default_tab`                  | string    | first tab id / `'default'` | Default tab id when the card loads. |
 | `hide_tabs_when_single`        | boolean   | `true`                     | Hide tab bar when there is only one tab. |
@@ -590,7 +617,7 @@ Available methods:
 | Method | Purpose |
 |--------|---------|
 | `ddc.settings.list()` | List known settings with current values and inferred types |
-| `ddc.settings.all()` / `ddc.settings.options()` | Return the current exportable dashboard options |
+| `ddc.settings.all()` / `ddc.settings.options()` | Return current dashboard options plus runtime `active_tab` |
 | `ddc.settings.get(key)` | Read one setting |
 | `ddc.settings.set(key, value, options?)` | Apply one setting |
 | `ddc.settings.setMany(patch, options?)` | Apply several settings |
@@ -631,6 +658,57 @@ Tabs are configured in `options.tabs`:
 ```
 
 Every card entry should then include a matching `tabId`.
+
+#### Read or switch the active tab
+
+Use `active_tab` for navigation at runtime. `default_tab` remains the configured starting tab and is not changed by navigation.
+
+```js
+const currentTab = ddc.settings.get('active_tab');
+await ddc.settings.set('active_tab', 'overview');
+```
+
+The target must be an existing tab **ID**, not its label. An invalid ID rejects the promise before any settings are applied. Selecting the current tab is a no-op. `setMany()` can combine `active_tab` with other settings or a new `tabs` list. Boolean helpers such as `toggle()` are not supported for this string-valued setting.
+
+Navigation affects only this DDC instance in this browser. It remembers the last tab using the existing browser preference for the dashboard's `storage_key`, but never writes `active_tab` to the backend or Lovelace config—even with `{ persist: true }`. With a mixed `setMany()` call, only the ordinary settings are persisted. `settings.list()` identifies `active_tab` with `runtime: true`.
+
+Listen on the DDC host for completed switches from API calls, the tab bar, or automatic return:
+
+```js
+const onTabChanged = (event) => {
+  const { tabId, previousTabId, reason, storageKey } = event.detail;
+  console.log(`${previousTabId} → ${tabId}`, reason, storageKey);
+};
+ddc.card.addEventListener('ddc:active-tab-changed', onTabChanged);
+
+// In an HTML card script, return cleanup when the card is removed:
+return () => ddc.card.removeEventListener('ddc:active-tab-changed', onTabChanged);
+```
+
+The event bubbles and crosses shadow boundaries (`composed: true`). `reason` is `api`, `tab-change`, or `auto-return` for these paths. No event is emitted for a no-op or a transition superseded by a newer navigation. For listeners outside the card, use `event.target` to distinguish DDC instances; dashboards may share a `storage_key`.
+
+A “Back to Home” button inside an HTML card can use:
+
+```js
+const button = root.querySelector('#back-home');
+const goHome = () => ddc.settings.set('active_tab', 'overview').catch(console.error);
+button.addEventListener('click', goHome);
+return () => button.removeEventListener('click', goHome);
+```
+
+#### Automatic return after inactivity
+
+Configure automatic return in **Dashboard Settings → Tabs**, or through `ddc.settings`:
+
+```js
+await ddc.settings.setMany({
+  tabs_auto_return_enabled: true,
+  tabs_auto_return_tab: 'overview',
+  tabs_auto_return_delay: 300000
+}, { persist: true });
+```
+
+`tabs_auto_return_delay` is in **milliseconds**, defaults to five minutes, and is clamped to one minute–24 hours. Automatic return pauses during editing or an active screen saver. A screen saver scheduled for the same time or earlier takes priority.
 
 ### Layers
 
@@ -1105,3 +1183,69 @@ drag-and-drop-card vX.Y.Z
 Known issues are tracked in the [GitHub issue tracker](https://github.com/Prosono/Drag-And-Drop-Card/issues). One current limitation is worth highlighting:
 
 - `card-mod` support **inside nested cards** is still limited and may not behave as expected. The outer Drag & Drop Card supports `card_mod` directly.
+
+### Tab appearance
+
+Dashboard Settings → Tabs → **Tab appearance** controls this Drag & Drop Card instance's top or bottom navigation bar. Empty fields follow the theme and **Tab bar size**. Reset tab appearance clears all overrides when you save.
+
+Use `tabs_style` in YAML or the settings API. Icon dimensions are independent of button dimensions; oversized icons can overflow a small button. Padding changes the space inside buttons; `button_gap` changes the space between them. Colors accept CSS colors, including `transparent` and theme variables.
+
+```yaml
+tabs_style:
+  icon_width: 32
+  icon_height: 32
+  button_height: 56
+  button_padding_horizontal: 4
+  button_padding_vertical: 4
+  button_gap: 8
+  button_color: "#eeeeee"
+  text_color: "#333333"
+  active_button_color: "#237a57"
+  active_text_color: "#ffffff"
+  active_shadow: false
+  bar_padding_bottom: 12
+  dashboard_gap: 16
+```
+
+Dimensions use pixels. Icon dimensions accept 8–64, button height 32–120, horizontal padding and button gap 0–48, vertical padding 0–32, bottom bar padding 0–64, and dashboard gap 0–96. The active shadow is enabled by default. These settings do not alter other Drag & Drop Card instances or Sidebar Studio.
+
+### Sidebar
+
+Dashboard Settings → **Sidebar** offers two modes for the dashboard's tabs:
+
+- **Buttons only** (`sidebar_type: minimal`): icon buttons centered vertically in the viewport by default. Choose Top, Center or Bottom under Content placement. The vertical sidebar background fills the available viewport height in both modes, even when its content is short. Alignment moves the content inside that full-height background. Tab names remain available as tooltips and accessible labels.
+- **Expanded** (`sidebar_type: expanded`): icons and names, followed by optional Clock, Calendar and Weather widgets. Enable any combination. **Content placement** positions tabs, Layers and all widgets together at the Top, Center or Bottom; overflowing content remains scrollable from the top. There is no card canvas or drag-and-drop area inside the sidebar.
+
+Widgets offer three styles: **Soft** (subtle surfaces), **Minimal** (typography and separators), and **Accent** (tinted surfaces). Calendar shows the current month and up to two upcoming events; event and weather buttons open Home Assistant details. Select weather/calendar entities or leave them empty for automatic discovery.
+
+When layers are enabled, a separate **Layers** button shows the active count. Its panel toggles visibility groups without switching the current tab; **Show all** restores every layer. The panel stays inside the viewport, supports arrow keys, and Escape closes it and returns focus to the Layers button.
+
+On narrow dashboards, navigation becomes a horizontally scrollable row above the canvas. Expanded mode retains tab labels. Existing `essentials` and `canvas` types map to Expanded; legacy sidebar card data is retained in saved configurations but is no longer rendered.
+
+**Customize appearance** controls widths, icon size, button height, spacing, corner radius, padding, dashboard distance and colors. Empty fields follow the Home Assistant theme. Changes preview immediately; **Cancel** restores the previous sidebar and **Save** stores the settings for this DDC instance. **Reset appearance** clears visual overrides while retaining widget selections. Manage tab names, icons and order through **Manage tabs and icons**.
+
+```yaml
+sidebar_enabled: true
+sidebar_type: expanded
+sidebar_appearance:
+  title: Your spaces
+  alignment: center       # minimal mode: top, center, bottom
+  widgets: [clock, calendar, weather] # [] hides all widgets
+  widget_style: soft      # soft, minimal, accent
+  weather_entity: weather.home
+  calendar_entities: [calendar.home]
+  compact_width: 76
+  expanded_width: 280
+  icon_size: 24
+  button_height: 52
+  button_gap: 6
+  button_radius: 12
+  padding: 10
+  dashboard_gap: 16
+  # background: "var(--card-background-color)"
+  # text_color: "var(--primary-text-color)"
+  # active_background: "#276d67"
+  # active_text_color: "#ffffff"
+```
+
+Use `title: ""` to hide the navigation title. If `widgets` is omitted, the legacy `sidebar_header` value supplies the default: weather → Weather, none → no widgets, otherwise Clock. The settings API and layout export/import support `sidebar_appearance`.

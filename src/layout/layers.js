@@ -206,6 +206,11 @@ const layerMethods = {
 
   _removeLayerMenuDismissHandlers_() {
     try {
+      if (this.__sidebarLayerPositionHandler) {
+        window.removeEventListener('resize', this.__sidebarLayerPositionHandler);
+        window.removeEventListener('scroll', this.__sidebarLayerPositionHandler, true);
+        this.__sidebarLayerPositionHandler = null;
+      }
       if (this.__layerMenuDismissHandler) {
         document.removeEventListener('pointerdown', this.__layerMenuDismissHandler, true);
         this.__layerMenuDismissHandler = null;
@@ -217,12 +222,14 @@ const layerMethods = {
     } catch {}
   },
 
-  _closeLayersMenu_({ render = true } = {}) {
+  _closeLayersMenu_({ render = true, focusTrigger = false } = {}) {
     this.__layersMenuOpen = false;
+    this.shadowRoot?.querySelector?.('.ddc-sidebar-layer-panel')?.remove?.();
     this._removeLayerMenuDismissHandlers_?.();
     if (render) {
       this.__preserveTabsScrollOnNextRender = true;
       try { this._renderTabs?.(); } catch {}
+      if (focusTrigger) this.shadowRoot?.querySelector?.('.ddc-layer-trigger')?.focus?.();
     }
   },
 
@@ -240,10 +247,13 @@ const layerMethods = {
     this.__layerMenuEscapeHandler = (ev) => {
       if (ev.key === 'Escape') {
         ev.stopPropagation?.();
-        this._closeLayersMenu_?.();
+        this._closeLayersMenu_?.({ focusTrigger: true });
       }
     };
     try {
+      this.__sidebarLayerPositionHandler = () => this._positionSidebarLayerPanel_?.();
+      window.addEventListener('resize', this.__sidebarLayerPositionHandler);
+      window.addEventListener('scroll', this.__sidebarLayerPositionHandler, true);
       document.addEventListener('pointerdown', this.__layerMenuDismissHandler, true);
       document.addEventListener('keydown', this.__layerMenuEscapeHandler, true);
     } catch {}
@@ -271,7 +281,7 @@ const layerMethods = {
       btn.classList.toggle('active', !!isActive);
       btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
       const meta = btn.querySelector?.('.ddc-layer-option-meta');
-      if (meta) meta.textContent = isActive ? 'Visible' : 'Hidden';
+      if (meta) meta.textContent = isAll ? (isActive ? 'All layers visible' : 'Show every layer') : (isActive ? 'Visible' : 'Hidden');
     });
   },
 
@@ -297,7 +307,7 @@ const layerMethods = {
     label.textContent = option.label || option.id || 'Layer';
     const meta = document.createElement('small');
     meta.className = 'ddc-layer-option-meta';
-    meta.textContent = option.active ? 'Visible' : 'Hidden';
+    meta.textContent = option.id === '__all__' ? (option.active ? 'All layers visible' : 'Show every layer') : (option.active ? 'Visible' : 'Hidden');
     copy.append(label, meta);
     btn.appendChild(copy);
   
@@ -344,10 +354,12 @@ const layerMethods = {
   },
 
   _appendLayersMenuToTabs_(bar, { panelHost = null } = {}) {
+    this.shadowRoot?.querySelector?.('.ddc-sidebar-layer-panel')?.remove?.();
+    const sidebar = !!this._isSidebarNavigationActive_?.();
     if (!bar || !this._hasLayerMenu_?.()) return;
     const { layers, activeIds, activeSet, allActive } = this._getLayerSelectionSummary_();
     const wrap = document.createElement('div');
-    wrap.className = 'ddc-layer-menu';
+    wrap.className = sidebar ? 'ddc-layer-menu ddc-sidebar-layer-menu' : 'ddc-layer-menu';
     wrap.setAttribute('role', 'presentation');
     const shouldUsePanelHost = (() => {
       try {
@@ -360,7 +372,7 @@ const layerMethods = {
   
     const trigger = document.createElement('button');
     trigger.type = 'button';
-    const showDetails = !!this.layersButtonDetails;
+    const showDetails = sidebar ? this._normalizeSidebarType_?.(this.sidebarType) === 'expanded' : !!this.layersButtonDetails;
     trigger.className = `ddc-layer-trigger ${showDetails ? 'details' : 'compact'} ${this.__layersMenuOpen || !allActive ? 'active' : ''}`.trim();
     trigger.setAttribute('aria-haspopup', 'menu');
     trigger.setAttribute('aria-expanded', this.__layersMenuOpen ? 'true' : 'false');
@@ -385,13 +397,14 @@ const layerMethods = {
     const count = document.createElement('span');
     count.className = 'ddc-layer-count';
     count.textContent = String(activeIds.length);
-    if (showDetails) trigger.appendChild(count);
+    if (showDetails || sidebar) trigger.appendChild(count);
   
     trigger.addEventListener('click', (ev) => {
       ev.stopPropagation();
       this.__preserveTabsScrollOnNextRender = true;
       this.__layersMenuOpen = !this.__layersMenuOpen;
       this._renderTabs?.();
+      requestAnimationFrame(() => this.shadowRoot?.querySelector?.(this.__layersMenuOpen ? '.ddc-layer-option' : '.ddc-layer-trigger')?.focus?.());
     });
     trigger.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') {
@@ -416,7 +429,7 @@ const layerMethods = {
   
     if (this.__layersMenuOpen) {
       const panel = document.createElement('div');
-      panel.className = 'ddc-layer-menu-panel';
+      panel.className = sidebar ? 'ddc-layer-menu-panel ddc-sidebar-layer-panel' : 'ddc-layer-menu-panel';
       panel.setAttribute('role', 'menu');
       panel.setAttribute('aria-label', 'Layers');
       panel.addEventListener('click', (ev) => ev.stopPropagation());
@@ -427,10 +440,16 @@ const layerMethods = {
         <span>${activeIds.length} of ${layers.length} active</span>
       `;
       panel.appendChild(panelHead);
+      if (sidebar) {
+        const hint = document.createElement('p');
+        hint.className = 'ddc-sidebar-layer-hint';
+        hint.textContent = 'Show or hide groups of cards. Your current tab stays open.';
+        panel.appendChild(hint);
+      }
   
       panel.appendChild(this._createLayerOptionButton_({
         id: '__all__',
-        label: 'All',
+        label: sidebar ? 'Show all' : 'All',
         icon: 'mdi:layers-triple-outline',
         color: 'var(--primary-color, #8b5cf6)',
         active: allActive,
@@ -445,12 +464,31 @@ const layerMethods = {
           active: activeSet.has(layer.id),
         }));
       });
-      if (shouldUsePanelHost) panelHost.appendChild(panel);
+      if (sidebar) this.shadowRoot.appendChild(panel);
+      else if (shouldUsePanelHost) panelHost.appendChild(panel);
       else wrap.appendChild(panel);
-      requestAnimationFrame(() => this._installLayerMenuDismissHandlers_?.());
+      requestAnimationFrame(() => { this._positionSidebarLayerPanel_?.(); this._installLayerMenuDismissHandlers_?.(); });
     }
   
     bar.appendChild(wrap);
+  },
+
+  _positionSidebarLayerPanel_() {
+    const panel = this.shadowRoot?.querySelector?.('.ddc-sidebar-layer-panel');
+    const trigger = this.shadowRoot?.querySelector?.('.ddc-layer-trigger');
+    if (!panel || !trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const viewport = globalThis.visualViewport;
+    const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+    const width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+    const panelWidth = Math.min(300, width - 24);
+    panel.style.width = `${panelWidth}px`;
+    panel.style.maxHeight = `${height - 24}px`;
+    const panelHeight = Math.min(panel.scrollHeight, height - 24);
+    const x = Math.max(left + 12, Math.min(rect.right + 12, left + width - panelWidth - 12));
+    const y = Math.max(top + 12, Math.min(rect.top, top + height - panelHeight - 12));
+    panel.style.setProperty('--ddc-layer-panel-x', `${x}px`);
+    panel.style.setProperty('--ddc-layer-panel-y', `${y}px`);
   },
 
   _renderLayersBar_() {

@@ -1,3 +1,6 @@
+import { resolveSidebarWidgets } from '../layout/sidebar-widgets.js';
+import { normalizeSidebarAppearance, sidebarAppearanceFields, applySidebarAppearance } from '../layout/sidebar-appearance.js';
+import { normalizeTabStyle, tabStyleFields } from '../layout/tab-style.js';
 /*
  * Dashboard settings panel controller.
  *
@@ -173,6 +176,22 @@ const dashboardSettingsMethods = {
     const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
     const selEditorThemeMode = modal.querySelector('#ddc-setting-editorThemeMode');
     const initialEditorThemeMode = this._getEditorThemeMode_?.() || 'light';
+    const selStorageMode = modal.querySelector('#ddc-setting-storageMode');
+    const storageModeConfirm = modal.querySelector('#ddc-storage-mode-confirm');
+    const storageModeConfirmRow = modal.querySelector('#ddc-storage-mode-confirm-row');
+    const storageModeError = modal.querySelector('#ddc-storage-mode-error');
+    const initialStorageMode = this._getStorageMode_?.() || 'backend';
+    if (selStorageMode) selStorageMode.value = initialStorageMode;
+    selStorageMode?.addEventListener('change', () => {
+      storageModeConfirmRow.hidden = selStorageMode.value === initialStorageMode;
+      storageModeConfirm.checked = false;
+      storageModeError.hidden = true;
+    });
+    const showStorageModeError = (message) => {
+      storageModeError.textContent = message;
+      storageModeError.hidden = false;
+      activateSettingsTab('advanced');
+    };
     let editorThemeModeCommitted = false;
     const txtDashboardThemeHint = modal.querySelector('#ddc-setting-dashboardThemeHint');
     const chkDashboardThemeOverrideAllDesign = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesign');
@@ -257,6 +276,15 @@ const dashboardSettingsMethods = {
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    const tabStyleInputs = tabStyleFields.map(([key]) => [key, modal.querySelector(`#ddc-tab-style-${key}`)]);
+    const tabShadowInput = modal.querySelector('#ddc-tab-style-shadow');
+    const populateTabStyle = (value) => {
+      const normalized = normalizeTabStyle(value);
+      for (const [key, input] of tabStyleInputs) if (input) input.value = normalized[key] ?? '';
+      if (tabShadowInput) tabShadowInput.checked = normalized.active_shadow !== false;
+    };
+    populateTabStyle(this.tabsStyle);
+    modal.querySelector('#ddc-tab-style-reset')?.addEventListener('click', () => populateTabStyle({}));
     const rngTabsSize        = modal.querySelector('#ddc-setting-tabsSize');
     const outTabsSize        = modal.querySelector('#ddc-tabsSizeOut');
     const chkTabsAutoReturn  = modal.querySelector('#ddc-setting-tabsAutoReturnEnabled');
@@ -264,22 +292,49 @@ const dashboardSettingsMethods = {
     const inpTabsAutoReturnMinutes = modal.querySelector('#ddc-setting-tabsAutoReturnMinutes');
     const tabsAutoReturnControls = modal.querySelector('#ddc-tabsAutoReturnControls');
     const chkSidebarEnabled  = modal.querySelector('#ddc-setting-sidebarEnabled');
-    const inpSidebarCanvasHeight = modal.querySelector('#ddc-setting-sidebarCanvasHeight');
-    const outSidebarCanvasHeight = modal.querySelector('#ddc-sidebarCanvasHeightOut');
     const sidebarTypeInputs = Array.from(modal.querySelectorAll('input[name="ddc-sidebar-type"]'));
-    const selSidebarHeader = modal.querySelector('#ddc-setting-sidebarHeader');
     const sidebarContextControls = modal.querySelector('#ddc-sidebar-context-controls');
-    const sidebarHeaderSetting = modal.querySelector('#ddc-sidebar-header-setting');
-    const sidebarCanvasHeightSetting = modal.querySelector('#ddc-sidebar-canvas-height-setting');
     const sidebarPreview = modal.querySelector('#ddc-sidebar-preview');
     const sidebarPreviewHeader = modal.querySelector('#ddc-sidebar-preview-header');
     const initialSidebarSettings = {
+      appearance: normalizeSidebarAppearance(this.sidebarAppearance),
       enabled: !!this.sidebarEnabled,
       type: this._normalizeSidebarType_?.(this.sidebarType) || 'minimal',
       header: this._normalizeSidebarHeader_?.(this.sidebarHeader) || 'date_time',
       canvasHeight: this._normalizeSidebarCanvasHeight_?.(this.sidebarCanvasHeight) || 520,
       cards: this._cloneJson_?.(this.sidebarCards || this._config?.sidebar_cards || []) || [],
     };
+    const sidebarAppearanceInputs = sidebarAppearanceFields.map(([key]) => [key, modal.querySelector(`#ddc-sidebar-appearance-${key}`)]);
+    const sidebarTitleInput = modal.querySelector('#ddc-sidebar-title');
+    const sidebarWidgetInputs = Array.from(modal.querySelectorAll('[data-sidebar-widget]'));
+    const sidebarWidgetStyle = modal.querySelector('#ddc-sidebar-widget-style');
+    const sidebarAlignment = modal.querySelector('#ddc-sidebar-alignment');
+    const sidebarWeatherEntity = modal.querySelector('#ddc-sidebar-weather-entity');
+    const sidebarCalendarEntities = modal.querySelector('#ddc-sidebar-calendar-entities');
+    const populateSidebarAppearance = (value, { content = true } = {}) => {
+      const appearance = normalizeSidebarAppearance(value);
+      for (const [key, input] of sidebarAppearanceInputs) if (input) input.value = appearance[key] ?? '';
+      sidebarWidgetStyle.value = appearance.widget_style || 'soft';
+      sidebarAlignment.value = appearance.alignment || 'center';
+      if (content) {
+        if (sidebarTitleInput) sidebarTitleInput.value = appearance.title ?? 'Your spaces';
+        const widgets = resolveSidebarWidgets(appearance, initialSidebarSettings.header);
+        for (const input of sidebarWidgetInputs) input.checked = widgets.includes(input.dataset.sidebarWidget);
+        sidebarWeatherEntity.value = appearance.weather_entity || '';
+        sidebarCalendarEntities.value = (appearance.calendar_entities || []).join(', ');
+      }
+    };
+    const readSidebarAppearance = () => normalizeSidebarAppearance({
+      ...Object.fromEntries(sidebarAppearanceInputs.map(([key,input]) => [key,input?.value])),
+      title: sidebarTitleInput?.value ?? 'Your spaces',
+      widgets: sidebarWidgetInputs.filter(input => input.checked).map(input => input.dataset.sidebarWidget),
+      widget_style: sidebarWidgetStyle.value,
+      alignment: sidebarAlignment.value,
+      weather_entity: sidebarWeatherEntity.value,
+      calendar_entities: sidebarCalendarEntities.value.split(',').map(v => v.trim()).filter(Boolean),
+    });
+    populateSidebarAppearance(initialSidebarSettings.appearance);
+    modal.querySelector('#ddc-sidebar-manage-tabs')?.addEventListener('click', () => modal.querySelector('[data-settings-tab="tabs"]')?.click());
     let sidebarSettingsCommitted = false;
     const chkLayersEnabled   = modal.querySelector('#ddc-setting-layersEnabled');
     const chkLayersButtonDetails = modal.querySelector('#ddc-setting-layersButtonDetails');
@@ -1223,69 +1278,75 @@ const dashboardSettingsMethods = {
     };
     chkTabsAutoReturn?.addEventListener('change', syncTabsAutoReturnControls);
     syncTabsAutoReturnControls();
-    let sidebarHeaderDraft = initialSidebarSettings.header;
+    const sidebarHeaderDraft = initialSidebarSettings.header;
     const getSidebarTypeDraft = () => this._normalizeSidebarType_?.(
       sidebarTypeInputs.find((input) => input.checked)?.value || initialSidebarSettings.type
     ) || 'minimal';
-    const sidebarHeaderOptionsForType = (type) => {
-      if (type === 'essentials') {
-        return [
-          { value: 'date_time', label: 'Date & time' },
-          { value: 'weather', label: 'Weather' },
-        ];
-      }
-      if (type === 'canvas') {
-        return [
-          { value: 'clock', label: 'Clock' },
-          { value: 'date_time', label: 'Date & time' },
-          { value: 'none', label: 'No header' },
-        ];
-      }
-      return [];
-    };
-    const syncSidebarHeaderOptions = (type) => {
-      const options = sidebarHeaderOptionsForType(type);
-      if (!selSidebarHeader) return 'none';
-      const allowed = options.map((option) => option.value);
-      if (!allowed.includes(sidebarHeaderDraft)) {
-        sidebarHeaderDraft = type === 'essentials' ? 'date_time' : (type === 'canvas' ? 'clock' : 'none');
-      }
-      selSidebarHeader.innerHTML = options.map((option) => `<option value="${option.value}">${option.label}</option>`).join('');
-      selSidebarHeader.value = sidebarHeaderDraft;
-      return sidebarHeaderDraft;
-    };
     const updateSidebarSettingsPreview = ({ applyToDashboard = true } = {}) => {
       const enabled = !!chkSidebarEnabled?.checked;
       const type = getSidebarTypeDraft();
-      const header = syncSidebarHeaderOptions(type);
-      const minHeight = type === 'canvas' ? 360 : 280;
-      const maxHeight = type === 'essentials' ? 440 : 1200;
-      if (inpSidebarCanvasHeight) {
-        inpSidebarCanvasHeight.min = String(minHeight);
-        inpSidebarCanvasHeight.max = String(maxHeight);
-      }
-      const normalizedHeight = this._normalizeSidebarCanvasHeight_?.(inpSidebarCanvasHeight?.value || initialSidebarSettings.canvasHeight) || 520;
-      const height = Math.max(minHeight, Math.min(maxHeight, normalizedHeight));
-      if (inpSidebarCanvasHeight) inpSidebarCanvasHeight.value = String(height);
-      if (outSidebarCanvasHeight) outSidebarCanvasHeight.textContent = `${height} px`;
+      const header = sidebarHeaderDraft;
+      const appearance = readSidebarAppearance();
+      const height = initialSidebarSettings.canvasHeight;
       sidebarContextControls?.classList?.toggle?.('is-minimal', type === 'minimal');
-      if (sidebarHeaderSetting) sidebarHeaderSetting.hidden = type === 'minimal';
-      if (sidebarCanvasHeightSetting) sidebarCanvasHeightSetting.hidden = type === 'minimal';
+      modal.querySelector('#ddc-sidebar-weather-row').hidden = !appearance.widgets.includes('weather');
+      modal.querySelector('#ddc-sidebar-calendar-row').hidden = !appearance.widgets.includes('calendar');
       if (sidebarPreview) {
         sidebarPreview.dataset.sidebarType = type;
         sidebarPreview.dataset.sidebarEnabled = enabled ? 'true' : 'false';
         sidebarPreview.dataset.sidebarHeader = header;
+        applySidebarAppearance(sidebarPreview, appearance);
+        const previewNav = sidebarPreview.querySelector('.sidebar-preview-nav');
+        if (previewNav) {
+          previewNav.replaceChildren();
+          if (type === 'expanded' && appearance.title) {
+            const title = document.createElement('p');
+            title.className = 'sidebar-preview-title';
+            title.textContent = appearance.title;
+            previewNav.appendChild(title);
+          }
+          for (const tab of this.tabs || []) {
+            const item = document.createElement('span');
+            if (tab.id === this.activeTab) item.className = 'active';
+            const iconBox = document.createElement('span');
+            iconBox.className = 'sidebar-preview-nav-icon';
+            const icon = document.createElement('ha-icon');
+            icon.setAttribute('icon', tab.icon || 'mdi:view-dashboard-outline');
+            iconBox.appendChild(icon);
+            const label = document.createElement('b');
+            label.textContent = tab.label || tab.id;
+            item.append(iconBox, label);
+            previewNav.appendChild(item);
+          }
+        }
       }
-      if (sidebarPreviewHeader) {
-        sidebarPreviewHeader.hidden = type === 'minimal' || header === 'none';
-        sidebarPreviewHeader.innerHTML = header === 'weather'
-          ? `<small>Oslo</small><span class="sidebar-preview-time">18°</span><em>Partly cloudy</em>`
-          : `<small>${header === 'clock' ? 'Local time' : 'Tuesday'}</small><span class="sidebar-preview-time">19:42</span><em>${header === 'clock' ? 'Europe / Oslo' : '11 August'}</em>`;
-      }
-      if (!applyToDashboard) return;
+      const syncPreviewColors = () => {
+        if (!sidebarPreview || !this.sidebarHost) return;
+        if (sidebarPreviewHeader) {
+          sidebarPreviewHeader.replaceChildren();
+          const widgets = this._createSidebarHeader_?.(new Date());
+          sidebarPreviewHeader.hidden = !widgets;
+          if (widgets) sidebarPreviewHeader.appendChild(widgets);
+        }
+        const paint = getComputedStyle(this.sidebarHost);
+        const active = this.sidebarHost.querySelector('.ddc-sidebar-tab.active');
+        const activePaint = active ? getComputedStyle(active) : null;
+        sidebarPreview.style.setProperty('--ddc-side-background', paint.backgroundColor);
+        sidebarPreview.style.setProperty('--ddc-side-text_color', paint.color);
+        sidebarPreview.style.setProperty('--ddc-rail-text', paint.color);
+        sidebarPreview.style.setProperty('--ddc-rail-bg', paint.backgroundColor);
+        if (activePaint) {
+          sidebarPreview.style.setProperty('--ddc-side-active_background', activePaint.backgroundColor);
+          sidebarPreview.style.setProperty('--ddc-side-active_text_color', activePaint.color);
+          sidebarPreview.style.setProperty('--ddc-rail-active', activePaint.backgroundColor);
+          sidebarPreview.style.setProperty('--ddc-rail-active-ink', activePaint.color);
+        }
+      };
+      if (!applyToDashboard) { syncPreviewColors(); return; }
       this.sidebarEnabled = enabled;
       this.sidebarType = type;
-      this.sidebarHeader = header;
+      this.sidebarAppearance = appearance;
+      this.sidebarHeader = sidebarHeaderDraft;
       this.sidebarCanvasHeight = height;
       this.sidebarItems = ['navigation'];
       this._config = {
@@ -1293,13 +1354,15 @@ const dashboardSettingsMethods = {
         sidebar_enabled: enabled,
         sidebar_type: type,
         sidebar_items: ['navigation'],
-        sidebar_header: header,
+        sidebar_header: sidebarHeaderDraft,
+        sidebar_appearance: appearance,
         sidebar_canvas_height: height,
         sidebar_cards: this._cloneJson_?.(this.sidebarCards || initialSidebarSettings.cards) || initialSidebarSettings.cards,
       };
       this._renderTabs?.();
       this._renderSidebar_?.();
       this._applyAutoScale?.();
+      syncPreviewColors();
     };
 
     if (chkSidebarEnabled) chkSidebarEnabled.checked = initialSidebarSettings.enabled;
@@ -1307,13 +1370,13 @@ const dashboardSettingsMethods = {
       input.checked = input.value === initialSidebarSettings.type;
       input.addEventListener('change', () => updateSidebarSettingsPreview());
     });
-    if (inpSidebarCanvasHeight) {
-      inpSidebarCanvasHeight.value = String(initialSidebarSettings.canvasHeight);
-      inpSidebarCanvasHeight.addEventListener('input', () => updateSidebarSettingsPreview());
-    }
     chkSidebarEnabled?.addEventListener('change', () => updateSidebarSettingsPreview());
-    selSidebarHeader?.addEventListener('change', () => {
-      sidebarHeaderDraft = this._normalizeSidebarHeader_?.(selSidebarHeader.value) || selSidebarHeader.value;
+    for (const [, input] of sidebarAppearanceInputs) input?.addEventListener('input', () => updateSidebarSettingsPreview());
+    sidebarTitleInput?.addEventListener('input', () => updateSidebarSettingsPreview());
+    for (const input of [...sidebarWidgetInputs,sidebarWidgetStyle,sidebarAlignment]) input?.addEventListener('change', () => updateSidebarSettingsPreview());
+    for (const input of [sidebarWeatherEntity,sidebarCalendarEntities]) input?.addEventListener('change', () => updateSidebarSettingsPreview());
+    modal.querySelector('#ddc-sidebar-appearance-reset')?.addEventListener('click', () => {
+      populateSidebarAppearance({}, { content: false });
       updateSidebarSettingsPreview();
     });
     updateSidebarSettingsPreview({ applyToDashboard: false });
@@ -2757,6 +2820,7 @@ const dashboardSettingsMethods = {
         this.sidebarEnabled = initialSidebarSettings.enabled;
         this.sidebarType = initialSidebarSettings.type;
         this.sidebarHeader = initialSidebarSettings.header;
+        this.sidebarAppearance = normalizeSidebarAppearance(initialSidebarSettings.appearance);
         this.sidebarCanvasHeight = initialSidebarSettings.canvasHeight;
         this.sidebarItems = ['navigation'];
         this.sidebarCards = this._cloneJson_?.(initialSidebarSettings.cards) || initialSidebarSettings.cards;
@@ -2766,6 +2830,7 @@ const dashboardSettingsMethods = {
           sidebar_type: initialSidebarSettings.type,
           sidebar_items: ['navigation'],
           sidebar_header: initialSidebarSettings.header,
+          sidebar_appearance: normalizeSidebarAppearance(initialSidebarSettings.appearance),
           sidebar_canvas_height: initialSidebarSettings.canvasHeight,
           sidebar_cards: this._cloneJson_?.(initialSidebarSettings.cards) || initialSidebarSettings.cards,
         };
@@ -2784,12 +2849,23 @@ const dashboardSettingsMethods = {
     // Save handler
     modal.querySelector('#ddc-settings-save')?.addEventListener('click', async (e) => {
       e.stopPropagation();
+      const newStorageMode = selStorageMode?.value === 'lovelace' ? 'lovelace' : 'backend';
+      const storageModeChanged = newStorageMode !== (this._getStorageMode_?.() || 'backend');
+      if (storageModeChanged && !storageModeConfirm?.checked) {
+        showStorageModeError('Confirm which layout will be kept before switching storage.');
+        storageModeConfirm?.focus();
+        return;
+      }
       // Read values
       const newSize      = this._normalizeContainerSizeMode_(selSize?.value);
       const newResponsiveAspectLocks = this._normalizeResponsiveViewportAspectLocks_?.(this.responsiveViewportAspectLocks)
         || this.responsiveViewportAspectLocks
         || {};
       const newStorageKey = String(inpStorageKey?.value || this.storageKey || this._config?.storage_key || '').trim();
+      if (storageModeChanged && newStorageKey !== this.storageKey) {
+        showStorageModeError('Save a storage key change separately before changing storage mode.');
+        return;
+      }
       const newAuto      = newSize === 'auto' ? true : !!chkAuto?.checked;
       const newGrid      = parseInt(inpGrid?.value || '0', 10);
       const newAnim      = !!chkAnim?.checked;
@@ -2838,6 +2914,7 @@ const dashboardSettingsMethods = {
       const newYtAttachment = (selYtAttachment?.value || 'scroll');
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
+      const newTabsStyle = normalizeTabStyle({ ...Object.fromEntries(tabStyleInputs.map(([key, input]) => [key, input?.value])), active_shadow: tabShadowInput?.checked !== false });
       const newTabsSize = this._normalizeTabsSize_(rngTabsSize?.value ?? this.tabsSize);
       const newTabsAutoReturnEnabled = !!chkTabsAutoReturn?.checked;
       const newTabsAutoReturnTab = this._resolveTabsAutoReturnTarget_?.(selTabsAutoReturnTab?.value)
@@ -2847,13 +2924,9 @@ const dashboardSettingsMethods = {
       );
       const newSidebarEnabled = !!chkSidebarEnabled?.checked;
       const newSidebarType = this._normalizeSidebarType_?.(getSidebarTypeDraft()) || 'minimal';
-      const newSidebarHeader = this._getEffectiveSidebarHeader_?.(
-        newSidebarType,
-        selSidebarHeader?.value || sidebarHeaderDraft
-      ) || 'none';
-      const newSidebarCanvasHeight = this._normalizeSidebarCanvasHeight_?.(
-        inpSidebarCanvasHeight?.value || this.sidebarCanvasHeight
-      ) || 520;
+      const newSidebarHeader = this._normalizeSidebarHeader_(sidebarHeaderDraft);
+      const newSidebarAppearance = readSidebarAppearance();
+      const newSidebarCanvasHeight = initialSidebarSettings.canvasHeight;
       const newLayersEnabled = !!chkLayersEnabled?.checked;
       const newLayersButtonDetails = !!chkLayersButtonDetails?.checked;
       const normalizedLayers = normalizeLayerDrafts(
@@ -3018,12 +3091,14 @@ const dashboardSettingsMethods = {
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
         this.tabsSize = newTabsSize;
+        this.tabsStyle = newTabsStyle;
         this.tabsAutoReturnEnabled = newTabsAutoReturnEnabled;
         this.tabsAutoReturnTab = newTabsAutoReturnTab;
         this.tabsAutoReturnDelay = newTabsAutoReturnDelay;
         this._syncTabsSize_?.();
         this.sidebarEnabled = newSidebarEnabled;
         this.sidebarType = newSidebarType;
+        this.sidebarAppearance = newSidebarAppearance;
         this.sidebarItems = ['navigation'];
         this.sidebarHeader = newSidebarHeader;
         this.sidebarCanvasHeight = newSidebarCanvasHeight;
@@ -3034,11 +3109,13 @@ const dashboardSettingsMethods = {
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
             tabs_size: this.tabsSize,
+            tabs_style: normalizeTabStyle(this.tabsStyle),
             tabs_auto_return_enabled: this.tabsAutoReturnEnabled,
             tabs_auto_return_tab: this.tabsAutoReturnTab,
             tabs_auto_return_delay: this.tabsAutoReturnDelay,
             sidebar_enabled: this.sidebarEnabled,
             sidebar_type: this.sidebarType,
+            sidebar_appearance: normalizeSidebarAppearance(this.sidebarAppearance),
             sidebar_items: ['navigation'],
             sidebar_header: this.sidebarHeader,
             sidebar_canvas_height: this.sidebarCanvasHeight,
@@ -3051,11 +3128,13 @@ const dashboardSettingsMethods = {
         }
         this._config.tabs_position = this.tabsPosition;
         this._config.tabs_size = this.tabsSize;
+        this._config.tabs_style = normalizeTabStyle(this.tabsStyle);
         this._config.tabs_auto_return_enabled = this.tabsAutoReturnEnabled;
         this._config.tabs_auto_return_tab = this.tabsAutoReturnTab;
         this._config.tabs_auto_return_delay = this.tabsAutoReturnDelay;
         this._config.sidebar_enabled = this.sidebarEnabled;
         this._config.sidebar_type = this.sidebarType;
+        this._config.sidebar_appearance = normalizeSidebarAppearance(this.sidebarAppearance);
         this._config.sidebar_items = ['navigation'];
         this._config.sidebar_header = this.sidebarHeader;
         this._config.sidebar_canvas_height = this.sidebarCanvasHeight;
@@ -3254,6 +3333,7 @@ const dashboardSettingsMethods = {
           }
           this._config.card_overflow = this._normalizeCardOverflow_(this.cardOverflow);
           this._config.tabs_size = this._normalizeTabsSize_(this.tabsSize);
+          this._config.tabs_style = normalizeTabStyle(this.tabsStyle);
           this._config.tabs_auto_return_enabled = !!this.tabsAutoReturnEnabled;
           this._config.tabs_auto_return_tab = this._resolveTabsAutoReturnTarget_?.(this.tabsAutoReturnTab) || this.defaultTab;
           this._config.tabs_auto_return_delay = this._normalizeTabsAutoReturnDelay_(this.tabsAutoReturnDelay);
@@ -3280,40 +3360,26 @@ const dashboardSettingsMethods = {
         }
         this.__ddcTextLockDirty = true;
         this._scheduleTextResizeLockRefresh_?.(true);
-        // Persist changes
-        // Persist changes both to the Lovelace storage (when available) and to the YAML config.
-        // Calling both persistence helpers ensures that any changed settings override the
-        // YAML definitions on reload, and that storage dashboards remain in sync.
-        try {
-          const opts = this._exportableOptions?.() || {};
-          // Attempt to persist this card config into the Lovelace storage (visual editor).
-          const storagePromise = this._persistThisCardConfigToStorage_?.();
-          if (storagePromise && typeof storagePromise.catch === 'function') {
-            storagePromise.catch((err) => {
-              console.warn('[drag-and-drop-card] Storage save failed (is this a YAML dashboard?)', err);
-            });
-          }
-          // Independently persist the updated options into YAML. This is harmless on storage
-          // dashboards and will noop if the YAML is not editable. Suppress downloads to avoid
-          // prompting the user for backups during normal settings changes.
-          const yamlPromise = this._persistOptionsToYaml?.(opts, { noDownload: true });
-          if (yamlPromise && typeof yamlPromise.catch === 'function') {
-            yamlPromise.catch((yamlErr) => {
-              console.warn('[drag-and-drop-card] YAML persist failed', yamlErr);
-            });
-          }
-        } catch (persErr) {
-          console.warn('[drag-and-drop-card] Unexpected error persisting settings', persErr);
-        }
 
         try {
           this._setDashboardPackages_(normalizedPackages);
-          await this._saveLayout(true);
+          const saveButton = modal.querySelector('#ddc-settings-save');
+          if (saveButton) saveButton.disabled = true;
+          try {
+            if (storageModeChanged) await this._changeStorageMode_(newStorageMode);
+            else await this._persistDashboardSettings_();
+          } finally {
+            if (saveButton) saveButton.disabled = false;
+          }
         } catch (packageSaveErr) {
           console.warn('[drag-and-drop-card] Failed to persist package bundles', packageSaveErr);
+          showStorageModeError(packageSaveErr.message || 'Could not save the dashboard.');
+          return;
         }
       } catch (err) {
         console.warn('[drag-and-drop-card] Failed to apply settings', err);
+        showStorageModeError(err.message || 'Could not apply the settings.');
+        return;
       }
       sidebarSettingsCommitted = true;
       closeModal();

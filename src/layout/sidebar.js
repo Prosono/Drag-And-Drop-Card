@@ -1,3 +1,5 @@
+import { resolveSidebarWidgets, sidebarWidgetMarkup } from './sidebar-widgets.js';
+import { applySidebarAppearance } from '../layout/sidebar-appearance.js';
 /*
  * Optional dashboard sidebar layout and widgets.
  *
@@ -9,29 +11,14 @@
 const sidebarMethods = {
   _normalizeSidebarType_(type = 'minimal') {
     const value = String(type || 'minimal').trim().toLowerCase().replace(/[\s-]+/g, '_');
-    const aliases = {
-      compact: 'minimal',
-      navigation: 'minimal',
-      nav: 'minimal',
-      standard: 'essentials',
-      essential: 'essentials',
-      widgets: 'essentials',
-      full: 'canvas',
-      custom: 'canvas',
-      workspace: 'canvas',
-    };
-    const normalized = aliases[value] || value;
-    return ['minimal', 'essentials', 'canvas'].includes(normalized) ? normalized : 'minimal';
+    const expanded = ['expanded', 'essentials', 'essential', 'standard', 'widgets', 'canvas', 'full', 'custom', 'workspace'];
+    return expanded.includes(value) ? 'expanded' : 'minimal';
   },
 
   _getEffectiveSidebarHeader_(type = this.sidebarType, header = this.sidebarHeader) {
-    const sidebarType = this._normalizeSidebarType_(type);
+    if (this._normalizeSidebarType_(type) === 'minimal') return 'none';
     const normalized = this._normalizeSidebarHeader_(header);
-    if (sidebarType === 'minimal') return 'none';
-    if (sidebarType === 'essentials') {
-      return normalized === 'weather' ? 'weather' : 'date_time';
-    }
-    return ['clock', 'date_time', 'none'].includes(normalized) ? normalized : 'clock';
+    return ['clock', 'date_time', 'weather', 'none'].includes(normalized) ? normalized : 'date_time';
   },
 
   _normalizeSidebarStyle_(style = 'glass') {
@@ -313,7 +300,7 @@ const sidebarMethods = {
 
   _getSidebarCalendarEntityIds_() {
     const configured = this._normalizeSidebarCalendarEntities_(
-      this.sidebarCalendarEntities ?? this._config?.sidebar_calendar_entities ?? this._config?.sidebar_calendars ?? []
+      this.sidebarAppearance?.calendar_entities ?? this.sidebarCalendarEntities ?? this._config?.sidebar_calendar_entities ?? this._config?.sidebar_calendars ?? []
     );
     if (configured.length) return configured;
     const states = this._getSidebarHass_?.()?.states || {};
@@ -467,9 +454,9 @@ const sidebarMethods = {
   },
 
   _getSidebarWeatherEntity_() {
-    const configured = String(this._config?.sidebar_weather_entity || this.sidebarWeatherEntity || '').trim();
+    const configured = String(this.sidebarAppearance?.weather_entity || this._config?.sidebar_weather_entity || this.sidebarWeatherEntity || '').trim();
     const hass = this._getSidebarHass_?.();
-    if (configured && hass?.states?.[configured]) return configured;
+    if (configured) return configured;
     return Object.keys(hass?.states || {}).find((entityId) => entityId.startsWith('weather.')) || '';
   },
 
@@ -1163,48 +1150,19 @@ const sidebarMethods = {
   },
 
   _createSidebarHeader_(now = new Date()) {
-    const safe = (value) => this._safe?.(value) || String(value ?? '');
-    const sidebarType = this._normalizeSidebarType_(
-      this.sidebarType ?? this._config?.sidebar_type ?? 'minimal'
-    );
-    const headerType = this._getEffectiveSidebarHeader_(
-      sidebarType,
-      this.sidebarHeader ?? this._config?.sidebar_header ?? 'date_time'
-    );
-    if (headerType === 'none') return null;
-    const weather = this._getSidebarWeatherData_?.() || {};
-    const timeZone = (() => {
-      try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
-    })();
-
-    const headerBodies = {
-      clock: `
-        <small>Local time</small>
-        <strong>${safe(this._formatSidebarTime_(now))}</strong>
-        <em>${safe(timeZone || this._formatSidebarDate_(now))}</em>
-      `,
-      date_time: `
-        <small>${safe(this._formatSidebarWeekday_(now))}</small>
-        <strong>${safe(this._formatSidebarTime_(now))}</strong>
-        <em>${safe(this._formatSidebarLongDate_(now))}</em>
-      `,
-      weather: `
-        <button type="button" class="ddc-sidebar-weather" data-sidebar-more-info="${safe(weather.entityId || '')}">
-          <small>${safe(weather.place || 'Weather')}</small>
-          <span class="ddc-sidebar-weather-reading">
-            <ha-icon icon="${safe(weather.icon || 'mdi:weather-partly-cloudy')}" aria-hidden="true"></ha-icon>
-            <strong>${safe(weather.temperature || '--')}</strong>
-          </span>
-          <em>${safe([weather.state, weather.humidity, weather.wind].filter(Boolean).join(' / ') || 'Current conditions')}</em>
-        </button>
-      `,
-    };
-
+    if (this._normalizeSidebarType_(this.sidebarType) === 'minimal') return null;
+    const widgets = resolveSidebarWidgets(this.sidebarAppearance, this.sidebarHeader);
+    if (!widgets.length) return null;
     const header = document.createElement('section');
-    header.className = `ddc-sidebar-header ddc-sidebar-mast ddc-sidebar-mast-${headerType}`;
-    header.dataset.sidebarHeader = headerType;
-    header.setAttribute('aria-label', `${headerType.replace(/_/g, ' ')} sidebar header`);
-    header.innerHTML = headerBodies[headerType] || headerBodies.clock;
+    header.className = 'ddc-sidebar-widgets-host';
+    header.setAttribute('aria-label', 'Sidebar information');
+    header.innerHTML = sidebarWidgetMarkup({
+      widgets, style: this.sidebarAppearance?.widget_style || 'soft',
+      time: this._formatSidebarTime_(now), date: this._formatSidebarLongDate_(now), weekday: this._formatSidebarWeekday_(now),
+      calendar: widgets.includes('calendar') ? this._sidebarCalendarMarkup_(now) : '',
+      events: widgets.includes('calendar') ? this._getSidebarCalendarEvents_(2) : [],
+      weather: widgets.includes('weather') ? this._getSidebarWeatherData_() : {},
+    });
     header.querySelectorAll?.('[data-sidebar-more-info]').forEach((button) => {
       button.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -1413,11 +1371,7 @@ const sidebarMethods = {
 
   _syncSidebarClockTimer_() {
     try {
-      const header = this._getEffectiveSidebarHeader_(
-        this.sidebarType ?? this._config?.sidebar_type ?? 'minimal',
-        this.sidebarHeader ?? this._config?.sidebar_header ?? 'date_time'
-      );
-      const needsTimer = this._isSidebarEnabled_?.() && ['clock', 'date_time', 'weather', 'home', 'people', 'profile'].includes(header);
+      const needsTimer = this._isSidebarEnabled_?.() && this._normalizeSidebarType_(this.sidebarType) === 'expanded' && resolveSidebarWidgets(this.sidebarAppearance, this.sidebarHeader).length > 0;
       const delay = 30000;
       if (!needsTimer) {
         if (this.__sidebarClockInterval) {
@@ -1446,6 +1400,39 @@ const sidebarMethods = {
     } catch {}
   },
 
+  _syncSidebarViewportPosition_() {
+    const host = this.sidebarHost, root = this.rootEl;
+    if (!host || !root || !this._isSidebarEnabled_()) return;
+    const rect = root.getBoundingClientRect?.();
+    if (!rect || root.classList.contains('ddc-sidebar-narrow')) return;
+    const viewport = globalThis.visualViewport;
+    const top = Number(viewport?.offsetTop || 0) + Math.max(0, Number(this.__topGutter) || 0);
+    const height = Math.max(44, (viewport?.height || globalThis.innerHeight || 800) - Math.max(0, Number(this.__topGutter) || 0));
+    const rootStyle = getComputedStyle(root);
+    const width = parseFloat(rootStyle.gridTemplateColumns) || 76;
+    host.style.setProperty('--ddc-side-fixed-left', `${rect.left}px`);
+    host.style.setProperty('--ddc-side-fixed-width', `${width}px`);
+    host.style.setProperty('--ddc-side-fixed-max-height', `${height}px`);
+    host.style.setProperty('--ddc-side-fixed-top', `${top}px`);
+  },
+
+  _getSidebarCanvasAvailableWidth_(measuredWidth) {
+    const width = Math.max(1, Number(measuredWidth) || 1);
+    const root = this.rootEl;
+    if (!this._isSidebarEnabled_() || !root || !this.sidebarHost) {
+      root?.classList?.remove?.('ddc-sidebar-narrow');
+      return width;
+    }
+    const rootWidth = Number(root.clientWidth) || width;
+    const available = Math.min(rootWidth, width);
+    const narrow = available <= 720;
+    root.classList.toggle('ddc-sidebar-narrow', narrow);
+    if (narrow) return available;
+    const sidebarWidth = Number(this.sidebarHost.getBoundingClientRect?.().width) || 0;
+    const gap = parseFloat(globalThis.getComputedStyle?.(root)?.columnGap) || 0;
+    return Math.max(1, available - sidebarWidth - gap);
+  },
+
   _renderSidebar_() {
     try {
       const host = this.sidebarHost;
@@ -1456,17 +1443,15 @@ const sidebarMethods = {
       const enabled = this._isSidebarEnabled_?.();
       const type = this._normalizeSidebarType_(this.sidebarType ?? this._config?.sidebar_type ?? 'minimal');
       const style = this._normalizeSidebarStyle_(this.sidebarStyle);
-      const density = type === 'minimal' ? 'compact' : (type === 'canvas' ? 'spacious' : 'comfortable');
+      const density = type === 'minimal' ? 'compact' : 'comfortable';
+      const appearance = applySidebarAppearance(root, this.sidebarAppearance);
+      this.sidebarAppearance = appearance;
       const accent = this._normalizeSidebarAccent_(this.sidebarAccent);
       const header = this._getEffectiveSidebarHeader_(type, this.sidebarHeader ?? this._config?.sidebar_header ?? 'date_time');
       const canvasHeight = this._normalizeSidebarCanvasHeight_(this.sidebarCanvasHeight ?? this._config?.sidebar_canvas_height ?? 520);
-      const showCanvas = type !== 'minimal';
-      const showHeader = type !== 'minimal' && header !== 'none';
-      const structureSignature = [type, style, density, accent, header, canvasHeight].join('|');
-      const sidebarEntriesForRender = (Array.isArray(this.sidebarCards) && this.sidebarCards.length)
-        ? this.sidebarCards
-        : (this._config?.sidebar_cards || []);
-      const cardsSignature = this._sidebarCardsRenderSignature_(sidebarEntriesForRender);
+      const showHeader = type !== 'minimal' && resolveSidebarWidgets(appearance, this.sidebarHeader).length > 0;
+      const structureSignature = [type, style, density, accent, header, appearance.expanded_width, appearance.padding, appearance.title ?? 'Your spaces', JSON.stringify(appearance.widgets), appearance.widget_style].join('|');
+
 
       const clearSidebar = () => {
         this._moveTabsBarToRoot_?.();
@@ -1476,7 +1461,7 @@ const sidebarMethods = {
         host.style.removeProperty('--ddc-sidebar-canvas-height');
         host.style.removeProperty('--ddc-sidebar-canvas-frame-height');
         root.classList.remove('ddc-sidebar-layout');
-        root.classList.remove('ddc-sidebar-type-minimal', 'ddc-sidebar-type-essentials', 'ddc-sidebar-type-canvas');
+        root.classList.remove('ddc-sidebar-type-minimal', 'ddc-sidebar-type-essentials', 'ddc-sidebar-type-canvas', 'ddc-sidebar-type-expanded');
         root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
         root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
         root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
@@ -1502,7 +1487,7 @@ const sidebarMethods = {
       } catch {}
       host.style.setProperty('--ddc-sidebar-canvas-frame-height', `${canvasHeight}px`);
       root.classList.add('ddc-sidebar-layout');
-      root.classList.remove('ddc-sidebar-type-minimal', 'ddc-sidebar-type-essentials', 'ddc-sidebar-type-canvas');
+      root.classList.remove('ddc-sidebar-type-minimal', 'ddc-sidebar-type-essentials', 'ddc-sidebar-type-canvas', 'ddc-sidebar-type-expanded');
       root.classList.remove('ddc-sidebar-style-glass', 'ddc-sidebar-style-neon', 'ddc-sidebar-style-minimal');
       root.classList.remove('ddc-sidebar-density-compact', 'ddc-sidebar-density-comfortable', 'ddc-sidebar-density-spacious');
       root.classList.remove('ddc-sidebar-accent-blue', 'ddc-sidebar-accent-cyan', 'ddc-sidebar-accent-purple', 'ddc-sidebar-accent-amber', 'ddc-sidebar-accent-green');
@@ -1512,15 +1497,14 @@ const sidebarMethods = {
       host.dataset.sidebarDensity = density;
       host.dataset.sidebarAccent = accent;
       host.dataset.sidebarHeader = header;
-      host.dataset.sidebarCanvas = showCanvas ? 'drag-drop' : 'none';
+      host.dataset.sidebarAlignment = appearance.alignment || 'center';
+      host.dataset.sidebarCanvas = 'none';
       this.sidebarDetail = null;
 
       const existingNavigation = host.querySelector?.('.ddc-sidebar-navigation');
       if (
         host.dataset.sidebarStructureSignature === structureSignature
-        && host.dataset.sidebarCardsSignature === cardsSignature
         && existingNavigation?.isConnected
-        && (!showCanvas || this.sidebarCanvas?.isConnected)
         && (!showHeader || this.sidebarHeaderHost?.isConnected)
       ) {
         if (bar && bar.parentNode !== existingNavigation) existingNavigation.appendChild(bar);
@@ -1546,45 +1530,22 @@ const sidebarMethods = {
       const navigation = document.createElement('nav');
       navigation.className = 'ddc-sidebar-navigation';
       navigation.setAttribute('aria-label', 'Dashboard tabs');
+      if (type === 'expanded' && (appearance.title ?? 'Your spaces')) {
+        const title = document.createElement('p');
+        title.className = 'ddc-sidebar-title';
+        title.textContent = appearance.title ?? 'Your spaces';
+        navigation.appendChild(title);
+      }
       host.appendChild(navigation);
       if (bar) navigation.appendChild(bar);
+      if (this.sidebarHeaderHost) host.appendChild(this.sidebarHeaderHost);
 
       this.sidebarCanvas = null;
-      if (showCanvas) {
-        const workspace = document.createElement('section');
-        workspace.className = 'ddc-sidebar-workspace';
-        workspace.setAttribute('aria-label', 'Sidebar drag and drop area');
-        workspace.innerHTML = `
-          <div class="ddc-sidebar-workspace-bar">
-            <span><ha-icon icon="mdi:cursor-move" aria-hidden="true"></ha-icon>${type === 'essentials' ? 'Quick area' : 'Sidebar canvas'}</span>
-            <button type="button" class="ddc-sidebar-add-card" data-sidebar-action="add-card" title="Add sidebar card" aria-label="Add sidebar card">
-              <ha-icon icon="mdi:plus"></ha-icon>
-            </button>
-          </div>
-          <div class="ddc-sidebar-canvas" id="ddcSidebarCanvas">
-            <div class="ddc-sidebar-empty">
-              <ha-icon icon="mdi:card-plus-outline" aria-hidden="true"></ha-icon>
-              <span>Drag to create</span>
-            </div>
-          </div>
-        `;
-        host.appendChild(workspace);
-        this.sidebarCanvas = workspace.querySelector('#ddcSidebarCanvas');
-        const addButton = workspace.querySelector('[data-sidebar-action="add-card"]');
-        addButton?.classList?.toggle?.('is-visible', !!this.editMode);
-        addButton?.addEventListener('click', async (ev) => {
-          ev.stopPropagation();
-          if (!this.editMode) return;
-          await this._openSidebarAddCard_?.();
-        });
-        this._installSidebarCreateGesture_?.();
-        this._buildSidebarCardsFromEntries_?.(sidebarEntriesForRender);
-      }
 
       host.dataset.sidebarStructureSignature = structureSignature;
-      host.dataset.sidebarCardsSignature = cardsSignature;
       this._syncSidebarEditState_?.();
       this._syncSidebarClockTimer_?.();
+      this._syncSidebarViewportPosition_?.();
     } catch {}
   },
 
@@ -1715,7 +1676,7 @@ const sidebarMethods = {
       const label = empty.querySelector('span');
       if (this.editMode) {
         icon?.setAttribute?.('icon', 'mdi:selection-drag');
-        if (label) label.textContent = 'Drag to create';
+        if (label) label.textContent = 'Add a card or drag to create';
       } else {
         icon?.setAttribute?.('icon', 'mdi:pencil-outline');
         if (label) label.textContent = 'Edit';

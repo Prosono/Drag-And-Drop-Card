@@ -5,6 +5,8 @@
  * backend/local fallback behavior consistent.
  */
 
+import { configFingerprint } from './storage-mode.js';
+
 export function normalizeBackendStorageKeys(response) {
   const values = Array.isArray(response)
     ? response
@@ -338,7 +340,7 @@ const persistenceMethods = {
   },
 
   // Persist this._config back into the stored card (Storage dashboards)
-  async _persistThisCardConfigToStorage_({ captureLive = true } = {}) {
+  async _persistThisCardConfigToStorage_({ captureLive = true, configPatch = {}, checkForExternalChanges = false, beforeSave } = {}) {
     if (!this._hasHassWebSocketApi_()) return false;
     const storageOperation = this._captureStorageOperation_();
     if (captureLive) {
@@ -365,6 +367,7 @@ const persistenceMethods = {
     const partial = {
       type: "custom:drag-and-drop-card",
       ...this._config,
+      ...configPatch,
       id,
       cards: this._cloneJson_(desktopCards),
     };
@@ -391,21 +394,36 @@ const persistenceMethods = {
 
     // MERGE + WRITE
     const currentCard = this._getValueAtStoragePath_(ll, hit.path);
+    if ((checkForExternalChanges || this._getStorageMode_?.() === 'lovelace')
+        && this.__lastSetConfigSource
+        && configFingerprint(currentCard) !== configFingerprint(this.__lastSetConfigSource)) {
+      throw new Error('This dashboard was changed elsewhere. Reload before saving to avoid replacing those changes.');
+    }
     const merged = { ...currentCard, ...partial };
     this._setValueAtStoragePath_(ll, hit.path, merged);
+    if (beforeSave) {
+      await beforeSave();
+      if (!this._isStorageOperationCurrent_(storageOperation)) throw new Error('Dashboard changed while preparing the storage switch.');
+    }
 
     // SAVE (respect url_path)
-    await this.hass.callWS(
+    this.__pendingLovelaceSaveFingerprint = configFingerprint(merged);
+    this.__pendingLovelaceSaveRoute = storageOperation.dashboardRoute;
+    try { await this.hass.callWS(
       url_path
         ? { type: "lovelace/config/save", url_path, config: ll }
         : { type: "lovelace/config/save", config: ll }
-    );
+    ); } finally { this.__pendingLovelaceSaveFingerprint = null; }
     if (!this._isStorageOperationCurrent_(storageOperation)) return true;
 
     // Apply locally
     this.config = this._cloneJson_?.(merged) || merged;
     this._config = this._cloneJson_?.(merged) || merged;
     this.__lastSetConfigSource = this._cloneJson_?.(merged) || merged;
+    if (merged.storage_mode === 'lovelace' || configPatch.storage_mode) {
+      this.__lastLovelaceSavedFingerprint = configFingerprint(merged);
+      this.__lastLovelaceSavedRoute = storageOperation.dashboardRoute;
+    }
     this.requestUpdate?.();
     return true;
   },
@@ -611,6 +629,23 @@ const persistenceMethods = {
     this._saveTimer = setTimeout(() => this._saveLayout(true), this.autoSaveDebounce);
   },
 
+  async _persistDashboardSettings_() {
+    // Persist the authoritative snapshot before a Lovelace save can recreate
+    // the card and reload its backend options. Never race two Lovelace writes.
+    const options = this._cloneJson_(this._exportableOptions());
+    if (await this._saveLayout(true) === false) {
+      throw new Error('Settings could not be saved. Check the storage connection and try again.');
+    }
+    if (this._getStorageMode_?.() === 'lovelace') return;
+    try {
+      const saved = await this._persistThisCardConfigToStorage_?.({ configPatch: options });
+      if (!saved) await this._persistOptionsToYaml?.(options, { noDownload: true });
+    } catch (error) {
+      // YAML dashboards can be read-only. The backend snapshot is already saved.
+      this._dbgPush?.('save', 'Settings saved to backend; Lovelace mirror unavailable', { error: String(error) });
+    }
+  },
+
   async _saveLayoutNow_() {
     return this._saveLayout(false);
   },
@@ -658,6 +693,28 @@ const persistenceMethods = {
        packages: this._exportDashboardPackages_(),
      };
     if (payload.options && saveStorageKey) payload.options.storage_key = saveStorageKey;
+
+    if (this._getStorageMode_?.() === 'lovelace') {
+      try {
+        if (this._getLovelace?.()?.mode === 'yaml') throw new Error('Lovelace mode requires a UI-managed dashboard to save edits.');
+        const saved = await this._persistThisCardConfigToStorage_({
+          captureLive: false,
+          configPatch: { ...payload.options, storage_mode: 'lovelace', packages: payload.packages },
+          checkForExternalChanges: true,
+        });
+        if (!saved) throw new Error('Home Assistant is not ready to save this dashboard.');
+        if (!isCurrentSave()) return false;
+        this.__dirty = false;
+        this._updateApplyBtn?.();
+        if (!silent) this._toast?.('Saved to Lovelace.');
+        return true;
+      } catch (error) {
+        this.__dirty = true;
+        this._updateApplyBtn?.();
+        this._toast?.(`Lovelace save failed: ${error.message || error}`);
+        return false;
+      }
+    }
 
     let blockBackendWrite = false;
     if (saveStorageKey && this._backendOK && this._shouldMergeRemoteDashboardSnapshot_()) {
@@ -714,7 +771,7 @@ const persistenceMethods = {
     if (!saveStorageKey) { if (!silent) this._toast('Saved locally (no storage_key set).');
       this._recordLastSyncedDashboardPayload_(saveStorageKey, payload);
       this.__dirty = false; this._updateApplyBtn();
-      return; }
+      return true; }
 
     try {
       await this._saveLayoutToBackend(saveStorageKey, payload);
@@ -728,10 +785,14 @@ const persistenceMethods = {
       }
       if (!silent) this._toast('Layout saved.');
       this.__dirty = false; this._updateApplyBtn();
+      return true;
     } catch (e) {
       console.error('Backend save failed', e);
       this._dbgPush('save', 'Backend save failed', { error: String(e) });
       if (!silent) this._toast('Backend save failed — kept local copy.');
+      this.__dirty = true;
+      this._updateApplyBtn?.();
+      return false;
     }
   },
 
@@ -809,7 +870,10 @@ const persistenceMethods = {
     }
   },
 
-  async _saveLayoutToBackend(key, data) {
+  async _saveLayoutToBackend(key, data, { allowModeSwitch = false } = {}) {
+    if (!allowModeSwitch && this._getStorageMode_?.() === 'lovelace') {
+      throw new Error('This dashboard uses Lovelace storage; backend writes are disabled.');
+    }
     if (!this._hasHassApi_()) {
       throw new Error('Home Assistant API is not ready');
     }
@@ -853,6 +917,9 @@ const persistenceMethods = {
   },
 
   async _saveOptionsToBackend(key, newOptions) {
+    if (this._getStorageMode_?.() === 'lovelace') {
+      return this._persistThisCardConfigToStorage_({ configPatch: newOptions, checkForExternalChanges: true });
+    }
     if (!this._hasHassApi_()) return false;
     const storageOperation = this._captureStorageOperation_(key);
     const saveStorageKey = storageOperation.key;
@@ -910,6 +977,14 @@ const persistenceMethods = {
 
   _updateStoreBadge() {
     const el = this.storeBadge; if (!el) return;
+    if (this._getStorageMode_?.() === 'lovelace') {
+      el.textContent = 'Lovelace';
+      el.title = 'Layouts are read from and saved to the Home Assistant dashboard configuration.';
+      el.classList.remove('warn');
+      el.style.background = 'rgba(76,175,80,.15)';
+      el.style.borderColor = 'rgba(76,175,80,.45)';
+      return;
+    }
     const usingHost = this._backendOK && !!this.storageKey;
     el.textContent = usingHost ? 'System OK' : 'Local storage';
     el.title = usingHost

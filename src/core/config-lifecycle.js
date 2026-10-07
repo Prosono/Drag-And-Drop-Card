@@ -1,9 +1,13 @@
+import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
+import { normalizeTabStyle } from '../layout/tab-style.js';
 /*
  * setConfig lifecycle implementation for the main custom element.
  *
  * This method normalizes user/YAML options, refreshes runtime state, builds the dashboard shell,
  * and decides whether an existing layout must be reloaded after a config change.
  */
+
+import { normalizeStorageMode, configFingerprint } from '../storage/storage-mode.js';
 
 export function resolveConfiguredActiveTab({
   tabs = [],
@@ -26,6 +30,19 @@ export function resolveConfiguredActiveTab({
 const setConfigMethods = {
   /* --------------------------- Card lifecycle --------------------------- */
   setConfig(config = {}) {
+      const incomingFingerprint = configFingerprint(config);
+      let incomingRoute = null;
+      try { incomingRoute = this._getCurrentDashboardUrlPath_?.() ?? null; } catch {}
+      if (this.__booted && (
+        (incomingFingerprint === this.__pendingLovelaceSaveFingerprint && incomingRoute === this.__pendingLovelaceSaveRoute)
+        || (incomingFingerprint === this.__lastLovelaceSavedFingerprint && incomingRoute === this.__lastLovelaceSavedRoute)
+      )) return;
+      this.__lastLovelaceSavedFingerprint = null;
+      const oldStorageMode = normalizeStorageMode(this._config?.storage_mode);
+      const nextStorageMode = normalizeStorageMode(config.storage_mode);
+      const sourceChanged = configFingerprint(this.__lastSetConfigSource) !== incomingFingerprint;
+      const reloadStorageConfig = oldStorageMode !== nextStorageMode
+        || (nextStorageMode === 'lovelace' && sourceChanged);
       try { this.__lastSetConfigSource = this._cloneJson_?.(config) || JSON.parse(JSON.stringify(config)); } catch {}
       const inHaConfigPreview = this._isInHaEditorPreview?.();
       if (this.__haConfigPreviewMode && !inHaConfigPreview) {
@@ -63,7 +80,7 @@ const setConfigMethods = {
       const previousDashboardRoute = this.__storageDashboardRoute;
       const dashboardRouteChanged = previousDashboardRoute !== undefined
         && previousDashboardRoute !== dashboardRoute;
-      const storageScopeChanged = keyChanged || dashboardRouteChanged;
+      const storageScopeChanged = keyChanged || dashboardRouteChanged || reloadStorageConfig;
       this.__storageDashboardRoute = dashboardRoute;
       if (storageScopeChanged) {
         // Home Assistant may reuse the same custom-card element while moving
@@ -178,6 +195,7 @@ const setConfigMethods = {
         const hasSidebarEnabled = Object.prototype.hasOwnProperty.call(config, 'sidebar_enabled');
         const legacyLeftRail = tabsPosition === 'left' && !hasSidebarEnabled;
         this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
+        this.tabsStyle = normalizeTabStyle(config.tabs_style);
         this.tabsSize = this._normalizeTabsSize_(config.tabs_size);
         this._syncTabsSize_?.();
         this.sidebarEnabled = hasSidebarEnabled ? !!config.sidebar_enabled : legacyLeftRail;
@@ -188,6 +206,7 @@ const setConfigMethods = {
           enabled: this.sidebarEnabled,
           legacyLeft: legacyLeftRail,
         });
+        this.sidebarAppearance = normalizeSidebarAppearance(config.sidebar_appearance);
         this.sidebarStyle = this._normalizeSidebarStyle_(config.sidebar_style ?? config.sidebarStyle);
         this.sidebarDensity = this._normalizeSidebarDensity_(config.sidebar_density ?? config.sidebarDensity);
         this.sidebarAccent = this._normalizeSidebarAccent_(config.sidebar_accent ?? config.sidebarAccent);
@@ -279,7 +298,7 @@ const setConfigMethods = {
 
       // Persist new option knobs into storage so next load matches the config.
       // Skip while in HA’s editor preview to avoid churn. Only queue save in edit mode (handled in _queueSave)
-      try { if (!this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
+      try { if (nextStorageMode !== 'lovelace' && !this._isInHaEditorPreview()) this._queueSave('config-change'); } catch {}
 
       this._updateStoreBadge();
       if (this.cardContainer) this._toggleEditMode(false);
@@ -288,6 +307,11 @@ const setConfigMethods = {
       // For normal config tweaks, just reflow with the new options.
      // Boot/rebuild logic
       this.__cfgReady = true;
+      if (reloadStorageConfig && this.__booted) {
+        if (this.__booting) this.__pendingStorageConfigReload = true;
+        else this._initialLoad(true, { replaceExisting: true, reason: 'storage-config-change' });
+        return;
+      }
       const haNativeEditActive = !!this._isHaEditorBlockingEmptyState_?.();
       const hasRenderedCards = !!this.cardContainer?.querySelector?.('.card-wrapper:not(.ddc-placeholder)');
       const editorLoadOptions = haNativeEditActive
@@ -305,6 +329,7 @@ const setConfigMethods = {
       } else if (!this.__booted && this.__probed) {
         const shouldWaitForBackendSnapshot = !!(
           this.__backendProbePending
+          && nextStorageMode !== 'lovelace'
           && this.storageKey
           && !this._hasPendingDashboardReplacement_?.()
         );

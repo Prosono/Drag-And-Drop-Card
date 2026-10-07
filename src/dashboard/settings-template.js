@@ -1,3 +1,5 @@
+import { sidebarAppearanceControls } from '../layout/sidebar-appearance.js';
+import { tabStyleControls } from '../layout/tab-style.js';
 /*
  * Markup template for the dashboard settings panel.
  *
@@ -32,8 +34,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       <ha-icon icon="mdi:tab" aria-hidden="true"></ha-icon>
       <span>Tabs</span>
     </button>
-    <!-- Temporarily hidden while Sidebar Studio is held back for further work. -->
-    <button type="button" class="settings-tab" id="ddc-settings-tab-sidebar" data-settings-tab="sidebar" data-feature-status="deferred" role="tab" aria-selected="false" aria-hidden="true" tabindex="-1" hidden>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-sidebar" data-settings-tab="sidebar" role="tab" aria-selected="false">
       <ha-icon icon="mdi:page-layout-sidebar-left" aria-hidden="true"></ha-icon>
       <span>Sidebar</span>
     </button>
@@ -48,6 +49,10 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
     <button type="button" class="settings-tab" id="ddc-settings-tab-packages" data-settings-tab="packages" role="tab" aria-selected="false">
       <ha-icon icon="mdi:puzzle-plus-outline" aria-hidden="true"></ha-icon>
       <span>Packages</span>
+    </button>
+    <button type="button" class="settings-tab" id="ddc-settings-tab-advanced" data-settings-tab="advanced" role="tab" aria-selected="false">
+      <ha-icon icon="mdi:cog-outline" aria-hidden="true"></ha-icon>
+      <span>Advanced</span>
     </button>
   </nav>
 
@@ -923,7 +928,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
             <ha-switch id="ddc-setting-hideSbar"></ha-switch>
           </div>
         </div>
-        <div class="hint">Hides the left navigation drawer so the dashboard gets more room.</div>
+        <div class="hint">Hides the Home Assistant navigation drawer during normal use. It returns in Edit Mode; your dashboard Sidebar stays visible.</div>
       </div>
     </section>
 
@@ -1073,6 +1078,8 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Scales the tab controls while preserving touch-friendly sizing and viewport alignment.</div>
       </div>
 
+      ${tabStyleControls()}
+
       <div class="setting tab-auto-return-setting" role="group" aria-labelledby="lbl-tabs-auto-return">
         <div class="row">
           <div class="title">
@@ -1125,8 +1132,8 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       <header class="sidebar-studio-head">
         <div>
           <span class="sidebar-studio-kicker">Dashboard structure</span>
-          <h4 id="sidebar-head">Sidebar studio</h4>
-          <p id="ddc-settings-intro-sidebar">One global rail for navigation and the controls you want to keep close.</p>
+          <h4 id="sidebar-head">Sidebar</h4>
+          <p id="ddc-settings-intro-sidebar">Choose a simple button rail or a sidebar with labels and your everyday controls.</p>
         </div>
         <label class="sidebar-master-switch" for="ddc-setting-sidebarEnabled">
           <span><strong>Sidebar</strong><small>Show on this dashboard</small></span>
@@ -1137,52 +1144,47 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       <div class="sidebar-studio-layout">
         <div class="sidebar-studio-editor">
           <fieldset class="sidebar-blueprints" id="ddc-setting-sidebarTypeGroup">
-            <legend>Structure</legend>
+            <legend>Mode</legend>
 
             <label class="sidebar-blueprint">
               <input type="radio" name="ddc-sidebar-type" value="minimal" />
               <span class="sidebar-blueprint-index">01</span>
-              <span class="sidebar-blueprint-copy"><strong>Minimal</strong><small>A compact tab spine. Nothing else.</small></span>
+              <span class="sidebar-blueprint-copy"><strong>Buttons only</strong><small>Your tabs, arranged vertically. Icons with names on hover.</small></span>
               <span class="sidebar-blueprint-diagram diagram-minimal" aria-hidden="true"><i></i><i></i><i></i></span>
               <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
             </label>
 
             <label class="sidebar-blueprint">
-              <input type="radio" name="ddc-sidebar-type" value="essentials" />
+              <input type="radio" name="ddc-sidebar-type" value="expanded" />
               <span class="sidebar-blueprint-index">02</span>
-              <span class="sidebar-blueprint-copy"><strong>Essentials</strong><small>Time or weather, tabs, and one focused card area.</small></span>
-              <span class="sidebar-blueprint-diagram diagram-essentials" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-              <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
-            </label>
-
-            <label class="sidebar-blueprint">
-              <input type="radio" name="ddc-sidebar-type" value="canvas" />
-              <span class="sidebar-blueprint-index">03</span>
-              <span class="sidebar-blueprint-copy"><strong>Canvas</strong><small>A full-height space for any Home Assistant card.</small></span>
+              <span class="sidebar-blueprint-copy"><strong>Expanded</strong><small>Icons and names, and optional clock, calendar or weather.</small></span>
               <span class="sidebar-blueprint-diagram diagram-canvas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
               <span class="sidebar-blueprint-state" aria-hidden="true"><ha-icon icon="mdi:check"></ha-icon></span>
             </label>
           </fieldset>
 
+          <p class="hint">Uses the same tabs as your dashboard. On narrow screens, navigation becomes a horizontal row.</p>
+          <button type="button" class="btn" id="ddc-sidebar-manage-tabs">Manage tabs and icons</button>
           <div class="sidebar-inspector" id="ddc-sidebar-context-controls">
-            <div class="sidebar-inspector-row" id="ddc-sidebar-header-setting">
-              <label for="ddc-setting-sidebarHeader"><span>Header</span><small>What leads the rail</small></label>
-              <select id="ddc-setting-sidebarHeader"></select>
-            </div>
-            <div class="sidebar-inspector-row sidebar-inspector-range" id="ddc-sidebar-canvas-height-setting">
-              <label for="ddc-setting-sidebarCanvasHeight"><span>Card area</span><small>Available vertical space</small></label>
-              <div>
-                <input type="range" id="ddc-setting-sidebarCanvasHeight" min="280" max="1200" step="20" />
-                <output id="ddc-sidebarCanvasHeightOut" for="ddc-setting-sidebarCanvasHeight">520 px</output>
-              </div>
-            </div>
+            <div class="sidebar-inspector-row"><label for="ddc-sidebar-title">Navigation title</label><input id="ddc-sidebar-title" type="text" maxlength="80" placeholder="Your spaces" /></div>
+            <fieldset class="sidebar-widget-choices"><legend>Information widgets</legend>
+              <label><input type="checkbox" data-sidebar-widget="clock" /> Clock</label>
+              <label><input type="checkbox" data-sidebar-widget="calendar" /> Calendar</label>
+              <label><input type="checkbox" data-sidebar-widget="weather" /> Weather</label>
+            </fieldset>
+            <div class="sidebar-inspector-row"><label for="ddc-sidebar-widget-style">Widget style</label><select id="ddc-sidebar-widget-style"><option value="soft">Soft — quiet surfaces</option><option value="minimal">Minimal — clean typography</option><option value="accent">Accent — tinted with your color</option></select></div>
+            <div class="sidebar-inspector-row" id="ddc-sidebar-weather-row"><label for="ddc-sidebar-weather-entity">Weather entity</label><input id="ddc-sidebar-weather-entity" type="text" placeholder="Automatic (weather.home)" /></div>
+            <div class="sidebar-inspector-row" id="ddc-sidebar-calendar-row"><label for="ddc-sidebar-calendar-entities">Calendars</label><input id="ddc-sidebar-calendar-entities" type="text" placeholder="Automatic, or calendar.home, calendar.work" /></div>
           </div>
+          <div class="sidebar-inspector-row"><label for="ddc-sidebar-alignment">Content placement</label><select id="ddc-sidebar-alignment"><option value="center">Center of viewport</option><option value="top">Top</option><option value="bottom">Bottom of viewport</option></select></div>
+          <p class="hint">Positions all sidebar content together: tabs, Layers and widgets. The background always fills the viewport height. Long content scrolls; narrow screens use horizontal navigation.</p>
 
-          <p class="sidebar-studio-note"><ha-icon icon="mdi:cursor-move"></ha-icon><span>Add and arrange sidebar cards directly on the rail in Edit Mode.</span></p>
+          ${sidebarAppearanceControls()}
+          <p class="sidebar-studio-note"><ha-icon icon="mdi:layers-outline"></ha-icon><span>Layers has its own button with an active count. Open it to toggle visibility groups without leaving your current tab.</span></p>
         </div>
 
         <figure class="sidebar-preview-panel" aria-live="polite">
-          <figcaption><span>Preview</span><small>Live dashboard scale</small></figcaption>
+          <figcaption><span>Preview</span><small>Appearance preview</small></figcaption>
           <div class="sidebar-preview-stage" id="ddc-sidebar-preview" data-sidebar-type="minimal" data-sidebar-enabled="false">
             <div class="sidebar-preview-rail">
               <div class="sidebar-preview-header" id="ddc-sidebar-preview-header">
@@ -1193,9 +1195,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
                 <span><i>02</i><span class="sidebar-preview-nav-icon"><ha-icon icon="mdi:lightbulb-outline"></ha-icon></span><b>Lights</b></span>
                 <span><i>03</i><span class="sidebar-preview-nav-icon"><ha-icon icon="mdi:thermometer"></ha-icon></span><b>Climate</b></span>
               </div>
-              <div class="sidebar-preview-canvas" id="ddc-sidebar-preview-canvas" aria-hidden="true">
-                <i></i><i></i><i></i>
-              </div>
+
             </div>
             <div class="sidebar-preview-dashboard" aria-hidden="true">
               <div class="sidebar-preview-dashboard-head"><span>Living space</span><i>19:42</i></div>
@@ -1260,6 +1260,31 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         </div>
         <div class="hint">Layer IDs stay stable behind the scenes, so you can rename labels later without breaking assigned cards.</div>
       </div>
+    </section>
+
+    <section class="card" data-settings-section="advanced" aria-labelledby="advanced-head" role="tabpanel" aria-describedby="ddc-settings-intro-advanced" hidden>
+      <div class="section-head">
+        <ha-icon icon="mdi:cog-outline" aria-hidden="true"></ha-icon>
+        <h4 id="advanced-head">Advanced</h4>
+      </div>
+      <p class="tab-intro" id="ddc-settings-intro-advanced">Choose where this dashboard reads and saves its layout. Most dashboards should keep the default.</p>
+      <div class="setting">
+        <label for="ddc-setting-storageMode">Layout storage</label>
+        <select id="ddc-setting-storageMode" aria-describedby="ddc-storage-mode-help">
+          <option value="backend">DDC backend (default)</option>
+          <option value="lovelace">Lovelace — external tools and dashboard config</option>
+        </select>
+        <p class="hint" id="ddc-storage-mode-help">DDC backend uses the shared layout saved by DDC, with browser storage as a fallback. Lovelace uses Home Assistant's dashboard configuration, so changes from external tools take effect when Home Assistant delivers the new configuration or the dashboard reloads.</p>
+      </div>
+      <div class="theme-override-warning" role="note">
+        <ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon>
+        <div><strong>Before changing storage</strong><p>Export a backup first. Switching copies the dashboard currently on screen, including responsive layouts, to the selected destination and replaces its saved layout. It does not load the older copy from that destination.</p><p>Lovelace saving requires a UI-managed dashboard and permission to edit it. Avoid editing from multiple browsers or external tools at the same time. Package definitions are retained, but Lovelace mode does not deploy package files through the DDC backend.</p></div>
+      </div>
+      <label id="ddc-storage-mode-confirm-row" hidden>
+        <input type="checkbox" id="ddc-storage-mode-confirm" />
+        Keep the dashboard on screen and replace the layout in the selected destination when I save.
+      </label>
+      <p class="hint" id="ddc-storage-mode-error" role="alert" hidden></p>
     </section>
 
     <!-- Packages -->

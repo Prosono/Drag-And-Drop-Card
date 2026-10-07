@@ -1,3 +1,4 @@
+import { applyTabStyle } from '../layout/tab-style.js';
 /*
  * Dashboard tab model, tab bar rendering, and active-tab filtering.
  *
@@ -60,7 +61,7 @@ export function shouldDeferTabAutoReturnToScreensaver({
 export function buildTabButtonMarkup(tab = {}, tabIndex = 0, { sidebar = false } = {}) {
   const label = tab.label ?? tab.id ?? '';
   if (!sidebar) {
-    return `${tab.icon ? `<ha-icon icon="${tab.icon}"></ha-icon>` : ''}<span class="ddc-tab-label">${label}</span>`;
+    return `${tab.icon ? `<span class="ddc-tab-icon"><ha-icon icon="${tab.icon}"></ha-icon></span>` : ''}<span class="ddc-tab-label">${label}</span>`;
   }
   return `
     <span class="ddc-sidebar-tab-indicator" aria-hidden="true"></span>
@@ -219,6 +220,7 @@ const tabsLayoutMethods = {
     setLength('--ddc-tabs-layer-icon-radius', 14);
     setLength('--ddc-tabs-font-size', 14);
     setLength('--ddc-tabs-gap', 10);
+    applyTabStyle(this);
   },
 
   _renderTabs() {
@@ -342,6 +344,7 @@ const tabsLayoutMethods = {
   async _switchActiveTab_(tabId, options = {}) {
     const nextTab = this._normalizeTabId?.(tabId) || tabId;
     if (!nextTab || this.activeTab === nextTab) return false;
+    const previousTabId = this.activeTab;
 
     const transitionSeq = (Number(this.__tabTransitionSeq || 0) || 0) + 1;
     this.__tabTransitionSeq = transitionSeq;
@@ -384,6 +387,16 @@ const tabsLayoutMethods = {
     try { this._applyVisibility_(); } catch {}
     try { this._syncEmptyStateUI?.(); } catch {}
     try { this._renderConnectors_?.(); } catch {}
+    this.dispatchEvent?.(new CustomEvent('ddc:active-tab-changed', {
+      detail: {
+        tabId: nextTab,
+        previousTabId,
+        reason: options.reason || 'tab-change',
+        storageKey: this.storageKey,
+      },
+      bubbles: true,
+      composed: true,
+    }));
     return true;
   },
 
@@ -647,6 +660,7 @@ const tabsLayoutMethods = {
     const bar = this.tabsBar; if (!bar) return;
     const scrollHost = bar.querySelector?.('.ddc-tabs-scroller') || bar;
     const btns = bar.querySelectorAll('.ddc-tab');
+    this._syncTabsOrientation_?.();
     if (btns.length) bar.setAttribute('role', 'tablist');
     else bar.removeAttribute('role');
     btns.forEach((btn, idx) => {
@@ -659,20 +673,24 @@ const tabsLayoutMethods = {
     if (!this.__tabsKeyHandler) {
       this.__tabsKeyHandler = (e) => {
         if (e.target?.closest?.('.ddc-layer-menu')) return;
-        const valid = ['ArrowLeft','ArrowRight','Home','End'];
+        const vertical = this._isSidebarNavigationActive_?.();
+        const valid = vertical ? ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'] : ['ArrowLeft','ArrowRight','Home','End'];
         if (!valid.includes(e.key)) return;
         const list = Array.from(bar.querySelectorAll('.ddc-tab'));
         if (!list.length) return;
         e.preventDefault();
-        const focusedIndex = list.findIndex(b => b === document.activeElement);
+        const focusedIndex = list.findIndex(b => b === (this.shadowRoot?.activeElement || document.activeElement));
         const activeIndex = list.findIndex(b => b.classList.contains('active'));
         let idx = focusedIndex >= 0 ? focusedIndex : (activeIndex >= 0 ? activeIndex : 0);
-        if (e.key === 'ArrowRight') idx = Math.min(list.length - 1, idx + 1);
-        if (e.key === 'ArrowLeft')  idx = Math.max(0, idx - 1);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') idx = Math.min(list.length - 1, idx + 1);
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')  idx = Math.max(0, idx - 1);
         if (e.key === 'Home')       idx = 0;
         if (e.key === 'End')        idx = list.length - 1;
         const target = list[idx];
-        if (target) { try { target.focus({preventScroll:false}); } catch {}; target.click(); }
+        if (target) {
+          target.click();
+          try { bar.querySelector('.ddc-tab.active')?.focus({ preventScroll: false }); } catch {}
+        }
       };
       bar.addEventListener('keydown', this.__tabsKeyHandler);
     }
@@ -687,11 +705,21 @@ const tabsLayoutMethods = {
     this._updateTabOverflowShadows_?.();
   },
 
+  _syncTabsOrientation_() {
+    const bar = this.tabsBar;
+    if (!bar) return;
+    const scroller = bar.querySelector?.('.ddc-tabs-scroller');
+    const layout = scroller && globalThis.getComputedStyle?.(scroller);
+    const vertical = this._isSidebarNavigationActive_?.() && layout?.flexDirection !== 'row';
+    bar.setAttribute?.('aria-orientation', vertical ? 'vertical' : 'horizontal');
+  },
+
   _syncTabsWidth_() {
     try {
       this._syncTabsPlacement_?.();
       this._syncViewportPreviewUI_?.();
       this._syncLeftRailViewportPosition_?.();
+      this._syncTabsOrientation_?.();
       const bar = this.tabsBar;
       if (!bar) return;
       const vw =
@@ -893,6 +921,7 @@ const tabsLayoutMethods = {
 
   _syncLeftRailViewportPosition_() {
     try {
+      this._syncSidebarViewportPosition_?.();
       if (!this._isSidebarNavigationActive_?.()) {
         this.style?.removeProperty?.('--ddc-left-rail-left');
         return;

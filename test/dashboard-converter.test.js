@@ -242,7 +242,7 @@ test('dashboard converter preserves conditional behavior while removing recursiv
   assert.equal(stateSwitch.states.home, undefined);
 });
 
-test('dashboard converter builds sections as ordered blocks with full-width section headings', () => {
+test('dashboard converter keeps sections side by side with headings spanning only their own section', () => {
   const harness = new DashboardConverterHarness();
   const converted = harness._convertLovelaceDashboardToDdc_({
     views: [{
@@ -259,8 +259,10 @@ test('dashboard converter builds sections as ordered blocks with full-width sect
   assert.deepEqual(converted.cards.map((entry) => entry.card.type), ['markdown', 'tile', 'markdown', 'tile']);
   const [heading, tile, secondHeading] = converted.cards;
   assert.ok(heading.size.width > tile.size.width);
-  assert.ok(secondHeading.position.y > tile.position.y);
-  assert.deepEqual(converted.summary.view_details, [{ id: 'rooms', title: 'Rooms', cards: 4, layout: 'grid' }]);
+  assert.equal(secondHeading.position.y, heading.position.y);
+  assert.ok(secondHeading.position.x > heading.position.x + heading.size.width);
+  assert.ok(tile.position.y > heading.position.y);
+  assert.deepEqual(converted.summary.view_details, [{ id: 'rooms', title: 'Rooms', cards: 4, layout: 'sections' }]);
 });
 
 test('dashboard converter uses the configured desktop canvas without stretching tablet variants to desktop width', () => {
@@ -287,4 +289,81 @@ test('dashboard converter rejects invalid generated layouts before changing the 
     () => harness._validateConvertedDashboardPayload_(converted),
     /duplicate or empty card ID/,
   );
+});
+
+function assertNoOverlaps(entries) {
+  entries.forEach((a, index) => entries.slice(index + 1).forEach((b) => {
+    if (a.tabId !== b.tabId) return;
+    assert.ok(a.position.x + a.size.width <= b.position.x || b.position.x + b.size.width <= a.position.x
+      || a.position.y + a.size.height <= b.position.y || b.position.y + b.size.height <= a.position.y,
+    `Overlapping cards: ${a.id}, ${b.id}`);
+  }));
+}
+
+test('sections preserve twelve-column widths and explicit row heights on desktop and mobile', () => {
+  const harness = new DashboardConverterHarness();
+  harness._responsiveLayoutVariantKeys_ = () => ['desktop_landscape', 'mobile_portrait'];
+  harness._dashboardConverterViewportWidth_ = (key) => key === 'mobile_portrait' ? 390 : 1440;
+  const source = { type: 'sections', max_columns: 2, sections: [
+    { cards: [
+      { type: 'heading', heading: 'Lights', grid_options: { columns: 'full', rows: 1 } },
+      { type: 'tile', entity: 'light.one', grid_options: { columns: 6, rows: 2 } },
+      { type: 'tile', entity: 'light.two', grid_options: { columns: 6, rows: 2 } },
+      { type: 'entities', entities: ['light.one'], grid_options: { columns: 12, rows: 4 } },
+    ] },
+    { cards: [{ type: 'tile', entity: 'light.three' }] },
+  ] };
+  const original = structuredClone(source);
+  const converted = harness._convertLovelaceDashboardToDdc_(source);
+  assert.deepEqual(source, original);
+  for (const entries of Object.values(converted.responsive_layouts)) {
+    const [heading, left, right, full] = entries;
+    assert.equal(heading.size.height, 48);
+    assert.equal(left.size.height, 104);
+    assert.equal(full.size.height, 216);
+    assert.equal(left.position.y, right.position.y);
+    assert.ok(Math.abs(full.size.width - (left.size.width + right.size.width + 8)) <= 1);
+    assertNoOverlaps(entries);
+  }
+  const desktop = converted.responsive_layouts.desktop_landscape;
+  const mobile = converted.responsive_layouts.mobile_portrait;
+  assert.equal(desktop[4].position.y, desktop[0].position.y);
+  assert.ok(mobile[4].position.y >= mobile[3].position.y + mobile[3].size.height);
+  assert.ok(mobile.every((entry) => entry.position.x >= 0 && entry.position.x + entry.size.width <= 390));
+  harness._validateConvertedDashboardPayload_(converted);
+});
+
+test('section spans and dense placement retain whole sections without overlaps', () => {
+  for (const dense of [false, true]) {
+    const harness = new DashboardConverterHarness();
+    harness._dashboardConverterViewportWidth_ = () => 1440;
+    const converted = harness._convertLovelaceDashboardToDdc_({ views: [{
+      type: 'sections', max_columns: 3, dense_section_placement: dense,
+      sections: [2, 2, 1].map((span, index) => ({ column_span: span, cards: [
+        { type: 'markdown', content: String(index), grid_options: { columns: 'full', rows: 2 } },
+      ] })),
+    }] });
+    const [first, second, third] = converted.cards;
+    assert.ok(second.position.y > first.position.y);
+    assert.equal(third.position.y, dense ? first.position.y : second.position.y);
+    assert.ok(first.size.width > third.size.width * 2);
+    assertNoOverlaps(converted.cards);
+  }
+});
+
+test('layout wrappers retain styles, visibility, sibling placement and panel semantics', () => {
+  const wrapper = { type: 'custom:layout-card', layout_type: 'custom:horizontal-layout',
+    cards: [{ type: 'tile', entity: 'light.one' }, { type: 'tile', entity: 'light.two' }] };
+  for (const view of [
+    { cards: [{ ...wrapper, card_mod: { style: 'ha-card { background: red; }' } }] },
+    { cards: [{ ...wrapper, visibility: [{ condition: 'state', entity: 'light.one', state: 'on' }] }] },
+    { cards: [wrapper, { type: 'tile', entity: 'light.three' }] },
+    { panel: true, cards: [wrapper] },
+    { cards: [{ ...wrapper, layout: { mediaquery: { '(max-width: 600px)': { max_cols: 1 } } } }] },
+  ]) {
+    const converted = new DashboardConverterHarness()._convertLovelaceDashboardToDdc_(view);
+    assert.deepEqual(converted.cards[0].card, view.cards[0]);
+  }
+  const flattened = new DashboardConverterHarness()._convertLovelaceDashboardToDdc_({ cards: [wrapper] });
+  assert.equal(flattened.cards.length, 2);
 });

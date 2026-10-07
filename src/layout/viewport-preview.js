@@ -149,7 +149,8 @@ const viewportPreviewMethods = {
   },
 
   _getAvailableAutoCanvasViewport_(measuredWidth = 1, fallbackHeight = 1) {
-    const rawWidth = Math.max(1, this._getEffectivePreviewWidth_?.(measuredWidth) || measuredWidth || 1);
+    const measured = Math.max(1, this._getEffectivePreviewWidth_?.(measuredWidth) || measuredWidth || 1);
+    const rawWidth = this._getSidebarCanvasAvailableWidth_?.(measured) ?? measured;
     const previewHeight = this._getEffectivePreviewHeight_?.() || 0;
     if (previewHeight > 0) {
       return { width: rawWidth, height: previewHeight, isPreview: true };

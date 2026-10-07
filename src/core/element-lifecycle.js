@@ -27,6 +27,7 @@ export function shouldLoadBackendSnapshotAfterProbe(instance = null) {
 
 const lifecycleMethods = {
   _queueBackendRefresh_(reason = 'backend-refresh') {
+    if (this._getStorageMode_?.() === 'lovelace') return false;
     if (reason) this.__backendRefreshReason = String(reason);
     this.__backendRefreshPending = true;
     if (this.__backendRefreshTimer) return true;
@@ -54,6 +55,7 @@ const lifecycleMethods = {
   },
 
   _scheduleBackendProbeRetry_() {
+    if (this._getStorageMode_?.() === 'lovelace') return false;
     if (this.__backendProbeRetryTimer || this.__backendProbePending || this._backendOK) return false;
     if (!this.storageKey || !this._hasHassApi_?.()) return false;
     const attempt = (Number(this.__backendProbeRetryAttempts || 0) || 0) + 1;
@@ -74,6 +76,7 @@ const lifecycleMethods = {
   },
 
   _scheduleBackendSnapshotRetry_(reason = 'backend-load-retry') {
+    if (this._getStorageMode_?.() === 'lovelace') return false;
     if (this.__backendSnapshotRetryTimer || !this._backendOK || !this.storageKey) return false;
     const attempt = (Number(this.__backendSnapshotRetryAttempts || 0) || 0) + 1;
     const delays = [500, 1500, 5000, 15000];
@@ -223,6 +226,7 @@ const lifecycleMethods = {
     },
 
   disconnectedCallback() {
+      this._closeLayersMenu_?.({ render: false });
       // A dashboard navigation can detach the old card while backend reads,
       // card builds, or a debounced autosave are still pending. Invalidate all
       // of them so a detached DEV card cannot commit after PRD is mounted.
@@ -239,7 +243,6 @@ const lifecycleMethods = {
       try { this._clearEditorAppearance_?.(); } catch {}
       try { this._uninstallGridObservers_(); } catch {}
       try { this._setHeaderVisible_?.(true); this._setSidebarVisible_?.(true); } catch {}
-      try { this._applyHaChromeVisibility_?.(); } catch {}
       try { this._clearPageBackground_?.(); } catch {}
 
       if (this.__keyHandlerBound && this.__keyHandler) {
@@ -366,6 +369,10 @@ const lifecycleMethods = {
 
   set hass(hass) {
       this._hass = hass;
+      if (hass && this.__cfgReady && !this.__booted && this._getStorageMode_?.() === 'lovelace') {
+        this.__booted = true;
+        this._initialLoad(true, { replaceExisting: true });
+      }
       const hassApiReady = !!(hass && typeof hass.callApi === 'function');
       if (!this.__probed && hassApiReady) {
         this.__probed = true;

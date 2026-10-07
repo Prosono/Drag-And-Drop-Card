@@ -9,19 +9,19 @@ import { buildTabButtonMarkup } from '../src/layout/tabs.js';
 class SidebarHarness {}
 installSidebarMethods(SidebarHarness.prototype);
 
-test('Sidebar types normalize to the three purpose-based designs', () => {
+test('Sidebar has two modes and migrates legacy designs', () => {
   const harness = new SidebarHarness();
 
   assert.equal(harness._normalizeSidebarType_('navigation'), 'minimal');
-  assert.equal(harness._normalizeSidebarType_('standard'), 'essentials');
-  assert.equal(harness._normalizeSidebarType_('workspace'), 'canvas');
+  assert.equal(harness._normalizeSidebarType_('standard'), 'expanded');
+  assert.equal(harness._normalizeSidebarType_('workspace'), 'expanded');
   assert.equal(harness._normalizeSidebarType_('unexpected'), 'minimal');
 
   assert.equal(harness._getEffectiveSidebarHeader_('minimal', 'weather'), 'none');
   assert.equal(harness._getEffectiveSidebarHeader_('essentials', 'weather'), 'weather');
-  assert.equal(harness._getEffectiveSidebarHeader_('essentials', 'clock'), 'date_time');
+  assert.equal(harness._getEffectiveSidebarHeader_('essentials', 'clock'), 'clock');
   assert.equal(harness._getEffectiveSidebarHeader_('canvas', 'none'), 'none');
-  assert.equal(harness._getEffectiveSidebarHeader_('canvas', 'weather'), 'clock');
+  assert.equal(harness._getEffectiveSidebarHeader_('canvas', 'weather'), 'weather');
 });
 
 test('Sidebar navigation is global whenever the dashboard Sidebar is enabled', () => {
@@ -69,7 +69,7 @@ test('Sidebar mast uses the header allowed by the selected structure', () => {
   };
   try {
     harness.sidebarType = 'essentials';
-    harness.sidebarHeader = 'clock';
+    harness.sidebarHeader = 'date_time';
     harness._safe = value => String(value ?? '');
     harness._getSidebarWeatherData_ = () => ({});
     harness._formatSidebarWeekday_ = () => 'Tuesday';
@@ -79,8 +79,8 @@ test('Sidebar mast uses the header allowed by the selected structure', () => {
     const mast = harness._createSidebarHeader_(new Date('2026-08-11T19:42:00'));
 
     assert.equal(created.length, 1);
-    assert.equal(mast.dataset.sidebarHeader, 'date_time');
-    assert.match(mast.className, /ddc-sidebar-mast-date_time/);
+    assert.equal(mast.attributes['aria-label'], 'Sidebar information');
+    assert.match(mast.className, /ddc-sidebar-widgets-host/);
     assert.match(mast.innerHTML, /19:42/);
     assert.doesNotMatch(mast.innerHTML, /live-pill|header-stats/);
   } finally {
@@ -131,18 +131,21 @@ test('dashboard option normalization preserves Sidebar data', () => {
   });
 });
 
-test('Sidebar settings stay implemented but are hidden while the feature is deferred', async () => {
+test('Sidebar settings expose two modes and customization', async () => {
   const template = await readFile(new URL('../src/dashboard/settings-template.js', import.meta.url), 'utf8');
   const controller = await readFile(new URL('../src/dashboard/settings-controller.js', import.meta.url), 'utf8');
   const settingsStyles = await readFile(new URL('../src/styles/dashboard-settings-styles.js', import.meta.url), 'utf8');
   const shell = await readFile(new URL('../src/dashboard/shell-template.js', import.meta.url), 'utf8');
   const tabs = await readFile(new URL('../src/layout/tabs.js', import.meta.url), 'utf8');
 
-  assert.match(template, /id="ddc-settings-tab-sidebar"[^>]*data-settings-tab="sidebar"[^>]*data-feature-status="deferred"[^>]*aria-hidden="true"[^>]*hidden/);
+  const nav = template.match(/<button[^>]*id="ddc-settings-tab-sidebar"[^>]*>/)?.[0];
+  assert.ok(nav);
+  assert.doesNotMatch(nav, /hidden|deferred/);
   assert.match(controller, /filter\(\(btn\) => !btn\.hidden && btn\.getAttribute\('aria-hidden'\) !== 'true'\)/);
   assert.match(template, /name="ddc-sidebar-type" value="minimal"/);
-  assert.match(template, /name="ddc-sidebar-type" value="essentials"/);
-  assert.match(template, /name="ddc-sidebar-type" value="canvas"/);
+  assert.match(template, /name="ddc-sidebar-type" value="expanded"/);
+  assert.equal((template.match(/name="ddc-sidebar-type"/g) || []).length, 2);
+  assert.match(template, /sidebarAppearanceControls/);
   assert.match(template, /id="ddc-sidebar-preview"/);
   assert.match(template, /class="sidebar-studio-layout"/);
   assert.match(template, /class="sidebar-blueprint-index">01/);

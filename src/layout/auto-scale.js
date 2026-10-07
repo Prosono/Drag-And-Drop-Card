@@ -473,7 +473,8 @@ _applyAutoScale(options = {}) {
         (this.offsetParent && this.offsetParent.getBoundingClientRect?.().width) ||
         (this.getBoundingClientRect && this.getBoundingClientRect().width) ||
         this.offsetWidth || d.w;
-      const outerW = this._getEffectivePreviewWidth_?.(pw) || pw;
+      const measuredOuterW = this._getEffectivePreviewWidth_?.(pw) || pw;
+      const outerW = this._getSidebarCanvasAvailableWidth_?.(measuredOuterW) ?? measuredOuterW;
       const wantOuterW = `${Math.max(1, outerW)}px`;
       const wantOuterH = `${Math.max(1, isPreview ? previewHeight : d.h)}px`;
       if (this.__scaleOuter.style.width  !== wantOuterW) this.__scaleOuter.style.width  = wantOuterW;

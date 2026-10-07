@@ -126,26 +126,35 @@ const haChromeMethods = {
 
   _setSidebarVisible_(show=true) {
     try {
-      const sidebars = this._deepQueryAll?.('ha-sidebar') || [];
-      sidebars.forEach(el => {
-        if (!el) return;
-        if (el.dataset.ddcPrevDisplaySidebar === undefined) {
-          el.dataset.ddcPrevDisplaySidebar = el.style.display || '';
-        }
-        el.style.display = show ? el.dataset.ddcPrevDisplaySidebar || '' : 'none';
-      });
-      const drawers = this._deepQueryAll?.('ha-drawer') || [];
-      drawers.forEach(el => {
-        if (!el) return;
-        if (el.dataset.ddcPrevDrawerWidth === undefined) {
-          el.dataset.ddcPrevDrawerWidth = el.style.getPropertyValue('--mdc-drawer-width') || '';
-        }
+      const setHiddenStyle = (el, property, value) => {
+        if (!el || this._isOwnChromeElement_?.(el)) return;
+        const saved = el.__ddcSidebarStyles;
         if (show) {
-          el.style.setProperty('--mdc-drawer-width', el.dataset.ddcPrevDrawerWidth || '');
+          if (!saved?.has(property)) return;
+          const previous = saved.get(property);
+          if (previous.value) el.style.setProperty(property, previous.value, previous.priority);
+          else el.style.removeProperty(property);
+          saved.delete(property);
+          if (!saved.size) delete el.__ddcSidebarStyles;
         } else {
-          el.style.setProperty('--mdc-drawer-width', '0px');
+          const styles = el.__ddcSidebarStyles ||= new Map();
+          if (!styles.has(property)) styles.set(property, {
+            value: el.style.getPropertyValue(property),
+            priority: el.style.getPropertyPriority(property),
+          });
+          el.style.setProperty(property, value, 'important');
         }
-        try { if (!show && typeof el.close === 'function') el.close(); } catch {}
+      };
+      (this._deepQueryAll?.('ha-sidebar') || []).forEach(el => setHiddenStyle(el, 'display', 'none'));
+      (this._deepQueryAll?.('ha-drawer') || []).forEach(el => {
+        if (this._isOwnChromeElement_?.(el)) return;
+        // Support both the legacy Material drawer and the current HA drawer.
+        setHiddenStyle(el, '--mdc-drawer-width', '0px');
+        setHiddenStyle(el, '--ha-sidebar-width', '0px');
+        if (!show) {
+          if ('open' in el) el.open = false;
+          try { if (typeof el.close === 'function') el.close(); } catch {}
+        }
       });
     } catch {}
   },

@@ -5,6 +5,8 @@
  * then builds the active responsive layout and refreshes post-load UI state.
  */
 
+import { normalizeStorageMode, lovelaceLayoutSnapshot } from '../storage/storage-mode.js';
+
 export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot, { preferLocal = false } = {}) {
   if (preferLocal && localSnapshot && typeof localSnapshot === 'object') {
     return { source: 'local-replacement', snapshot: localSnapshot };
@@ -248,12 +250,13 @@ const initialLoadMethods = {
         this._dbgPush('boot', 'Initial load start', { force });
 
         const __rebuildAfter = [];
-        let saved = null;
+        const useLovelace = normalizeStorageMode(this._config?.storage_mode) === 'lovelace';
+        let saved = useLovelace ? lovelaceLayoutSnapshot(this.__lastSetConfigSource || this._config) : null;
         let local = null;
         let syncedWithBackend = false;
         let authoritativeBackendSnapshot = null;
 
-        if (loadStorageKey) {
+        if (!useLovelace && loadStorageKey) {
           local = this._readLocalLayoutSnapshot_?.(loadStorageKey);
         }
         const preferLocalReplacement = !!(
@@ -280,7 +283,7 @@ const initialLoadMethods = {
               this._dbgPush('boot', 'Pending dashboard commit failed; keeping local replacement', { error: String(e) });
             }
           }
-        } else if (this._backendOK && loadStorageKey) {
+        } else if (!useLovelace && this._backendOK && loadStorageKey) {
           try {
             saved = await this._loadLayoutFromBackend(loadStorageKey);
             syncedWithBackend = !!(saved && typeof saved === 'object');
@@ -297,7 +300,7 @@ const initialLoadMethods = {
         const selectedInitialSnapshot = selectInitialLayoutSnapshot(saved, local, {
           preferLocal: preferLocalReplacement,
         });
-        if (selectedInitialSnapshot.source === 'backend') {
+        if (!useLovelace && selectedInitialSnapshot.source === 'backend') {
           saved = selectedInitialSnapshot.snapshot;
           authoritativeBackendSnapshot = this._cloneJson_?.(saved) || saved;
           syncedWithBackend = true;
@@ -353,7 +356,7 @@ const initialLoadMethods = {
         }
 
         const hasSavedCards = Array.isArray(saved?.cards) && saved.cards.length > 0;
-        if (!hasSavedCards && (options?.preserveExistingOnEmpty || this._isHaEditorBlockingEmptyState_?.())) {
+        if (!useLovelace && !hasSavedCards && (options?.preserveExistingOnEmpty || this._isHaEditorBlockingEmptyState_?.())) {
           const cached = this._readRuntimeLayoutCache_?.(loadStorageKey);
           if (cached?.cards?.length) {
             this._dbgPush('boot', 'Using runtime layout cache for empty editor refresh', {
@@ -401,7 +404,7 @@ const initialLoadMethods = {
           'storage_key','grid','drag_live_snap','auto_save','auto_save_debounce',
           'container_background','card_background','card_overflow','card_shadow','card_shadow_intensity','debug','disable_overlap',
           'container_size_mode','container_fixed_width','container_fixed_height',
-          'container_preset','container_preset_orientation','tabs','tabs_position','tabs_size','default_tab','hide_tabs_when_single','tabs_auto_return_enabled','tabs_auto_return_tab','tabs_auto_return_delay','sidebar_enabled','sidebar_type','sidebar_items','sidebar_header','sidebar_canvas_height','sidebar_cards','layers_enabled','layers_button_details','layers', 'auto_resize_cards', 'auto_viewport_max_width', 'auto_scale_max', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'outer_grid_buffer_cells', 'play-loading_animation', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports', 'responsive_viewport_aspect_locks',
+          'container_preset','container_preset_orientation','tabs','tabs_position','tabs_size','tabs_style','default_tab','hide_tabs_when_single','tabs_auto_return_enabled','tabs_auto_return_tab','tabs_auto_return_delay','sidebar_enabled','sidebar_type','sidebar_appearance','sidebar_items','sidebar_header','sidebar_canvas_height','sidebar_cards','layers_enabled','layers_button_details','layers', 'auto_resize_cards', 'auto_viewport_max_width', 'auto_scale_max', 'optimize_for_mobile', 'mobile_dynamic_behavior', 'do_not_resize_text', 'outer_grid_buffer', 'outer_grid_buffer_cells', 'play-loading_animation', 'dashboard_theme_enabled', 'dashboard_theme', 'dashboard_theme_override_all_design', 'background_mode', 'background_image', 'background_particles', 'background_youtube', 'responsive_viewports', 'responsive_viewport_aspect_locks',
           // Ensure screen saver settings from YAML override persisted options on reload. Without
           // including these keys, the screensaver delay can become stuck because the overlay
           // of YAML values never occurs. Adding them keeps behaviour consistent with other
@@ -468,7 +471,7 @@ const initialLoadMethods = {
         const targetLayoutKey = this._getRuntimeResponsiveLayoutKey_?.(targetProfile, targetOrientation) || this._getResponsiveLayoutKey_(targetProfile, targetOrientation);
         const entriesToBuild = nextResponsiveLayouts?.[targetLayoutKey] || [];
         const hasExistingRealCards = !!this.cardContainer?.querySelector?.('.card-wrapper:not(.ddc-placeholder)');
-        if (!entriesToBuild.length && options?.preserveExistingOnEmpty && hasExistingRealCards) {
+        if (!useLovelace && !entriesToBuild.length && options?.preserveExistingOnEmpty && hasExistingRealCards) {
           this._dbgPush('boot', 'Skipped empty refresh; preserving current dashboard', {
             profile: targetLayoutKey,
             reason: options?.reason || 'refresh',
@@ -491,7 +494,7 @@ const initialLoadMethods = {
         this._activeResponsiveLayoutKey = targetLayoutKey;
 
         await this._buildCardsFromEntries_(entriesToBuild, 0, {
-          replaceExisting: !!options?.replaceExisting,
+          replaceExisting: useLovelace || !!options?.replaceExisting,
         });
         if (!isCurrentLoad()) return;
 
@@ -535,6 +538,10 @@ const initialLoadMethods = {
         const loadStillCurrent = isCurrentLoad();
         this._loading = false;
         this.__booting = false;
+        if (this.__pendingStorageConfigReload) {
+          this.__pendingStorageConfigReload = false;
+          queueMicrotask(() => this._initialLoad(true, { replaceExisting: true }));
+        }
         if (!loadStillCurrent) {
           this.__suppressCardAnimation = previousSuppressCardAnimation;
           this._setAutoScaleStartupVisualState_?.(false);

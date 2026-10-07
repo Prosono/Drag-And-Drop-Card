@@ -18,6 +18,7 @@ import { installSetConfigMethod } from './config-lifecycle.js';
 import { installDashboardSettingsMethods } from '../dashboard/settings-controller.js';
 import { installSmartPickerMethods } from '../cards/smart-card-picker.js';
 import { installPersistenceMethods } from '../storage/layout-persistence.js';
+import { installStorageModeMethods } from '../storage/storage-mode.js';
 import { installLayoutHistoryMethods } from '../layout/history.js';
 import { installSelectionMethods } from '../interactions/selection.js';
 import { installInputInteractionMethods } from '../interactions/input-handlers.js';
@@ -90,6 +91,7 @@ export function installDragAndDropCardFeatures(CardClass, version) {
   installInputInteractionMethods(CardClass.prototype);
   installLayoutHistoryMethods(CardClass.prototype);
   installPersistenceMethods(CardClass.prototype);
+  installStorageModeMethods(CardClass.prototype);
   installDashboardApiMethods(CardClass.prototype);
   installDesignImportExportMethods(CardClass.prototype);
   installDashboardConverterMethods(CardClass.prototype);
