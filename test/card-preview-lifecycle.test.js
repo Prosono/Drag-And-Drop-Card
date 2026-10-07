@@ -311,3 +311,15 @@ test('Update closes the card picker before replacement and persistence run', asy
   assert.match(commitSource, /window\.setTimeout\(async \(\) => \{/);
   assert.match(commitSource, /if \(!currentConfig \|\| commitInFlight\) return;/);
 });
+
+test('issue 40: pasted YAML replaces picker defaults even when the visual editor is stale', () => {
+  const yaml = { type: 'markdown', title: 'Forecast', content: '{{ states("sensor.weather") }}' };
+  const stale = { getConfig: () => ({ type: 'entities', entities: ['sensor.old'] }) };
+  assert.deepEqual(resolveVisualEditorConfigForCommit(yaml, 'markdown', stale, false, true), yaml);
+});
+
+test('issue 40: same-type YAML replacement preserves deleted fields after reopening Visual', () => {
+  const yaml = { type: 'entities', entities: ['sensor.new'] };
+  const stale = { getConfig: () => ({ type: 'entities', title: 'Old title', entities: ['sensor.old'], show_header_toggle: true }) };
+  assert.deepEqual(resolveVisualEditorConfigForCommit(yaml, 'entities', stale, false, true), yaml);
+});

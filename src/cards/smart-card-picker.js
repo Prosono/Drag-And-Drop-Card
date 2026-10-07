@@ -44,12 +44,13 @@ export function resolveVisualEditorConfigForCommit(
   currentType = '',
   editor = null,
   editorHasEmittedChange = false,
+  yamlIsAuthoritative = false,
 ) {
   const current = mergeVisualEditorConfig({}, currentType, currentConfig);
   // Some Home Assistant card editors expose a stale value from getConfig()
   // after emitting the correct config-changed event. Once an editor event has
   // updated our local config, that event is the freshest source of truth.
-  if (editorHasEmittedChange) return current;
+  if (yamlIsAuthoritative || editorHasEmittedChange) return current;
 
   const liveConfig = readVisualEditorConfig(editor);
   if (!isConfigObject(liveConfig)) return current;
@@ -3105,6 +3106,7 @@ const smartPickerMethods = {
     let yamlEditorApi = null;
     let visualEditor = null;
     let visualEditorHasEmittedChange = false;
+    let yamlIsAuthoritative = false;
     let editor = null;
     let pickSeq = 0; // stale-select guard
     let previewSeq = 0;
@@ -4878,7 +4880,9 @@ const smartPickerMethods = {
 
         const wantType = cfg.type || currentType;
 
-        editor = await this._getEditorElementForType(wantType, cfg);
+        const nextEditor = await this._getEditorElementForType(wantType, cfg);
+        if (seq !== pickSeq) return false;
+        editor = nextEditor;
 
 
         // 🚫 Visual editor not supported for the placeholder entry
@@ -4922,6 +4926,7 @@ const smartPickerMethods = {
 
         // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
+        if (seq !== pickSeq) return false;
         try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
 
         // Try official getStubConfig once for HA cards only. DDC internal
@@ -4948,6 +4953,7 @@ const smartPickerMethods = {
 
         // small yield before setConfig to help late-attaching internals
         await Promise.resolve();
+        if (seq !== pickSeq) return false;
         try { editor.setConfig(cfg); } catch (e) { /* YAML still works */ }
     
         // Remove old listeners if any
@@ -4960,9 +4966,11 @@ const smartPickerMethods = {
         }
     
         const onChange = async (e) => {
+          if (seq !== pickSeq) return;
           const next = e.detail?.config ?? e.detail?.value; // some editors fire value-changed
           if (!isConfigObject(next)) return;
           visualEditorHasEmittedChange = true;
+          yamlIsAuthoritative = false;
           const nextType = next.type || currentType;
           currentType = nextType;
           currentConfig = this._shapeBySchema(
@@ -5012,29 +5020,30 @@ const smartPickerMethods = {
           try {
             const nextType = parsed?.type || currentType;
             const shaped = this._shapeBySchema(nextType, parsed || {});
-            const typeChanged = nextType !== currentType;
-    
+            // YAML is a complete replacement, including fields that were removed.
+            // Retire the visual editor: it may reject a new type, retain stub
+            // fields, or emit a delayed event with its previous configuration.
+            yamlIsAuthoritative = true;
+            ++pickSeq;
+            if (visualEditor && this.__onEditorChange) {
+              visualEditor.removeEventListener('config-changed', this.__onEditorChange);
+              visualEditor.removeEventListener('value-changed', this.__onEditorChange);
+            }
+            if (visualEditor && this.__onEditorSubElement) {
+              visualEditor.removeEventListener('edit-sub-element', this.__onEditorSubElement);
+            }
+            cleanupSubElementEditor();
+            visualEditor = null;
+            editorHost.innerHTML = '';
+            editorSpin.hidden = true;
             currentType = nextType;
             currentConfig = shaped;
-    
+
             yamlErr.hidden = true; yamlErr.textContent = '';
             enableCommit(true);
-    
-            if (typeChanged) {
-              buildQuickFill(currentType, currentConfig);
-              // Only update Visual if it’s already mounted
-              if (visualEditor) {
-                try { visualEditor.setConfig?.(currentConfig); } catch {}
-                if (__activeTab !== 'yaml') showTab('visual');
-              }
-              // When the card type changes via YAML, rebuild the visibility UI
-              try { buildVisUI(currentConfig); } catch {}
-            } else {
-              try { visualEditor?.setConfig?.(currentConfig); } catch {}
-              mountPreview(currentConfig);
-              // Update the visibility UI when YAML modifies non-type properties
-              try { buildVisUI(currentConfig); } catch {}
-            }
+            buildQuickFill(currentType, currentConfig);
+            mountPreview(currentConfig);
+            try { buildVisUI(currentConfig); } catch {}
 
           } catch (e) {
             yamlErr.hidden = false;
@@ -5063,6 +5072,7 @@ const smartPickerMethods = {
       yamlErr.hidden = true; yamlErr.textContent = '';
       setError('');
       currentType = type;
+      yamlIsAuthoritative = false;
       // Update the selected-card headline and favorite star when a new card is chosen
       try {
         if (typeof updateHeader === 'function') updateHeader(type);
@@ -5118,7 +5128,7 @@ const smartPickerMethods = {
         // Try mounting visual editor for the current configuration. If the
         // returned value is false, the card lacks a visual editor.
         const visReady = await mountVisualEditor(currentConfig);
-        showTab(visReady ? 'visual' : 'yaml');
+        if (!yamlIsAuthoritative) showTab(visReady ? 'visual' : 'yaml');
       } catch {
         // On error, fall back to YAML
         showTab('yaml');
@@ -5147,6 +5157,7 @@ const smartPickerMethods = {
           currentType,
           visualEditor,
           visualEditorHasEmittedChange,
+          yamlIsAuthoritative,
         );
         const resolvedType = resolvedConfig.type || currentType;
         currentType = resolvedType;
