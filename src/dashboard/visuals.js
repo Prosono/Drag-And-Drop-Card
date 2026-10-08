@@ -1,3 +1,4 @@
+import { normalizeContainerRadius } from '../layout/container-style.js';
 /*
  * Dashboard-level visual refresh and theme helpers.
  *
@@ -202,6 +203,8 @@ const dashboardVisualMethods = {
         effectiveThemeMode: this._getEffectiveDashboardThemeMode_?.() || 'light',
         themeDefinition,
         containerBackground: String(this.containerBackground ?? ''),
+        containerRadius: normalizeContainerRadius(this.containerRadius),
+        containerBorder: this.containerBorder !== false,
         cardBackground: String(this.cardBackground ?? ''),
         cardShadowEnabled: !!this.cardShadowEnabled,
         cardShadowIntensity: this._normalizeCardShadowIntensity_?.(this.cardShadowIntensity) || 5,
@@ -324,6 +327,8 @@ const dashboardVisualMethods = {
 
       const themeOwnsDesign = this._isDashboardThemeOverrideAllDesignActive_();
       const mediaBackgroundActive = !!this._isDashboardMediaBackgroundActive_?.();
+      host.style.setProperty('--ddc-container-radius', `${normalizeContainerRadius(this.containerRadius)}px`);
+      host.style.setProperty('--ddc-container-border-width', this.containerBorder === false ? '0px' : '1px');
       host.style.setProperty(
         '--ddc-bg',
         mediaBackgroundActive

@@ -1,4 +1,4 @@
-import { applyTabStyle } from '../layout/tab-style.js';
+import { applyTabStyle, applyTabIconColor } from '../layout/tab-style.js';
 /*
  * Dashboard tab model, tab bar rendering, and active-tab filtering.
  *
@@ -291,6 +291,7 @@ const tabsLayoutMethods = {
       } else {
         btn.innerHTML = buildTabButtonMarkup(t, tabIndex);
       }
+      applyTabIconColor(btn.querySelector?.('ha-icon'), t.icon_color);
       btn.type = 'button';
       btn.addEventListener('click', (ev) => {
         ev.preventDefault?.();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTabStyle, applyTabStyle } from '../src/layout/tab-style.js';
+import { normalizeTabStyle, applyTabStyle, normalizeTabIconColor, applyTabIconColor } from '../src/layout/tab-style.js';
 import { installTabsLayoutMethods } from '../src/layout/tabs.js';
 import { installConfigHelperMethods } from '../src/core/config-normalization.js';
 
@@ -48,4 +48,28 @@ test('dashboard option normalization preserves tab appearance without mutating i
   const result = new Harness()._normalizeDashboardOptions_(input);
   assert.deepEqual(result.tabs_style,{icon_width:36,active_shadow:false});
   assert.equal(input.tabs_style.icon_width,'36');
+});
+
+
+test('per-tab icon colors apply independently and clearing restores inheritance', () => {
+  const values=new Map();
+  const icon={style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)}};
+  assert.equal(normalizeTabIconColor(' #f59e0b '),'#f59e0b');
+  assert.equal(normalizeTabIconColor('var(--info-color)'),'var(--info-color)');
+  assert.equal(normalizeTabIconColor('red;display:none'),'');
+  applyTabIconColor(icon,'#f59e0b');assert.equal(values.get('color'),'#f59e0b');
+  applyTabIconColor(icon,'');assert.equal(values.has('color'),false);
+});
+
+
+test('viewport bottom offset preserves zero, clamps values, and resets independently of padding', () => {
+  assert.deepEqual(normalizeTabStyle({viewport_bottom_offset:'0',bar_padding_bottom:16}),{viewport_bottom_offset:0,bar_padding_bottom:16});
+  assert.equal(normalizeTabStyle({viewport_bottom_offset:200}).viewport_bottom_offset,96);
+  const props=new Map(),attrs=new Set();
+  const host={tabsStyle:{viewport_bottom_offset:0},style:{setProperty:(k,v)=>props.set(k,v),removeProperty:k=>props.delete(k)},toggleAttribute:(k,v)=>v?attrs.add(k):attrs.delete(k)};
+  applyTabStyle(host);
+  assert.equal(props.get('--ddc-tab-style-viewport_bottom_offset'),'0px');
+  host.tabsStyle={};applyTabStyle(host);
+  assert.equal(props.has('--ddc-tab-style-viewport_bottom_offset'),false);
+  assert.equal(attrs.has('data-tab-style-viewport_bottom_offset'),false);
 });

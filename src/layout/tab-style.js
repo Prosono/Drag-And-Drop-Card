@@ -6,6 +6,7 @@ export const tabStyleFields = [
   ['button_padding_horizontal', 'Button horizontal padding (px)', 0, 48],
   ['button_padding_vertical', 'Button vertical padding (px)', 0, 32],
   ['button_gap', 'Space between buttons (px)', 0, 48],
+  ['viewport_bottom_offset', 'Distance from viewport bottom (px)', 0, 96],
   ['bar_padding_bottom', 'Navigation bar bottom padding (px)', 0, 64],
   ['dashboard_gap', 'Space between bar and dashboard (px)', 0, 96],
   ['button_color', 'Button background'],
@@ -35,6 +36,18 @@ export function normalizeTabStyle(value) {
   return result;
 }
 
+// Reuse the same CSS color validation as dashboard-wide tab colors.
+export function normalizeTabIconColor(value) {
+  return normalizeTabStyle({ text_color: value }).text_color || '';
+}
+
+export function applyTabIconColor(icon, value) {
+  if (!icon?.style) return;
+  const color = normalizeTabIconColor(value);
+  if (color) icon.style.setProperty('color', color);
+  else icon.style.removeProperty('color');
+}
+
 export function applyTabStyle(host) {
   const style = normalizeTabStyle(host.tabsStyle);
   host.tabsStyle = style;
@@ -53,6 +66,7 @@ export function applyTabStyle(host) {
 export function tabStyleControls() {
   return `<details class="setting tab-appearance"><summary>Tab appearance</summary>
     <p class="hint">Optional overrides for this dashboard's top or bottom tab bar. Leave fields empty to use the theme and tab bar size. Large icons may extend beyond small buttons.</p>
+    <p class="hint">Distance from viewport bottom moves the bottom tab bar itself. Set 0 for flush alignment; leave empty for the default safe-area spacing. Bottom padding controls space inside the bar.</p>
     <div class="tab-appearance-grid">${tabStyleFields.map(([key, label, min, max]) => `<label class="tab-appearance-field" for="ddc-tab-style-${key}"><span>${label}</span><input id="ddc-tab-style-${key}" data-tab-style-field="${key}" type="${min === undefined ? 'text' : 'number'}" ${min === undefined ? 'placeholder="Theme default (e.g. #167d86)" maxlength="160"' : `min="${min}" max="${max}" step="1" placeholder="Default"`} /></label>`).join('')}</div>
     <div class="row"><label for="ddc-tab-style-shadow">Active tab shadow</label><input id="ddc-tab-style-shadow" type="checkbox" checked /></div>
     <button type="button" id="ddc-tab-style-reset">Reset tab appearance</button>

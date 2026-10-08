@@ -1,3 +1,4 @@
+import { normalizeContainerRadius } from '../layout/container-style.js';
 import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
 import { normalizeTabStyle } from '../layout/tab-style.js';
 /*
@@ -104,6 +105,8 @@ const setConfigMethods = {
       try { this._syncToolbarAutoSaveState_?.(); } catch {}
       this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
       this.containerBackground      = config.container_background ?? 'transparent';
+      this.containerRadius = normalizeContainerRadius(config.container_radius);
+      this.containerBorder = config.container_border !== false;
       this.cardBackground           = config.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
       this.cardOverflow             = this._normalizeCardOverflow_(config.card_overflow);
       this._syncCardOverflow_?.();

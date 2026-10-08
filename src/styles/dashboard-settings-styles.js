@@ -1800,7 +1800,7 @@ export function getSettingsStyles() {
       padding:6px 8px; border-radius:6px;
     }
 
-    .tab-icon-wrap { position:relative; display:flex; align-items:center; gap:6px; }
+    .tab-icon-wrap { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
     .tab-icon-wrap ha-icon { opacity:.9; }
 
     .mode-chips {

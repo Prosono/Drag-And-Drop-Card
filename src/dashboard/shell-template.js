@@ -2225,7 +2225,7 @@ export function getDashboardShellTemplate() {
 }
 :host([ddc-fixed-ui]) .ddc-tabs.ddc-tabs-bottom {
   top: auto;
-  bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  bottom: var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 12px));
 }
 
 /* Make tabs horizontally scrollable when narrow */
@@ -2275,7 +2275,7 @@ export function getDashboardShellTemplate() {
   .ddc-tabs.ddc-tabs-bottom {
     position: fixed !important;
     top: auto !important;
-    bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    bottom: var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 8px)) !important;
     left: 0 !important;
     right: 0 !important;
     transform: none !important;
@@ -2285,7 +2285,7 @@ export function getDashboardShellTemplate() {
 
   :host([ddc-bottom-tabs-fixed-canvas]) .ddc-tabs.ddc-tabs-bottom,
   .ddc-root.ddc-fixed-canvas-tabs-bottom > .ddc-tabs.ddc-tabs-bottom{
-    bottom: max(env(safe-area-inset-bottom, 0px), var(--ddc-visual-viewport-bottom, 0px), 8px) !important;
+    bottom: max(var(--ddc-visual-viewport-bottom, 0px), var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 8px))) !important;
     z-index: 10020 !important;
   }
 }
@@ -4336,9 +4336,9 @@ export function getDashboardShellTemplate() {
         position: relative;
         transform-origin: top left;
         padding: 0;
-        border: 1px solid var(--divider-color);
+        border: var(--ddc-container-border-width, 1px) solid var(--divider-color);
         background: var(--ddc-bg, transparent);
-        width: auto; height: auto; border-radius: 12px; overflow: hidden;
+        width: auto; height: auto; border-radius: var(--ddc-container-radius, 12px); overflow: hidden;
         isolation: isolate; z-index: 0; -webkit-touch-callout: none;
         user-select: none;
       }
@@ -9081,7 +9081,7 @@ export function getDashboardShellTemplate() {
   left: calc(var(--ddc-left-gutter, 0px) + 12px);
   right: calc(var(--ddc-right-gutter, 0px) + 12px);
   top: auto;
-  bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  bottom: var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 12px));
   transform: none;
   width: fit-content;
   max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px);
@@ -9123,7 +9123,7 @@ export function getDashboardShellTemplate() {
   left: calc(var(--ddc-left-gutter, 0px) + 12px) !important;
   right: calc(var(--ddc-right-gutter, 0px) + 12px) !important;
   top: auto !important;
-  bottom: max(env(safe-area-inset-bottom, 0px), var(--ddc-visual-viewport-bottom, 0px), 12px) !important;
+  bottom: max(var(--ddc-visual-viewport-bottom, 0px), var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 12px))) !important;
   transform: none !important;
   margin-inline: auto !important;
   max-width: calc(100vw - var(--ddc-left-gutter, 0px) - var(--ddc-right-gutter, 0px) - 24px) !important;

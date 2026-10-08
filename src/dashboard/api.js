@@ -1,5 +1,6 @@
+import { normalizeContainerRadius } from '../layout/container-style.js';
 import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
-import { normalizeTabStyle } from '../layout/tab-style.js';
+import { normalizeTabStyle, normalizeTabIconColor } from '../layout/tab-style.js';
 /*
  * Local dashboard API surface exposed to internal HTML cards and other embedded tools.
  *
@@ -58,6 +59,8 @@ const dashboardApiMethods = {
 
       // Appearance
       container_background: this.containerBackground,
+      container_radius: normalizeContainerRadius(this.containerRadius),
+      container_border: this.containerBorder !== false,
       apply_background_to_page: !!this.applyBackgroundToPage,
       card_background: this.cardBackground,
       card_overflow: this._normalizeCardOverflow_(this.cardOverflow),
@@ -193,6 +196,8 @@ const dashboardApiMethods = {
       this._connectorDraft = null;
       this._selectedConnectorId = null;
     }
+    if ('container_radius' in opts) this.containerRadius = normalizeContainerRadius(opts.container_radius);
+    if ('container_border' in opts) this.containerBorder = opts.container_border !== false;
     if ('container_background' in opts) this.containerBackground = opts.container_background ?? 'transparent';
     if ('apply_background_to_page' in opts) this.applyBackgroundToPage = !!opts.apply_background_to_page;
     if ('card_background' in opts)      this.cardBackground = opts.card_background ?? 'var(--ha-card-background, var(--card-background-color))';
@@ -307,6 +312,7 @@ const dashboardApiMethods = {
         id: String(tab?.id || tab?.label || `tab_${index + 1}`).trim() || `tab_${index + 1}`,
         label: String(tab?.label || tab?.id || `Tab ${index + 1}`).trim(),
         icon: tab?.icon || '',
+        ...(normalizeTabIconColor(tab?.icon_color) ? { icon_color: normalizeTabIconColor(tab.icon_color) } : {}),
         label_mode: tab?.label_mode || tab?.labelMode || 'both',
       })) : [];
     }
@@ -444,6 +450,8 @@ const dashboardApiMethods = {
       connectors: { type: 'array' },
       responsive_connectors: { type: 'object' },
       container_background: { type: 'string' },
+      container_radius: { type: 'number', minimum: 0, maximum: 96 },
+      container_border: { type: 'boolean' },
       apply_background_to_page: { type: 'boolean' },
       card_background: { type: 'string' },
       card_overflow: { type: 'string' },
@@ -513,6 +521,8 @@ const dashboardApiMethods = {
       responsiveViewportAspectLocks: 'responsive_viewport_aspect_locks',
       responsiveConnectors: 'responsive_connectors',
       containerBackground: 'container_background',
+      containerRadius: 'container_radius',
+      containerBorder: 'container_border',
       applyBackgroundToPage: 'apply_background_to_page',
       cardBackground: 'card_background',
       cardOverflow: 'card_overflow',

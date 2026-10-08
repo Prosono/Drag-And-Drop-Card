@@ -1249,3 +1249,26 @@ sidebar_appearance:
 ```
 
 Use `title: ""` to hide the navigation title. If `widgets` is omitted, the legacy `sidebar_header` value supplies the default: weather → Weather, none → no widgets, otherwise Clock. The settings API and layout export/import support `sidebar_appearance`.
+
+#### Per-tab icon colors
+
+For vertical tabs on the left, open **Dashboard Settings → Tabs → Configure left sidebar**, enable Sidebar and select **Buttons only** or **Expanded**.
+
+Each tab also has an **Icon color** field in the Tabs settings. Use a CSS color (for example `#f59e0b`) or a theme variable. Leave it empty to inherit the normal/active theme colors. An explicit icon color applies in both active and inactive states, in the sidebar and regular top/bottom tab bars; labels and button backgrounds retain their own colors.
+
+```yaml
+tabs:
+  - id: home
+    label: Home
+    icon: mdi:home
+    icon_color: "#f59e0b"
+  - id: climate
+    label: Climate
+    icon: mdi:thermometer
+    icon_color: "var(--info-color)"
+```
+
+**Distance from viewport bottom** (`tabs_style.viewport_bottom_offset`, 0–96 px) positions the bottom tab bar itself. Set `0` to place its outer edge flush with the viewport bottom. Leave it empty to retain the default 12 px desktop / 8 px mobile gap and safe-area handling. This is separate from `bar_padding_bottom` (inside the bar) and `dashboard_gap` (space reserved for dashboard content). The option does not reposition top tabs, sidebars, or tabs docked inside an editor preview.
+
+
+**Canvas frame:** Under **Dashboard Settings → Appearance**, set **Canvas corner radius** (`container_radius`, 0–96 px; default 12) and **Show canvas border** (`container_border`, default true). For a seamless join with the sidebar, set radius and sidebar gap to `0` and disable the canvas border. These settings apply only to this DDC dashboard's main canvas; individual cards keep their styling.

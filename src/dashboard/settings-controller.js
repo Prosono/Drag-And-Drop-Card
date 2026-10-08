@@ -1,6 +1,7 @@
+import { normalizeContainerRadius } from '../layout/container-style.js';
 import { resolveSidebarWidgets } from '../layout/sidebar-widgets.js';
 import { normalizeSidebarAppearance, sidebarAppearanceFields, applySidebarAppearance } from '../layout/sidebar-appearance.js';
-import { normalizeTabStyle, tabStyleFields } from '../layout/tab-style.js';
+import { normalizeTabStyle, tabStyleFields, normalizeTabIconColor, applyTabIconColor } from '../layout/tab-style.js';
 /*
  * Dashboard settings panel controller.
  *
@@ -198,6 +199,8 @@ const dashboardSettingsMethods = {
     const txtDashboardThemeOverrideAllDesignHint = modal.querySelector('#ddc-setting-dashboardThemeOverrideAllDesignHint');
     const dashboardThemeColorWarning = modal.querySelector('[data-theme-color-warning]');
     const inpCBg     = modal.querySelector('#ddc-setting-containerBg');
+    const inpContainerRadius = modal.querySelector('#ddc-setting-containerRadius');
+    const chkContainerBorder = modal.querySelector('#ddc-setting-containerBorder');
     const chkApplyPageBg = modal.querySelector('#ddc-setting-applyPageBackground');
     const inpCardBg  = modal.querySelector('#ddc-setting-cardBg');
     const selCardOverflow = modal.querySelector('#ddc-setting-cardOverflow');
@@ -276,6 +279,7 @@ const dashboardSettingsMethods = {
     const rngYtOpacity       = modal.querySelector('#ddc-youtube-opacity');
     const outYtOpacity       = modal.querySelector('#ddc-youtube-opacity-out');
     const selTabsPosition    = modal.querySelector('#ddc-setting-tabsPosition');
+    modal.querySelector('#ddc-open-sidebar-from-tabs')?.addEventListener('click', () => activateSettingsTab('sidebar'));
     const tabStyleInputs = tabStyleFields.map(([key]) => [key, modal.querySelector(`#ddc-tab-style-${key}`)]);
     const tabShadowInput = modal.querySelector('#ddc-tab-style-shadow');
     const populateTabStyle = (value) => {
@@ -1312,6 +1316,7 @@ const dashboardSettingsMethods = {
             iconBox.className = 'sidebar-preview-nav-icon';
             const icon = document.createElement('ha-icon');
             icon.setAttribute('icon', tab.icon || 'mdi:view-dashboard-outline');
+            applyTabIconColor(icon, tab.icon_color);
             iconBox.appendChild(icon);
             const label = document.createElement('b');
             label.textContent = tab.label || tab.id;
@@ -1510,6 +1515,8 @@ const dashboardSettingsMethods = {
     if (selEditorThemeMode) selEditorThemeMode.value = this._getEditorThemeMode_?.() || 'light';
     if (chkDashboardThemeOverrideAllDesign) chkDashboardThemeOverrideAllDesign.checked = !!this.dashboardThemeOverrideAllDesign;
     updateDashboardThemeState();
+    if (inpContainerRadius) inpContainerRadius.value = String(normalizeContainerRadius(this.containerRadius));
+    if (chkContainerBorder) chkContainerBorder.checked = this.containerBorder !== false;
     if (inpCBg)     inpCBg.value       = String(this.containerBackground || '');
     if (chkApplyPageBg) chkApplyPageBg.checked = !!this.applyBackgroundToPage;
     if (inpCardBg)  inpCardBg.value    = String(this.cardBackground || '');
@@ -2331,6 +2338,7 @@ const dashboardSettingsMethods = {
           id: t.id ?? t.key ?? t.label ?? 'tab',
           label: t.label ?? t.id ?? 'Tab',
           icon: t.icon ?? '',
+          icon_color: normalizeTabIconColor(t.icon_color),
           label_mode: t.label_mode ?? 'both', // 'icon' | 'text' | 'both' (optional)
           __raw: t                               // keep full object to avoid dropping fields
         };
@@ -2344,6 +2352,7 @@ const dashboardSettingsMethods = {
         id: t.id,
         label: t.label,
         icon: t.icon || '',
+        icon_color: normalizeTabIconColor(t.icon_color) || undefined,
         label_mode: t.label_mode || 'both'
       }));
       const nextDefault = defaultId ?? out[0]?.id ?? 'default';
@@ -2361,6 +2370,7 @@ const dashboardSettingsMethods = {
         id: t.id ?? t.key ?? t.label ?? 'tab',
         label: t.label ?? t.id ?? 'Tab',
         icon: t.icon || '',
+        icon_color: normalizeTabIconColor(t.icon_color) || undefined,
         label_mode: t.label_mode || 'both',
       }));
       this.defaultTab = nextDefault;
@@ -2454,6 +2464,7 @@ const dashboardSettingsMethods = {
         // live icon preview
         const preview = document.createElement('ha-icon');
         preview.setAttribute('icon', t.icon || 'mdi:tab');
+        applyTabIconColor(preview, t.icon_color);
 
         // icon input
         const iconInput = document.createElement('input');
@@ -2464,6 +2475,23 @@ const dashboardSettingsMethods = {
         iconInput.addEventListener('change', async () => {
           t.icon = iconInput.value.trim();
           preview.setAttribute('icon', t.icon || 'mdi:tab');
+          tabs[idx] = t;
+          await writeTabs(tabs, def);
+        });
+
+        const colorInput = document.createElement('input');
+        colorInput.value = t.icon_color || '';
+        colorInput.placeholder = 'Theme color';
+        colorInput.setAttribute('aria-label', `Icon color for ${t.label || t.id}`);
+        colorInput.title = 'Icon color (CSS color or theme variable). Leave empty to follow the theme.';
+        colorInput.style.width = '130px';
+        colorInput.addEventListener('input', async () => {
+          const value = colorInput.value.trim();
+          const color = normalizeTabIconColor(value);
+          colorInput.setCustomValidity(value && !color ? 'Enter a valid CSS color, or leave empty.' : '');
+          if (!colorInput.checkValidity()) return;
+          t.icon_color = color;
+          applyTabIconColor(preview, color);
           tabs[idx] = t;
           await writeTabs(tabs, def);
         });
@@ -2483,6 +2511,7 @@ const dashboardSettingsMethods = {
         iconWrap.className = 'tab-icon-wrap';
         iconWrap.appendChild(preview);
         iconWrap.appendChild(iconInput);
+        iconWrap.appendChild(colorInput);
 
         nameWrap.appendChild(iconWrap);
         nameWrap.appendChild(nameInput);
@@ -2782,6 +2811,14 @@ const dashboardSettingsMethods = {
       scheduleParticlesPreview({ clearUrl: false, immediate: true });
     });
 
+    inpContainerRadius?.addEventListener('input', () => {
+      this.containerRadius = normalizeContainerRadius(inpContainerRadius.value);
+      this._applyDashboardThemeStyling_?.();
+    });
+    chkContainerBorder?.addEventListener('change', () => {
+      this.containerBorder = !!chkContainerBorder.checked;
+      this._applyDashboardThemeStyling_?.();
+    });
     // Live preview when manually editing background text inputs
     if (inpCBg) {
       inpCBg.addEventListener('input', () => {
@@ -3163,6 +3200,14 @@ const dashboardSettingsMethods = {
           this.containerBackground = '';
           this._config = this._config || {};
           this._config.container_background = this.containerBackground;
+        }
+        this.containerRadius = normalizeContainerRadius(inpContainerRadius?.value);
+        this.containerBorder = !!chkContainerBorder?.checked;
+        this._config.container_radius = this.containerRadius;
+        this._config.container_border = this.containerBorder;
+        if (this._config.options) {
+          this._config.options.container_radius = this.containerRadius;
+          this._config.options.container_border = this.containerBorder;
         }
         this.applyBackgroundToPage = newApplyPageBg;
         this._config = this._config || {};

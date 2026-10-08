@@ -1,3 +1,4 @@
+import { normalizeTabIconColor } from '../layout/tab-style.js';
 /*
  * Lovelace dashboard converter.
  *
@@ -1631,6 +1632,7 @@ const converterMethods = {
           id: String(tab?.id || tab?.label || `tab_${index + 1}`).trim() || `tab_${index + 1}`,
           label: String(tab?.label || tab?.id || `Tab ${index + 1}`).trim(),
           icon: tab?.icon || '',
+          ...(normalizeTabIconColor(tab?.icon_color) ? { icon_color: normalizeTabIconColor(tab.icon_color) } : {}),
           label_mode: tab?.label_mode || tab?.labelMode || 'both',
         }))
       : [];

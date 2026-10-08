@@ -360,6 +360,21 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Extends the current background across the full Lovelace view, not just the card canvas.</div>
       </div>
 
+      <div class="setting">
+        <div class="row">
+          <label for="ddc-setting-containerRadius">Canvas corner radius (px)</label>
+          <input id="ddc-setting-containerRadius" type="number" min="0" max="96" step="1" placeholder="12" />
+        </div>
+        <div class="hint">Set 0 for square corners. Applies to the main canvas, not individual cards.</div>
+      </div>
+      <div class="setting">
+        <div class="row">
+          <label for="ddc-setting-containerBorder">Show canvas border</label>
+          <ha-switch id="ddc-setting-containerBorder"></ha-switch>
+        </div>
+        <div class="hint">For a seamless join with the sidebar, turn this off and set canvas corner radius and sidebar gap to 0.</div>
+      </div>
+
       <!-- CARD BG -->
       <div class="setting color-setting" role="group" aria-labelledby="lbl-card-bg">
         <div class="row">
@@ -1059,7 +1074,8 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
             </select>
           </div>
         </div>
-        <div class="hint">Controls where the regular tabs bar sits around the dashboard.</div>
+        <div class="hint">Controls where the regular tabs bar sits around the dashboard. For vertical tabs on the left, enable Sidebar and choose Buttons only or Expanded.</div>
+        <button type="button" class="btn" id="ddc-open-sidebar-from-tabs">Configure left sidebar</button>
       </div>
 
       <div class="setting" role="group" aria-labelledby="lbl-tabs-size">

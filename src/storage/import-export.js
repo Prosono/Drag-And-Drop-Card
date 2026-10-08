@@ -379,7 +379,7 @@ const designImportExportMethods = {
       'connectors','responsive_connectors',
   
       // Visuals
-      'container_background','apply_background_to_page','card_background','card_overflow','card_shadow','card_shadow_intensity',
+      'container_radius','container_border','container_background','apply_background_to_page','card_background','card_overflow','card_shadow','card_shadow_intensity',
       'dashboard_theme_enabled','dashboard_theme','dashboard_theme_override_all_design',
   
       // Size / layout
