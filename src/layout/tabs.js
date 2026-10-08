@@ -741,6 +741,8 @@ const tabsLayoutMethods = {
       bar.classList.toggle('ddc-tabs-canvas-centered', fixed && rect.width > 0);
       if (!fixed || rect.width <= 0) return;
       this.style.setProperty('--ddc-tabs-canvas-center', `${rect.left + rect.width / 2}px`);
+      this.style.setProperty('--ddc-tabs-canvas-top', `${rect.top}px`);
+      this.style.setProperty('--ddc-tabs-canvas-bottom', `${rect.bottom}px`);
       this.style.setProperty('--ddc-tabs-canvas-width', `${Math.max(0, rect.width - 24)}px`);
     };
     if (this.__tabsCanvasTarget !== canvas) {

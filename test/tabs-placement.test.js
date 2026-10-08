@@ -284,3 +284,35 @@ test('fixed tab bars center between both Home Assistant side gutters', async () 
     /\.ddc-root\.ddc-fixed-canvas-tabs-bottom[\s\S]*?left:\s*calc\(var\(--ddc-left-gutter,\s*0px\)\s*\+\s*12px\)\s*!important;[\s\S]*?right:\s*calc\(var\(--ddc-right-gutter,\s*0px\)\s*\+\s*12px\)\s*!important;/,
   );
 });
+
+test('canvas-anchored tabs track both axes and release listeners when disabled', () => {
+  const oldWindow = globalThis.window;
+  const oldGetComputedStyle = globalThis.getComputedStyle;
+  const listeners = new Map();
+  globalThis.window = {addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name)};
+  globalThis.getComputedStyle = () => ({position: 'fixed'});
+  try {
+    const host = new TabsHarness();
+    const values = new Map(), classes = new Set();
+    let rect = {left: 120, top: 80, width: 600, bottom: 480};
+    host.tabsCenterOnCanvas = true;
+    host.style = {setProperty: (key, value) => values.set(key, value)};
+    host.tabsBar = {classList: {toggle: (key, on) => on ? classes.add(key) : classes.delete(key), remove: key => classes.delete(key)}};
+    host.cardContainer = {getBoundingClientRect: () => rect};
+    host._syncTabsCanvasCenter_();
+    assert.equal(values.get('--ddc-tabs-canvas-center'), '420px');
+    assert.equal(values.get('--ddc-tabs-canvas-top'), '80px');
+    assert.equal(values.get('--ddc-tabs-canvas-bottom'), '480px');
+    rect = {left: 100, top: 20, width: 300, bottom: 220};
+    listeners.get('scroll')();
+    assert.equal(values.get('--ddc-tabs-canvas-center'), '250px');
+    assert.equal(values.get('--ddc-tabs-canvas-bottom'), '220px');
+    host.tabsCenterOnCanvas = false;
+    host._syncTabsCanvasCenter_();
+    assert.equal(classes.size, 0);
+    assert.equal(listeners.size, 0);
+  } finally {
+    globalThis.window = oldWindow;
+    globalThis.getComputedStyle = oldGetComputedStyle;
+  }
+});

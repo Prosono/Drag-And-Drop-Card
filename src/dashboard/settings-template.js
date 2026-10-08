@@ -1097,7 +1097,7 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
       <div class="setting"><div class="row">
         <label for="ddc-setting-tabsCenterOnCanvas">Center tab bar on canvas</label>
         <ha-switch id="ddc-setting-tabsCenterOnCanvas"></ha-switch>
-      </div><div class="hint">Aligns the tab bar horizontally with the dashboard canvas instead of the browser. Top/bottom placement and bottom distance stay unchanged.</div></div>
+      </div><div class="hint">Anchors the tab bar inside the dashboard canvas, centered horizontally at its top or bottom edge. Bottom distance is measured from the canvas when enabled.</div></div>
       ${tabStyleControls()}
 
       <div class="setting tab-auto-return-setting" role="group" aria-labelledby="lbl-tabs-auto-return">

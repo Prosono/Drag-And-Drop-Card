@@ -1275,4 +1275,4 @@ tabs:
 
 **Tab bar size:** Under **Dashboard Settings → Tabs**, enter a percentage manually or use the slider (1–1000%, default 100%). YAML/API: `tabs_size: 150`. Per-field Tab appearance overrides still take priority.
 
-**Center tab bar on canvas:** Enable in **Dashboard Settings → Tabs** (`tabs_center_on_canvas: true`) to center fixed top/bottom tabs over the rendered canvas, including scaled fixed-size dashboards. Disabled by default. Vertical placement and bottom offset stay unchanged; sidebar navigation and editor previews retain their own placement.
+**Center tab bar on canvas:** Enable in **Dashboard Settings → Tabs** (`tabs_center_on_canvas: true`) to center fixed top/bottom tabs over the rendered canvas, including scaled fixed-size dashboards. Disabled by default. The bar follows the canvas top or bottom edge, and bottom offset is measured inward from the canvas bottom. Sidebar navigation and editor previews retain their own placement.

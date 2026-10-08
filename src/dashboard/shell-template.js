@@ -8909,7 +8909,7 @@ export function getDashboardShellTemplate() {
   overflow: visible;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   -webkit-mask-image: none;
   mask-image: none;
 }
@@ -8928,7 +8928,7 @@ export function getDashboardShellTemplate() {
   overflow-y:hidden;
   -webkit-overflow-scrolling:touch;
   scroll-snap-type:x proximity;
-  scrollbar-gutter:stable;
+  scrollbar-gutter:auto;
   scrollbar-width:thin;
 }
 
@@ -9130,13 +9130,25 @@ export function getDashboardShellTemplate() {
   z-index: 10020 !important;
 }
 
- :host .ddc-root .ddc-tabs.ddc-tabs-canvas-centered {
+:host .ddc-root .ddc-tabs.ddc-tabs-canvas-centered:not(.ddc-tabs-left) {
+  top: var(--ddc-tabs-canvas-top) !important;
+  bottom: auto !important;
   left: var(--ddc-tabs-canvas-center) !important;
   right: auto !important;
   transform: translateX(-50%) !important;
   margin-inline: 0 !important;
   width: fit-content !important;
   max-width: var(--ddc-tabs-canvas-width) !important;
+}
+
+:host .ddc-root .ddc-tabs.ddc-tabs-canvas-centered:not(.ddc-tabs-left).ddc-tabs-bottom {
+  top: calc(var(--ddc-tabs-canvas-bottom) - var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 12px))) !important;
+  transform: translate(-50%, -100%) !important;
+}
+@media (max-width: 768px) {
+  :host .ddc-root .ddc-tabs.ddc-tabs-canvas-centered:not(.ddc-tabs-left).ddc-tabs-bottom {
+    top: calc(var(--ddc-tabs-canvas-bottom) - var(--ddc-tab-style-viewport_bottom_offset, max(env(safe-area-inset-bottom, 0px), 8px))) !important;
+  }
 }
 
 /* In edit mode a fixed-size dashboard is a canvas, not the viewport. Keep
@@ -9799,9 +9811,6 @@ export function getDashboardShellTemplate() {
   }
 }
 
-@supports not (scrollbar-gutter: stable){
-  .ddc-tabs{ padding-inline-end: 24px; }
-}
 
 /* ===== DDC Tabs —END ==================== */
 
