@@ -10,7 +10,7 @@ const haChromeMethods = {
   _setHeaderVisible_(show = true) {
     try {
       // 1) Hide the header containers across HA variants
-      const headers = this._deepQueryAll?.(
+      const headers = this._queryHaChrome_?.(
         'app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar, ha-toolbar'
       ) || [];
       headers.forEach(el => {
@@ -38,7 +38,7 @@ const haChromeMethods = {
 
       // 2) Explicitly hide the action items (Search / Assist / Edit menu)
       //    Belt & suspenders: catch both slot-based and direct buttons/menus.
-      const actionNodes = this._deepQueryAll?.(
+      const actionNodes = this._queryHaChrome_?.(
         '[slot="actionItems"], ha-icon-button, ha-button-menu, assist-button, search-input, ha-quick-bar, ha-mwc-menu'
       ) || [];
       actionNodes.forEach(el => {
@@ -59,8 +59,8 @@ const haChromeMethods = {
       // 3) Adjust CSS variables so layout doesn't reserve header space
       //    Include an extra var some themes use, and collapse content padding.
       const containers = [
-        ...(this._deepQueryAll?.('ha-app-layout') || []),
-        ...(this._deepQueryAll?.('home-assistant-main') || []),
+        ...(this._queryHaChrome_?.('ha-app-layout') || []),
+        ...(this._queryHaChrome_?.('home-assistant-main') || []),
         document.documentElement,
         document.body
       ].filter(Boolean);
@@ -95,7 +95,7 @@ const haChromeMethods = {
       });
 
       // 4) Some builds keep content under a #contentContainer; collapse its padding too
-      const contentContainers = this._deepQueryAll?.('#contentContainer') || [];
+      const contentContainers = this._queryHaChrome_?.('#contentContainer') || [];
       contentContainers.forEach(cc => {
         if (!cc) return;
         if (cc.dataset.ddcPrevContentPadTop === undefined) {
@@ -105,7 +105,7 @@ const haChromeMethods = {
       });
 
       // 5) Hide the main title (e.g. "Home")
-      const mainTitles = this._deepQueryAll?.('.main-title') || [];
+      const mainTitles = this._queryHaChrome_?.('.main-title') || [];
       mainTitles.forEach(el => {
         if (!el) return;
         if (el.dataset.ddcPrevDisplayTitle === undefined) {
@@ -145,8 +145,8 @@ const haChromeMethods = {
           el.style.setProperty(property, value, 'important');
         }
       };
-      (this._deepQueryAll?.('ha-sidebar') || []).forEach(el => setHiddenStyle(el, 'display', 'none'));
-      (this._deepQueryAll?.('ha-drawer') || []).forEach(el => {
+      (this._queryHaChrome_?.('ha-sidebar') || []).forEach(el => setHiddenStyle(el, 'display', 'none'));
+      (this._queryHaChrome_?.('ha-drawer') || []).forEach(el => {
         if (this._isOwnChromeElement_?.(el)) return;
         // Support both the legacy Material drawer and the current HA drawer.
         setHiddenStyle(el, '--mdc-drawer-width', '0px');
@@ -169,7 +169,7 @@ const haChromeMethods = {
     };
     const selector = 'ha-sidebar, ha-drawer, app-drawer, mwc-drawer, .drawer, .mdc-drawer, [slot="drawer"]';
     try {
-      (this._deepQueryAll?.(selector) || []).forEach(add);
+      (this._queryHaChrome_?.(selector) || []).forEach(add);
     } catch {}
     try {
       const ha = document.querySelector('home-assistant');
@@ -241,7 +241,7 @@ const haChromeMethods = {
       'partial-panel-resolver [class*="edit"]'
     ].join(',');
     try {
-      (this._deepQueryAll?.(selector) || []).forEach(add);
+      (this._queryHaChrome_?.(selector) || []).forEach(add);
     } catch {}
     return candidates;
   },
@@ -287,7 +287,7 @@ const haChromeMethods = {
 
   _isHaDashboardEditorActive_() {
     try {
-      const roots = this._deepQueryAll?.(
+      const roots = this._queryHaChrome_?.(
         'ha-panel-lovelace, hui-root, hui-view, hui-panel-view, hui-masonry-view, hui-sections-view'
       ) || [];
       for (const el of roots) {
@@ -479,7 +479,7 @@ const haChromeMethods = {
       const roots = [
         document.documentElement,
         document.body,
-        ...(this._deepQueryAll?.('ha-app-layout, home-assistant-main') || [])
+        ...(this._queryHaChrome_?.('ha-app-layout, home-assistant-main') || [])
       ].filter(Boolean);
       roots.forEach((node) => {
         try {
@@ -495,7 +495,7 @@ const haChromeMethods = {
       });
     } catch {}
     try {
-      const headers = this._deepQueryAll?.(
+      const headers = this._queryHaChrome_?.(
         'app-header, ha-top-app-bar, ha-top-app-bar-fixed, mwc-top-app-bar-fixed, ha-header-bar, app-toolbar, ha-toolbar'
       ) || [];
       headers.forEach((el) => {

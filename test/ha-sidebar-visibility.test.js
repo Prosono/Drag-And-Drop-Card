@@ -14,7 +14,7 @@ function element(initial = {}) {
 function fixture() {
   class Host {} installHaChromeMethods(Host.prototype);
   const host=new Host(),sidebar=element({display:'flex'}),drawer=element({'--ha-sidebar-width':'280px'});
-  host._deepQueryAll=selector=>selector==='ha-sidebar'?[sidebar]:[drawer];
+  host._queryHaChrome_=selector=>selector==='ha-sidebar'?[sidebar]:[drawer];
   return {host,sidebar,drawer};
 }
 test('hide removes both current and legacy drawer widths and repeated hide restores original styles',()=>{

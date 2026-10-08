@@ -1,3 +1,4 @@
+import { queryHaChrome } from '../ha/chrome-query.js';
 /*
  * Small API and utility methods mixed into the main DragAndDropCard element.
  *
@@ -6,6 +7,9 @@
  */
 
 const coreMethods = {
+  _queryHaChrome_(selector) {
+    return queryHaChrome(this, selector);
+  },
   _hasCardModDeep(cfg) {
     try {
       if (!cfg || typeof cfg !== 'object') return false;

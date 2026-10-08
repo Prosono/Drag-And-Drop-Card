@@ -234,8 +234,8 @@ const tabsLayoutMethods = {
     const previousScrollLeft = Number(previousScrollHost?.scrollLeft || 0) || 0;
     const shouldPreserveScroll = !!this.__preserveTabsScrollOnNextRender;
     this.__preserveTabsScrollOnNextRender = false;
-    this._syncTabsPlacement_?.();
     if (!this._shouldRenderTabBar_()) {
+      this._syncTabsPlacement_?.();
       this._closeLayersMenu_?.({ render: false });
       bar.style.display = 'none';
       this.rootEl?.classList?.remove?.('ddc-tabs-left-layout');
@@ -318,7 +318,7 @@ const tabsLayoutMethods = {
     // card container width (scaled or unscaled). Without syncing the width,
     // the tabs could stretch to the full page width instead of aligning
     // with the drag-and-drop container.
-    try { this._syncTabsWidth_?.(); } catch {}
+    try { this._syncTabsWidth_?.({ placementSynced: true }); } catch {}
 
     try { this._refreshTabsAlignment_?.(); } catch {}
 
@@ -340,6 +340,15 @@ const tabsLayoutMethods = {
         this._centerTabButtonInScroller_?.(activeBtn);
       }
     } catch {}
+  },
+
+  _ensureTabBackground_() {
+    // Empty hosts are normal for none/image backgrounds. Config changes own
+    // their application and cleanup; tab changes only repair missing media.
+    const mode = this._getDashboardBackgroundMode_?.() || 'none';
+    if (mode !== 'particles' && mode !== 'youtube') return;
+    const host = mode === 'particles' ? this.__particlesHost : this.__ytWrap;
+    if (!host?.isConnected) this._applyBackgroundFromConfig?.();
   },
 
   async _switchActiveTab_(tabId, options = {}) {
@@ -372,8 +381,7 @@ const tabsLayoutMethods = {
     // cards on the destination tab are correct on the very first frame.
     try { this._applyVisibility_(); } catch {}
     try {
-      const host = this.cardContainer?.querySelector?.('#ddcBgHost');
-      if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+      this._ensureTabBackground_?.();
     } catch {}
 
     try {
@@ -642,8 +650,7 @@ const tabsLayoutMethods = {
       // Reapply visibility so conditions evaluate in the new tab context.
       try { this._applyVisibility_(); } catch {}
       try {
-        const host = this.cardContainer?.querySelector?.('#ddcBgHost');
-        if (!host || !host.firstChild) this._applyBackgroundFromConfig?.();
+        this._ensureTabBackground_?.();
       } catch {}
       try { this._queueSave('tab-change'); } catch {}
     };
@@ -759,9 +766,9 @@ const tabsLayoutMethods = {
     update();
   },
 
-  _syncTabsWidth_() {
+  _syncTabsWidth_({ placementSynced = false } = {}) {
     try {
-      this._syncTabsPlacement_?.();
+      if (!placementSynced) this._syncTabsPlacement_?.();
       this._syncViewportPreviewUI_?.();
       this._syncTabsCanvasCenter_?.();
       this._syncLeftRailViewportPosition_?.();

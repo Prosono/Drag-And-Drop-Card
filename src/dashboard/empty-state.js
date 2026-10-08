@@ -39,7 +39,7 @@ const emptyStateMethods = {
       if (this.hasAttribute?.('ddc-ha-editor-active')) return true;
     } catch {}
     try {
-      const roots = this._deepQueryAll?.(
+      const roots = this._queryHaChrome_?.(
         'ha-panel-lovelace, hui-root, hui-view, hui-panel-view, hui-masonry-view, hui-sections-view, hui-dashboard-editor, hui-view-editor'
       ) || [];
       for (const el of roots) {

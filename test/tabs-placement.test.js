@@ -316,3 +316,17 @@ test('canvas-anchored tabs track both axes and release listeners when disabled',
     globalThis.getComputedStyle = oldGetComputedStyle;
   }
 });
+
+test('tab changes leave none/image and mounted media backgrounds untouched', () => {
+  const host=new TabsHarness();
+  let mode='none', applied=0;
+  host._getDashboardBackgroundMode_=()=>mode;
+  host._applyBackgroundFromConfig=()=>applied++;
+  host._ensureTabBackground_();
+  mode='image';host._ensureTabBackground_();
+  mode='youtube';host.__ytWrap={isConnected:true};host._ensureTabBackground_();
+  mode='particles';host.__particlesHost={isConnected:true};host._ensureTabBackground_();
+  assert.equal(applied,0);
+  host.__particlesHost.isConnected=false;host._ensureTabBackground_();
+  assert.equal(applied,1);
+});
