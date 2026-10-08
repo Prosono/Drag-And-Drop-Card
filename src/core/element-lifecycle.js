@@ -301,6 +301,7 @@ const lifecycleMethods = {
       this.__ddcResizeObs = null;
 
       this._stopScaleWatch?.();
+      this._stopTabsCanvasCenter_?.();
 
       if (this.__ddcOnWinResize) {
         window.removeEventListener('resize', this.__ddcOnWinResize);

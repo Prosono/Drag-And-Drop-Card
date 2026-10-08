@@ -1094,6 +1094,10 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Enter a size from 1% to 1000%, or use the slider. 100% is the default. Small values can make tabs difficult to tap; large values may require scrolling.</div>
       </div>
 
+      <div class="setting"><div class="row">
+        <label for="ddc-setting-tabsCenterOnCanvas">Center tab bar on canvas</label>
+        <ha-switch id="ddc-setting-tabsCenterOnCanvas"></ha-switch>
+      </div><div class="hint">Aligns the tab bar horizontally with the dashboard canvas instead of the browser. Top/bottom placement and bottom distance stay unchanged.</div></div>
       ${tabStyleControls()}
 
       <div class="setting tab-auto-return-setting" role="group" aria-labelledby="lbl-tabs-auto-return">

@@ -80,6 +80,7 @@ const dashboardApiMethods = {
       tabs_position: this._normalizeTabsPosition_(this.tabsPosition),
       tabs_style: normalizeTabStyle(this.tabsStyle),
       tabs_size: this._normalizeTabsSize_(this.tabsSize),
+      tabs_center_on_canvas: !!this.tabsCenterOnCanvas,
       default_tab: this.defaultTab,
       hide_tabs_when_single: !!this.hideTabsWhenSingle,
       tabs_auto_return_enabled: !!this.tabsAutoReturnEnabled,
@@ -381,6 +382,7 @@ const dashboardApiMethods = {
       this.tabsStyle = normalizeTabStyle(opts.tabs_style);
       this._syncTabsSize_?.();
     }
+    if ('tabs_center_on_canvas' in opts) this.tabsCenterOnCanvas = !!opts.tabs_center_on_canvas;
     if ('tabs_size' in opts) {
       this.tabsSize = this._normalizeTabsSize_(opts.tabs_size);
       this._syncTabsSize_?.();
@@ -410,7 +412,7 @@ const dashboardApiMethods = {
       this._updateStoreBadge?.();
       this._applyAutoScale?.();
     }
-    if ('tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'tabs_style' in opts || 'tabs_auto_return_enabled' in opts || 'tabs_auto_return_tab' in opts || 'tabs_auto_return_delay' in opts || 'sidebar_enabled' in opts || 'sidebar_type' in opts || 'sidebarType' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_appearance' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
+    if ('tabs_center_on_canvas' in opts || 'tabs' in opts || 'default_tab' in opts || 'hide_tabs_when_single' in opts || 'tabs_position' in opts || 'tabs_size' in opts || 'tabs_style' in opts || 'tabs_auto_return_enabled' in opts || 'tabs_auto_return_tab' in opts || 'tabs_auto_return_delay' in opts || 'sidebar_enabled' in opts || 'sidebar_type' in opts || 'sidebarType' in opts || 'sidebar_items' in opts || 'sidebar_content' in opts || 'sidebar_appearance' in opts || 'sidebar_style' in opts || 'sidebar_density' in opts || 'sidebar_accent' in opts || 'sidebar_header' in opts || 'sidebar_header_type' in opts || 'sidebar_canvas_height' in opts || 'sidebar_cards' in opts || 'sidebar_home_image' in opts || 'sidebar_house_image' in opts || 'sidebar_home_image_url' in opts || 'sidebar_calendar_entities' in opts || 'sidebar_calendars' in opts) {
       this._renderTabs?.();
       this._renderSidebar_?.();
       this._applyActiveTab?.();
@@ -466,6 +468,7 @@ const dashboardApiMethods = {
       container_preset_orientation: { type: 'string' },
       tabs: { type: 'array' },
       tabs_position: { type: 'string' },
+      tabs_center_on_canvas: { type: 'boolean' },
       tabs_size: { type: 'number', minimum: 1, maximum: 1000 },
       tabs_style: { type: 'object' },
       default_tab: { type: 'string' },
@@ -540,6 +543,7 @@ const dashboardApiMethods = {
       containerPresetOrientation: 'container_preset_orientation',
       tabsPosition: 'tabs_position',
       tabsSize: 'tabs_size',
+      tabsCenterOnCanvas: 'tabs_center_on_canvas',
       defaultTab: 'default_tab',
       activeTab: 'active_tab',
       hideTabsWhenSingle: 'hide_tabs_when_single',

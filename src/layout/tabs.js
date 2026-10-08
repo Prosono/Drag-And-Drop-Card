@@ -715,10 +715,53 @@ const tabsLayoutMethods = {
     bar.setAttribute?.('aria-orientation', vertical ? 'vertical' : 'horizontal');
   },
 
+  _stopTabsCanvasCenter_() {
+    this.__tabsCanvasRO?.disconnect();
+    this.__tabsCanvasRO = null;
+    if (this.__tabsCanvasHandler) {
+      window.removeEventListener('scroll', this.__tabsCanvasHandler, true);
+      window.removeEventListener('resize', this.__tabsCanvasHandler);
+    }
+    this.__tabsCanvasHandler = null;
+    this.__tabsCanvasTarget = null;
+    this.tabsBar?.classList?.remove('ddc-tabs-canvas-centered');
+  },
+
+  _syncTabsCanvasCenter_() {
+    const bar = this.tabsBar;
+    const canvas = this.cardContainer;
+    if (!this.tabsCenterOnCanvas || !bar || !canvas || this.editMode || this._isSidebarNavigationActive_?.() || this._isExplicitViewportPreview_?.()) {
+      this._stopTabsCanvasCenter_();
+      return;
+    }
+    const update = () => {
+      // In-flow top tabs already follow the canvas. Only fixed bars need viewport coordinates.
+      const fixed = getComputedStyle(bar).position === 'fixed';
+      const rect = canvas.getBoundingClientRect();
+      bar.classList.toggle('ddc-tabs-canvas-centered', fixed && rect.width > 0);
+      if (!fixed || rect.width <= 0) return;
+      this.style.setProperty('--ddc-tabs-canvas-center', `${rect.left + rect.width / 2}px`);
+      this.style.setProperty('--ddc-tabs-canvas-width', `${Math.max(0, rect.width - 24)}px`);
+    };
+    if (this.__tabsCanvasTarget !== canvas) {
+      this._stopTabsCanvasCenter_();
+      this.__tabsCanvasTarget = canvas;
+      this.__tabsCanvasHandler = update;
+      if (typeof ResizeObserver !== 'undefined') {
+        this.__tabsCanvasRO = new ResizeObserver(update);
+        this.__tabsCanvasRO.observe(canvas);
+      }
+      window.addEventListener('scroll', update, {capture: true, passive: true});
+      window.addEventListener('resize', update);
+    }
+    update();
+  },
+
   _syncTabsWidth_() {
     try {
       this._syncTabsPlacement_?.();
       this._syncViewportPreviewUI_?.();
+      this._syncTabsCanvasCenter_?.();
       this._syncLeftRailViewportPosition_?.();
       this._syncTabsOrientation_?.();
       const bar = this.tabsBar;

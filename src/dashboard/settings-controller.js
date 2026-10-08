@@ -289,6 +289,7 @@ const dashboardSettingsMethods = {
     };
     populateTabStyle(this.tabsStyle);
     modal.querySelector('#ddc-tab-style-reset')?.addEventListener('click', () => populateTabStyle({}));
+    const chkTabsCenterOnCanvas = modal.querySelector('#ddc-setting-tabsCenterOnCanvas');
     const rngTabsSize        = modal.querySelector('#ddc-setting-tabsSize');
     const inpTabsSize        = modal.querySelector('#ddc-setting-tabsSizeNumber');
     const chkTabsAutoReturn  = modal.querySelector('#ddc-setting-tabsAutoReturnEnabled');
@@ -1261,6 +1262,7 @@ const dashboardSettingsMethods = {
     };
     writeParticleControlsFromConfig();
     if (selTabsPosition) selTabsPosition.value = this._normalizeTabsPosition_(this.tabsPosition || 'top');
+    if (chkTabsCenterOnCanvas) chkTabsCenterOnCanvas.checked = !!this.tabsCenterOnCanvas;
     if (rngTabsSize && inpTabsSize) {
       const syncTabsSize = (raw) => {
         const value = String(this._normalizeTabsSize_(raw));
@@ -3132,6 +3134,7 @@ const dashboardSettingsMethods = {
         this._applyAutoScale?.();
         this.tabsPosition = newTabsPosition;
         this.tabsSize = newTabsSize;
+        this.tabsCenterOnCanvas = !!chkTabsCenterOnCanvas?.checked;
         this.tabsStyle = newTabsStyle;
         this.tabsAutoReturnEnabled = newTabsAutoReturnEnabled;
         this.tabsAutoReturnTab = newTabsAutoReturnTab;
@@ -3150,6 +3153,7 @@ const dashboardSettingsMethods = {
             ...(this._config.options || {}),
             tabs_position: this.tabsPosition,
             tabs_size: this.tabsSize,
+            tabs_center_on_canvas: this.tabsCenterOnCanvas,
             tabs_style: normalizeTabStyle(this.tabsStyle),
             tabs_auto_return_enabled: this.tabsAutoReturnEnabled,
             tabs_auto_return_tab: this.tabsAutoReturnTab,
@@ -3168,6 +3172,7 @@ const dashboardSettingsMethods = {
           };
         }
         this._config.tabs_position = this.tabsPosition;
+        this._config.tabs_center_on_canvas = this.tabsCenterOnCanvas;
         this._config.tabs_size = this.tabsSize;
         this._config.tabs_style = normalizeTabStyle(this.tabsStyle);
         this._config.tabs_auto_return_enabled = this.tabsAutoReturnEnabled;

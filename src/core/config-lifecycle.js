@@ -200,6 +200,7 @@ const setConfigMethods = {
         this.tabsPosition = this._normalizeTabsPosition_(tabsPosition);
         this.tabsStyle = normalizeTabStyle(config.tabs_style);
         this.tabsSize = this._normalizeTabsSize_(config.tabs_size);
+        this.tabsCenterOnCanvas = !!config.tabs_center_on_canvas;
         this._syncTabsSize_?.();
         this.sidebarEnabled = hasSidebarEnabled ? !!config.sidebar_enabled : legacyLeftRail;
         this.sidebarType = this._normalizeSidebarType_(

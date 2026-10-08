@@ -1274,3 +1274,5 @@ tabs:
 **Canvas frame:** Under **Dashboard Settings → Appearance**, set **Canvas corner radius** (`container_radius`, 0–96 px; default 12) and **Show canvas border** (`container_border`, default true). For a seamless join with the sidebar, set radius and sidebar gap to `0` and disable the canvas border. These settings apply only to this DDC dashboard's main canvas; individual cards keep their styling.
 
 **Tab bar size:** Under **Dashboard Settings → Tabs**, enter a percentage manually or use the slider (1–1000%, default 100%). YAML/API: `tabs_size: 150`. Per-field Tab appearance overrides still take priority.
+
+**Center tab bar on canvas:** Enable in **Dashboard Settings → Tabs** (`tabs_center_on_canvas: true`) to center fixed top/bottom tabs over the rendered canvas, including scaled fixed-size dashboards. Disabled by default. Vertical placement and bottom offset stay unchanged; sidebar navigation and editor previews retain their own placement.
