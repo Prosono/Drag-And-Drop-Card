@@ -1086,12 +1086,12 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
           </div>
           <div class="control">
             <div class="range-wrap">
-              <input type="range" id="ddc-setting-tabsSize" min="80" max="140" step="5" />
-              <output id="ddc-tabsSizeOut" for="ddc-setting-tabsSize">100%</output>
+              <input type="range" id="ddc-setting-tabsSize" min="1" max="1000" step="1" />
+              <input type="number" id="ddc-setting-tabsSizeNumber" aria-label="Tab bar size (%)" min="1" max="1000" step="1" style="width:100px" /><span>%</span>
             </div>
           </div>
         </div>
-        <div class="hint">Scales the tab controls while preserving touch-friendly sizing and viewport alignment.</div>
+        <div class="hint">Enter a size from 1% to 1000%, or use the slider. 100% is the default. Small values can make tabs difficult to tap; large values may require scrolling.</div>
       </div>
 
       ${tabStyleControls()}

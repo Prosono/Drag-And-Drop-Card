@@ -466,7 +466,7 @@ const dashboardApiMethods = {
       container_preset_orientation: { type: 'string' },
       tabs: { type: 'array' },
       tabs_position: { type: 'string' },
-      tabs_size: { type: 'number' },
+      tabs_size: { type: 'number', minimum: 1, maximum: 1000 },
       tabs_style: { type: 'object' },
       default_tab: { type: 'string' },
       hide_tabs_when_single: { type: 'boolean' },

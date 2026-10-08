@@ -290,7 +290,7 @@ const dashboardSettingsMethods = {
     populateTabStyle(this.tabsStyle);
     modal.querySelector('#ddc-tab-style-reset')?.addEventListener('click', () => populateTabStyle({}));
     const rngTabsSize        = modal.querySelector('#ddc-setting-tabsSize');
-    const outTabsSize        = modal.querySelector('#ddc-tabsSizeOut');
+    const inpTabsSize        = modal.querySelector('#ddc-setting-tabsSizeNumber');
     const chkTabsAutoReturn  = modal.querySelector('#ddc-setting-tabsAutoReturnEnabled');
     const selTabsAutoReturnTab = modal.querySelector('#ddc-setting-tabsAutoReturnTab');
     const inpTabsAutoReturnMinutes = modal.querySelector('#ddc-setting-tabsAutoReturnMinutes');
@@ -1261,15 +1261,19 @@ const dashboardSettingsMethods = {
     };
     writeParticleControlsFromConfig();
     if (selTabsPosition) selTabsPosition.value = this._normalizeTabsPosition_(this.tabsPosition || 'top');
-    if (rngTabsSize) {
-      const syncTabsSizeOutput = () => {
-        const value = this._normalizeTabsSize_(rngTabsSize.value);
-        rngTabsSize.value = String(value);
-        if (outTabsSize) outTabsSize.textContent = `${value}%`;
+    if (rngTabsSize && inpTabsSize) {
+      const syncTabsSize = (raw) => {
+        const value = String(this._normalizeTabsSize_(raw));
+        rngTabsSize.value = value;
+        inpTabsSize.value = value;
       };
-      rngTabsSize.value = String(this._normalizeTabsSize_(this.tabsSize));
-      rngTabsSize.addEventListener('input', syncTabsSizeOutput);
-      syncTabsSizeOutput();
+      syncTabsSize(this.tabsSize);
+      rngTabsSize.addEventListener('input', () => syncTabsSize(rngTabsSize.value));
+      inpTabsSize.addEventListener('input', () => {
+        // Let users finish typing before clamping incomplete or out-of-range input.
+        if (inpTabsSize.value !== '' && inpTabsSize.validity.valid) rngTabsSize.value = inpTabsSize.value;
+      });
+      inpTabsSize.addEventListener('change', () => syncTabsSize(inpTabsSize.value));
     }
     if (chkTabsAutoReturn) chkTabsAutoReturn.checked = !!this.tabsAutoReturnEnabled;
     if (inpTabsAutoReturnMinutes) {
@@ -2952,7 +2956,7 @@ const dashboardSettingsMethods = {
       const newTabsPositionRaw = String(selTabsPosition?.value || this.tabsPosition || 'top').toLowerCase();
       const newTabsPosition = this._normalizeTabsPosition_(newTabsPositionRaw);
       const newTabsStyle = normalizeTabStyle({ ...Object.fromEntries(tabStyleInputs.map(([key, input]) => [key, input?.value])), active_shadow: tabShadowInput?.checked !== false });
-      const newTabsSize = this._normalizeTabsSize_(rngTabsSize?.value ?? this.tabsSize);
+      const newTabsSize = this._normalizeTabsSize_(inpTabsSize?.value ?? rngTabsSize?.value ?? this.tabsSize);
       const newTabsAutoReturnEnabled = !!chkTabsAutoReturn?.checked;
       const newTabsAutoReturnTab = this._resolveTabsAutoReturnTarget_?.(selTabsAutoReturnTab?.value)
         || this.defaultTab;

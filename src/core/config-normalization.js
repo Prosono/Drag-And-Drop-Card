@@ -25,9 +25,10 @@ const configStaticMethods = {
 };
 
 export function normalizeTabsSize(value) {
+  if (value == null || String(value).trim() === '') return 100;
   const size = Number(value);
   if (!Number.isFinite(size)) return 100;
-  return Math.max(80, Math.min(140, Math.round(size)));
+  return Math.max(1, Math.min(1000, Math.round(size)));
 }
 
 export function normalizeCardOverflow(value) {

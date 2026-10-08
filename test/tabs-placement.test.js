@@ -205,7 +205,7 @@ test('tab moves at list boundaries are safe no-ops', () => {
   assert.deepEqual(moveTabById(source, 'missing', 1), source);
 });
 
-test('tab bar sizing stays within touch-friendly limits and updates CSS tokens', () => {
+test('tab bar sizing supports 1–1000 percent and updates CSS tokens', () => {
   const values = new Map();
   const harness = new TabsHarness();
   harness.style = {
@@ -213,18 +213,18 @@ test('tab bar sizing stays within touch-friendly limits and updates CSS tokens',
       values.set(name, value);
     },
   };
-  harness.tabsSize = 65;
+  harness.tabsSize = 0;
 
   harness._syncTabsSize_();
 
-  assert.equal(harness.tabsSize, 80);
-  assert.equal(values.get('--ddc-tabs-button-height'), '44.8px');
-  assert.equal(values.get('--ddc-tabs-icon-size'), '19.2px');
+  assert.equal(harness.tabsSize, 1);
+  assert.equal(values.get('--ddc-tabs-button-height'), '0.56px');
+  assert.equal(values.get('--ddc-tabs-icon-size'), '0.24px');
 
-  harness.tabsSize = 150;
+  harness.tabsSize = 1001;
   harness._syncTabsSize_();
-  assert.equal(harness.tabsSize, 140);
-  assert.equal(values.get('--ddc-tabs-button-height'), '78.4px');
+  assert.equal(harness.tabsSize, 1000);
+  assert.equal(values.get('--ddc-tabs-button-height'), '560px');
 });
 
 test('tab and card overflow options normalize legacy aliases', () => {
@@ -233,6 +233,8 @@ test('tab and card overflow options normalize legacy aliases', () => {
   const harness = new ConfigHarness();
 
   assert.equal(normalizeTabsSize('115'), 115);
+  for (const value of [1, 65, 150, 777, 1000]) assert.equal(normalizeTabsSize(value), value);
+  for (const value of [undefined, null, '', ' ']) assert.equal(normalizeTabsSize(value), 100);
   assert.equal(normalizeTabsSize('invalid'), 100);
   assert.equal(normalizeCardOverflow('HIDDEN'), 'hidden');
   assert.equal(normalizeCardOverflow('scroll'), 'auto');
