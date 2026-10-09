@@ -485,18 +485,21 @@ const tabsLayoutMethods = {
 
     wraps.forEach((w) => {
       if (!w) return;
-      // Skip hidden cards
-      const cs = window.getComputedStyle?.(w);
-      const isHidden =
-        (w.style.display === 'none') ||
-        (cs && cs.display === 'none') ||
-        w.classList.contains('ddc-hidden');
-      if (isHidden) return;
-
-      const cardStyle = this._extractPerCardStyle_?.(w) || {};
-      const animatePref = String(cardStyle.animate_cards || '').toLowerCase();
-      const shouldAnimate = animatePref === 'on' || (animatePref !== 'off' && this.animateCards);
+      // Decide from the small persisted override before any layout/style read.
+      const raw = w.dataset?.cardStyle || '';
+      if (!this.__cardAnimationPrefs) this.__cardAnimationPrefs = new WeakMap();
+      let cached = this.__cardAnimationPrefs.get(w);
+      if (!cached || cached.raw !== raw) {
+        let pref = '';
+        try { pref = String(JSON.parse(raw || '{}')?.animate_cards || '').trim().toLowerCase(); } catch {}
+        cached = {raw, pref};
+        this.__cardAnimationPrefs.set(w, cached);
+      }
+      const shouldAnimate = cached.pref === 'on' || (cached.pref !== 'off' && this.animateCards);
       if (!shouldAnimate) return;
+      if (w.style.display === 'none' || w.classList.contains('ddc-hidden')) return;
+      const cs = window.getComputedStyle?.(w);
+      if (cs?.display === 'none') return;
 
       const animationId = this._cardAnimationId_(w);
       if (!replay && animationId && this.__animatedCardIds.has(animationId)) return;

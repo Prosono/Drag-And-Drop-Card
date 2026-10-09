@@ -184,7 +184,14 @@ const layerMethods = {
     const variants = this._responsiveLayoutVariantKeys_();
     variants.forEach((variantKey) => {
       const entries = Array.isArray(this._responsiveLayouts?.[variantKey]) ? this._responsiveLayouts[variantKey] : [];
-      this._responsiveLayouts[variantKey] = entries.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+      this._responsiveLayouts[variantKey] = entries.map((entry) => {
+        // Layer edits must not clone or normalize the entire card configuration.
+        const layerIds = this._normalizeCardLayerIds_(entry.layerIds || entry.layer_ids || []);
+        const next = { ...entry };
+        if (layerIds.length) next.layerIds = layerIds;
+        else { delete next.layerIds; delete next.layer_ids; }
+        return next;
+      });
     });
   },
 

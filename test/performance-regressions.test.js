@@ -91,3 +91,21 @@ test('only fixed-canvas tab transitions skip autoscale, resize and automatic lay
   mode='auto';h._applyActiveTab({transitionSeq:2});assert.equal(scales,1);
   mode='fixed_custom';h._applyActiveTab();assert.equal(scales,2);
 });
+
+test('disabled animation avoids style/config extraction but honors changing per-card overrides',()=>{
+  const oldWindow=globalThis.window;let reads=0;
+  globalThis.window={matchMedia:()=>({matches:false}),getComputedStyle:()=>{reads++;return {display:'none'};}};
+  try {
+    const h=new Host();h.animateCards=false;
+    h._extractPerCardStyle_=()=>{throw Error('Unnecessary style extraction');};
+    h._extractCardConfig=()=>{throw Error('Unnecessary config extraction');};
+    const w={dataset:{},style:{},classList:{contains:()=>false}};
+    h._animateCards([w]);assert.equal(reads,0);
+    w.dataset.cardStyle='{"animate_cards":"on"}';
+    h._animateCards([w]);assert.equal(reads,1);
+    w.dataset.cardStyle='{"animate_cards":"off"}';h.animateCards=true;
+    h._animateCards([w]);assert.equal(reads,1);
+    delete w.dataset.cardStyle;
+    h._animateCards([w]);assert.equal(reads,2);
+  } finally {globalThis.window=oldWindow;}
+});

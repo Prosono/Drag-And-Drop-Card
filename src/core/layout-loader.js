@@ -7,6 +7,10 @@
 
 import { normalizeStorageMode, lovelaceLayoutSnapshot } from '../storage/storage-mode.js';
 
+export function mergeInitialLayoutOptions(baseline, overrides, normalize = value => value) {
+  return { ...normalize(baseline), ...normalize(overrides) };
+}
+
 export function selectInitialLayoutSnapshot(backendSnapshot, localSnapshot, { preferLocal = false } = {}) {
   if (preferLocal && localSnapshot && typeof localSnapshot === 'object') {
     return { source: 'local-replacement', snapshot: localSnapshot };
@@ -386,18 +390,12 @@ const initialLoadMethods = {
         // Snapshot of YAML before we overlay anything
         const yamlCfg = { ...(this._config || {}) };
 
-        // 1) Apply persisted options as baseline
-          if (saved?.options) {
-    const { storage_key, ...optsNoKey } = saved.options;
-    // Apply all persisted options, including background-related fields. Previously, the
-    // backgrounds were stripped to avoid overwriting YAML values. However, this
-    // prevented users from changing the card and container backgrounds or background
-    // modes via the settings UI. Including them here allows saved options (and
-    // consequently YAML updates) to take effect on reload.
-    this._applyImportedOptions(optsNoKey, true);
-  } else if (typeof saved?.grid === 'number') {
-          this._applyImportedOptions({ grid: saved.grid }, true);
-        }
+        // Resolve both sources before applying effects. YAML keeps precedence,
+        // while normalization of each source resolves legacy aliases first.
+        const { storage_key: ignoredStorageKey, ...persistedOptions } = saved?.options || {};
+        const baselineOptions = saved?.options
+          ? persistedOptions
+          : (typeof saved?.grid === 'number' ? { grid: saved.grid } : {});
 
         // 2) Overlay explicit YAML options (take precedence)
         const overrideKeys = [
@@ -450,9 +448,11 @@ const initialLoadMethods = {
             delete cfgOpts.tabs_position;
           }
         }
-        if (Object.keys(cfgOpts).length) {
-          this._applyImportedOptions(cfgOpts, true);
-        }
+        const mergedOptions = mergeInitialLayoutOptions(
+          baselineOptions, cfgOpts,
+          options => this._normalizeDashboardOptions_?.(options, { forceAutoResize: true }) || options
+        );
+        if (Object.keys(mergedOptions).length) this._applyImportedOptions(mergedOptions, true);
         if (!loadingAnimation) loadingAnimation = this._beginDashboardLoadingAnimation_?.();
 
         try {
