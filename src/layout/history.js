@@ -98,7 +98,8 @@ const layoutHistoryMethods = {
   _resetLayoutHistory_(reason = 'reset') {
     this.__undoStack = [];
     this.__redoStack = [];
-    this.__historyCurrentSnapshot = this._captureLayoutHistorySnapshot_(reason);
+    this.__historyCurrentSnapshot = reason === 'load' && !this.editMode
+      ? null : this._captureLayoutHistorySnapshot_(reason);
     this._syncHistoryButtons_?.();
   },
 

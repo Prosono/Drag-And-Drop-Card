@@ -316,7 +316,7 @@ const responsiveModelMethods = {
     };
   },
 
-  _normalizeSavedCardEntry_(entry = {}, fallback = null) {
+  _normalizeSavedCardEntry_(entry = {}, fallback = null, { sanitizeCards = true } = {}) {
     const normalized = (entry && typeof entry === 'object') ? { ...entry } : {};
     const fallbackEntry = fallback || {};
     const defaultWidth = 14 * Math.max(1, Number(this.gridSize || 10) || 10);
@@ -364,15 +364,17 @@ const responsiveModelMethods = {
       delete out.layer_ids;
     }
     if (!out.card && fallbackEntry.card) out.card = fallbackEntry.card;
-    if (out.card && typeof out.card === 'object') out.card = this._sanitizeCardConfigForStorage_(out.card);
-    if (out.card?.type === 'custom:ddc-html-card') out.card = this._applyHtmlCardConfigOverride_(out.card);
+    if (sanitizeCards && out.card && typeof out.card === 'object') out.card = this._sanitizeCardConfigForStorage_(out.card);
+    if (sanitizeCards && out.card?.type === 'custom:ddc-html-card') out.card = this._applyHtmlCardConfigOverride_(out.card);
     if (!out.card_style && fallbackEntry.card_style) out.card_style = this._cloneJson_(fallbackEntry.card_style);
     if (!out.cardStyle && fallbackEntry.cardStyle) out.cardStyle = this._cloneJson_(fallbackEntry.cardStyle);
     if (!out.overflow && fallbackEntry.overflow) out.overflow = fallbackEntry.overflow;
     return out;
   },
 
-  _normalizeResponsiveLayouts_(cards = [], responsiveLayouts = null) {
+  _normalizeResponsiveLayouts_(cards = [], responsiveLayouts = null, entryOptions = {}) {
+    const sanitizeCards = entryOptions.sanitizeCards !== false;
+    entryOptions = { ...entryOptions, sanitizeCards: false };
     const variants = this._responsiveLayoutVariantKeys_();
     const baseCards = Array.isArray(cards) ? cards : [];
     const sourceLayouts = responsiveLayouts || {};
@@ -408,12 +410,12 @@ const responsiveModelMethods = {
           || baseCards;
       normalized[variantKey] = (Array.isArray(working) ? working : []).map((entry) => {
         const fallback = normalized[this._getPrimaryResponsiveLayoutKey_()]?.find?.((candidate) => candidate.id === entry?.id) || null;
-        return this._normalizeSavedCardEntry_(entry, fallback);
+        return this._normalizeSavedCardEntry_(entry, fallback, entryOptions);
       });
     };
   
     const desktopSource = resolveVariantEntries('desktop', 'landscape') || baseCards;
-    normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeSavedCardEntry_(entry, baseById.get(entry?.id)));
+    normalized.desktop_landscape = desktopSource.map((entry) => this._normalizeSavedCardEntry_(entry, baseById.get(entry?.id), entryOptions));
     buildVariant('tablet', 'landscape', ['tablet_portrait', 'desktop_landscape']);
     buildVariant('tablet', 'portrait', ['tablet_landscape', 'desktop_landscape']);
     buildVariant('mobile', 'landscape', ['mobile_portrait', 'desktop_landscape']);
@@ -431,19 +433,31 @@ const responsiveModelMethods = {
         const fallback = variants
           .map((candidate) => normalized[candidate]?.find?.((entry) => entry.id === id))
           .find(Boolean);
-        if (fallback) map.set(id, this._normalizeSavedCardEntry_(fallback, fallback));
+        if (fallback) map.set(id, this._normalizeSavedCardEntry_(fallback, fallback, entryOptions));
       });
       normalized[variantKey] = Array.from(map.values());
     });
 
     if (this._shouldUseSharedResponsiveLayout_?.()) {
       const primaryKey = this._getPrimaryResponsiveLayoutKey_();
-      const shared = (normalized[primaryKey] || baseCards || []).map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+      const shared = (normalized[primaryKey] || baseCards || []).map((entry) => this._normalizeSavedCardEntry_(entry, entry, entryOptions));
       variants.forEach((variantKey) => {
-        normalized[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(entry, entry));
+        normalized[variantKey] = shared.map((entry) => this._normalizeSavedCardEntry_(entry, entry, entryOptions));
       });
     }
   
+    // Geometry fallback does not need full config copies at each stage.
+    // Clone once per final entry, retaining independent editable variants.
+    if (sanitizeCards) {
+      for (const entries of Object.values(normalized)) {
+        for (const entry of entries) {
+          if (entry.card && typeof entry.card === 'object') {
+            entry.card = this._sanitizeCardConfigForStorage_(entry.card);
+            if (entry.card.type === 'custom:ddc-html-card') entry.card = this._applyHtmlCardConfigOverride_(entry.card);
+          }
+        }
+      }
+    }
     return normalized;
   },
 
@@ -485,7 +499,7 @@ const responsiveModelMethods = {
         && entry?.card
         && this._cardConfigsMatchForResponsiveSerialization_(entry.card, desktopEntry.card)
       );
-      if (!canOmitCard) return this._cloneJson_(entry);
+      if (!canOmitCard) return this._normalizeSavedCardEntry_(this._cloneJson_(entry));
 
       const { card, ...rest } = entry || {};
       return this._cloneJson_(rest);
@@ -493,7 +507,7 @@ const responsiveModelMethods = {
   },
 
   _serializeResponsiveLayouts_(layouts = null, fallbackCards = null) {
-    const normalized = this._normalizeResponsiveLayouts_(fallbackCards || [], layouts || this._responsiveLayouts);
+    const normalized = this._normalizeResponsiveLayouts_(fallbackCards || [], layouts || this._responsiveLayouts, { sanitizeCards: false });
     const desktopLandscape = normalized.desktop_landscape || fallbackCards || [];
     const desktopById = new Map((desktopLandscape || []).map((entry) => [entry?.id, entry]));
     const sharedMode = this._shouldUseSharedResponsiveLayout_?.();

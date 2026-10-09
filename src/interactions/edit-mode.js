@@ -280,6 +280,7 @@ const editModeMethods = {
     }
   
     // === Your existing non-visual logic unchanged ===
+    if (entering && !this.__historyCurrentSnapshot) this._resetLayoutHistory_?.('enter-edit');
     this.editMode = entering;
     if (entering) this._applyEditorAppearance_?.();
     else this._clearEditorAppearance_?.();

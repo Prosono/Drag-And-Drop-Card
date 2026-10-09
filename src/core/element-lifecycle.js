@@ -302,6 +302,7 @@ const lifecycleMethods = {
 
       this._stopScaleWatch?.();
       this._stopTabsCanvasCenter_?.();
+      this._clearSidebarGutterCache_?.();
 
       if (this.__ddcOnWinResize) {
         window.removeEventListener('resize', this.__ddcOnWinResize);

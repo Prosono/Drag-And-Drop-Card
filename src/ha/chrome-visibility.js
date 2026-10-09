@@ -421,7 +421,43 @@ const haChromeMethods = {
     return Math.max(0, Math.round(bottom));
   },
 
+  _clearSidebarGutterCache_() {
+    this.__sidebarGutterCache = null;
+    this.__sidebarGutterObserver?.disconnect();
+    this.__sidebarGutterObserver = null;
+  },
+
   _computeHaSidebarGutters_() {
+    const candidates = this._getHaSidebarGutterCandidates_?.() || [];
+    // Attribute reads do not force layout. Include ancestors for kiosk/theme
+    // visibility changes; ResizeObserver catches drawer animation/size changes.
+    const nodes = new Set();
+    for (const candidate of candidates) {
+      let node = candidate;
+      while (node && !nodes.has(node)) {
+        nodes.add(node);
+        node = node.parentElement || node.getRootNode?.()?.host;
+      }
+    }
+    const signature = JSON.stringify([
+      window.innerWidth, window.innerHeight, !!this.hideHaSidebar, !!this.editMode,
+      [...nodes].map(node => ['class','style','hidden','open','expanded','narrow'].map(name => node.getAttribute?.(name))),
+    ]);
+    const cached = this.__sidebarGutterCache;
+    if (cached?.signature === signature && cached.candidates.length === candidates.length
+      && candidates.every((node, index) => cached.candidates[index] === node)) return;
+    this._clearSidebarGutterCache_();
+    this.__sidebarGutterCache = {signature, candidates};
+    if (typeof ResizeObserver !== 'undefined' && candidates.length) {
+      let initial = true;
+      this.__sidebarGutterObserver = new ResizeObserver(() => {
+        if (initial) { initial = false; return; }
+        this._clearSidebarGutterCache_();
+        this._syncTabsWidth_?.();
+      });
+      candidates.forEach(node => this.__sidebarGutterObserver.observe(node));
+    }
+
     let left = 56; // default desktop gutter; HA collapsed is ~56-64px
     try {
       const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -435,7 +471,6 @@ const haChromeMethods = {
           const n = parseFloat(String(value ?? '').trim());
           return Number.isFinite(n) ? Math.max(0, n) : 0;
         };
-        const candidates = this._getHaSidebarGutterCandidates_?.() || [];
         candidates.forEach((el) => {
           try {
             const styles = window.getComputedStyle?.(el);

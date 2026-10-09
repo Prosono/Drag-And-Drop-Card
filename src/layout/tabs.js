@@ -427,7 +427,7 @@ const tabsLayoutMethods = {
     // After switching tabs, reapply sizing based on the current container mode.
     try {
       const __m = this._normalizeContainerSizeMode_(this.containerSizeMode || this.container_size_mode);
-      this._applyAutoScale?.();
+      if (!opts.transitionSeq || __m === 'auto') this._applyAutoScale?.();
     } catch {}
 
     try { this._clearSelection(); } catch {}

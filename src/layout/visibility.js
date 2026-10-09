@@ -107,6 +107,21 @@ const visibilityMethods = {
     }
   },
 
+  _getWrapperVisibility_(wrap) {
+    const el = wrap.firstElementChild;
+    const raw = wrap.dataset?.cfg;
+    const source = el?.__ddcSourceConfig || el?._config || el?.config;
+    if (!this.__visibilityRulesCache) this.__visibilityRulesCache = new WeakMap();
+    if (!raw && !source) return this._extractCardConfig(el)?.visibility;
+    const cached = this.__visibilityRulesCache.get(wrap);
+    const key = raw || JSON.stringify(source?.visibility || []);
+    if (cached?.el === el && cached.key === key) return cached.rules;
+    let rules;
+    try { rules = raw ? JSON.parse(raw).visibility : source?.visibility; } catch { rules = source?.visibility; }
+    this.__visibilityRulesCache.set(wrap, {el, key, rules});
+    return rules;
+  },
+
   _shouldWrapDisplayForCurrentContext_(wrap) {
     if (!wrap || !wrap.firstElementChild) return false;
     const currentTabId = this._normalizeTabId(this.activeTab);
@@ -115,8 +130,7 @@ const visibilityMethods = {
     const passesLayers = this._isWrapVisibleForActiveLayers_(wrap);
     if (!passesActiveTab || !passesLayers) return false;
     if (this.editMode) return true;
-    const cfg = this._extractCardConfig(wrap.firstElementChild) || {};
-    const visList = cfg.visibility;
+    const visList = this._getWrapperVisibility_(wrap);
     return this._evaluateVisibility_(visList);
   },
 

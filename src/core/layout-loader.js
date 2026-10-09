@@ -482,12 +482,14 @@ const initialLoadMethods = {
         }
 
         this._responsiveLayouts = nextResponsiveLayouts;
+        let serializedResponsiveLayouts;
         try {
           const primaryCards = this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_()] || saved?.cards || [];
+          serializedResponsiveLayouts = this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards);
           this._config = {
             ...(this._config || {}),
             cards: this._cloneJson_(primaryCards),
-            responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_(this._responsiveLayouts, primaryCards)),
+            responsive_layouts: serializedResponsiveLayouts,
           };
         } catch {}
         this._activeResponsiveProfile = targetProfile;
@@ -503,10 +505,7 @@ const initialLoadMethods = {
             version: 3,
             options: this._exportableOptions?.() || {},
             cards: this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || entriesToBuild,
-            responsive_layouts: this._cloneJson_(this._serializeResponsiveLayouts_?.(
-              this._responsiveLayouts,
-              this._responsiveLayouts?.[this._getPrimaryResponsiveLayoutKey_?.()] || entriesToBuild
-            )),
+            responsive_layouts: this._cloneJson_(serializedResponsiveLayouts),
             packages: this._exportDashboardPackages_?.() || [],
           }, loadStorageKey);
           this._dbgPush('boot', 'Layout applied', {
