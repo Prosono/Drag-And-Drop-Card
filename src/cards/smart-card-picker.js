@@ -2217,6 +2217,7 @@ const smartPickerMethods = {
   },
   
   async _openSmartPicker(mode='add', initialCfg=null, onCommit=null) {
+    if (this._canEditDashboard_?.() === false) return false;
 
     
     let mobilePickerResizeObserver = null;

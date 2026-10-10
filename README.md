@@ -1276,3 +1276,26 @@ tabs:
 **Tab bar size:** Under **Dashboard Settings → Tabs**, enter a percentage manually or use the slider (1–1000%, default 100%). YAML/API: `tabs_size: 150`. Per-field Tab appearance overrides still take priority.
 
 **Center tab bar on canvas:** Enable in **Dashboard Settings → Tabs** (`tabs_center_on_canvas: true`) to center fixed top/bottom tabs over the rendered canvas, including scaled fixed-size dashboards. Disabled by default. The bar follows the canvas top or bottom edge, and bottom offset is measured inward from the canvas bottom. Sidebar navigation and editor previews retain their own placement.
+
+
+### Editing permissions
+
+Under **Dashboard Settings → Behaviour → Editing permissions**, choose All users (default), Administrators only, or Selected users. In Selected users, administrators can click user names to add or remove dashboard editors. Home Assistant requires an administrator account to load the user list. Existing selections are preserved if loading fails. Administrators always retain access.
+
+For a non-admin wall-tablet account, use:
+
+```yaml
+edit_permissions:
+  mode: admins
+```
+
+To allow specific non-admin users as well:
+
+```yaml
+edit_permissions:
+  mode: selected
+  users:
+    - your-home-assistant-user-id
+```
+
+Restricted users can still operate cards and switch tabs. DDC edit-mode entry, settings, the card picker, and local API configuration writes are blocked. This is a per-dashboard UI restriction, not server-side authorization; Home Assistant permissions remain separate. Existing edit PIN protection still applies to permitted users.

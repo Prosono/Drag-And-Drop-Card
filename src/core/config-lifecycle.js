@@ -1,3 +1,4 @@
+import { normalizeEditPermissions } from './edit-permissions.js';
 import { normalizeContainerRadius } from '../layout/container-style.js';
 import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
 import { normalizeTabStyle } from '../layout/tab-style.js';
@@ -103,6 +104,7 @@ const setConfigMethods = {
       this.autoSave                 = config.auto_save !== false;
       this.autoSaveDebounce         = Number(config.auto_save_debounce ?? 800);
       try { this._syncToolbarAutoSaveState_?.(); } catch {}
+      this.editPermissions = normalizeEditPermissions(config.edit_permissions);
       this.editModePin =            (this.editModePin != null) ? this.editModePin: (config.edit_mode_pin ?? config.editModePin ?? '');
       this.containerBackground      = config.container_background ?? 'transparent';
       this.containerRadius = normalizeContainerRadius(config.container_radius);

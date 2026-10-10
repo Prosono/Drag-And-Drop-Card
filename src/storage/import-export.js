@@ -373,7 +373,7 @@ const designImportExportMethods = {
     const ADOPT_IMPORTED_STORAGE_KEY = false;  // keep current storage_key by default
     const KNOWN_OPT_KEYS = [
       // Core + behavior
-      'grid','drag_live_snap','auto_save','auto_save_debounce',
+      'edit_permissions','grid','drag_live_snap','auto_save','auto_save_debounce',
       'debug','disable_overlap','card_mod','storage_key',
       'animate_cards','play-loading_animation','auto_resize_cards','auto_viewport_max_width','auto_scale_max','optimize_for_mobile','mobile_dynamic_behavior','do_not_resize_text','outer_grid_buffer','outer_grid_buffer_cells','responsive_viewports','responsive_viewport_aspect_locks',
       'connectors','responsive_connectors',

@@ -902,6 +902,31 @@ export function getDashboardSettingsTemplate(screenSaverStyleOptionsHtml = '') {
         <div class="hint">Writes extra layout diagnostics to the browser console.</div>
       </div>
 
+      <div class="setting edit-permissions-setting" role="group" aria-labelledby="lbl-edit-permissions">
+        <div class="row">
+          <div class="title">
+            <ha-icon icon="mdi:account-lock-outline" aria-hidden="true"></ha-icon>
+            <label id="lbl-edit-permissions" for="ddc-edit-permissions">Editing permissions</label>
+          </div>
+          <div class="control">
+            <select id="ddc-edit-permissions" aria-describedby="ddc-edit-permissions-hint">
+              <option value="all">All users</option>
+              <option value="admins">Administrators only</option>
+              <option value="selected">Selected users</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="ddc-edit-permissions-hint">Choose who can edit this DDC dashboard. Administrators always retain access; everyone can still use cards and tabs.</div>
+        <div id="ddc-edit-users-row" class="setting-subcontrol edit-permissions-users" hidden>
+          <span class="edit-users-label" id="ddc-edit-users-label">Dashboard editors</span>
+          <div class="hint">Select users who can edit. Click a selected name again to remove access.</div>
+          <div id="ddc-edit-users" class="edit-user-list" role="group" aria-labelledby="ddc-edit-users-label"></div>
+          <div class="hint" id="ddc-edit-users-status" role="status"></div>
+          <button type="button" class="btn" id="ddc-edit-users-retry" hidden>Try again</button>
+        </div>
+        <div class="hint">Controls DDC editing only. Home Assistant permissions are unchanged.</div>
+      </div>
+
       <!-- EDIT MODE PIN/PASSWORD -->
       <div class="setting" role="group" aria-labelledby="lbl-edit-pin">
         <div class="row">

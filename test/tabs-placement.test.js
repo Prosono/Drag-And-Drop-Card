@@ -330,3 +330,30 @@ test('tab changes leave none/image and mounted media backgrounds untouched', () 
   host.__particlesHost.isConnected=false;host._ensureTabBackground_();
   assert.equal(applied,1);
 });
+
+test('selection-only updates preserve tab buttons and rebuild when configuration changes', () => {
+  const h=new TabsHarness();
+  h.tabs=[{id:'a',icon:'custom:one'},{id:'b',icon:'custom:two'}];
+  h.activeTab='a';
+  const button=(id,active)=>{
+    const classes=new Set(active?['active']:[]),attrs={};
+    return {dataset:{tabId:id},attrs,classList:{contains:k=>classes.has(k),toggle:(k,on)=>on?classes.add(k):classes.delete(k)},setAttribute:(k,v)=>attrs[k]=v};
+  };
+  const a=button('a',true),b=button('b',false),buttons=[a,b];
+  h.tabsBar={querySelector:()=>({}),querySelectorAll:()=>buttons};
+  h.__renderedTabsBar=h.tabsBar;
+  h.__renderedTabsSignature=h._tabRenderSignature_();
+  let renders=0,centered;
+  h._renderTabs=()=>renders++;
+  h._centerTabButtonInScroller_=btn=>centered=btn;
+  h._updateTabOverflowShadows_=()=>{};
+  h.activeTab='b';h._updateActiveTabSelection_();
+  assert.equal(renders,0);
+  assert.equal(centered,b);
+  assert.equal(a.attrs['aria-selected'],'false');
+  assert.equal(a.attrs.tabindex,'-1');
+  assert.equal(b.attrs['aria-selected'],'true');
+  assert.equal(b.attrs.tabindex,'0');
+  h.tabs[1].icon='custom:changed';h._updateActiveTabSelection_();
+  assert.equal(renders,1);
+});

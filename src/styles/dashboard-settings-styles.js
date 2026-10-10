@@ -2105,6 +2105,72 @@ export function getSettingsStyles() {
   .setting-subcontrol.is-disabled{
     opacity:.58;
   }
+  .edit-permissions-setting select{
+    width:100%;
+    min-width:0;
+  }
+  .edit-permissions-users:not([hidden]){
+    display:grid;
+    gap:8px;
+    margin-top:14px;
+    margin-bottom:12px;
+  }
+  .edit-permissions-users > .edit-users-label{
+    color:var(--ddc-settings-text);
+    font-size:.86rem;
+    font-weight:650;
+  }
+  .edit-user-list{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap:8px;
+    max-height:340px;
+    overflow-y:auto;
+    padding:3px;
+  }
+  .edit-user-choice{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-height:64px;
+    padding:12px;
+    border:1px solid var(--ddc-settings-field-border);
+    border-radius:8px;
+    background:var(--ddc-settings-field);
+    color:var(--ddc-settings-text);
+    font:inherit;
+    text-align:left;
+    cursor:pointer;
+  }
+  .edit-user-choice[aria-pressed="true"]{
+    border-color:var(--primary-color, #03a9f4);
+    background:color-mix(in oklab, var(--primary-color, #03a9f4) 9%, var(--ddc-settings-field));
+  }
+  .edit-user-choice:hover:not(:disabled),
+  .edit-user-choice:focus-visible{
+    outline:2px solid var(--primary-color, #03a9f4);
+    outline-offset:1px;
+  }
+  .edit-user-choice:disabled{ cursor:default; opacity:.7; }
+  .edit-user-check{
+    display:grid;
+    place-items:center;
+    flex:0 0 22px;
+    height:22px;
+    border:1px solid var(--ddc-settings-field-border);
+    border-radius:6px;
+  }
+  .edit-user-choice[aria-pressed="true"] .edit-user-check{
+    background:var(--primary-color, #03a9f4);
+    color:var(--text-primary-color, #fff);
+    border-color:transparent;
+  }
+  .edit-user-text{ display:grid; gap:3px; min-width:0; overflow-wrap:anywhere; }
+  .edit-user-text strong{ font-size:.9rem; font-weight:650; }
+  .edit-permissions-users .hint{
+    margin:0;
+    overflow-wrap:anywhere;
+  }
   .dialog.modern .tab-auto-return-controls{
     padding:12px;
     border:1px solid var(--ddc-settings-line);
@@ -2674,6 +2740,8 @@ export function getSettingsStyles() {
     .setting .row{ flex-direction:column; align-items:stretch; gap:10px; }
     .setting .title{ flex:0 0 auto; min-width:0; }
     .setting .hint{ margin-left:0; }
+    .edit-permissions-users{ margin-left:0; max-width:100%; }
+    .edit-permissions-setting > .hint{ max-width:100%; }
     .setting-doc-link{
       max-width:100%;
       margin-left:0;

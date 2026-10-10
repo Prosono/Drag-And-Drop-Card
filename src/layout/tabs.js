@@ -223,8 +223,39 @@ const tabsLayoutMethods = {
     applyTabStyle(this);
   },
 
+  _tabRenderSignature_() {
+    return JSON.stringify([
+      this.tabs, this.tabsPosition, this.tabsSize, this.tabsStyle,
+      !!this.hideTabsWhenSingle, !!this._isSidebarNavigationActive_?.(),
+      !!this._hasLayerMenu_?.(), this.layers, !!this.__layersMenuOpen,
+    ]);
+  },
+
+  _updateActiveTabSelection_() {
+    const bar = this.tabsBar;
+    if (!bar || this.__renderedTabsBar !== bar
+      || this.__renderedTabsSignature !== this._tabRenderSignature_()
+      || !bar.querySelector?.('.ddc-tabs-scroller')) {
+      this._renderTabs();
+      return;
+    }
+    let activeButton;
+    for (const button of bar.querySelectorAll('.ddc-tab')) {
+      const selected = button.dataset.tabId === this.activeTab;
+      if (button.classList.contains('active') !== selected) {
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-selected', String(selected));
+        button.setAttribute('tabindex', selected ? '0' : '-1');
+      }
+      if (selected) activeButton = button;
+    }
+    if (activeButton) this._centerTabButtonInScroller_?.(activeButton);
+    this._updateTabOverflowShadows_?.();
+  },
+
   _renderTabs() {
     const bar = this.tabsBar; if (!bar) return;
+    this.__renderedTabsSignature = null;
     this._syncTabsSize_?.();
     const tabs = Array.isArray(this.tabs) ? this.tabs : [];
     const hasLayerMenu = !!this._hasLayerMenu_?.();
@@ -340,6 +371,8 @@ const tabsLayoutMethods = {
         this._centerTabButtonInScroller_?.(activeBtn);
       }
     } catch {}
+    this.__renderedTabsBar = bar;
+    this.__renderedTabsSignature = this._tabRenderSignature_();
   },
 
   _ensureTabBackground_() {
@@ -376,7 +409,7 @@ const tabsLayoutMethods = {
     } catch (err) {
       console.warn('[ddc:tabs] Could not apply active tab', err);
     }
-    try { this._renderTabs(); } catch (err) { console.warn('[ddc:tabs] Could not render tabs after switch', err); }
+    try { this._updateActiveTabSelection_(); } catch (err) { console.warn('[ddc:tabs] Could not update tabs after switch', err); }
     // Reapply visibility after tab membership has been resolved so conditional
     // cards on the destination tab are correct on the very first frame.
     try { this._applyVisibility_(); } catch {}

@@ -1,3 +1,4 @@
+import { normalizeEditPermissions } from '../core/edit-permissions.js';
 import { normalizeContainerRadius } from '../layout/container-style.js';
 import { normalizeSidebarAppearance } from '../layout/sidebar-appearance.js';
 import { normalizeTabStyle, normalizeTabIconColor } from '../layout/tab-style.js';
@@ -36,6 +37,7 @@ const dashboardApiMethods = {
       auto_save_debounce: this.autoSaveDebounce,
       disable_overlap: !!this.disableOverlap,
       debug: !!this.debug,
+      edit_permissions: normalizeEditPermissions(this.editPermissions),
       edit_mode_pin: (this.editModePin || undefined),
 
       // Size & layout
@@ -160,6 +162,7 @@ const dashboardApiMethods = {
     if ('auto_save' in opts)          this.autoSave = !!opts.auto_save;
     if ('auto_save_debounce' in opts) this.autoSaveDebounce = Number(opts.auto_save_debounce) || 800;
     if ('auto_save' in opts || 'auto_save_debounce' in opts) this._syncToolbarAutoSaveState_?.();
+    if ('edit_permissions' in opts) this.editPermissions = normalizeEditPermissions(opts.edit_permissions);
     if ('edit_mode_pin' in opts || 'editModePin' in opts) this.editModePin = String(opts.edit_mode_pin ?? opts.editModePin ?? '');
     if ('do_not_resize_text' in opts) this.doNotResizeText = !!opts.do_not_resize_text;
     if ('optimize_for_mobile' in opts) this.optimizeForMobile = !!opts.optimize_for_mobile;
@@ -436,6 +439,7 @@ const dashboardApiMethods = {
       auto_save_debounce: { type: 'number' },
       debug: { type: 'boolean' },
       disable_overlap: { type: 'boolean' },
+      edit_permissions: { type: 'object' },
       edit_mode_pin: { type: 'string' },
       animate_cards: { type: 'boolean' },
       'play-loading_animation': { type: 'boolean' },
@@ -672,6 +676,7 @@ const dashboardApiMethods = {
   },
 
   async _persistDashboardApiSettings_(opts = {}) {
+    if (this._canEditDashboard_?.() === false) throw new Error('Editing this dashboard is not allowed for this user.');
     const options = this._exportableOptions?.() || {};
     if (this._getStorageMode_?.() === 'lovelace') {
       const saved = await this._saveLayout?.(true);
@@ -702,6 +707,9 @@ const dashboardApiMethods = {
   async _setDashboardApiSettings_(patch = {}, opts = {}) {
     const normalized = this._normalizeDashboardApiPatch_(patch);
     const keys = Object.keys(normalized);
+    if (this._canEditDashboard_?.() === false && keys.some(key => key !== 'active_tab')) {
+      throw new Error('Editing this dashboard is not allowed for this user.');
+    }
     if (!keys.length) return this._cloneDashboardApiValue_(this._getDashboardApiState_());
     const hasActiveTab = Object.prototype.hasOwnProperty.call(normalized, 'active_tab');
     if (hasActiveTab) {
@@ -801,6 +809,7 @@ const dashboardApiMethods = {
         return owner._openDashboardSettings?.();
       },
       saveLayout(silent = true) {
+        if (owner._canEditDashboard_?.() === false) return false;
         return owner._saveLayout?.(silent);
       },
       setEditMode(enabled) {

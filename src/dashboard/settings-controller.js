@@ -1,3 +1,5 @@
+import { setupEditUserPicker } from './edit-user-picker.js';
+import { normalizeEditPermissions } from '../core/edit-permissions.js';
 import { normalizeContainerRadius } from '../layout/container-style.js';
 import { resolveSidebarWidgets } from '../layout/sidebar-widgets.js';
 import { normalizeSidebarAppearance, sidebarAppearanceFields, applySidebarAppearance } from '../layout/sidebar-appearance.js';
@@ -31,6 +33,7 @@ const dashboardSettingsMethods = {
   },
 
   _openDashboardSettings() {
+    if (this._canEditDashboard_?.() === false) return false;
     // Build modal container
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -174,6 +177,18 @@ const dashboardSettingsMethods = {
     const outerGridBufferCellsControl = modal.querySelector('[data-outer-grid-buffer-cells]');
     const chkOverlap = modal.querySelector('#ddc-setting-disableOverlap');
     const inpEditPin = modal.querySelector('#ddc-setting-editPin');
+    const editPolicy = normalizeEditPermissions(this.editPermissions);
+    const selEditPolicy = modal.querySelector('#ddc-edit-permissions');
+    const selectedEditUsers = new Set(editPolicy.users);
+    const userPicker = setupEditUserPicker(modal, this._hass || this.hass, selectedEditUsers);
+    selEditPolicy.value = editPolicy.mode;
+    const syncEditPolicy = () => {
+      const selected = selEditPolicy.value === 'selected';
+      modal.querySelector('#ddc-edit-users-row').hidden = !selected;
+      if (selected) userPicker.load();
+    };
+    selEditPolicy.addEventListener('change', syncEditPolicy);
+    syncEditPolicy();
     const selDashboardTheme = modal.querySelector('#ddc-setting-dashboardTheme');
     const selEditorThemeMode = modal.querySelector('#ddc-setting-editorThemeMode');
     const initialEditorThemeMode = this._getEditorThemeMode_?.() || 'light';
@@ -2891,6 +2906,7 @@ const dashboardSettingsMethods = {
     modal.querySelector('#ddc-settings-cancel')?.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); });
     // Save handler
     modal.querySelector('#ddc-settings-save')?.addEventListener('click', async (e) => {
+      if (this._canEditDashboard_?.() === false) { closeModal(); return; }
       e.stopPropagation();
       const newStorageMode = selStorageMode?.value === 'lovelace' ? 'lovelace' : 'backend';
       const storageModeChanged = newStorageMode !== (this._getStorageMode_?.() || 'backend');
@@ -3073,6 +3089,9 @@ const dashboardSettingsMethods = {
         this.cardShadowEnabled = newShadow;
         this.cardShadowIntensity = newShadowIntensity;
         // Edit mode PIN
+        this.editPermissions = normalizeEditPermissions({ mode: selEditPolicy.value, users: [...selectedEditUsers] });
+        this._config = { ...(this._config || {}), edit_permissions: this.editPermissions };
+        if (this._config.options) this._config.options.edit_permissions = this.editPermissions;
         this.editModePin = newEditPin;
         // make sure the persisted config also carries it
         this._config = { ...(this._config || {}), edit_mode_pin: newEditPin };

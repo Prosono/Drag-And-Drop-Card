@@ -371,6 +371,7 @@ const lifecycleMethods = {
 
   set hass(hass) {
       this._hass = hass;
+      if (this.editMode && this._canEditDashboard_?.() === false) this._toggleEditMode?.(false);
       if (hass && this.__cfgReady && !this.__booted && this._getStorageMode_?.() === 'lovelace') {
         this.__booted = true;
         this._initialLoad(true, { replaceExisting: true });

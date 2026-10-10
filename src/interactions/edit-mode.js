@@ -1,3 +1,4 @@
+import { canUserEdit } from '../core/edit-permissions.js';
 /*
  * Edit mode state, preview rendering, and dashboard editing affordances.
  *
@@ -9,6 +10,9 @@ import { getHaConfigPreviewTemplate } from '../ha/config-preview-template.js';
 
 /* Edit mode, HA editor preview, long-press entry, and edit toolbar helpers. */
 const editModeMethods = {
+  _canEditDashboard_() {
+    return canUserEdit(this.editPermissions ?? this._config?.edit_permissions, (this._hass || this.hass)?.user);
+  },
     _requestEditModePin_(expectedPin = '') {
       const expected = String(expectedPin || '').trim();
       if (!expected) return Promise.resolve(true);
@@ -136,6 +140,7 @@ const editModeMethods = {
     try { this.__clearPressTimer?.(); } catch {}
   
     const entering = (force === null) ? !this.editMode : !!force;
+    if (entering && !this._canEditDashboard_()) return false;
     const editModeChanged = entering !== !!this.editMode;
     const wasOff   = !this.editMode && entering;
     if (!entering) {
