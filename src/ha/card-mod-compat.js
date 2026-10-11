@@ -11,6 +11,8 @@
    - No extra resource needed; executed as part of this script
    - Uses a guarded (WeakSet) ll-rebuild dispatch on newly added card elements
    ========================================================================== */
+import { dispatchInternalRebuild } from '../cards/lovelace-rebuild.js';
+
 export function installCardModCompatibility() {
   const SEEN = new WeakSet();
 
@@ -29,7 +31,7 @@ export function installCardModCompatibility() {
     try {
       if (!el || SEEN.has(el)) return;
       SEEN.add(el);
-      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+      dispatchInternalRebuild(el);
     } catch {}
   };
 

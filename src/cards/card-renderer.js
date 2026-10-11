@@ -880,11 +880,13 @@ const cardBuilderMethods = {
       return el;
     },
 
-    async _replaceEditedCardElement_(wrap, cardConfig = {}) {
+    async _replaceEditedCardElement_(wrap, cardConfig = {}, { isCurrent } = {}) {
       if (!wrap) return null;
       const cleanConfig = this._sanitizeCardConfigForStorage_(cardConfig || {});
       const oldEl = wrap.firstElementChild;
       const newEl = await this._createCard(cleanConfig);
+      // A delayed module must not replace a newer edit or a removed wrapper.
+      if (isCurrent && !isCurrent()) return null;
 
       // Give the new card its live HA state before connection when possible,
       // then once more after connection for cards whose setter initializes Lit.

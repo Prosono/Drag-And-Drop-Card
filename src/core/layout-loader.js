@@ -529,7 +529,7 @@ const initialLoadMethods = {
         try {
           __rebuildAfter.forEach((el) => {
             try {
-              el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+              this._rebuildOnce(el);
             } catch {}
           });
         } catch {}

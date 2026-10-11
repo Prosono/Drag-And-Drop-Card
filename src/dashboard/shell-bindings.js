@@ -6,9 +6,11 @@
  */
 
 import { getDashboardShellTemplate } from './shell-template.js';
+import { createCardRebuildHandler } from '../cards/lovelace-rebuild.js';
 
 export function installInternalLovelaceRebuildBoundary(root, host) {
   if (!root || !host || host.__ddcInternalLovelaceRebuildBoundary) return false;
+  const rebuildCard = createCardRebuildHandler(host);
   host.__ddcInternalLovelaceRebuildBoundary = (event) => {
     // Child cards use ll-rebuild to finish their own initialization. Let that
     // event traverse the complete internal card tree, but do not let it escape
@@ -17,6 +19,7 @@ export function installInternalLovelaceRebuildBoundary(root, host) {
     // an imported tab are initialized on first activation, so that recreation
     // used to reset the newly selected tab immediately.
     event?.stopPropagation?.();
+    return rebuildCard(event);
   };
   root.addEventListener('ll-rebuild', host.__ddcInternalLovelaceRebuildBoundary);
   return true;

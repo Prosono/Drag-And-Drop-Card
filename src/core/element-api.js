@@ -1,4 +1,5 @@
 import { queryHaChrome } from '../ha/chrome-query.js';
+import { dispatchInternalRebuild } from '../cards/lovelace-rebuild.js';
 /*
  * Small API and utility methods mixed into the main DragAndDropCard element.
  *
@@ -32,7 +33,7 @@ const coreMethods = {
       if (!this.__rebuiltCards) this.__rebuiltCards = new WeakSet();
       if (this.__rebuiltCards.has(el)) return;
       this.__rebuiltCards.add(el);
-      el.dispatchEvent(new Event('ll-rebuild', { bubbles: true, composed: true }));
+      dispatchInternalRebuild(el);
     } catch {}
   },
 
