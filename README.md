@@ -165,6 +165,8 @@ debug: false                           # verbose console logs
 Now:
 
 - **Long-press** on blank canvas (≈1s) **or** **double-click** an empty area to enter **Edit Mode**.
+- **Touch navigation:** drag with one finger to pan horizontally, vertically, or diagonally, including in Edit Mode. In Edit Mode, pan from blank canvas; tap a card to select it, drag the card to move it, or drag its resize handles. Edit and delete buttons remain directly tappable. Outside Edit Mode, normal taps still operate cards.
+- **Add a card on touch:** in Edit Mode, hold a blank area until the progress ring completes, then drag to mark an area and release to open the card picker. Moving before the hold completes pans instead. Lift your finger after entering Edit Mode, then hold again to start marking an area. Mouse drag selection is unchanged.
 - Use the **toolbar** to **Add** cards, **Import/Export**, **Apply**, or **Exit** edit mode.
 - **Ctrl/Cmd + S** applies (saves) the layout while in edit mode.
 - **Esc** exits edit mode.

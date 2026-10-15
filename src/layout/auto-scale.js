@@ -255,6 +255,8 @@ const scaleManagerMethods = {
   // Create a layout box that will reflect the *visual* size
   const outer = document.createElement('div');
   outer.className = 'ddc-scale-outer';
+  // DDC owns touch panning on the entire viewport, including canvas margins.
+  outer.style.touchAction = 'none';
   Object.assign(outer.style, {
     position: 'relative',
     width: '100%',

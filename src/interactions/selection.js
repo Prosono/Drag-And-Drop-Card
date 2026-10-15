@@ -439,6 +439,8 @@ const selectionMethods = {
       };
   
       const down = (e) => {
+        if ('touches' in e || e.sourceCapabilities?.firesTouchEvents
+          || Date.now() - (this.__lastCanvasTouch || 0) < 1000) return;
         if (!this.editMode) return;
         if (typeof e.button === 'number' && e.button !== 0) return;
         if (e.target.closest('.card-wrapper')) return;
@@ -458,10 +460,7 @@ const selectionMethods = {
       cont.addEventListener('mousedown', down);
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', up);
-      cont.addEventListener('touchstart', (e)=>{ if (!this.editMode) return; if (e.target.closest('.card-wrapper')) return; down(e); }, {passive:false});
-      window.addEventListener('touchmove', (e)=>{ move(e); }, {passive:true});
-      window.addEventListener('touchend', up);
-      window.addEventListener('touchcancel', up);
+
     },
 };
 

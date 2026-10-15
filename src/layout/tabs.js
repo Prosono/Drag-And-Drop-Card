@@ -761,6 +761,8 @@ const tabsLayoutMethods = {
   _stopTabsCanvasCenter_() {
     this.__tabsCanvasRO?.disconnect();
     this.__tabsCanvasRO = null;
+    if (this.__tabsCanvasRAF != null) cancelAnimationFrame(this.__tabsCanvasRAF);
+    this.__tabsCanvasRAF = null;
     if (this.__tabsCanvasHandler) {
       window.removeEventListener('scroll', this.__tabsCanvasHandler, true);
       window.removeEventListener('resize', this.__tabsCanvasHandler);
@@ -783,21 +785,34 @@ const tabsLayoutMethods = {
       const rect = canvas.getBoundingClientRect();
       bar.classList.toggle('ddc-tabs-canvas-centered', fixed && rect.width > 0);
       if (!fixed || rect.width <= 0) return;
-      this.style.setProperty('--ddc-tabs-canvas-center', `${rect.left + rect.width / 2}px`);
-      this.style.setProperty('--ddc-tabs-canvas-top', `${rect.top}px`);
-      this.style.setProperty('--ddc-tabs-canvas-bottom', `${rect.bottom}px`);
-      this.style.setProperty('--ddc-tabs-canvas-width', `${Math.max(0, rect.width - 24)}px`);
+      // These values belong only to the tabs. Writing them on the host makes
+      // every embedded card inherit new custom properties on each scroll.
+      for (const [name, value] of Object.entries({
+        center: rect.left + rect.width / 2, top: rect.top,
+        bottom: rect.bottom, width: Math.max(0, rect.width - 24),
+      })) {
+        const property = `--ddc-tabs-canvas-${name}`;
+        const next = `${value}px`;
+        if (bar.style.getPropertyValue(property) !== next) bar.style.setProperty(property, next);
+      }
     };
     if (this.__tabsCanvasTarget !== canvas) {
       this._stopTabsCanvasCenter_();
       this.__tabsCanvasTarget = canvas;
-      this.__tabsCanvasHandler = update;
+      const schedule = () => {
+        if (this.__tabsCanvasRAF != null) return;
+        this.__tabsCanvasRAF = requestAnimationFrame(() => {
+          this.__tabsCanvasRAF = null;
+          update();
+        });
+      };
+      this.__tabsCanvasHandler = schedule;
       if (typeof ResizeObserver !== 'undefined') {
-        this.__tabsCanvasRO = new ResizeObserver(update);
+        this.__tabsCanvasRO = new ResizeObserver(schedule);
         this.__tabsCanvasRO.observe(canvas);
       }
-      window.addEventListener('scroll', update, {capture: true, passive: true});
-      window.addEventListener('resize', update);
+      window.addEventListener('scroll', schedule, {capture: true, passive: true});
+      window.addEventListener('resize', schedule);
     }
     update();
   },

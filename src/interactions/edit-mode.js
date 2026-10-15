@@ -137,6 +137,7 @@ const editModeMethods = {
     },
 
   _toggleEditMode(force = null) {
+    try { this.__cancelTouchGesture?.(); } catch {}
     try { this.__clearPressTimer?.(); } catch {}
   
     const entering = (force === null) ? !this.editMode : !!force;
@@ -307,6 +308,7 @@ const editModeMethods = {
     }
     try { this._syncViewportPreviewUI_?.(); } catch {}
     this._syncEmptyStateUI?.();
+    if (this.cardContainer?.style) this.cardContainer.style.touchAction = 'none';
     this.cardContainer?.classList.toggle('grid-on', this.editMode);
     this.cardContainer?.classList.toggle('ddc-editing-connectors', this.editMode);
   
@@ -446,10 +448,9 @@ const editModeMethods = {
 
   _installLongPressToEnterEdit() {
     if (this.__lpInstalled) return;
-    this.__lpInstalled = true;
-  
     const cont = this.cardContainer;
     if (!cont) return;
+    this.__lpInstalled = true;
   
     // Tunables
     const HOLD_MS  = 800;  // how long to hold
@@ -498,32 +499,54 @@ const editModeMethods = {
       const r = 18, circ = 2 * Math.PI * r;
       fg.style.strokeDasharray = `${circ}`;
       fg.style.strokeDashoffset = `${circ}`;
-      requestAnimationFrame(() => {
+      // Independent expiry: even a missing release/cancel event cannot strand
+      // an overlay on document.body.
+      const expiry = setTimeout(() => el.remove(), HOLD_MS + 500);
+      const animationFrame = requestAnimationFrame(() => {
         fg.style.transition = `stroke-dashoffset ${HOLD_MS}ms linear`;
         fg.style.strokeDashoffset = '0';
       });
       return {
         el,
         move(nx, ny) { el.style.left = `${nx}px`; el.style.top = `${ny}px`; },
-        remove() { try { el.remove(); } catch {} }
+        remove() { clearTimeout(expiry); cancelAnimationFrame(animationFrame); try { el.remove(); } catch {} }
       };
     };
   
   
   
+    this.__makePressRing = makeRing;
+
     // ---- state --------------------------------------------------------------
     let timer = null;
     let ring  = null;
     let startX = 0, startY = 0;
     let activePointerId = null;
   
-    const clearTimer = () => { if (timer) clearTimeout(timer); timer = null; ring?.remove(); ring = null; };
-    this.__clearPressTimer = clearTimer; // allow external cancel on mode changes
+    const pointers = new Set();
+    const clearTimer = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      ring?.remove();
+      ring = null;
+      activePointerId = null;
+    };
+    const cancelGesture = () => { clearTimer(); pointers.clear(); };
+    const onGlobalPointerDown = (e) => {
+      pointers.add(e.pointerId);
+      if (pointers.size > 1 || e.isPrimary === false) clearTimer();
+    };
+    const onVisibilityChange = () => { if (document.hidden) cancelGesture(); };
+    this.__clearPressTimer = cancelGesture; // allow external cancel on mode changes
   
   
   
     // ---- handlers -----------------------------------------------------------
     const onPointerDown = (e) => {
+      if (this.__touchPanActive) { clearTimer(); return; }
+      // A second finger cancels the entire gesture, including outside the canvas.
+      if (pointers.size > 1 || e.isPrimary === false) { clearTimer(); return; }
+      if (!this.editMode && !this._canEditDashboard_()) { clearTimer(); return; }
       // Left mouse / primary touch only
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (this._isInHaEditorPreview()) return;
@@ -531,6 +554,7 @@ const editModeMethods = {
       // Only trigger on empty space *within this container*
       if (!within(e.target) || isOverCard(e)) return;
   
+      clearTimer();
       activePointerId = e.pointerId;
       startX = e.clientX; startY = e.clientY;
       this.__lastHoldX = startX; this.__lastHoldY = startY;
@@ -540,9 +564,10 @@ const editModeMethods = {
   
       timer = setTimeout(() => {
         clearTimer();
+        if (!this.isConnected || (!this.editMode && !this._canEditDashboard_())) return;
         const toState = !this.editMode;
         this._toggleEditMode(toState);
-        this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
+        if (this.editMode === toState) this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
       }, HOLD_MS);
     };
   
@@ -555,6 +580,7 @@ const editModeMethods = {
     };
   
     const onPointerUpOrCancel = (e) => {
+      pointers.delete(e.pointerId);
       if (e.pointerId !== activePointerId) return;
       clearTimer();
       activePointerId = null;
@@ -566,24 +592,50 @@ const editModeMethods = {
     };
   
     const onDblClick = (e) => {
+      if (!this.editMode && !this._canEditDashboard_()) return;
       if (this._isInHaEditorPreview()) return;
       if (!within(e.target) || isOverCard(e)) return;
       const toState = !this.editMode;
       this._toggleEditMode(toState);
-      this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
+      if (this.editMode === toState) this._toast?.(`Edit mode ${toState ? 'enabled' : 'disabled'}`);
     };
   
     // ---- wire up ------------------------------------------------------------
+    window.addEventListener('pointerdown', onGlobalPointerDown, true);
     cont.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUpOrCancel, { passive: true });
-    window.addEventListener('pointercancel', onPointerUpOrCancel, { passive: true });
+    window.addEventListener('pointerup', onPointerUpOrCancel, { passive: true, capture: true });
+    window.addEventListener('pointercancel', onPointerUpOrCancel, { passive: true, capture: true });
     window.addEventListener('contextmenu', onContextMenu);
   
     cont.addEventListener('dblclick', onDblClick);
   
-    // keep references for clean-up in disconnectedCallback
-    this.__lpHandlers = { onPointerDown, onPointerMove, onPointerUpOrCancel, onContextMenu, onDblClick };
+    window.addEventListener('lostpointercapture', cancelGesture, true);
+    window.addEventListener('blur', cancelGesture);
+    window.addEventListener('pagehide', cancelGesture);
+    window.addEventListener('location-changed', cancelGesture);
+    window.addEventListener('popstate', cancelGesture);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    this.__lpCleanup = () => {
+      cancelGesture();
+      cont.removeEventListener('pointerdown', onPointerDown);
+      cont.removeEventListener('dblclick', onDblClick);
+      window.removeEventListener('pointerdown', onGlobalPointerDown, true);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUpOrCancel, true);
+      window.removeEventListener('pointercancel', onPointerUpOrCancel, true);
+      window.removeEventListener('contextmenu', onContextMenu);
+      window.removeEventListener('lostpointercapture', cancelGesture, true);
+      window.removeEventListener('blur', cancelGesture);
+      window.removeEventListener('pagehide', cancelGesture);
+      window.removeEventListener('location-changed', cancelGesture);
+      window.removeEventListener('popstate', cancelGesture);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      this.__makePressRing = null;
+      this.__clearPressTimer = null;
+      this.__lpCleanup = null;
+      this.__lpInstalled = false;
+    };
   },
 
   _isLayoutEmpty() {

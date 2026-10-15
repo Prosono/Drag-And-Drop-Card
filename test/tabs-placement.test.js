@@ -288,6 +288,12 @@ test('fixed tab bars center between both Home Assistant side gutters', async () 
 test('canvas-anchored tabs track both axes and release listeners when disabled', () => {
   const oldWindow = globalThis.window;
   const oldGetComputedStyle = globalThis.getComputedStyle;
+  const oldRAF = globalThis.requestAnimationFrame, oldCancel = globalThis.cancelAnimationFrame;
+  const frames = new Map();
+  let serial = 0, writes = 0, reads = 0;
+  globalThis.requestAnimationFrame = fn => { frames.set(++serial, fn); return serial; };
+  globalThis.cancelAnimationFrame = id => frames.delete(id);
+  const frame = () => { const jobs = [...frames.values()]; frames.clear(); jobs.forEach(fn => fn()); };
   const listeners = new Map();
   globalThis.window = {addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name)};
   globalThis.getComputedStyle = () => ({position: 'fixed'});
@@ -296,22 +302,33 @@ test('canvas-anchored tabs track both axes and release listeners when disabled',
     const values = new Map(), classes = new Set();
     let rect = {left: 120, top: 80, width: 600, bottom: 480};
     host.tabsCenterOnCanvas = true;
-    host.style = {setProperty: (key, value) => values.set(key, value)};
-    host.tabsBar = {classList: {toggle: (key, on) => on ? classes.add(key) : classes.delete(key), remove: key => classes.delete(key)}};
-    host.cardContainer = {getBoundingClientRect: () => rect};
+    host.style = {setProperty: () => assert.fail('must not invalidate styles of embedded cards')};
+    host.tabsBar = {style: {getPropertyValue: key => values.get(key), setProperty: (key, value) => { writes++; values.set(key, value); }}, classList: {toggle: (key, on) => on ? classes.add(key) : classes.delete(key), remove: key => classes.delete(key)}};
+    host.cardContainer = {getBoundingClientRect: () => { reads++; return rect; }};
     host._syncTabsCanvasCenter_();
     assert.equal(values.get('--ddc-tabs-canvas-center'), '420px');
     assert.equal(values.get('--ddc-tabs-canvas-top'), '80px');
     assert.equal(values.get('--ddc-tabs-canvas-bottom'), '480px');
     rect = {left: 100, top: 20, width: 300, bottom: 220};
-    listeners.get('scroll')();
+    for (let i = 0; i < 20; i++) listeners.get('scroll')();
+    assert.equal(frames.size, 1);
+    assert.equal(reads, 1);
+    frame();
     assert.equal(values.get('--ddc-tabs-canvas-center'), '250px');
     assert.equal(values.get('--ddc-tabs-canvas-bottom'), '220px');
+    const priorWrites = writes;
+    listeners.get('scroll')();
+    frame();
+    assert.equal(writes, priorWrites);
+    listeners.get('scroll')();
     host.tabsCenterOnCanvas = false;
     host._syncTabsCanvasCenter_();
     assert.equal(classes.size, 0);
     assert.equal(listeners.size, 0);
+    assert.equal(frames.size, 0);
   } finally {
+    globalThis.requestAnimationFrame = oldRAF;
+    globalThis.cancelAnimationFrame = oldCancel;
     globalThis.window = oldWindow;
     globalThis.getComputedStyle = oldGetComputedStyle;
   }

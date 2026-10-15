@@ -57,6 +57,8 @@ const interactBehaviorMethods = {
       modifiers: mods,
       listeners: {
         start: (ev) => {
+          this.__activeCardInteraction = ev.interaction;
+          if (this.__touchPanActive) { ev.interaction?.stop(); return; }
           // ensure the clicked card is in the selection
           if (!this._selection.has(wrap)) {
             if (!ev?.shiftKey && !ev?.ctrlKey && !ev?.metaKey) this._clearSelection();
@@ -111,6 +113,7 @@ const interactBehaviorMethods = {
         },
 
         move: (ev) => {
+          if (this.__touchPanActive) { ev.interaction?.stop(); return; }
           if (!this.__groupDrag) return;
           const gs   = this.gridSize;
           const live = !!this.dragLiveSnap;
@@ -202,6 +205,7 @@ const interactBehaviorMethods = {
         },
 
         end: (ev) => {
+          this.__activeCardInteraction = null;
           if (!this.__groupDrag) return;
           const gs = this.gridSize;
 
@@ -295,6 +299,9 @@ const interactBehaviorMethods = {
       inertia:false,
       listeners:{
         start:(ev)=>{
+          this.__activeCardInteraction = ev.interaction;
+          if (this.__touchPanActive) { ev.interaction?.stop(); return; }
+          this.__touchResizeOriginal = { wrap, x: wrap.getAttribute('data-x'), y: wrap.getAttribute('data-y'), width: wrap.style.width, height: wrap.style.height };
           this.__ddcResizingCard = true;
           this.__ddcScaleAfterCardResize = false;
           this.__ddcResizeFromLeft = !!ev?.edges?.left;
@@ -314,6 +321,7 @@ const interactBehaviorMethods = {
           }
         },
         move:(ev)=>{
+          if (this.__touchPanActive) { ev.interaction?.stop(); return; }
           const gs   = this.gridSize;
           const live = !!this.dragLiveSnap;
           const curW = parseFloat(wrap.style.width)  || wrap.getBoundingClientRect().width;
@@ -373,6 +381,8 @@ const interactBehaviorMethods = {
           this._renderConnectors_?.();
         },
         end:()=>{
+          this.__activeCardInteraction = null;
+          this.__touchResizeOriginal = null;
           const needsFinalScale = !!this.__ddcScaleAfterCardResize;
           const gs = this.gridSize;
           const prevW = parseFloat(wrap.style.width)  || wrap.getBoundingClientRect().width;
@@ -447,8 +457,9 @@ const interactBehaviorMethods = {
       }
     });
 
-    // selection with clicks
-    wrap.addEventListener('mousedown', (e) => {
+    // Select immediately for both touch and mouse, without relying on iOS
+    // synthesizing a compatibility mousedown after the gesture.
+    wrap.addEventListener('pointerdown', (e) => {
       if (!this.editMode) return;
       if (typeof e.button === 'number' && e.button !== 0) return;
       // Ignore clicks on controls: resize handle, delete handle, or chip actions

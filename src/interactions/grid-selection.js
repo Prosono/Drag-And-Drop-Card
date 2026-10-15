@@ -33,11 +33,12 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     _isGridInteractionSuspended_() {
-      return !!this.__ddcResizingCard || !!this.cardContainer?.classList?.contains?.('ddc-card-resizing');
+      return !!this.__touchPanActive || !!this.__ddcResizingCard || !!this.cardContainer?.classList?.contains?.('ddc-card-resizing');
     },
 
     _clearGridInteractionVisualState_() {
       this._gridDown = false;
+      this._gridInputType = null;
       this._gridPointerId = null;
       this._gridHoverCol = this._gridHoverRow = -1;
       this._gridStartCol = this._gridStartRow = -1;
@@ -138,6 +139,7 @@ export function installGridSelectPatch(DragAndDropCard) {
       this._gridTile = null;
       this._gridLightMode = false;
       this._gridDown = false;
+      this._gridInputType = null;
       this._gridPointerId = null;
       this._gridHoverCol = this._gridHoverRow = -1;
       this._destroyGridDomOverlays_();
@@ -223,13 +225,18 @@ export function installGridSelectPatch(DragAndDropCard) {
         return;
       }
       el.style.display = 'block';
+      if (el === this._gridSelectionEl) {
+        el.style.zIndex = this.__touchAreaSelecting ? '2147483000' : '';
+        el.style.border = this.__touchAreaSelecting ? '2px solid var(--primary-color, #03a9f4)' : '';
+        el.style.backgroundColor = this.__touchAreaSelecting ? 'color-mix(in srgb, var(--primary-color, #03a9f4) 20%, transparent)' : '';
+      }
       el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
       el.style.width = `${Math.max(0, Math.round(w))}px`;
       el.style.height = `${Math.max(0, Math.round(h))}px`;
     },
 
     _updateGridDomOverlays_() {
-      if (!this._gridLightMode) return;
+      if (!this._gridLightMode && !this.__touchAreaSelecting) return;
       this._ensureGridDomOverlays_();
       const grid = this._gridCellSize || 10;
 
@@ -268,6 +275,7 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     _markGridDirty() {
+      if (this.__touchAreaSelecting) this._updateGridDomOverlays_();
       if (this._gridDirty) return;
       this._gridDirty = true;
       this._gridRAF = requestAnimationFrame(() => {
@@ -286,7 +294,8 @@ export function installGridSelectPatch(DragAndDropCard) {
         this._updateGridDomOverlays_();
         return;
       }
-      this._destroyGridDomOverlays_();
+      if (this.__touchAreaSelecting) this._updateGridDomOverlays_();
+      else this._destroyGridDomOverlays_();
       const ctx = this._gridCtx;
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const grid = this._gridCellSize || 10;
@@ -373,8 +382,14 @@ export function installGridSelectPatch(DragAndDropCard) {
 
     /* === GRID SELECT PATCH START (interaction) === */
     _emptySpaceAt_(clientX, clientY) {
-      const el = document.elementFromPoint(clientX, clientY);
-      return !el || !el.closest || !el.closest('.card-wrapper, .resize-handle, .ddc-chip, .shield');
+      // document.elementFromPoint stops at HA's shadow hosts and can report
+      // a real card as blank canvas. Hit-test inside this DDC's own shadow root.
+      const root = this.shadowRoot;
+      const el = root?.elementFromPoint
+        ? root.elementFromPoint(clientX, clientY)
+        : document.elementFromPoint(clientX, clientY);
+      if (!el || !this.cardContainer?.contains?.(el)) return false;
+      return !el.closest?.('.card-wrapper, .resize-handle, .ddc-chip, .shield');
     },
 
     _locToCell_(clientX, clientY) {
@@ -391,6 +406,15 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     _onGridPointerDown(ev) {
+      const type = ev.pointerType || 'mouse';
+      const authorizedTouch = this.__touchAreaSelecting && this.__touchAreaPointerId === ev.pointerId;
+      if ((type === 'touch' && !authorizedTouch)
+        || (type === 'mouse' && (ev.sourceCapabilities?.firesTouchEvents
+          || Date.now() - (this.__lastCanvasTouch || 0) < 1000))) {
+        this._clearGridInteractionVisualState_?.();
+        this._markGridDirty();
+        return;
+      }
       if (this._isGridInteractionSuspended_?.()) {
         this._clearGridInteractionVisualState_?.();
         this._markGridDirty();
@@ -407,13 +431,14 @@ export function installGridSelectPatch(DragAndDropCard) {
       if (!this._emptySpaceAt_(ev.clientX, ev.clientY)) return;
       const { col, row } = this._locToCell_(ev.clientX, ev.clientY);
       this._gridDown = true;
+      this._gridInputType = type;
       this._gridPointerId = ev.pointerId;
       this._gridStartCol = col;
       this._gridStartRow = row;
       this._gridCurrCol = col;
       this._gridCurrRow = row;
       this._markGridDirty();
-      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+      if (ev.pointerType !== 'touch') ev.currentTarget.setPointerCapture?.(ev.pointerId);
     },
 
     _onGridPointerMove(ev) {
@@ -440,6 +465,14 @@ export function installGridSelectPatch(DragAndDropCard) {
     },
 
     async _onGridPointerUp(ev) {
+      // Creation requires a matching start AND a live hold authorization.
+      const type = ev?.pointerType || 'mouse';
+      if (!this._gridDown || type !== this._gridInputType
+        || (type === 'touch' && (!this.__touchAreaSelecting || this.__touchAreaPointerId !== ev.pointerId))) {
+        this._clearGridInteractionVisualState_?.();
+        this._markGridDirty();
+        return;
+      }
       if (this._isGridInteractionSuspended_?.()) {
         this._clearGridInteractionVisualState_?.();
         this._markGridDirty();
@@ -452,6 +485,7 @@ export function installGridSelectPatch(DragAndDropCard) {
       if (!this._gridDown) return;
       if (this._gridPointerId != null && ev?.pointerId !== this._gridPointerId) return;
       this._gridDown = false;
+      this._gridInputType = null;
       this._gridPointerId = null;
 
       const minCol = Math.min(this._gridStartCol, this._gridCurrCol);
@@ -474,6 +508,7 @@ export function installGridSelectPatch(DragAndDropCard) {
 
     _onGridPointerCancel() {
       this._gridDown = false;
+      this._gridInputType = null;
       this._gridPointerId = null;
       this._gridHoverCol = this._gridHoverRow = -1;
       this._markGridDirty();

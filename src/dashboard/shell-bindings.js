@@ -245,6 +245,7 @@ const dashboardShellBindingMethods = {
 
     this._applyContainerSizingFromConfig(true);
     this._applyAutoScale?.();
+    this._installTouchPan_?.();
     this._installLongPressToEnterEdit();
     this._installMiddleMousePan_?.();
     this._startScaleWatch?.();

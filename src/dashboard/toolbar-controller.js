@@ -283,21 +283,32 @@ _installToolbarFollowListeners_() {
   try {
     if (this.__toolbarFollowListeners || typeof window === 'undefined') return;
     const watched = new WeakSet();
+    let needsMeasurement = false;
     const sync = () => {
-      try { this._computeHaSidebarGutters_?.(); } catch {}
+      const measure = needsMeasurement;
+      needsMeasurement = false;
+      if (measure) {
+        try { this._computeHaSidebarGutters_?.(); } catch {}
+        try { this._refreshToolbarOpenHeight_?.(); } catch {}
+      }
       try { this._computeHaTopGutter_?.(); } catch {}
       try { this._syncToolbarFollowPosition_?.(); } catch {}
-      try { this._refreshToolbarOpenHeight_?.(); } catch {}
       try { this._positionToolbarDropdown_?.(); } catch {}
     };
-    const schedule = () => {
+    const schedule = (measure = true) => {
+      needsMeasurement ||= measure;
       if (this.__toolbarFollowRAF) return;
       this.__toolbarFollowRAF = requestAnimationFrame(() => {
         this.__toolbarFollowRAF = 0;
         sync();
       });
     };
-    window.addEventListener('scroll', schedule, true);
+    const onScroll = (event) => {
+      // Scrolling inside DDC cannot move HA chrome or the fixed toolbar.
+      if (event.composedPath?.().includes(this)) return;
+      schedule(false);
+    };
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', schedule, { passive: true });
     let resizeObserver = null;
     let discoveryTimer = 0;
@@ -321,7 +332,7 @@ _installToolbarFollowListeners_() {
         schedule();
       }, 1200);
     } catch {}
-    this.__toolbarFollowListeners = { schedule, resizeObserver, discoveryTimer };
+    this.__toolbarFollowListeners = { schedule, onScroll, resizeObserver, discoveryTimer };
     schedule();
   } catch {}
 },
@@ -331,7 +342,7 @@ _removeToolbarFollowListeners_() {
   try {
     const listeners = this.__toolbarFollowListeners;
     if (listeners?.schedule && typeof window !== 'undefined') {
-      window.removeEventListener('scroll', listeners.schedule, true);
+      window.removeEventListener('scroll', listeners.onScroll, true);
       window.removeEventListener('resize', listeners.schedule);
     }
     try { listeners?.resizeObserver?.disconnect?.(); } catch {}

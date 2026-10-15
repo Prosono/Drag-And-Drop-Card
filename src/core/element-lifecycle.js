@@ -134,6 +134,8 @@ const lifecycleMethods = {
   },
 
   connectedCallback() {
+    this._installTouchPan_?.();
+    this._installLongPressToEnterEdit?.();
       if (this._isInHaEditorPreview?.()) {
         this.__haConfigPreviewMode = true;
         this._renderHaConfigPreview_?.();
@@ -320,19 +322,9 @@ const lifecycleMethods = {
       try { this._removeEmptyPlaceholderCentering_?.(); } catch {}
       try { this._destroySelectionArrangeToolbar_?.(); } catch {}
 
-      if (this.__lpInstalled && this.__lpHandlers) {
-        const cont = this.cardContainer;
-        cont?.removeEventListener('mousedown', this.__lpHandlers.mouseDown);
-        window.removeEventListener('mousemove', this.__lpHandlers.mouseMove);
-        window.removeEventListener('mouseup', this.__lpHandlers.mouseUp);
-        window.removeEventListener('contextmenu', this.__lpHandlers.contextMenu);
-        cont?.removeEventListener('touchstart', this.__lpHandlers.touchStart);
-        window.removeEventListener('touchmove', this.__lpHandlers.touchMove);
-        window.removeEventListener('touchend', this.__lpHandlers.touchEnd);
-        window.removeEventListener('touchcancel', this.__lpHandlers.touchCancel);
-        this.__lpInstalled = false;
-        this.__lpHandlers = null;
-      }
+      this.__touchPanCleanup?.();
+      this.__touchPanCleanup = null;
+      this.__lpCleanup?.();
 
       try { this.__visObs?.disconnect?.(); } catch {}
       this.__visObs = null;

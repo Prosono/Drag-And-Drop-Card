@@ -1,3 +1,4 @@
+import { installTouchPan } from './touch-pan.js';
 /*
  * Pointer, keyboard, clipboard, panning, and long-press interactions.
  *
@@ -169,6 +170,12 @@ const inputInteractionMethods = {
 
 
 
+  _installTouchPan_() {
+    if (!this.cardContainer || this.__touchPanCleanup) return;
+    this.cardContainer.style.touchAction = 'none';
+    this.__touchPanCleanup = installTouchPan(this);
+  },
+
   _isTypingTarget_(targetOrEvent) {
   const eventPath = typeof targetOrEvent?.composedPath === 'function'
     ? targetOrEvent.composedPath()
@@ -217,26 +224,33 @@ const inputInteractionMethods = {
 
 
   _getMiddleMousePanAxisTarget_(primary, axis) {
-    const canScroll = (el) => {
-      if (!el) return false;
-      const scrollSize = axis === 'x' ? el.scrollWidth : el.scrollHeight;
-      const clientSize = axis === 'x' ? el.clientWidth : el.clientHeight;
-      return (Number(scrollSize || 0) - Number(clientSize || 0)) > 1;
-    };
-    if (primary && canScroll(primary)) return primary;
-    const container = this.cardContainer || this.shadowRoot?.querySelector?.('#cardContainer') || null;
-    if (container && container !== primary && canScroll(container)) return container;
-    let node = primary || container || this;
+    const container = this.cardContainer || null;
+    const page = document.scrollingElement || document.documentElement || document.body || null;
+    const candidates = [];
     const seen = new Set();
+    let node = primary || container || this;
     while (node && !seen.has(node)) {
       seen.add(node);
-      const root = typeof node.getRootNode === 'function' ? node.getRootNode() : null;
-      node = node.parentElement || node.parentNode || root?.host || null;
-      if (node && canScroll(node)) return node;
+      if (node.nodeType == null || node.nodeType === 1) candidates.push(node);
+      const root = node.getRootNode?.();
+      node = node.parentElement || node.host || root?.host || node.parentNode || null;
     }
-    const page = document.scrollingElement || document.documentElement || document.body || null;
-    if (page && page !== primary && canScroll(page)) return page;
-    return primary || page || null;
+    if (page && !seen.has(page)) candidates.push(page);
+    let clippedFallback = null;
+    for (const el of candidates) {
+      const size = axis === 'x' ? el.scrollWidth : el.scrollHeight;
+      const viewport = axis === 'x' ? el.clientWidth : el.clientHeight;
+      if (!(Number(size || 0) - Number(viewport || 0) > 1)) continue;
+      let style;
+      try { style = window.getComputedStyle?.(el); } catch { continue; }
+      const overflow = axis === 'x' ? style?.overflowX : style?.overflowY;
+      if (overflow === 'clip') continue;
+      if (el === page || overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay' || !style) return el;
+      // A clipped canvas may report overflow from transforms/edit handles, but
+      // that is not the HA viewport. Prefer the real ancestor scroller first.
+      if (overflow === 'hidden' && !clippedFallback) clippedFallback = el;
+    }
+    return clippedFallback;
   },
 
 
