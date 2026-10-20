@@ -1,8 +1,15 @@
+// Inspect the composed path so controls nested inside HA/custom-card shadow
+// roots keep their drag gestures. This is separate from keyboard/typing checks.
+const DRAG_CONTROLS = 'ha-control-slider, ha-control-circular-slider, ha-slider, input[type="range"], [role="slider"]';
+export function isTouchDragControl(event) {
+  return (event.composedPath?.() || []).some(node => node?.matches?.(DRAG_CONTROLS));
+}
+
 // Touch has one owner: drag to pan, or hold empty edit canvas before drawing.
 export function installTouchPan(host) {
   const container = host.cardContainer;
   const pointers = new Map();
-  const cardPointers = new Set();
+  const delegatedPointers = new Set();
   const onEditCard = event => host.editMode && host._canEditDashboard_?.() !== false
     && (event.composedPath?.() || []).some(node =>
       node?.matches?.('.card-wrapper:not(.ddc-placeholder)'));
@@ -82,7 +89,7 @@ export function installTouchPan(host) {
     restoreScrollStyles();
     cancelArea();
     pointers.clear();
-    cardPointers.clear();
+    delegatedPointers.clear();
     gesture = null;
     host.__touchPanActive = false;
   };
@@ -104,12 +111,11 @@ export function installTouchPan(host) {
   const down = event => {
     if (event.pointerType !== 'touch' || (!inside(event) && !gesture)) return;
     if (host._isInHaEditorPreview?.()) return;
-    // Preserve editable fields; ordinary cards still support taps.
-    if (!gesture && host._isTypingTarget_?.(event)) return;
-    // Leave the entire card gesture to interact.js and the card controls.
-    // Only gestures that start on blank canvas belong to the pan owner.
-    if (!gesture && (cardPointers.size || onEditCard(event))) {
-      cardPointers.add(event.pointerId);
+    // Decide ownership at pointerdown and keep it until release, even if the
+    // finger leaves the control or another finger lands on blank canvas.
+    if (!gesture && (delegatedPointers.size || onEditCard(event)
+      || isTouchDragControl(event) || host._isTypingTarget_?.(event))) {
+      delegatedPointers.add(event.pointerId);
       suppressUntil = 0;
       host.__clearPressTimer?.();
       return;
@@ -179,7 +185,7 @@ export function installTouchPan(host) {
 
   };
   const end = event => {
-    cardPointers.delete(event.pointerId);
+    delegatedPointers.delete(event.pointerId);
     if (event.pointerType !== 'touch' || !pointers.has(event.pointerId) || !gesture) return;
     host.__lastCanvasTouch = Date.now();
     const mode = gesture.mode;
@@ -211,7 +217,7 @@ export function installTouchPan(host) {
   };
   const touch = event => {
     if (!gesture && (event.type === 'touchcancel' ||
-      (event.type === 'touchend' && event.touches?.length === 0))) cardPointers.clear();
+      (event.type === 'touchend' && event.touches?.length === 0))) delegatedPointers.clear();
     // WebKit may finish the native touch stream without a corresponding
     // pointer release reaching this owner. Never leave the hold timer armed.
     if (gesture && event.type === 'touchcancel') {
@@ -245,7 +251,8 @@ export function installTouchPan(host) {
     if (gesture.mode !== 'pending' && event.cancelable) event.preventDefault();
   };
   const compatibilityMouse = event => {
-    if (!gesture && onEditCard(event)) return;
+    if (!gesture && (delegatedPointers.size || onEditCard(event)
+      || isTouchDragControl(event) || host._isTypingTarget_?.(event))) return;
     if (inside(event) && (event.sourceCapabilities?.firesTouchEvents
       || Date.now() - (host.__lastCanvasTouch || 0) < 1000)) stop(event);
   };

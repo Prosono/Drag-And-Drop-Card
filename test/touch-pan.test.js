@@ -206,7 +206,7 @@ test('ordinary mouse drag still creates a card without holding', t => {
 
 test('hold over a card cannot start area creation even if document hit-testing sees a shadow host', t => {
   const f = setup(t);
-  const card = { matches: () => true };
+  const card = { matches: selector => selector.includes('.card-wrapper') };
   f.emit('pointerdown', 100, 100, 1, { composedPath: () => [card, f.host.cardContainer] });
   f.hold();
   assert.equal(f.timers.size, 0);
@@ -303,7 +303,7 @@ for (const part of ['card', 'resize handle', 'edit button', 'delete button']) {
 test('a deliberate card tap immediately after panning is not swallowed', t => {
   const f = setup(t);
   f.emit('pointerdown'); f.emit('pointermove', 20, 30); f.emit('pointerup');
-  const wrap = { matches: () => true };
+  const wrap = { matches: selector => selector.includes('.card-wrapper') };
   const extra = { composedPath: () => [wrap, f.host.cardContainer], detail: 1 };
   assert.equal(f.emit('pointerdown', 100, 100, 2, extra).stopped, undefined);
   f.emit('pointerup', 100, 100, 2, extra);
@@ -313,14 +313,14 @@ test('a deliberate card tap immediately after panning is not swallowed', t => {
 test('a canvas pan stays owned even when the finger crosses a card', t => {
   const f = setup(t);
   f.emit('pointerdown');
-  const extra = { composedPath: () => [{ matches: () => true }, f.host.cardContainer] };
+  const extra = { composedPath: () => [{ matches: selector => selector.includes('.card-wrapper') }, f.host.cardContainer] };
   assert.equal(f.emit('pointermove', 20, 30, 1, extra).stopped, true);
   assert.deepEqual(f.scroll, { scrollLeft: 180, scrollTop: 270 });
 });
 
 test('view-mode dragging over cards still pans', t => {
   const f = setup(t, false);
-  const extra = { composedPath: () => [{ matches: () => true }, f.host.cardContainer] };
+  const extra = { composedPath: () => [{ matches: selector => selector.includes('.card-wrapper') }, f.host.cardContainer] };
   f.emit('pointerdown', 100, 100, 1, extra);
   f.emit('pointermove', 20, 30, 1, extra);
   assert.deepEqual(f.scroll, { scrollLeft: 180, scrollTop: 270 });
@@ -343,4 +343,67 @@ test('card selection responds to touch pointerdown and leaves resize controls al
   f.host._selection.clear();
   select({ pointerType: 'touch', button: 0, target: { closest: selector => selector === '.resize-handle' } });
   assert.equal(f.host._selection.size, 0);
+});
+
+for (const selector of ['ha-control-slider', 'ha-control-circular-slider', 'ha-slider', 'input[type="range"]', '[role="slider"]']) {
+  test(`${selector} keeps its complete gesture in view mode, including nested shadow content`, t => {
+    const f = setup(t, false);
+    const control = { matches: selectors => selectors.split(', ').includes(selector) };
+    const nested = { composedPath: () => [{}, {}, control, {}, f.host.cardContainer] };
+    assert.equal(f.emit('pointerdown', 100, 100, 1, nested).stopped, undefined);
+    assert.equal(f.emit('touchstart', 100, 100, 1, nested).stopped, undefined);
+    f.hold();
+    // The drag continues even when subsequent events target blank canvas.
+    for (const type of ['pointermove', 'touchmove', 'mousedown', 'mousemove']) {
+      const event = f.emit(type, 20, 30, 1, { touches: [{ clientX: 20, clientY: 30 }], sourceCapabilities: { firesTouchEvents: true } });
+      assert.equal(event.stopped, undefined, type);
+      assert.equal(event.prevented, undefined, type);
+    }
+    assert.equal(f.emit('pointerup', 20, 30).stopped, undefined);
+    assert.equal(f.emit('touchend', 20, 30, 1, { touches: [] }).stopped, undefined);
+    assert.equal(f.emit('click', 20, 30, 1, { ...nested, detail: 1 }).stopped, undefined);
+    assert.deepEqual(f.scroll, { scrollLeft: 100, scrollTop: 200 });
+    assert.equal(f.host.editMode, false);
+    assert.equal(f.rings(), 0);
+    assert.equal(f.created(), null);
+    f.emit('pointerdown'); f.emit('pointermove', 20, 30);
+    assert.deepEqual(f.scroll, { scrollLeft: 180, scrollTop: 270 });
+  });
+}
+
+test('a slider touch after panning is accepted, but crossing a slider during a pan does not transfer ownership', t => {
+  const f = setup(t, false);
+  const control = { matches: selectors => selectors.includes('ha-control-slider') };
+  const extra = { composedPath: () => [control, f.host.cardContainer], detail: 1 };
+  f.emit('pointerdown');
+  assert.equal(f.emit('pointermove', 20, 30, 1, extra).stopped, true);
+  f.emit('pointerup');
+  assert.equal(f.emit('click', 20, 30, 1, extra).stopped, true);
+  assert.equal(f.emit('pointerdown', 100, 100, 2, extra).stopped, undefined);
+  f.emit('pointerup', 100, 100, 2, extra);
+  assert.equal(f.emit('click', 100, 100, 2, extra).stopped, undefined);
+});
+
+for (const finish of ['pointercancel', 'touchcancel', 'blur']) {
+  test(`delegated slider gesture releases ownership on ${finish}`, t => {
+    const f = setup(t, false);
+    const extra = { composedPath: () => [{ matches: () => true }, f.host.cardContainer] };
+    f.emit('pointerdown', 100, 100, 1, extra);
+    f.emit(finish);
+    f.emit('pointerdown'); f.emit('pointermove', 20, 30);
+    assert.deepEqual(f.scroll, { scrollLeft: 180, scrollTop: 270 });
+  });
+}
+
+test('second finger cannot turn an active slider adjustment into a canvas pan', t => {
+  const f = setup(t, false);
+  const extra = { composedPath: () => [{ matches: () => true }, f.host.cardContainer] };
+  f.emit('pointerdown', 100, 100, 1, extra);
+  assert.equal(f.emit('pointerdown', 200, 100, 2).stopped, undefined);
+  f.emit('pointerup', 100, 100, 1);
+  assert.equal(f.emit('pointermove', 50, 30, 2).stopped, undefined);
+  assert.deepEqual(f.scroll, { scrollLeft: 100, scrollTop: 200 });
+  f.emit('pointerup', 50, 30, 2);
+  f.emit('pointerdown'); f.emit('pointermove', 20, 30);
+  assert.deepEqual(f.scroll, { scrollLeft: 180, scrollTop: 270 });
 });
